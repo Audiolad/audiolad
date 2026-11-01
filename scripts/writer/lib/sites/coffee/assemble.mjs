@@ -16,14 +16,28 @@ export function normalizeText(value) {
     .trim();
 }
 
+/**
+ * Retro of sets 2–7 (01.11.2026): 58 of 111 validator errors on raw drafts were link typos from the
+ * model – a space after «(», escaped slashes («\\/b\\/coffee\\/…» in the file) and «//b/…». Fixed here
+ * deterministically, without an extra call: spaces inside the parentheses are dropped, a backslash
+ * before «/» is removed and a doubled leading slash before an internal path collapses to one.
+ * Anything still not allowed is caught by rules.mjs as before.
+ */
+export function normalizeHref(href) {
+  return String(href ?? "")
+    .trim()
+    .replace(/\\\//g, "/")
+    .replace(/^\/{2,}(?=b\/)/, "/");
+}
+
 /** "Текст [анкор](/b/x) дальше" → ["Текст ", {href, label}, " дальше"]. */
 export function parseInline(text) {
   const parts = [];
-  const re = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  const re = /\[([^\]]+)\]\(\s*([^)\s]+)\s*\)/g;
   let last = 0;
   for (let match; (match = re.exec(text)); ) {
     if (match.index > last) parts.push(text.slice(last, match.index));
-    parts.push({ href: match[2], label: match[1] });
+    parts.push({ href: normalizeHref(match[2]), label: match[1].trim() });
     last = re.lastIndex;
   }
   if (last < text.length) parts.push(text.slice(last));

@@ -21,13 +21,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, TARIFF, costRub, estimatePromptTokens, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
 import { applyCoffeePack, registerArticles } from "./lib/sites/coffee/apply.mjs";
-import { assembleCoffeeArticle, normalizeText, parseInline, toTsModule } from "./lib/sites/coffee/assemble.mjs";
+import { assembleCoffeeArticle, normalizeHref, normalizeText, parseInline, toTsModule } from "./lib/sites/coffee/assemble.mjs";
 import { CoffeeBriefError, quoteFitWarnings, expertSlotProblems, isAllowedTextHref, isInternalHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
 import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, startsInfinitive, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
+import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, expertSlotStyleProblems, hasQueryWords, imperativeIndexes, kanceliarit, linkGrammarProblems, ordinalAgreementSlips, prohibitions, rotationProblems, startsInfinitive, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
 import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
@@ -705,6 +705,83 @@ test("SEO audit rules: visible dates, year in seoTitle, few links, summary size,
   assert.ok(startsInfinitive("Посчитать расход") && startsInfinitive("Договориться о пробной партии") && startsInfinitive("Беречь зерно") && !startsInfinitive("Посчитайте расход") && !startsInfinitive("Слепая дегустация"));
   const briefProblems = (() => { try { const raw = readJson(packFile); normalizeCoffeePack({ ...raw, articles: raw.articles.map((a) => ({ ...a, links: [] })) }, { experts, repoDir: root }); return ""; } catch (error) { return error.message; } })();
   assert.match(briefProblems, /не меньше 3 адресов статей раздела/);
+});
+
+// ── retro of sets 2–7 (01.11.2026): what Codex fixed by hand, now in the template and the validator ──
+test("retro 2–7: link typos from the model are normalised by the assembler, foreign hosts still refused", () => {
+  assert.deepEqual(parseInline("см. [атлас]( /b/coffee/atlas ) тут"), ["см. ", { href: "/b/coffee/atlas", label: "атлас" }, " тут"]);
+  assert.deepEqual(parseInline("[атлас](\\/b\\/coffee\\/atlas)"), [{ href: "/b/coffee/atlas", label: "атлас" }]);
+  assert.deepEqual(parseInline("[атлас](//b/coffee/atlas)"), [{ href: "/b/coffee/atlas", label: "атлас" }]);
+  assert.equal(normalizeHref("//evil.ru/x"), "//evil.ru/x");
+  assert.ok(!isAllowedTextHref(normalizeHref("\\/\\/evil.ru/x")));
+  assert.ok(!isAllowedTextHref(normalizeHref("/\\example.com")));
+});
+
+test("retro 2–7: schema pins counts (3 partTwo sections, 7 FAQ, 5 checklist items) and the prompt names the fixes", () => {
+  const schema = coffeeArticleSchema();
+  assert.equal(schema.properties.partTwo.minItems, 3);
+  assert.equal(schema.properties.partTwo.maxItems, 3);
+  assert.equal(schema.properties.partOne.minItems, 2);
+  assert.equal(schema.properties.faq.minItems, 7);
+  assert.equal(schema.properties.checklist.properties.items.minItems, 5);
+  assert.equal(schema.properties.summary.minItems, 3);
+  assert.equal(schema.properties.partTwo.items.properties.paragraphs.minItems, 2);
+  const text = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  assert.match(text, /ровно 3 раздела \(три объекта/);
+  assert.match(text, /без формулы «отвечает на вопрос»/);
+  assert.match(text, /без зачина «Для кофейни это значит»/);
+  assert.match(text, /не с голого «Да,» или «Нет,»/);
+  assert.match(text, /только после «о том,»/);
+  assert.match(text, /«сверить с \[бизнес-планом кофейни\]»/);
+  assert.match(text, /служебных слов: «бриф»/);
+  assert.match(text, /«в Москве», «в СПб»/);
+  assert.doesNotMatch(LESSONS.join("\n"), /«часто берут» и назови/);
+});
+
+test("retro 2–7: validator catches service words, lowercase cities, raw markdown and question anchors", () => {
+  const run = (mutate) => {
+    const f = structuredClone(fields);
+    mutate(f);
+    return checkCoffeeArticle(assembleCoffeeArticle(brief, f, { today: "2026-11-01" }), brief, { experts, repoDir: root });
+  };
+  const errs = (list) => list.filter((p) => p.severity === "error").map((p) => p.message).join("\n");
+  const warns = (list) => list.filter((p) => p.severity === "warning").map((p) => p.message).join("\n");
+  const base = run(() => {});
+  assert.equal(errs(base), "");
+  assert.doesNotMatch(warns(base), /«Да»\/«Нет»|отвечает на вопрос|Для кофейни это значит|вне блока эксперта|анкор-вопрос/);
+  assert.match(errs(run((f) => { f.faq[0].answer += " В брифе этого нет."; })), /служебное слово/);
+  assert.match(errs(run((f) => { f.faq[0].answer += " В источниках не дано точной цифры."; })), /служебное слово/);
+  assert.match(errs(run((f) => { f.faq[0].answer += " Так было в кофейне в москве."; })), /город со строчной буквы: «москве»/);
+  assert.doesNotMatch(errs(run((f) => { f.faq[0].answer += " Так было в кофейне в Москве и в петербургских кофейнях."; })), /город со строчной/);
+  assert.match(errs(run((f) => { f.faq[0].answer += " См. [атлас] (/b/coffee)."; })), /неразобранная markdown-ссылка/);
+  const href = brief.links.find((l) => l.startsWith("/b/coffee/"));
+  const withLink = (before) => run((f) => { f.partOne[0].paragraphs[0] += ` ${before}[как готовят кофе в кофейне](${href}).`; });
+  assert.match(warns(withLink("Расход удобно сверить с ")), /анкор-вопрос после предлога/);
+  assert.doesNotMatch(errs(withLink("Решение зависит от того, в ")), /анкор-вопрос/);
+  assert.doesNotMatch(errs(run((f) => { f.faq[0].answer += " Короткий брифинг помогает команде обсудить меню перед сменой."; })), /служебное слово/);
+  assert.doesNotMatch(errs(run((f) => { f.faq[0].answer += " Например, набор №3 включает чашку и блюдце."; })), /служебное слово/);
+  assert.match(warns(run((f) => { f.faq[0].answer += " Например, набор №3 включает чашку и блюдце."; })), /похоже на служебное слово/);
+  assert.doesNotMatch(errs(withLink("Есть отдельный материал о том, ")), /анкор-вопрос/);
+  assert.doesNotMatch(warns(withLink("Есть отдельный материал о том, ")), /анкор-вопрос/);
+  assert.match(warns(withLink("Подробнее – ")), /анкор-вопрос «как готовят кофе в кофейне» без «о том/);
+  assert.match(warns(run((f) => { f.faq[0].answer = `Да, ${f.faq[0].answer}`; })), /не с голого «Да»\/«Нет»/);
+  assert.doesNotMatch(warns(run((f) => { f.faq[0].answer = `Дальше ${f.faq[0].answer}`; })), /«Да»\/«Нет»/);
+});
+
+test("retro 2–7: expert slot formulas and experts retold in sections are warnings", () => {
+  const article = assembleCoffeeArticle(brief, fields, { today: "2026-11-01" });
+  assert.deepEqual(expertSlotStyleProblems(article, experts), []);
+  const name = experts.get(article.expertOne.expertId).name;
+  const bad = structuredClone(article);
+  bad.expertOne.lead = [[`${name} отвечает на вопрос о закупке зерна.`]];
+  bad.expertOne.after = [["Для кофейни это значит, что закупку удобно планировать заранее."]];
+  bad.partOne[0].paragraphs.push([`Как говорит ${name}, зерно лучше брать свежим.`]);
+  const messages = expertSlotStyleProblems(bad, experts).map(([field, message]) => `${field}: ${message}`).join("\n");
+  assert.match(messages, /expertOne\.lead: lead без формулы «отвечает на вопрос»/);
+  assert.match(messages, /expertOne\.after: after без зачина/);
+  assert.match(messages, /partOne\[0\]\.paragraphs\[\d\]: .* упоминается вне блока эксперта/);
+  assert.ok(checkCoffeeArticle(bad, brief, { experts, repoDir: root }).filter((p) => /отвечает на вопрос|зачина|вне блока/.test(p.message)).every((p) => p.severity === "warning"));
+  assert.deepEqual(linkGrammarProblems(article), []);
 });
 
 for (const [name, fn] of tests) {
