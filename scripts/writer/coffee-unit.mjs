@@ -287,12 +287,13 @@ test("foreign expert Howard Schultz is page-ready: licensed face crop, verified 
   assert.match(schultz.photo.credit, /^Фото: Гейдж Скидмор, Викисклад, .*кадрировано$/);
   const head = readFileSync(join(root, "public", schultz.photo.file)).subarray(0, 12).toString("latin1");
   assert.ok(head.startsWith("RIFF") && head.endsWith("WEBP"), "портрет – webp");
-  assert.equal(schultz.quotes.length, 2);
+  // Sets keep adding new real quotes to existing experts (Sergey, 01.11), so only the first two are pinned here.
+  assert.ok(schultz.quotes.length >= 2);
   const translations = [
     "В 1983 году я, ещё молодым человеком, впервые поехал в Италию. Как и многих, кто бывал в Италии, меня покорили итальянские кофейные бары, романтика и театр эспрессо. Но по-настоящему меня поразило чувство общности, которое было внутри всех этих баров, – то, что я начал понимать и называть третьим местом между домом и работой.",
     "Но со временем мы поняли, что продавали не кофе. Мы продавали впечатление и это чувство общности.",
   ];
-  for (const [quoteIndex, quote] of schultz.quotes.entries()) {
+  for (const [quoteIndex, quote] of schultz.quotes.slice(0, translations.length).entries()) {
     assert.equal(quote.language, "en");
     assert.match(quote.sourceLabel, /Атлантический совет, Вашингтон, 10 мая 2018 года$/);
     assert.deepEqual(expertSlotProblems({ id: "howard-schultz", quoteIndex, translation: translations[quoteIndex] }, experts, { repoDir: root }), []);
@@ -619,11 +620,12 @@ test("facts block is required: 3–6 sourced facts; the reference fixture brief 
 
 test("quote fit: a better registry quote of the same expert is suggested, never an invented one", () => {
   const bar = { slug: "barnaya-stoyka-dlya-kofeyni", title: "Барная стойка для кофейни: размеры, зоны и материалы", primaryQuery: "барная стойка для кофейни", intent: "Владелец планирует рабочее место бариста и оборудование стойки", sectionsHint: ["оборудованная рабочая площадка бариста"], tableHint: "", experts: [{ id: "anna-tsfasman", quoteIndex: 0 }, { id: "howard-schultz", quoteIndex: 0, translation: "Я был очарован итальянскими кофейными барами." }] };
+  const annaQuotes = experts.get("anna-tsfasman").quotes.length;
   const warnings = quoteFitWarnings(bar, experts);
   assert.match(warnings.join("\n"), /anna-tsfasman цитата №1 ближе к теме/);
   assert.equal(quoteFitWarnings({ ...bar, experts: [{ id: "anna-tsfasman", quoteIndex: 1 }, bar.experts[1]] }, experts).filter((w) => /anna/.test(w)).length, 0);
   // Warnings never block the brief and never add quotes.
-  assert.equal(experts.get("anna-tsfasman").quotes.length, 2);
+  assert.equal(experts.get("anna-tsfasman").quotes.length, annaQuotes);
 });
 
 test("draft setup mirrors sz pack 17: gpt-5.4-mini only, max_tokens 9000, temperature 0.4, no repair", async () => {
