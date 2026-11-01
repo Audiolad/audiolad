@@ -756,7 +756,11 @@ test("retro 2–7: validator catches service words, lowercase cities, raw markdo
   assert.match(errs(run((f) => { f.faq[0].answer += " См. [атлас] (/b/coffee)."; })), /неразобранная markdown-ссылка/);
   const href = brief.links.find((l) => l.startsWith("/b/coffee/"));
   const withLink = (before) => run((f) => { f.partOne[0].paragraphs[0] += ` ${before}[как готовят кофе в кофейне](${href}).`; });
-  assert.match(errs(withLink("Расход удобно сверить с ")), /анкор-вопрос после предлога/);
+  assert.match(warns(withLink("Расход удобно сверить с ")), /анкор-вопрос после предлога/);
+  assert.doesNotMatch(errs(withLink("Решение зависит от того, в ")), /анкор-вопрос/);
+  assert.doesNotMatch(errs(run((f) => { f.faq[0].answer += " Короткий брифинг помогает команде обсудить меню перед сменой."; })), /служебное слово/);
+  assert.doesNotMatch(errs(run((f) => { f.faq[0].answer += " Например, набор №3 включает чашку и блюдце."; })), /служебное слово/);
+  assert.match(warns(run((f) => { f.faq[0].answer += " Например, набор №3 включает чашку и блюдце."; })), /похоже на служебное слово/);
   assert.doesNotMatch(errs(withLink("Есть отдельный материал о том, ")), /анкор-вопрос/);
   assert.doesNotMatch(warns(withLink("Есть отдельный материал о том, ")), /анкор-вопрос/);
   assert.match(warns(withLink("Подробнее – ")), /анкор-вопрос «как готовят кофе в кофейне» без «о том/);

@@ -376,12 +376,13 @@ export function rotationProblems(article, env = {}) {
 // ── Retro of sets 2–7 (01.11.2026): what Codex fixed by hand in 30 drafts, made machine-checkable ─────
 // Errors only where the text is unambiguously wrong; style patterns stay warnings for the polish pass.
 
-/** Service words of the pipeline that leaked into the page: «бриф», «в источниках не дано», «набор №3». */
+/** Service words of the pipeline that leaked into the page: «бриф», «в источниках не дано» – errors (never «брифинг»). */
 export const SERVICE_WORDS = [
-  /(^|[^а-яё])бриф/i,
+  /(^|[^а-яё])бриф(?:а|е|у|ом|ы|ов|ам|ами|ах)?(?![а-яё])/i,
   /в источник(?:ах|е) (?:не|нет)(?![а-яё])/i,
-  /(^|[^а-яё])набор[а-яё]* №/i,
 ];
+/** «набор №3» is usually the generation batch, but can be tableware – a warning. */
+export const SERVICE_WORDS_WARN = [/(^|[^а-яё])набор[а-яё]* №/i];
 /** City names written in lowercase (the query is lowercase, the page is not): «в москве», «спб». */
 export const LOWERCASE_CITY = /(^|[^а-яёА-ЯЁ])(москв(?:а|е|у|ы|ой|ою)|спб|петербург(?:а|е|у|ом)?)(?![а-яё])/;
 /** A markdown link the assembler could not parse is printed as is: «[анкор]( /b/…)». */
@@ -401,8 +402,8 @@ const richParagraphs = (article) => [
 
 /**
  * Link anchors that break the sentence (retro 2–7: 34 in raw drafts, the most frequent link fix):
- * a question-like title as an anchor right after a preposition – «сверить с [что нужно для открытия]» – is an
- * error; elsewhere without «о том, …» it is a warning.
+ * a question-like title as an anchor – «сверить с [что нужно для открытия]». Warnings only: «зависит от того,
+ * в [какой чашке подают]» is valid Russian, so the check flags the pattern and the polish pass decides.
  */
 export function linkGrammarProblems(article) {
   const out = [];
@@ -411,7 +412,7 @@ export function linkGrammarProblems(article) {
       if (typeof part === "string" || !QUESTION_LABEL.test(part.label.trim())) return;
       const before = typeof paragraph[k - 1] === "string" ? paragraph[k - 1] : "";
       if (ABOUT_THAT_END.test(before)) return;
-      if (PREPOSITION_END.test(before)) out.push(["error", field, `анкор-вопрос после предлога: «…${before.slice(-20)}[${part.label}]» – вопрос в анкоре только после «о том, …», иначе слова фразы в нужном падеже`]);
+      if (PREPOSITION_END.test(before)) out.push(["warning", field, `анкор-вопрос после предлога: «…${before.slice(-20)}[${part.label}]» – если фраза не читается, вопрос в анкоре только после «о том, …», иначе слова фразы в нужном падеже`]);
       else out.push(["warning", field, `анкор-вопрос «${part.label}» без «о том, …» – проверьте, что фраза читается`]);
     });
   }
@@ -461,6 +462,7 @@ export function checkCoffeeArticle(article, brief, env) {
     if (!/\.translation$/.test(field) && EXCLAMATORY.test(text)) error(field, `восклицательный тон («${String(text).match(EXCLAMATORY)[0].trim()}») – спокойный деловой тон, без «Отлично!» и восклицаний`);
     for (const slip of ordinalAgreementSlips(text)) error(field, `не согласовано: «${slip.text}» – существительное ${slip.noun} рода`);
     for (const re of SERVICE_WORDS) if (re.test(text)) { error(field, `служебное слово в тексте («${String(text).match(re)[0].trim()}…») – читатель не знает про бриф, источники и наборы`); break; }
+    for (const re of SERVICE_WORDS_WARN) if (re.test(text)) { warn(field, `похоже на служебное слово («${String(text).match(re)[0].trim()}…») – если это номер набора статей, уберите`); break; }
     if (LOWERCASE_CITY.test(text)) error(field, `город со строчной буквы: «${String(text).match(LOWERCASE_CITY)[2]}» – «Москва», «СПб», «Петербург»`);
     if (RAW_MARKDOWN.test(text)) error(field, "неразобранная markdown-ссылка – формат строго [анкор](/b/coffee/…), без пробела после «(»");
   }
