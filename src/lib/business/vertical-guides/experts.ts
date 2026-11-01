@@ -90,8 +90,9 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     if (expert.origin === "foreign" && expert.countryCode === "RU") {
       throw new Error(`${expert.id}: foreign origin cannot be RU`);
     }
-    if (expert.quotes.length < 1 || expert.quotes.length > 3) {
-      throw new Error(`${expert.id}: need 1 to 3 quotes`);
+    // Sergey, 2026-11-01: sets reuse the existing pool, each time with a new real quote, so an expert can hold more than three.
+    if (expert.quotes.length < 1 || expert.quotes.length > 6) {
+      throw new Error(`${expert.id}: need 1 to 6 quotes`);
     }
     if (!expert.photo) {
       throw new Error(`${expert.id}: a real portrait is required, no initials placeholders`);
