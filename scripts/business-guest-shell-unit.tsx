@@ -112,8 +112,8 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   const bar = g.slice(g.indexOf('data-testid="biz-guest-status"'), g.indexOf("</section>", g.indexOf('data-testid="biz-guest-status"')));
-  has(bar, /30 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
-  has(bar, /Получить 30 дней бесплатно/);
+  has(bar, /7 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  has(bar, /Получить 7 дней бесплатно/);
   hasNot(bar, /30 минут/, "the top banner does not mention the 30 minutes before they run out");
   hasNot(bar, /Гостевой режим/);
   const bottom = g.slice(g.indexOf('aria-label="Мобильная навигация"'), g.indexOf("</nav>", g.indexOf('aria-label="Мобильная навигация"')));
@@ -163,7 +163,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
     wrap(anonymous, path, <BusinessAppShell initialGuestLimit={limit}><main>page</main></BusinessAppShell>);
   const exhaustedHome = at("exhausted", "/");
   has(exhaustedHome, /data-limit="exhausted"/, "exhausted shown on Home");
-  has(exhaustedHome, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(exhaustedHome, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(exhaustedHome, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/);
   has(exhaustedHome, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
   hasNot(exhaustedHome, /30 минут прослушивания без регистрации/);
@@ -202,7 +202,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   if (name === "guest") {
     has(html, /data-testid="biz-guest-gift-cta"/, "guest gift button");
     has(html, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-gift-cta"/, "guest gift button is green (pine)");
-    has(html, /Получить 30 дней в подарок/);
+    has(html, /Получить 7 дней в подарок/);
     has(html, /Со всеми функциями\. Далее /);
     has(html, /799/);
     has(html, /без привязки карты/);
@@ -216,7 +216,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
 {
   const g = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   has(g, /data-testid="biz-sound-exhausted"/);
-  has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(g, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/, "register button after the meter");
   has(g, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
   has(g, /href="\/onboarding\?type=cafe"/, "exhausted → real connect path");
@@ -275,7 +275,7 @@ async function closedApis() {
     wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
   for (const path of ["/", "/onboarding", "/settings"]) {
     const t = withAccess(signedInNoOrg, path, trial);
-    hasNot(t, /biz-guest-status|Гостевой режим|Получить 30 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
+    hasNot(t, /biz-guest-status|Гостевой режим|Получить 7 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
     has(t, /data-testid="biz-access-line"[^>]*>[\s\S]*Бесплатный доступ до 22 ноября 2026/, `${path}: calm access line with the Moscow end date`);
   }
   const paid = withAccess(signedInNoOrg, "/", { mode: "paid" as const, endsAt: "2026-12-31T10:00:00Z" });
@@ -292,11 +292,11 @@ async function closedApis() {
   const inTrial = (domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) =>
     wrap(domain, pathname, <BusinessChromeAccessProvider value={trial}>{node}</BusinessChromeAccessProvider>);
   const onb = inTrial(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />);
-  hasNot(onb, /onboarding-terms-note|30 дней в подарок|799/, "onboarding in trial: no gift terms / price");
+  hasNot(onb, /onboarding-terms-note|7 дней в подарок|799/, "onboarding in trial: no gift terms / price");
   has(onb, /data-testid="onboarding-access-line"[^>]*>Бесплатный доступ до 22 ноября 2026/, "onboarding in trial: end date line");
   has(wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />), /onboarding-terms-note/, "onboarding without gift keeps the terms");
   const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
-  hasNot(studio, /biz-trial-cta|Получить 30 дней бесплатно|799/, "sound limit in trial: no gift CTA");
+  hasNot(studio, /biz-trial-cta|Получить 7 дней бесплатно|799/, "sound limit in trial: no gift CTA");
   has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
 
   // First visit: /workspace issues the gift while the (persisting) layout peek may already have

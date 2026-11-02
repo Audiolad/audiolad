@@ -100,6 +100,12 @@ export const AUTHOR_FEEDBACK_EMPTY = "Новых отзывов пока нет.
 
 export const AUTHOR_FEEDBACK_REPLY_PLACEHOLDER = "Ответ слушателю";
 
+export const AUTHOR_REPLY_EMOJIS = [
+  { emoji: "❤️", label: "Вставить сердечко" },
+  { emoji: "🔥", label: "Вставить огонёк" },
+  { emoji: "🙏", label: "Вставить смайлик благодарности" },
+] as const;
+
 export const AUTHOR_FEEDBACK_MARK_READ = "Прочитано";
 
 export const ADMIN_LISTENER_COMMENTS_TITLE = "Отзывы слушателей";

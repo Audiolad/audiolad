@@ -113,7 +113,7 @@ function readStoredProfile(): GuestCoffeeProfile {
 export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
-  // 30-day gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
+  // Gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
   const liveAccess = useHasLiveBusinessAccess();
   const offerGift = guest && !liveAccess;
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();

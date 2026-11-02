@@ -308,7 +308,7 @@ assert.equal(COFFEE_ATLAS_CTA_HREF, process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST
 
 // --- offer on every page ---
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
-assert.equal(COFFEE_ATLAS_OFFER.trial, "30 дней в подарок");
+assert.equal(COFFEE_ATLAS_OFFER.trial, "7 дней в подарок");
 assert.equal(COFFEE_ATLAS_OFFER.afterTrial, "Далее 799 ₽ в месяц");
 assert.equal(COFFEE_ATLAS_OFFER.rights, "Лицензионная музыка с соблюдением прав");
 assert.doesNotMatch(COFFEE_ATLAS_OFFER.rights, /авторов/);

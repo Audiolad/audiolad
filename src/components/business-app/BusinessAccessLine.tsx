@@ -44,13 +44,13 @@ export function useReportBusinessChromeAccess(): (access: BusinessChromeAccess) 
   return useContext(ChromeAccessContext).report;
 }
 
-/** True while the 30-day gift or a paid period is live: do not offer the gift or show its price. */
+/** True while the gift or a paid period is live: do not offer the gift or show its price. */
 export function useHasLiveBusinessAccess(): boolean {
   return hasLiveBusinessAccess(useContext(ChromeAccessContext).access);
 }
 
 /**
- * Quiet line instead of the guest strip once the 30-day gift (or a paid period) is live
+ * Quiet line instead of the guest strip once the gift (or a paid period) is live
  * (Sergey 23.10.2026): no «Гостевой режим», no repeated gift offer, no price.
  * The locked-section notice still has a place to be announced.
  */

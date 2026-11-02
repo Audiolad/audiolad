@@ -9,6 +9,7 @@ import {
 import ListenerCommentComposer from "@/components/products/practice-page/ListenerCommentComposer";
 import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import ListenerImpressionInvite from "@/components/products/practice-page/ListenerImpressionInvite";
+import ReplyEmojiButtons from "@/components/practice-comments/ReplyEmojiButtons";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { resolveListenerCommentComposer } from "@/lib/practice-comments/composer";
 import { hashCommentId, shouldLoadAnotherCommentPage } from "@/lib/practice-comments/deep-link";
@@ -462,6 +463,7 @@ function CommentCard({
 }) {
   const [draft, setDraft] = useState(comment.body);
   const [reply, setReply] = useState("");
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [reason, setReason] = useState<keyof typeof REPORT_REASON_LABELS>("spam");
@@ -692,8 +694,15 @@ function CommentCard({
         <form className="mt-3" onSubmit={(event) => void sendReply(event)}>
           <label className="block text-sm font-medium text-[#2b2144]">
             {LISTENER_IMPRESSION_REPLY_ACTION}
-            <textarea className={`${fieldClass} min-h-20`} value={reply} maxLength={2000} onChange={(event) => setReply(event.target.value)} />
+            <textarea
+              ref={replyRef}
+              className={`${fieldClass} min-h-20`}
+              value={reply}
+              maxLength={2000}
+              onChange={(event) => setReply(event.target.value)}
+            />
           </label>
+          <ReplyEmojiButtons textareaRef={replyRef} onChange={setReply} />
           <button type="submit" className={`${buttonClass} mt-2 bg-[#7042c5] text-white`} disabled={pending || reply.trim().length < 2}>
             {LISTENER_IMPRESSION_REPLY_ACTION}
           </button>

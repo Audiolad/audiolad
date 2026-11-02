@@ -130,7 +130,7 @@ function htmlOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
 
 const trialHtml = htmlOf("trial");
 assert.match(trialHtml, /data-status="trial"/);
-assert.match(trialHtml, /30 дней в подарок/);
+assert.match(trialHtml, /7 дней в подарок/);
 assert.match(trialHtml, /Бесплатный доступ до /);
 assert.match(trialHtml, /Образец кофейни/);
 

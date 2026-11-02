@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
-import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
+import { BUSINESS_GIFT_CTA, BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { businessLockedNotice } from "@/lib/business-app/access";
 import { GUEST_COFFEE_COPY, GUEST_COFFEE_TERMS } from "@/lib/business-app/guest-coffee/copy";
@@ -52,7 +52,7 @@ export function useBusinessGuestStatus(): GuestStatus {
 
 /**
  * Strip at the top of every cabinet screen for a guest.
- * Before the meter runs out it offers only the 30-day gift. The 30 minutes are
+ * Before the meter runs out it offers only the gift (BUSINESS_GIFT_TITLE). The 30 minutes are
  * named only in the exhausted banner, after the server limit is reached.
  * Sergey 28.10.2026: one green action only – no secondary «Подключить» on the guest banner.
  */
@@ -62,7 +62,7 @@ export function BusinessGuestStatusBar() {
   return (
     <section
       className="business-app-guest-bar"
-      aria-label={exhausted ? "Гостевое время закончилось" : "30 дней в подарок"}
+      aria-label={exhausted ? "Гостевое время закончилось" : BUSINESS_GIFT_TITLE}
       data-testid="biz-guest-status"
       data-limit={limit ?? "unknown"}
     >
