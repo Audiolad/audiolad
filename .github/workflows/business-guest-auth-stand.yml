@@ -1,0 +1,161 @@
+name: Business Guest Auth Stand
+
+# Stage 2 of task 253821e0: an ephemeral, isolated stand on the CI runner.
+# Real GoTrue (anonymous sign-ins + before-user-created HTTP hook) against a
+# disposable Supabase Postgres with the repository migrations. Every secret is
+# generated per run; no repository or production secrets, no production data.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/business-guest-auth-stand.yml"
+      - "scripts/business-guest-auth-stand.mts"
+      - "scripts/database-migrations-compile-isolated.mjs"
+      - "src/lib/auth/business-guest/**"
+      - "src/lib/auth/hooks/**"
+      - "src/app/api/auth/hooks/before-user-created/**"
+      - "supabase/migrations/20270210180000_jwt_claims_trigger_guards.sql"
+      - "supabase/migrations/20270211120000_business_guest_auth_stage1.sql"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: business-guest-auth-stand-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  STAND_PG: al253821e0-stand-pg
+  STAND_GOTRUE: al253821e0-stand-gotrue
+  STAND_REST: al253821e0-stand-rest
+  STAND_DB: audiolad_guest_auth_stand
+
+jobs:
+  business-guest-auth-stand:
+    name: Business Guest Auth Stand
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Generate per-run stand secrets
+        run: |
+          set -euo pipefail
+          jwt="$(openssl rand -hex 32)"
+          hook="v1,whsec_$(openssl rand -base64 32)"
+          ticket="$(openssl rand -hex 32)"
+          role_pw="$(openssl rand -hex 16)"
+          for value in "$jwt" "$hook" "$ticket" "$role_pw"; do echo "::add-mask::$value"; done
+          {
+            echo "STAND_JWT_SECRET=$jwt"
+            echo "AUDIOLAD_AUTH_HOOK_SECRET=$hook"
+            echo "AUDIOLAD_BUSINESS_GUEST_TICKET_SECRET=$ticket"
+            echo "STAND_ROLE_PASSWORD=$role_pw"
+          } >> "$GITHUB_ENV"
+      - name: Start disposable Supabase Postgres
+        run: |
+          set -euo pipefail
+          docker run -d --name "$STAND_PG" --network host \
+            -e POSTGRES_PASSWORD="$STAND_ROLE_PASSWORD" supabase/postgres:15.14.1.171
+          for _ in $(seq 1 60); do
+            pg_isready --host 127.0.0.1 --port 5432 --username supabase_admin --dbname postgres && break
+            sleep 2
+          done
+          pg_isready --host 127.0.0.1 --port 5432 --username supabase_admin --dbname postgres
+          sleep 3
+          export PGPASSWORD="$STAND_ROLE_PASSWORD"
+          admin="postgresql://supabase_admin@127.0.0.1:5432/postgres"
+          psql "$admin" -v ON_ERROR_STOP=1 -v pw="$STAND_ROLE_PASSWORD" <<'SQL'
+          ALTER ROLE supabase_auth_admin WITH LOGIN PASSWORD :'pw';
+          ALTER ROLE supabase_auth_admin SET search_path = auth;
+          ALTER ROLE authenticator WITH LOGIN PASSWORD :'pw';
+          CREATE DATABASE audiolad_guest_auth_stand;
+          GRANT ALL ON DATABASE audiolad_guest_auth_stand TO supabase_auth_admin;
+          SQL
+          psql "postgresql://supabase_admin@127.0.0.1:5432/$STAND_DB" -v ON_ERROR_STOP=1 \
+            -c "CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;"
+      - name: Start real GoTrue v2.189.0 (runs its own Auth migrations)
+        run: |
+          set -euo pipefail
+          docker run -d --name "$STAND_GOTRUE" --network host \
+            -e GOTRUE_API_HOST=127.0.0.1 -e PORT=9999 \
+            -e API_EXTERNAL_URL=http://127.0.0.1:9999 \
+            -e GOTRUE_SITE_URL=http://localhost:3000 \
+            -e GOTRUE_DB_DRIVER=postgres \
+            -e GOTRUE_DB_DATABASE_URL="postgres://supabase_auth_admin:$STAND_ROLE_PASSWORD@127.0.0.1:5432/$STAND_DB" \
+            -e GOTRUE_JWT_SECRET="$STAND_JWT_SECRET" -e GOTRUE_JWT_EXP=3600 \
+            -e GOTRUE_JWT_AUD=authenticated -e GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated \
+            -e GOTRUE_JWT_ADMIN_ROLES=service_role \
+            -e GOTRUE_DISABLE_SIGNUP=false -e GOTRUE_EXTERNAL_EMAIL_ENABLED=true \
+            -e GOTRUE_MAILER_AUTOCONFIRM=true \
+            -e GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=true \
+            -e GOTRUE_RATE_LIMIT_ANONYMOUS_USERS=1000 \
+            -e GOTRUE_HOOK_BEFORE_USER_CREATED_ENABLED=true \
+            -e GOTRUE_HOOK_BEFORE_USER_CREATED_URI=http://localhost:8787/api/auth/hooks/before-user-created \
+            -e GOTRUE_HOOK_BEFORE_USER_CREATED_SECRETS="$AUDIOLAD_AUTH_HOOK_SECRET" \
+            supabase/gotrue:v2.189.0
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:9999/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:9999/health
+      - name: Replay repository migrations on top of real Auth
+        env:
+          AUDIOLAD_MIGRATION_COMPILE_STAND_DATABASE: audiolad_guest_auth_stand
+        run: |
+          set -euo pipefail
+          export PGPASSWORD="$STAND_ROLE_PASSWORD"
+          export AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL="postgresql://supabase_admin@127.0.0.1:5432/postgres"
+          node scripts/database-migrations-compile-isolated.mjs
+          # The compile prerequisites replace auth.uid() with a fixture reading
+          # only request.jwt.claim.sub; restore the GoTrue form so PostgREST
+          # (request.jwt.claims) evaluates RLS exactly like production.
+          psql "postgresql://supabase_admin@127.0.0.1:5432/$STAND_DB" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+            SELECT coalesce(
+              nullif(current_setting('request.jwt.claim.sub', true), ''),
+              (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            )::uuid
+          $$;
+          SQL
+      - name: Start PostgREST
+        run: |
+          set -euo pipefail
+          docker run -d --name "$STAND_REST" --network host \
+            -e PGRST_DB_URI="postgres://authenticator:$STAND_ROLE_PASSWORD@127.0.0.1:5432/$STAND_DB" \
+            -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET="$STAND_JWT_SECRET" -e PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v12.2.12
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:3000/ && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:3000/
+      - name: Run guest Auth stand scenarios
+        env:
+          AUDIOLAD_GUEST_AUTH_STAND: "1"
+          AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED: "1"
+          STAND_GOTRUE_URL: http://127.0.0.1:9999
+          STAND_POSTGREST_URL: http://127.0.0.1:3000
+          STAND_HOOK_PORT: "8787"
+          STAND_PROXY_PORT: "54321"
+        run: |
+          set -euo pipefail
+          export PGPASSWORD="$STAND_ROLE_PASSWORD"
+          export STAND_DATABASE_URL="postgresql://supabase_admin@127.0.0.1:5432/$STAND_DB"
+          node --conditions=react-server --import tsx scripts/business-guest-auth-stand.mts
+      - name: Stand diagnostics
+        if: failure()
+        run: |
+          docker logs --tail 120 "$STAND_GOTRUE" 2>&1 || true
+          docker logs --tail 40 "$STAND_REST" 2>&1 || true
+      - name: Remove stand containers by name
+        if: always()
+        run: docker rm -f "$STAND_GOTRUE" "$STAND_REST" "$STAND_PG" >/dev/null 2>&1 || true

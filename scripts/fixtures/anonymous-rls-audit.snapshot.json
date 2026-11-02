@@ -6346,6 +6346,11 @@
       "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_product_audio_normalize_job(uuid, uuid, text, text, text, bigint, text, text) TO service_role;"
     },
     {
+      "file": "supabase/migrations/20270210180000_jwt_claims_trigger_guards.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.request_jwt_sub_text() TO anon, authenticated, service_role;"
+    },
+    {
       "file": "supabase/migrations/20270211120000_business_guest_auth_stage1.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.consume_business_guest_auth_ticket(text) TO service_role;"
@@ -6354,6 +6359,16 @@
       "file": "supabase/migrations/20270211120000_business_guest_auth_stage1.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.is_business_anonymous_user() TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270212120000_business_guest_start_stage3.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_start_reserve(text, int, int) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270212120000_business_guest_start_stage3.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_bootstrap(uuid, text, text, int, text) TO service_role;"
     }
   ]
 }

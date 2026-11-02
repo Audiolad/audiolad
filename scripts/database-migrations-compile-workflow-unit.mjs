@@ -38,6 +38,8 @@ assert.match(driver, /seo_wordstat_music_queries_seed_smoke\.sql/);
 assert.match(driver, /20261101120000/);
 assert.match(workflow, /supabase\/tests\/seo_wordstat_jazz_queries_seed_smoke\.sql/);
 assert.match(driver, /seo_wordstat_jazz_queries_seed_smoke\.sql/);
+assert.match(workflow, /supabase\/tests\/jwt_claims_trigger_guards_smoke\.sql/);
+assert.match(driver, /jwt_claims_trigger_guards_smoke\.sql/);
 assert.match(driver, /20261102120000/);
 assert.match(driver, /CREATE DATABASE \$\{expectedDatabase\}/);
 assert.match(driver, /20260714180000/);
