@@ -202,7 +202,6 @@ async function runSignUp(options: {
     { ...VALID_SIGNUP, ...options.input },
     {
       createClient: auth.createClient,
-      requestHeaders: async () => new Headers({ host: "audiolad.ru" }),
       onNewListenerCreated: (input: OnNewListenerCreatedInput) =>
         onNewListenerCreated(input, {
           sendWelcomeEmail: options.send,

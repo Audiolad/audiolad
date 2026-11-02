@@ -1,6 +1,6 @@
 "use client";
 
-import BottomNav from "@/components/auth/AuthHostNavigation";
+import BottomNav from "@/components/BottomNav";
 import {
   applyRecoveryContinueOutcome,
 } from "@/lib/auth/recovery-continue";

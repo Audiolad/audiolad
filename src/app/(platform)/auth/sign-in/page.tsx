@@ -1,6 +1,6 @@
 "use client";
 
-import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
+import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { BUSINESS_REGISTERED_NOTE } from "@/lib/access-grants/copy";
 import { isBusinessTrialNext } from "@/lib/access-grants/paths";
@@ -26,7 +26,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 
 function SignInForm() {
-  const coffee = useCoffeeAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegistered = searchParams.get("registered") === "1";
@@ -88,7 +87,7 @@ function SignInForm() {
       // Guest rating claim must never break login.
     }
 
-    const destination = getSafeNextPath(searchParams.get("next"), coffee ? "/cabinet" : undefined);
+    const destination = getSafeNextPath(searchParams.get("next"));
 
     router.replace(destination);
     router.refresh();
@@ -116,7 +115,7 @@ function SignInForm() {
             {isBusinessTrialNext(searchParams.get("next")) ? (
               <>
                 {BUSINESS_REGISTERED_NOTE}{" "}
-                <Link href={coffee ? `https://audiolad.ru${helpArticlePath(emailNotReceivedArticle)}` : helpArticlePath(emailNotReceivedArticle)} className="font-semibold underline">
+                <Link href={helpArticlePath(emailNotReceivedArticle)} className="font-semibold underline">
                   Письмо не пришло
                 </Link>
               </>

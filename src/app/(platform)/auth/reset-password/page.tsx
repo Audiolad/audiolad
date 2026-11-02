@@ -1,6 +1,6 @@
 "use client";
 
-import BottomNav from "@/components/auth/AuthHostNavigation";
+import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
   PASSWORD_MIN_LENGTH,

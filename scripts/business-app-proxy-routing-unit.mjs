@@ -22,8 +22,6 @@ import {
 } from "../src/lib/business-app/host.ts";
 import { VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag.ts";
 import {
-  COFFEE_ALLOWED_AUTH_PATHS,
-  COFFEE_ALLOWED_AUTH_API_PATHS,
   businessPrivateGuestRedirect,
   resolveBusinessProxyAction,
 } from "../src/lib/business-app/proxy-policy.ts";
@@ -249,32 +247,3 @@ assert.equal(
 );
 
 console.log("business-app-proxy-routing-unit: ok");
-
-// Exact coffee auth admission, without opening business auth or arbitrary platform routes.
-const coffeeFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-try {
-  for (const enabled of [undefined, "1"]) {
-    if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
-    else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-    const paths = [
-      "/auth/sign-in", "/auth/sign-up", "/auth/forgot-password", "/auth/recovery",
-      "/auth/reset-password", "/auth/callback", "/auth/sign-out",
-      "/auth/business-return", "/auth/business-cabinet",
-      "/auth/claim-partner-attribution", "/auth/claim-guest-ratings",
-      "/api/analytics/track", "/api/analytics/signup/complete",
-    ];
-    assert.deepEqual([...COFFEE_ALLOWED_AUTH_PATHS, ...COFFEE_ALLOWED_AUTH_API_PATHS], paths);
-    for (const path of paths) {
-      assertAction("coffee.audiolad.ru", path, enabled ? "pass_through" : "not_found");
-      assertAction(BUSINESS_HOSTNAME, path, "not_found");
-      assertAction("audiolad.ru", path, "pass_through");
-      assertAction("coffee.audiolad.ru", `${path}/extra`, "not_found");
-    }
-    for (const path of ["/auth/unknown", "/api/listen/resume-session", "/api/analytics/session", "/catalog", "/privacy"]) {
-      assertAction("coffee.audiolad.ru", path, "not_found");
-    }
-  }
-} finally {
-  if (coffeeFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-  else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlag;
-}

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
 import {
-  serialize,
   planSupabaseCookieScope,
   hostnameFromHeaders,
   getSupabaseCookieOptions,
@@ -204,20 +203,3 @@ console.log("supabase-cookie-domain-unit: ok");
 }
 
 console.log("supabase-cookie-domain-unit: proxy ok");
-
-// The same server/browser/proxy options apply to coffee login, refresh and logout.
-for (const value of ["session", ""]) {
-  const options = { path: "/", ...getSupabaseCookieOptions("coffee.audiolad.ru"), ...(value ? {} : { maxAge: 0 }) };
-  const shared = serialize(KEY, value, options);
-  assert.match(shared, /Domain=\.audiolad\.ru; Path=\/; Secure/);
-  if (!value) assert.match(shared, /Max-Age=0/);
-  const plan = planSupabaseCookieScope({
-    hostname: "coffee.audiolad.ru", supabaseUrl: URL_,
-    requestCookies: [{ name: SUPABASE_COOKIE_SCOPE_MARKER, value: "d1" }],
-    written: [{ name: KEY, value, options }],
-  });
-  assert.equal(plan.mode, "none");
-  assert.equal(plan.lines.length, 1);
-  assert.match(plan.lines[0]!, /Max-Age=0/);
-  assert.doesNotMatch(plan.lines[0]!, /Domain=/, "also expire the host-only twin");
-}
