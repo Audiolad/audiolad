@@ -119,7 +119,7 @@ assert.match(trialHome, new RegExp(`Осталось ${trialDays} ${ruDaysWord(t
 const trialCardStart = trialHome.lastIndexOf("<section", trialHome.indexOf('data-testid="biz-home-access"'));
 const trialCard = trialHome.slice(trialCardStart, trialHome.indexOf("</section>", trialCardStart) + "</section>".length);
 assert.ok(trialCardStart >= 0 && trialCard.startsWith("<section") && !trialCard.slice(1).includes("<section"));
-assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После подарочного периода требуется оплата. Музыка играет ещё 3 дня, затем плеер закрыт до оплаты.");
 assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
 assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
 assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
@@ -127,7 +127,7 @@ assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
 assert.deepEqual(visibleLines(trialCard), [
   `Осталось ${trialDays} ${ruDaysWord(trialDays)}`,
   `до ${formatMoscowDateTime(new Date(trialEnds))}`,
-  "После срока плеер закрыт до оплаты.",
+  "После подарочного периода требуется оплата. Музыка играет ещё 3 дня, затем плеер закрыт до оплаты.",
   "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.",
   `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`,
   "Оплатить",

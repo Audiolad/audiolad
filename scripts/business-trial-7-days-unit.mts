@@ -6,10 +6,12 @@ import assert from "node:assert/strict";
 
 import { activateBusinessTrial, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import {
+  BUSINESS_GIFT_CLOSING_NOTE,
   BUSINESS_GIFT_CTA,
   BUSINESS_GIFT_TITLE,
   businessGiftPriceNote,
 } from "../src/lib/access-grants/copy";
+import { eventsForAccessAction } from "../src/lib/access-grants/events";
 import { hashAccessEmail } from "../src/lib/access-grants/email-hash";
 import { createMemoryAccessGrantStore } from "../src/lib/access-grants/memory-store";
 import { addGiftPeriod, moscowCalendarDayIndex, moscowYmd, resolveCustomerAccess } from "../src/lib/access-grants/policy";
@@ -36,7 +38,8 @@ assert.equal(BUSINESS_PAID_PERIOD_DAYS, 30, "the paid period is unchanged");
 assert.equal(BUSINESS_GIFT_TITLE, "7 дней в подарок");
 assert.equal(BUSINESS_GIFT_CTA, "Получить 7 дней бесплатно");
 assert.equal(businessGiftPriceNote().replace(/\s/gu, " "), "799 ₽ за 30 дней, картой или по СБП. Автосписания нет.");
-for (const text of [BUSINESS_GIFT_TITLE, BUSINESS_GIFT_CTA, businessGiftPriceNote()]) {
+assert.match(BUSINESS_GIFT_CLOSING_NOTE, /требуется оплата.*ещё 3 дня.*до оплаты/u);
+for (const text of [BUSINESS_GIFT_TITLE, BUSINESS_GIFT_CTA, BUSINESS_GIFT_CLOSING_NOTE, businessGiftPriceNote()]) {
   assert.doesNotMatch(text, /\u2014/u, "no em dash in visible copy");
   assert.doesNotMatch(text, /30 дней в подарок|30 дней бесплатно/u);
 }
@@ -154,6 +157,38 @@ assert.equal(access(graceEnd).grantKept, true);
   assert.equal(store.grants.length, 1);
   const legacyGrace = await activateBusinessTrial(store, { userId: USER, email: EMAIL, now: legacyEnd });
   assert.equal(legacyGrace.access.mode, "grace", "legacy trials still get the 3-day grace");
+}
+
+// Moscow midnight, month/year rollover and leap day: never truncate the full period.
+for (const iso of [
+  "2026-11-02T00:00:00+03:00",
+  "2026-11-02T00:00:01+03:00",
+  "2026-11-02T23:59:59+03:00",
+  "2026-12-28T23:30:00+03:00",
+  "2028-02-26T12:00:00+03:00",
+]) {
+  const begins = at(iso);
+  const until = addGiftPeriod(begins);
+  const grant = { emailHash: hashAccessEmail(EMAIL)!, userId: USER, kind: "business_new_client", startsAt: begins.toISOString(), endsAt: until.toISOString() };
+  const state = (now: Date) => resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil: null });
+  assert.equal(until.getTime() - begins.getTime(), 7 * DAY, iso);
+  assert.equal(moscowCalendarDayIndex(begins, until), 7, iso);
+  assert.equal(state(new Date(until.getTime() - 1)).mode, "trial", iso);
+  assert.equal(state(until).mode, "grace", iso);
+  assert.equal(state(new Date(until.getTime() + 3 * DAY - 1)).player, true, iso);
+  assert.equal(state(new Date(until.getTime() + 3 * DAY)).mode, "offer", iso);
+}
+assert.equal(moscowYmd(at("2026-11-01T21:00:00Z")), "2026-11-02");
+assert.equal(moscowCalendarDayIndex(at("2026-11-01T20:59:59Z"), at("2026-11-01T21:00:00Z")), 1);
+// The start of calendar day 8 still keeps the remaining hours of the full 7-day gift.
+assert.equal(access(at("2026-03-08T00:00:00+03:00")).mode, "trial");
+for (let index = 0; index <= 10; index++) {
+  const now = new Date(start.getTime() + index * DAY);
+  const events = eventsForAccessAction({ action: "visit", mode: access(now).mode, calendarDayIndex: moscowCalendarDayIndex(start, now), recorded: [] });
+  assert.equal(events.includes("activity_day_7"), index === 6);
+  assert.equal(events.includes("activity_day_14"), false);
+  assert.equal(events.includes("activity_day_30"), false);
+  assert.equal(events.includes("subscription_offer_shown"), index === 10);
 }
 
 console.log("business-trial-7-days-unit: ok");

@@ -1,4 +1,4 @@
-import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS, formatBusinessMonthlyPrice } from "@/lib/business/plan";
+import { BUSINESS_GIFT_DAYS, BUSINESS_GRACE_DAYS, BUSINESS_PAID_PERIOD_DAYS, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 
 /** Unified phrase for the landing, registration and cabinet (task 1e008ee8). */
 export const BUSINESS_GIFT_TITLE = `${BUSINESS_GIFT_DAYS} дней в подарок`;
@@ -20,7 +20,7 @@ export const BUSINESS_REGISTERED_NOTE =
 
 /** One short line on the gift card while the gift days are still running. */
 export const BUSINESS_GIFT_CLOSING_NOTE =
-  "После срока плеер закрыт до оплаты.";
+  `После подарочного периода требуется оплата. Музыка играет ещё ${BUSINESS_GRACE_DAYS} дня, затем плеер закрыт до оплаты.`;
 
 /** Owner wording, 2026-10-28: the gift days include the venue's music rights and licence. */
 export const BUSINESS_GIFT_LICENSE_NOTE =

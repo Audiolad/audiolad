@@ -902,7 +902,7 @@ for (const file of [
 }
 
 assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
-assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После подарочного периода требуется оплата. Музыка играет ещё 3 дня, затем плеер закрыт до оплаты.");
 assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
 assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
 assert.equal(businessGiftPriceNote().replace(/\s/gu, " "), "799 ₽ за 30 дней, картой или по СБП. Автосписания нет.");
