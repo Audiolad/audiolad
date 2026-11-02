@@ -547,11 +547,11 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 // ---------------------------------------------------------------- screens
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-function wrap(pathname: string, node: React.ReactNode, hostname = "") {
+function wrap(pathname: string, node: React.ReactNode, hostname = "", guestStartEnabled = false) {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={fakeRouter}>
       <PathnameContext.Provider value={pathname}>
-        <BusinessDomainProvider value={anonymous} hostname={hostname}>{node}</BusinessDomainProvider>
+        <BusinessDomainProvider value={anonymous} hostname={hostname} guestStartEnabled={guestStartEnabled}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
   );
@@ -593,7 +593,21 @@ const playlists: GuestCoffeePlaylist[] = [{
   assert.match(html, /data-testid="biz-sound-exhausted"/);
   assert.match(html, /Зарегистрироваться/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
-  assert.match(html, /Подключить/);
+  // 253821e0: one green action in the exhausted block, no «Подключить».
+  const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
+  assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag off): exactly one CTA");
+  assert.match(block, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/, "exhausted CTA is green (pine)");
+  assert.doesNotMatch(block, /Подключить|business-app-btn-primary/);
+}
+{
+  // 253821e0, AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED on: the same guest start as the top banner, no registration wording.
+  const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "", true);
+  const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
+  assert.match(block, /Бесплатные 30 минут на этом устройстве закончились\. Получите 7 дней бесплатно – без регистрации и карты\./);
+  assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag on): exactly one CTA");
+  assert.match(block, /<button type="button" class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "green guest-start button");
+  assert.match(block, /data-testid="biz-guest-register-guest-start"/, "leads into the guest start flow");
+  assert.doesNotMatch(block, /Подключить|Зарегистрируйтесь|Зарегистрироваться|\u2014/);
 }
 {
   const workspace = wrap("/workspace", <BusinessAppShell><main>page</main></BusinessAppShell>);

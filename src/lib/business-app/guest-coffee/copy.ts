@@ -6,6 +6,7 @@ import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { COFFEE_ATLAS_CANONICAL, COFFEE_ATLAS_OFFER } from "@/lib/business/coffee-atlas/constants";
 import { BUSINESS_INQUIRY_EMAIL } from "@/lib/business/landing";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
+import { BUSINESS_GIFT_DAYS } from "@/lib/business/plan";
 
 export const GUEST_COFFEE_ATLAS_URL = COFFEE_ATLAS_CANONICAL;
 export const GUEST_COFFEE_RIGHTS_URL = `${PRODUCTION_APP_ORIGIN}${COFFEE_ATLAS_OFFER.rightsHref}`;
@@ -28,6 +29,12 @@ export const GUEST_COFFEE_COPY = {
   /** Shown only after the guest meter hits zero. The top banner does not mention the 30 minutes before that. */
   exhaustedBanner:
     `Гостевые 30 минут закончились. Зарегистрируйтесь – и получите ${BUSINESS_GIFT_TITLE} с полным доступом.`,
+  /**
+   * 253821e0: the «Ваша атмосфера» block after the meter when the no-registration guest start
+   * is on. The guest start signs in anonymously and asks for no card (see BUSINESS_GUEST_START_COPY.terms).
+   */
+  exhaustedBannerGuestStart:
+    `Бесплатные 30 минут на этом устройстве закончились. Получите ${BUSINESS_GIFT_DAYS} дней бесплатно – без регистрации и карты.`,
   exhaustedRegister: "Зарегистрироваться",
   exhaustedTrialTitle: "Знакомство с подборками завершено",
   exhaustedTrialText:

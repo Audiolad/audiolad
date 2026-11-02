@@ -62,11 +62,11 @@ const member: BusinessOwnerHomeContext = {
   signals: null,
 };
 
-function wrap(domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) {
+function wrap(domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode, guestStartEnabled = false) {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={fakeRouter}>
       <PathnameContext.Provider value={pathname}>
-        <BusinessDomainProvider value={domain}>{node}</BusinessDomainProvider>
+        <BusinessDomainProvider value={domain} guestStartEnabled={guestStartEnabled}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
   );
@@ -219,7 +219,17 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(g, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/, "register button after the meter");
   has(g, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
-  has(g, /href="\/onboarding\?type=cafe"/, "exhausted → real connect path");
+  // 253821e0: one green CTA in the exhausted block, no «Подключить».
+  const gBlock = g.slice(g.indexOf('data-testid="biz-sound-exhausted"'), g.indexOf("business-atmosphere-anchor"));
+  assert.equal((gBlock.match(/<a |<button /g) ?? []).length, 1, "exhausted block: exactly one CTA");
+  has(gBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/, "exhausted CTA is green (pine)");
+  hasNot(gBlock, /Подключить|href="\/onboarding/, "no «Подключить» in the exhausted block");
+  const on = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, true);
+  const onBlock = on.slice(on.indexOf('data-testid="biz-sound-exhausted"'), on.indexOf("business-atmosphere-anchor"));
+  has(onBlock, /Бесплатные 30 минут на этом устройстве закончились\. Получите 7 дней бесплатно – без регистрации и карты\./, "flag on: no-registration copy");
+  assert.equal((onBlock.match(/<a |<button /g) ?? []).length, 1, "flag on: exactly one CTA");
+  has(onBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: green guest-start CTA");
+  hasNot(onBlock, /Подключить|Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording, no «Подключить»");
   const m = wrap(member, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   hasNot(m, /href="\/onboarding/);
   has(m, /плеер программы/);
