@@ -1,5 +1,8 @@
 "use server";
 
+import { headers } from "next/headers";
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
+
 import {
   PASSWORD_RECOVERY_GENERIC_ERROR,
   PASSWORD_RECOVERY_REQUEST_MESSAGE,
@@ -26,7 +29,7 @@ export async function requestPasswordRecoveryAction(input: {
   }
 
   const supabase = await createClient();
-  const redirectTo = buildPasswordRecoveryRedirectUrl(input.next);
+  const redirectTo = buildPasswordRecoveryRedirectUrl(input.next, hostnameFromHeaders(await headers()));
 
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo,

@@ -49,6 +49,28 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/venue-licence/sticker",
 ] as const;
 
+/** Coffee-only platform auth. Server actions POST to the currently rendered page. */
+export const COFFEE_ALLOWED_AUTH_PATHS = [
+  "/auth/sign-in",
+  "/auth/sign-up",
+  "/auth/forgot-password",
+  "/auth/recovery",
+  "/auth/reset-password",
+  "/auth/callback",
+  "/auth/sign-out",
+  "/auth/business-return",
+  "/auth/business-cabinet",
+  // Post-login claims imported by sign-in (also permit their explicit action paths).
+  "/auth/claim-partner-attribution",
+  "/auth/claim-guest-ratings",
+] as const;
+
+/** Conditional telemetry called directly by the existing sign-up client. */
+export const COFFEE_ALLOWED_AUTH_API_PATHS = [
+  "/api/analytics/track", // signup_started
+  "/api/analytics/signup/complete", // authenticated signup completion
+] as const;
+
 /**
  * Business APIs never served on the coffee host: the /spa pilot player loads SPA programs
  * (loadSpaPilotContext). Coffee is the coffee cabinet only; business keeps them unchanged.
@@ -122,6 +144,12 @@ export function resolveBusinessProxyAction(
   if (hostname === COFFEE_HOSTNAME &&
       (COFFEE_BLOCKED_API_PATHS as readonly string[]).includes(pathname)) {
     return { action: "not_found" };
+  }
+
+  if (hostname === COFFEE_HOSTNAME &&
+      ((COFFEE_ALLOWED_AUTH_PATHS as readonly string[]).includes(pathname) ||
+       (COFFEE_ALLOWED_AUTH_API_PATHS as readonly string[]).includes(pathname))) {
+    return { action: "pass_through" };
   }
 
   if ((BUSINESS_ALLOWED_API_PATHS as readonly string[]).includes(pathname)) {
