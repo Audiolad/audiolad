@@ -145,6 +145,7 @@
     "test:admin-nav-author-space": "npx tsx scripts/admin-nav-author-space-unit.mjs",
     "test:admin-nav-moderation-badge": "npx tsx scripts/admin-nav-moderation-badge-unit.tsx",
     "test:admin-business-nav": "npx tsx scripts/admin-business-nav-group-unit.tsx",
+    "test:admin-business-trials": "npx tsx scripts/admin-business-trials-unit.tsx",
     "test:admin-nav-attention": "npx tsx scripts/admin-nav-attention-unit.mts",
     "test:admin-seo-unchecked-signal": "npx tsx scripts/admin-seo-unchecked-signal-unit.tsx",
     "test:admin-business-rightsholder-proposal": "npx tsx scripts/admin-business-rightsholder-proposal-unit.mts",

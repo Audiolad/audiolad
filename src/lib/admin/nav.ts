@@ -15,11 +15,21 @@ export type AdminNavItem = {
   anyPermissions?: readonly PlatformPermission[];
   /** Service routes that should highlight this item without appearing in the menu. */
   activePrefixes?: readonly string[];
+  /** Visible only to the platform owner role (permissions alone are not enough). */
+  ownerOnly?: boolean;
   match: (path: string) => boolean;
 };
 
 /** Kept off the top menu. Reachable from the authors section with authors.manage. */
 const CREATE_AUTHOR_SPACE_HREF = "/admin/authors/new";
+
+/** «АудиоЛад Бизнес» → «Подарочная неделя» (task 253821e0). Owner only. */
+export const BUSINESS_TRIALS_HREF = "/admin/business-trials";
+
+/** Owner role only, the same check as isAiCompanyOwner in guard.ts. */
+export function canSeeBusinessTrialStats(access: PlatformAccessSnapshot): boolean {
+  return access.roles.includes("owner");
+}
 
 /**
  * Declarative admin navigation.
@@ -98,6 +108,13 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     match: (path) => path.startsWith("/admin/business-track-review"),
   },
   {
+    href: BUSINESS_TRIALS_HREF,
+    label: "Подарочная неделя",
+    requiredPermission: "admin_panel.access",
+    ownerOnly: true,
+    match: (path) => path.startsWith(BUSINESS_TRIALS_HREF),
+  },
+  {
     href: "/admin/school-graduates",
     label: "Выпускники Школы аудиопрактик",
     requiredPermission: "authors.manage",
@@ -163,6 +180,7 @@ export function getVisibleAdminNavItems(
   access: PlatformAccessSnapshot,
 ): AdminNavItem[] {
   return ADMIN_NAV_ITEMS.filter((item) => {
+    if (item.ownerOnly && !access.roles.includes("owner")) return false;
     const permissions = item.anyPermissions ?? [item.requiredPermission];
     return permissions.some((permission) =>
       snapshotHasPermission(access, permission),
