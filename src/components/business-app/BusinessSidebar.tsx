@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
-import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+import { businessCabinetHomePath, businessNavPathname } from "@/lib/business-app/host";
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
@@ -71,7 +71,7 @@ function NavLink({
   access: BusinessAccess;
 }) {
   const hostname = useBusinessHostname();
-  const pathname = normalizeBusinessAppPathname(usePathname() || "/");
+  const pathname = businessNavPathname(usePathname() || "/", hostname);
   const active = isBusinessNavItemCurrent(pathname, item);
   const Icon = ICONS[item.icon];
   const labelId = useId();
