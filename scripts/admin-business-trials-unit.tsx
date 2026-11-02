@@ -62,6 +62,7 @@ assert.deepEqual(stats.totals, {
   guests: 1,
   registered: 3,
   firstPlayYes: 2,
+  activeEnough: null,
 });
 assert.equal(stats.generatedAt, now.toISOString());
 assert.deepEqual(stats.rows.map((row) => row.userId), [uid(1), uid(2), uid(4), uid(3)], "newest start first");

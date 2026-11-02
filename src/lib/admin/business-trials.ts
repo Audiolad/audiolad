@@ -59,6 +59,32 @@ export type BusinessTrialFacts = {
   pointSeenAt?: string | null;
   /** Latest business_player_device_heartbeat.last_seen_at of the venue. */
   deviceSeenAt?: string | null;
+  /** business_trial_activity_days of the venue (PR 2, only while recording is on). */
+  activityDays?: readonly BusinessTrialActivityDay[];
+  /** business_guest_starts.start_host (PR 2, only while recording is on). */
+  startHost?: "coffee" | "business" | null;
+};
+
+export type BusinessTrialActivityDay = {
+  /** Moscow calendar day, YYYY-MM-DD. */
+  day: string;
+  listenedSeconds: number;
+  cabinetVisits: number;
+};
+
+/** Per-account activity since the gift started. null = recording is off («нет данных»). */
+export type BusinessTrialActivity = {
+  listenedMinutes: number;
+  /** Days with at least one minute of music. */
+  musicDays: number;
+  cabinetVisits: number;
+};
+
+export const BUSINESS_TRIAL_NO_DATA = "нет данных";
+
+export const BUSINESS_TRIAL_START_HOST_LABELS: Record<"coffee" | "business", string> = {
+  coffee: "coffee",
+  business: "business",
 };
 
 export type BusinessTrialRow = {
@@ -74,6 +100,8 @@ export type BusinessTrialRow = {
   daysLeft: number;
   firstPlay: BusinessTrialFirstPlay;
   lastActivityAt: string | null;
+  activity: BusinessTrialActivity | null;
+  startHost: "coffee" | "business" | null;
 };
 
 export type BusinessTrialTotals = {
@@ -85,10 +113,14 @@ export type BusinessTrialTotals = {
   guests: number;
   registered: number;
   firstPlayYes: number;
+  /** Accounts with at least activeMinutes of music since the start; null while recording is off. */
+  activeEnough: number | null;
 };
 
 export type BusinessTrialStats = {
   generatedAt: string;
+  activityEnabled: boolean;
+  activeMinutes: number;
   totals: BusinessTrialTotals;
   rows: BusinessTrialRow[];
 };
@@ -125,11 +157,50 @@ export function businessTrialFirstPlay(facts: BusinessTrialFacts): BusinessTrial
   return "no";
 }
 
+const MOSCOW_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Moscow",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** YYYY-MM-DD of the instant in Moscow. */
+export function moscowDay(iso: string): string {
+  return MOSCOW_DAY.format(new Date(iso));
+}
+
+const MUSIC_DAY_SECONDS = 60;
+
+export function summarizeBusinessTrialActivity(
+  days: readonly BusinessTrialActivityDay[] | undefined,
+  startsAt: string,
+): BusinessTrialActivity {
+  const from = moscowDay(startsAt);
+  let seconds = 0;
+  let musicDays = 0;
+  let cabinetVisits = 0;
+  const seen = new Set<string>();
+  for (const row of days ?? []) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.day) || row.day < from || seen.has(row.day)) continue;
+    seen.add(row.day);
+    const listened = Number.isFinite(row.listenedSeconds) ? Math.max(0, Math.floor(row.listenedSeconds)) : 0;
+    const visits = Number.isFinite(row.cabinetVisits) ? Math.max(0, Math.floor(row.cabinetVisits)) : 0;
+    seconds += listened;
+    cabinetVisits += visits;
+    if (listened >= MUSIC_DAY_SECONDS) musicDays += 1;
+  }
+  return { listenedMinutes: Math.floor(seconds / 60), musicDays, cabinetVisits };
+}
+
 export function buildBusinessTrialStats(input: {
   now: Date;
   grants: readonly BusinessTrialGrantInput[];
   facts?: ReadonlyMap<string, BusinessTrialFacts>;
+  /** PR 2 recording flag and the «не меньше N минут» threshold. Off by default. */
+  activity?: { enabled: boolean; activeMinutes: number };
 }): BusinessTrialStats {
+  const activityEnabled = input.activity?.enabled === true;
+  const activeMinutes = Math.max(1, Math.floor(input.activity?.activeMinutes ?? 60));
   const totals: BusinessTrialTotals = {
     started: 0,
     trial: 0,
@@ -139,6 +210,7 @@ export function buildBusinessTrialStats(input: {
     guests: 0,
     registered: 0,
     firstPlayYes: 0,
+    activeEnough: activityEnabled ? 0 : null,
   };
   const rows: BusinessTrialRow[] = [];
   const seen = new Set<string>();
@@ -184,7 +256,13 @@ export function buildBusinessTrialStats(input: {
       daysLeft: status === "closed" ? 0 : Math.max(0, access.daysLeft ?? 0),
       firstPlay,
       lastActivityAt: latestIso(facts.workspacePlaybackAt, facts.pointSeenAt, facts.deviceSeenAt),
+      activity: activityEnabled ? summarizeBusinessTrialActivity(facts.activityDays, grant.startsAt) : null,
+      startHost: activityEnabled ? facts.startHost ?? null : null,
     });
+    const last = rows[rows.length - 1];
+    if (totals.activeEnough !== null && last.activity && last.activity.listenedMinutes >= activeMinutes) {
+      totals.activeEnough += 1;
+    }
 
     totals.started += 1;
     totals[status] += 1;
@@ -194,5 +272,5 @@ export function buildBusinessTrialStats(input: {
   }
 
   rows.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt) || a.userId.localeCompare(b.userId));
-  return { generatedAt: input.now.toISOString(), totals, rows };
+  return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows };
 }

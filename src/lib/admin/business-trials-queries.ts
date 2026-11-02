@@ -1,11 +1,13 @@
 import {
   buildBusinessTrialStats,
   latestIso,
+  type BusinessTrialActivityDay,
   type BusinessTrialFacts,
   type BusinessTrialGrantInput,
   type BusinessTrialStats,
 } from "@/lib/admin/business-trials";
 import { BUSINESS_NEW_CLIENT_GRANT_KIND } from "@/lib/access-grants/policy";
+import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -51,6 +53,9 @@ async function selectIn(
 
 export async function loadBusinessTrialStats(now: Date = new Date()): Promise<BusinessTrialStats> {
   const db = createServiceRoleClient();
+  // PR 2 columns exist only after migration 20270213120000: read them only with the flag on.
+  const config = businessTrialActivityConfig(process.env);
+  const activity = { enabled: config.enabled, activeMinutes: config.activeMinutes };
 
   const grantRows = await fetchAllPages<Row>((from, to) =>
     db
@@ -84,7 +89,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     return value;
   };
   const userIds = [...new Set(grants.map((grant) => grant.userId))];
-  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts });
+  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts, activity });
 
   const kindFilter = { kind: BUSINESS_NEW_CLIENT_GRANT_KIND };
   const [paidByUser, paidByHash, events, guestStarts, members, playback] = await Promise.all([
@@ -94,7 +99,14 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
       kind: BUSINESS_NEW_CLIENT_GRANT_KIND,
       event_name: "first_useful_action",
     }),
-    selectIn(db, "business_guest_starts", "user_id, organization_id, status", "user_id", userIds, { status: "ready" }),
+    selectIn(
+      db,
+      "business_guest_starts",
+      config.enabled ? "user_id, organization_id, status, start_host" : "user_id, organization_id, status",
+      "user_id",
+      userIds,
+      { status: "ready" },
+    ),
     selectIn(db, "business_organization_members", "user_id, organization_id, created_at", "user_id", userIds, { role: "owner" }),
     selectIn(db, "business_workspace_playback", "user_id, updated_at", "user_id", userIds),
   ]);
@@ -124,6 +136,8 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     const userId = str(row.user_id);
     if (!userId) continue;
     factsOf(userId).guestStart = true;
+    const host = row.start_host;
+    if (host === "coffee" || host === "business") factsOf(userId).startHost = host;
     const orgId = str(row.organization_id);
     if (orgId) orgByUser.set(userId, orgId);
   }
@@ -136,11 +150,23 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
 
   const orgIds = [...new Set(orgByUser.values())];
   if (orgIds.length > 0) {
-    const [orgs, sessions, heartbeats] = await Promise.all([
+    const [orgs, sessions, heartbeats, activityRows] = await Promise.all([
       selectIn(db, "business_organizations", "id, name", "id", orgIds),
       selectIn(db, "business_point_sessions", "organization_id, last_seen_at", "organization_id", orgIds),
       selectIn(db, "business_player_device_heartbeat", "organization_id, last_seen_at", "organization_id", orgIds),
+      config.enabled
+        ? selectIn(db, "business_trial_activity_days", "organization_id, day, listened_seconds, cabinet_visits", "organization_id", orgIds)
+        : Promise.resolve([] as Row[]),
     ]);
+    const daysByOrg = new Map<string, BusinessTrialActivityDay[]>();
+    for (const row of activityRows) {
+      const id = str(row.organization_id);
+      const day = str(row.day);
+      if (!id || !day) continue;
+      const list = daysByOrg.get(id) ?? [];
+      list.push({ day, listenedSeconds: Number(row.listened_seconds) || 0, cabinetVisits: Number(row.cabinet_visits) || 0 });
+      daysByOrg.set(id, list);
+    }
     const nameByOrg = new Map<string, string>();
     for (const row of orgs) {
       const id = str(row.id);
@@ -162,8 +188,9 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
       value.organizationName = nameByOrg.get(orgId) ?? null;
       value.pointSeenAt = pointByOrg.get(orgId) ?? null;
       value.deviceSeenAt = deviceByOrg.get(orgId) ?? null;
+      value.activityDays = daysByOrg.get(orgId) ?? [];
     }
   }
 
-  return buildBusinessTrialStats({ now, grants, facts });
+  return buildBusinessTrialStats({ now, grants, facts, activity });
 }

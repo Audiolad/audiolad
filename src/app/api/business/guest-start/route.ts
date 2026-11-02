@@ -6,6 +6,9 @@ import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
 import { guestNetworkKey } from "@/lib/business-guest/network-key";
 import { handleBusinessGuestStart } from "@/lib/business-guest/start";
+import { businessStartHost } from "@/lib/business-trial-activity/config";
+import { recordBusinessGuestStartHost } from "@/lib/business-trial-activity/record.server";
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -65,6 +68,8 @@ async function handle(request: Request) {
         p_gift_seconds: input.giftSeconds, p_venue_name: input.venueName,
       });
       if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
+      // Gift-week stats (flag OFF by default): coffee or business host only, never the raw Host.
+      await recordBusinessGuestStartHost(input.userId, businessStartHost(hostnameFromHeaders(request.headers)));
     },
     clearTicket: async (userId) => {
       const { error } = await createServiceRoleClient().auth.admin.updateUserById(userId, { user_metadata: { business_guest_ticket: null } });
