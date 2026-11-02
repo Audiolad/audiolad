@@ -73,7 +73,7 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
 // Real hook route, imported after env is in place (it reads env per call).
 const { POST: hookPost } = await import("../src/app/api/auth/hooks/before-user-created/route");
 const { issueBusinessGuestStartTicket } = await import("../src/lib/auth/business-guest/ticket.server");
-const { issueGuestTicket, guestTicketNonceHash } = await import("../src/lib/auth/business-guest/ticket");
+const { issueGuestTicket, guestTicketNonceHash, verifyGuestTicket } = await import("../src/lib/auth/business-guest/ticket");
 
 let hookCalls = 0;
 const hookServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -180,6 +180,10 @@ await scenario("expired ticket is rejected", async () => expectGuestRejected(awa
 let validTicket = "";
 await scenario("valid server-issued ticket creates an anonymous session", async () => {
   validTicket = await issueBusinessGuestStartTicket();
+  const validClaims = verifyGuestTicket(validTicket, ticketSecret, Math.floor(Date.now() / 1000));
+  assert.ok(validClaims, "server-issued ticket must verify");
+  const validNonceHash = guestTicketNonceHash(validClaims.nonce);
+  assert.equal(psql(`SELECT count(*) FROM public.business_guest_auth_tickets WHERE nonce_hash = '${validNonceHash}'`), "1", "ticket must be registered");
   const client = freshClient();
   const { data, error } = await client.auth.signInAnonymously({ options: { data: { business_guest_ticket: validTicket } } });
   assert.equal(error, null, error?.message);
@@ -193,7 +197,7 @@ await scenario("valid server-issued ticket creates an anonymous session", async 
   assert.equal(psql(`SELECT is_anonymous FROM auth.users WHERE id = '${id}'`), "t");
   assert.equal(psql(`SELECT coalesce(email, '<null>') || '|' || role FROM public.profiles WHERE id = '${id}'`), "<null>|listener");
   assert.equal(psql(`SELECT count(*) FROM public.user_practices WHERE user_id = '${id}'`), "0", "guest must not get starter practices");
-  assert.equal(psql("SELECT count(*) FROM public.business_guest_auth_tickets WHERE consumed_at IS NULL AND expires_at > now()"), "0");
+  assert.equal(psql(`SELECT count(*) FROM public.business_guest_auth_tickets WHERE nonce_hash = '${validNonceHash}'`), "0", "ticket must be consumed (row deleted)");
 });
 await scenario("ticket replay is rejected", () => expectGuestRejected(validTicket));
 await scenario("parallel sign-ins with one ticket: exactly one succeeds", async () => {
@@ -277,8 +281,15 @@ await scenario("RLS with real guest JWT via PostgREST", async () => {
   const anonTickets = await freshClient().from("business_guest_auth_tickets").select("nonce_hash");
   assert.ok(anonTickets.error || (anonTickets.data ?? []).length === 0);
 
-  await guest.from("profiles").update({ role: "admin" }).eq("id", guestId);
-  assert.equal(psql(`SELECT role FROM public.profiles WHERE id = '${guestId}'`), "listener", "guest must not escalate profile role");
+  // Column guards must hold for PostgREST 10+ sessions (request.jwt.claims only), guest and registered alike.
+  for (const [label, client, id] of [["guest", guest, guestId], ["owner", owner, ownerId]] as const) {
+    await client.from("profiles").update({ role: "admin", author_premium_enabled: true, author_projects_unlimited: true }).eq("id", id);
+    assert.equal(
+      psql(`SELECT role || '|' || author_premium_enabled || '|' || author_projects_unlimited FROM public.profiles WHERE id = '${id}'`),
+      "listener|false|false",
+      `${label} must not escalate protected profile columns`,
+    );
+  }
 });
 
 hookServer.close();
