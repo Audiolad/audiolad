@@ -13,7 +13,7 @@ BEGIN
         END IF;
       END LOOP;
     END LOOP;
-    FOREACH v_function IN ARRAY ARRAY['public.business_guest_start_reserve(text,integer,integer)', 'public.business_guest_bootstrap(uuid,text,text,integer,text)'] LOOP
+    FOREACH v_function IN ARRAY ARRAY['public.business_guest_start_reserve(text,integer,integer)', 'public.business_guest_start_purge(integer)', 'public.business_guest_bootstrap(uuid,text,text,integer,text)'] LOOP
       IF has_function_privilege(v_role, v_function, 'EXECUTE') IS DISTINCT FROM (v_role = 'service_role') THEN
         RAISE EXCEPTION 'incorrect function ACL: % %', v_role, v_function;
       END IF;
@@ -33,7 +33,13 @@ INSERT INTO public.business_guest_starts(idempotency_hash, network_hash, status,
 SET LOCAL ROLE service_role;
 DO $$
 BEGIN
+  IF (public.business_guest_start_purge(5000) ->> 'hits_deleted')::int < 1 THEN RAISE EXCEPTION 'purge removed no expired hit'; END IF;
   IF NOT public.business_guest_start_reserve(repeat('e', 64), 3, 86400) THEN RAISE EXCEPTION 'retention reserve refused'; END IF;
+  BEGIN
+    PERFORM public.business_guest_start_purge(0);
+    RAISE EXCEPTION 'purge batch 0 accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
   BEGIN
     PERFORM public.business_guest_start_reserve(repeat('e', 64), 3, 172801);
     RAISE EXCEPTION 'window above retention accepted';

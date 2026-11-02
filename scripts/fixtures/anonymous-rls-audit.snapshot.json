@@ -6363,6 +6363,11 @@
     {
       "file": "supabase/migrations/20270212120000_business_guest_start_stage3.sql",
       "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_start_purge(int) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270212120000_business_guest_start_stage3.sql",
+      "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_start_reserve(text, int, int) TO service_role;"
     },
     {

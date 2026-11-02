@@ -81,6 +81,31 @@ GRANT ALL ON public.business_guest_start_network_hits, public.business_guest_sta
 REVOKE ALL ON SEQUENCE public.business_guest_start_network_hits_id_seq FROM PUBLIC, anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.business_guest_start_network_hits_id_seq TO service_role;
 
+-- 48 h retention of network identifiers, independent of traffic: called by the
+-- hourly audiolad-business-guest-start-purge timer and (bounded) by reserve.
+-- Batched to keep locks short. Idempotency rests on idempotency_hash/user_id.
+CREATE OR REPLACE FUNCTION public.business_guest_start_purge(p_batch int DEFAULT 5000)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_hits int; v_starts int;
+BEGIN
+  IF p_batch IS NULL OR p_batch NOT BETWEEN 1 AND 50000 THEN
+    RAISE EXCEPTION 'invalid_guest_start_input' USING ERRCODE = '22023';
+  END IF;
+  DELETE FROM public.business_guest_start_network_hits
+    WHERE id IN (SELECT id FROM public.business_guest_start_network_hits
+                  WHERE expires_at <= now() ORDER BY expires_at LIMIT p_batch FOR UPDATE SKIP LOCKED);
+  GET DIAGNOSTICS v_hits = ROW_COUNT;
+  UPDATE public.business_guest_starts SET network_hash = NULL
+    WHERE id IN (SELECT id FROM public.business_guest_starts
+                  WHERE network_hash IS NOT NULL AND created_at <= now() - interval '48 hours'
+                  ORDER BY created_at LIMIT p_batch FOR UPDATE SKIP LOCKED);
+  GET DIAGNOSTICS v_starts = ROW_COUNT;
+  RETURN jsonb_build_object('hits_deleted', v_hits, 'starts_cleared', v_starts);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.business_guest_start_purge(int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.business_guest_start_purge(int) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.business_guest_start_reserve(p_network_hash text, p_limit int, p_window_seconds int)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_hits bigint;
@@ -91,10 +116,9 @@ BEGIN
     RAISE EXCEPTION 'invalid_guest_start_input' USING ERRCODE = '22023';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtext('business_guest_start:' || p_network_hash));
-  -- Retention 48 h for every network identifier, not only the calling network (window max = retention).
-  DELETE FROM public.business_guest_start_network_hits WHERE expires_at <= now();
-  UPDATE public.business_guest_starts SET network_hash = NULL
-    WHERE network_hash IS NOT NULL AND created_at <= now() - interval '48 hours';
+  DELETE FROM public.business_guest_start_network_hits WHERE network_hash = p_network_hash AND expires_at <= now();
+  -- Small bounded share of the global 48 h retention; the hourly timer runs the rest regardless of traffic.
+  PERFORM public.business_guest_start_purge(200);
   SELECT count(*) INTO v_hits FROM public.business_guest_start_network_hits
     WHERE network_hash = p_network_hash AND created_at > now() - make_interval(secs => p_window_seconds);
   IF v_hits >= p_limit THEN RETURN false; END IF;
