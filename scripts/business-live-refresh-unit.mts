@@ -133,7 +133,7 @@ assert.deepEqual(businessEntrySwitchAction("/documents"), { kind: "navigate", hr
 // Wiring (string checks, the components are client-only).
 const switcher = readFileSync("src/components/business-app/BusinessEntrySwitcher.tsx", "utf8");
 assert.match(switcher, /businessEntrySwitchAction\(pathname\)/);
-assert.match(switcher, /router\.push\(action\.href\)/);
+assert.match(switcher, /router\.push\(action\.href === "\/" \? businessCabinetHomePath\(hostname\) : action\.href\)/);
 assert.match(switcher, /router\.refresh\(\)/);
 assert.doesNotMatch(switcher, /setEntry\("venue"\)/, "switcher goes through switchTo");
 const provider = readFileSync("src/components/business-app/BusinessPointMode.tsx", "utf8");
