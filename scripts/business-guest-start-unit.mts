@@ -4,6 +4,7 @@ import { handleBusinessGuestStart, type GuestStartDeps, type GuestStartUser } fr
 import { businessGuestStartConfig } from "../src/lib/business-guest/start-config";
 import { guestNetworkKey } from "../src/lib/business-guest/network-key";
 import { BUSINESS_GIFT_MS } from "../src/lib/business/plan";
+import { BUSINESS_GUEST_START_COPY } from "../src/lib/business-guest/copy";
 
 const secret = randomBytes(32).toString("hex");
 const config = businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED: "1", AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SECRET: secret, NODE_ENV: "production" });
@@ -135,4 +136,10 @@ assert.equal(guestNetworkKey("unknown", secret), null); assert.equal(guestNetwor
   const h = harness(); h.deps.config.production = false;
   assert.equal((await handleBusinessGuestStart(request(payload, headers), h.deps)).status, 200);
 }
+// Owner 02.11.2026: the pre-trial offer names 7 days only; the 3 grace days stay in the access logic.
+assert.equal(
+  BUSINESS_GUEST_START_COPY.terms,
+  "7 дней бесплатно со всеми функциями. Дальше 799\u00a0₽ в месяц за одну точку, если решите продолжить. Без карты и автосписаний. Без регистрации – вход можно привязать позже.",
+);
+assert.doesNotMatch(BUSINESS_GUEST_START_COPY.terms, /льготн|grace|3 дня|10 дней/u);
 console.log("business-guest-start-unit: ok");
