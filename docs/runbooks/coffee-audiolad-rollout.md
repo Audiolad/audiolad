@@ -4,9 +4,14 @@
 7 дней в подарок (затем 3 дня льготного периода) и оплату 30 дней. Реальная стартовая страница – `/business-app/guest/coffee`,
 публичный постоянный адрес – `https://business.audiolad.ru/guest/coffee`.
 Новый адрес – `https://coffee.audiolad.ru/`. Отрасль SPA на coffee закрыта.
-Дизайн и содержимое кабинета сохранены. Оба кабинета закрыты от индексации:
-noindex/nofollow и robots disallow-all, sitemap на coffee отсутствует.
-Canonical coffee указывает на coffee, business остаётся прежним.
+Coffee открывается напрямую через rewrite, без первого перехода на business.
+Корень coffee остаётся гостевым кабинетом. Главная владельца с карточкой доступа
+и оплатой 799 ₽ доступна по `/cabinet` (также alias на business).
+Публичные страницы coffee `/`, `/help`, `/documents` и тексты документов
+индексируются: index/follow, canonical и OpenGraph указывают на соответствующую
+страницу coffee. Robots разрешает только эти страницы; sitemap содержит только их.
+Остальные страницы кабинета coffee сохраняют noindex/nofollow.
+Business сохраняет noindex/nofollow, robots disallow-all и 404 для sitemap.
 
 ## Флаг и безопасный выпуск до DNS
 
@@ -41,13 +46,13 @@ Business сохраняет свои маршруты, интерфейс и п�
   Secure и SameSite=Lax. Клиент читает их, поэтому HttpOnly здесь неприменим.
   Запись также сохраняет локальную копию. Общие настройки имеют приоритет над
   старой локальной копией. Существующие парсеры проверяют значения.
-- Первый переход на coffee делает 307 через business `/coffee-handoff`, сохраняя
-  исходные path/query, включая UTM. Business переносит HttpOnly идентификатор,
-  клиент переносит allowlist настроек из старого origin и возвращается на coffee.
-  Общий HttpOnly marker `al_coffee_handoff` предотвращает повторный переход.
-  Это работает и для первого прямого входа на coffee без предварительного посещения
-  business после обновления. При выключенном JS есть ссылка продолжения, но перенос
-  localStorage требует JS, как и сам плеер. Cookie должны быть разрешены.
+- Принудительного handoff при первом входе нет. Миграция выполняется лениво:
+  на запросах business `migrateCoffeeGuestCookie` переносит старый HttpOnly токен;
+  при чтении `coffeeStorage` зеркалирует разрешённые legacy localStorage настройки
+  в общие cookie. На coffee гостевой usage API уже выдаёт общий токен.
+  Первый прямой вход coffee не может прочитать host-only cookie и localStorage
+  business до посещения business после обновления. Старый `/coffee-handoff`
+  продолжает работать для ранее выданных ссылок, включая перенос настроек и marker.
 - Настройки зарегистрированной точки уже хранятся в БД; сохранённая серверная
   конфигурация по-прежнему имеет приоритет. Регистрация, подарочный доступ и
   аккаунт используют существующий путь; второго кабинета/бэкенда/регистрации нет.
@@ -81,11 +86,12 @@ Business сохраняет свои маршруты, интерфейс и п�
 
 - OFF: Atlas CTA на business; business `/`, `/guest/coffee`, `/music`, auth и
   существующая сессия работают как прежде; coffee не открывает витрину.
-- ON: прямой вход coffee `/`, вход из Атласа с UTM, один переход через handoff,
-  возврат в исходный path/query. `/guest/coffee` также открывает реальный кабинет.
+- ON: прямой вход coffee `/`, `/help`, `/documents`, вход из Атласа с UTM
+  открываются без редиректа на business. `/guest/coffee` открывает гостевой кабинет,
+  `/cabinet` – главную владельца с карточкой доступа и оплатой.
 - До первого входа coffee в старом business-госте выбрать характер, звучание,
   день/энергию и расписание, потратить часть 30 минут. После перехода проверить
-  те же настройки и остаток лимита. Вернуться в business, изменить настройки
+  те же настройки и остаток лимита после ленивой миграции на business. Вернуться в business, изменить настройки
   на coffee и убедиться, что последующее чтение на business использует новое значение.
 - Проверить новый чистый браузер, существующий общий токен с устаревшим host-only
   токеном, запрет localStorage, недоступность счётчика (fail closed).
@@ -97,8 +103,10 @@ Business сохраняет свои маршруты, интерфейс и п�
   доступ к документам и API плеера. Другие отрасли не доступны на coffee.
 - Проверить все 10 страниц кофеен, их примеры, ссылку PDF и скачивание PDF.
   Старый URL из PDF продолжает работать, аналитические goal names сохранены.
-- Проверить canonical/noindex/robots, 404 sitemap, отсутствие listener/admin/catalog
-  на coffee. Проверить сертификат без отключения TLS verification.
+- Проверить canonical/OpenGraph/index/follow публичных страниц coffee, noindex
+  остальных страниц и coffee robots/sitemap. На business robots запрещает всё,
+  sitemap – 404. Проверить отсутствие listener/admin/catalog на coffee
+  и сертификат без отключения TLS verification.
 - Не выводить cookie, токены, персональные данные и env значения в smoke-отчёт.
 
 ## Исправления по review PR #1073
@@ -131,7 +139,37 @@ DNS/TLS не удалять до истечения кэшей и заверше
 проверить candidate в браузерах и согласовать ON release. Эта сессия инфраструктуру
 не меняет, коммит/PR делает оркестратор.
 
-## Локальная проверка этой поставки
+## Возвраты авторизации и оставшиеся gates
+
+Вход и регистрация остаются на apex audiolad.ru с общей сессией .audiolad.ru.
+Ссылки coffee передают `next=/auth/business-return?site=coffee` для подарка,
+`next=/auth/business-cabinet?site=coffee` для обычного входа.
+Return-страницы принимают только точный marker `coffee` при ON:
+подарок ведёт на coffee onboarding/workspace, вход в кабинет – на
+`/cabinet#dostup`. Без marker сохраняется возврат на business.
+CTA apex checkout/result не менялся и при ON: после оплаты пользователь
+попадает на business `/#dostup` (уточнение Сергея 02.11: business остаётся
+общим бизнес-входом и работает как прежде).
+Платёжные API, заказы и Tochka redirectUrl/failRedirectUrl не менялись.
+
+Оставшиеся отдельные gates:
+
+- auth-экраны непосредственно на coffee требуют настройки Supabase redirect URLs;
+- возврат самого Tochka на coffee требует отдельного согласования;
+- MAX/VK callbacks требуют отдельной проверки и настройки.
+
+## Проверка этой поставки
+
+Node 20 (для тестов с proxy – `--experimental-websocket`), флаг OFF и ON:
+`tsc --noEmit` прошёл, ESLint изменённых файлов без замечаний,
+unit-проверки business-coffee-host, business-app-proxy-routing,
+business-coffee-atlas, business-guest-coffee, supabase-cookie-domain,
+business-brand-icons, business-app-domain-bind, business-ru-copy,
+business-trial-7-days, business-subscription-payment, business-guest-shell,
+business-workspace-trial прошли. Business `/`, его canonical/OG, robots и sitemap
+не менялись. Браузерная проверка coffee и business – после выпуска.
+
+## История проверок предыдущей поставки
 
 Использован Node 20.
 Ничего не устанавливалось, symlink node_modules не менялся.
@@ -164,7 +202,7 @@ NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 NODE_OPTIONS='--require ./scripts/cjs
 матрицу на candidate. Полный repo lint не запускался, ESLint проверял изменённые файлы.
 `git diff --check` прошёл. Коммит, push, merge и deploy не выполнялись.
 
-## Файлы поставки
+## Файлы предыдущей поставки
 
 - `.github/workflows/business-pr-validation.yml`
 - `deploy/nginx/coffee.audiolad.ru.conf.example`

@@ -115,7 +115,7 @@ export function resolveBusinessProxyAction(
     return { action: "pass_through" };
   }
 
-  if (pathname === "/robots.txt") {
+  if (pathname === "/robots.txt" || (hostname === COFFEE_HOSTNAME && pathname === "/sitemap.xml")) {
     return { action: "pass_through" };
   }
 

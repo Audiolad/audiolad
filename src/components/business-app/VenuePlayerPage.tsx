@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath } from "@/lib/business-app/host";
 
 import { provisionVenuePlayer } from "@/app/business-app/actions";
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
   VENUE_PLAYER_APP_VERSION,
@@ -30,6 +32,7 @@ type RuntimePhase =
 
 export default function VenuePlayerPage() {
   const domain = useBusinessDomain();
+  const hostname = useBusinessHostname();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const popTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -301,7 +304,7 @@ export default function VenuePlayerPage() {
       <section className="business-app-span-full business-app-card">
         <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер кофейни</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец кофейни</a>, чтобы подключить плеер и включить музыку.</p>
+          <a href={businessAuthHref(hostname, "sign-in")} className="underline">Войдите как владелец кофейни</a>, чтобы подключить плеер и включить музыку.</p>
       </section>
     );
   }
@@ -311,7 +314,7 @@ export default function VenuePlayerPage() {
       <section className="business-app-span-full business-app-card">
         <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер кофейни</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          <Link href="/" className="underline">Подключите заведение на главной</Link>, затем вернитесь сюда, чтобы настроить плеер зала.</p>
+          <Link href={businessCabinetHomePath(hostname)} className="underline">Подключите заведение на главной</Link>, затем вернитесь сюда, чтобы настроить плеер зала.</p>
       </section>
     );
   }

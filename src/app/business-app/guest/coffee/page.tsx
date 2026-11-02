@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 
 import BusinessMusicSection from "@/components/business-app/sound/BusinessMusicSection";
-import { BUSINESS_GUEST_COFFEE_URL, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled, getHostnameFromHeaders } from "@/lib/business-app/host";
-import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
+import { BUSINESS_GUEST_COFFEE_URL, getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildBusinessAppMetadata, buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
     ...buildBusinessAppMetadata(hostname),
     title: "Звучание кофейни – АудиоЛад Бизнес",
     description: "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Бизнес без регистрации.",
-    alternates: { canonical: coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? `${COFFEE_ORIGIN}/` : BUSINESS_GUEST_COFFEE_URL },
+    alternates: { canonical: BUSINESS_GUEST_COFFEE_URL },
+    ...buildCoffeePublicPageMetadata(hostname, "/", "Звучание кофейни – АудиоЛад Бизнес", "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Бизнес без регистрации."),
   };
 }
 

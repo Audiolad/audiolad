@@ -67,6 +67,7 @@ assert.equal(isBusinessSitePath(BUSINESS_SITE_PATH), true);
 assert.equal(isBusinessSitePath("/b"), false);
 
 assertAction(BUSINESS_HOSTNAME, "/", "rewrite_business_app", BUSINESS_SITE_PATH);
+assertAction(BUSINESS_HOSTNAME, "/cabinet", "rewrite_business_app", BUSINESS_SITE_PATH);
 assertAction(
   BUSINESS_HOSTNAME,
   "/music",
@@ -116,6 +117,7 @@ assertAction("audiolad.ru", "/", "pass_through");
 
 assert.equal(resolveBusinessInternalPath("/"), BUSINESS_SITE_PATH);
 assert.equal(normalizeBusinessAppPathname("/business-app"), "/");
+assert.equal(normalizeBusinessAppPathname("/cabinet"), "/");
 assert.equal(normalizeBusinessAppPathname("/business-app/settings"), "/preferences");
 assert.equal(normalizeBusinessAppPathname("/business-app/profile"), "/profile");
 assert.equal(resolveBusinessInternalPath("/profile"), `${BUSINESS_SITE_PATH}/profile`);

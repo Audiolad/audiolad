@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+
 import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
@@ -20,7 +22,6 @@ import {
 } from "@/components/business-app/sound/AtmosphereAssembling";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
-import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app/access";
 import {
   assembleGuestCoffeeAtmosphere,
@@ -111,6 +112,7 @@ function readStoredProfile(): GuestCoffeeProfile {
 }
 
 export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
+  const hostname = useBusinessHostname();
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
   // Gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
@@ -453,7 +455,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               ) : null}
               {offerGift ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-guest-register">
+                  <a href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-guest-register">
                     {GUEST_COFFEE_COPY.exhaustedRegister}
                   </a>
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring">
