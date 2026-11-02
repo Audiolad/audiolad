@@ -18,7 +18,6 @@ import { selectInPaged, type BusinessTrialsDb, type SelectInOptions } from "@/li
  * the page gets names, short ids, dates and statuses, no email, IP or hashes.
  */
 
-// 50 sha256 hex values keep the PostgREST GET URL well under common 8 KB proxy limits.
 type Db = ReturnType<typeof createServiceRoleClient>;
 type Row = Record<string, unknown>;
 
