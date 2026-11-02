@@ -340,9 +340,9 @@ void (async () => {
   const reader = (paid: string[] = []): PeekReader => ({
     async edges(users, hashes) {
       reads.push("edges");
-      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || hashes.includes(e.emailHash)).map(({ emailHash, userId }) => ({ emailHash, userId }));
+      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || (e.emailHash !== null && hashes.includes(e.emailHash))).flatMap(({ emailHash, userId }) => emailHash === null ? [] : [{ emailHash, userId }]);
     },
-    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || hashes.includes(g.emailHash)); },
+    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || (g.emailHash !== null && hashes.includes(g.emailHash))); },
     async paidStamps() { return paid; },
   });
   const now = new Date("2026-10-23T15:00:00Z");

@@ -26,6 +26,7 @@ export const BUSINESS_PUBLIC_ASSET_PATHS = [
 
 /** Minimal platform telemetry endpoints still hit by root BaseProviders. */
 export const BUSINESS_ALLOWED_API_PATHS = [
+  "/api/business/guest-start",
   "/api/client-errors",
   "/api/health/build",
   // c02fe282: stable (build-independent) /spa player endpoints.
@@ -169,7 +170,7 @@ export function resolveBusinessProxyAction(
     return { action: "rewrite_business_app", pathname: BUSINESS_GUEST_COFFEE_INTERNAL_PATH };
   }
 
-  // After rewrite Next re-enters proxy with the internal path — pass through.
+  // After rewrite Next re-enters proxy with the internal path – pass through.
   if (isBusinessSitePath(pathname)) {
     return { action: "pass_through" };
   }
@@ -202,7 +203,7 @@ export function businessPrivateGuestRedirect(
   return BUSINESS_GUEST_COFFEE_PUBLIC_PATH;
 }
 
-/** Exported for tests — public paths the business host rewrites. */
+/** Exported for tests – public paths the business host rewrites. */
 export function listBusinessPublicRewritePaths(): string[] {
   return Object.keys(BUSINESS_PUBLIC_PATH_REWRITES);
 }

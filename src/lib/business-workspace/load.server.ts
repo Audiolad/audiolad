@@ -1,3 +1,5 @@
+import { businessAccessPrincipal } from "@/lib/access-grants/principal";
+import { readGuestBusinessAccess } from "@/lib/access-grants/principal.server";
 import "server-only";
 
 import { activateBusinessTrial, recordAccessActivity } from "@/lib/access-grants/apply";
@@ -8,7 +10,7 @@ import {
   businessCabinetOnboardingPath,
   businessWorkspacePublicPath,
 } from "@/lib/access-grants/paths";
-import { isEmailConfirmed, formatMoscowDateTime } from "@/lib/access-grants/policy";
+import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
@@ -535,7 +537,8 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return model;
-  if (!isEmailConfirmed(user) || !user.email) return { ...model, status: "unconfirmed" };
+  const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
+  if (!principal) return { ...model, status: "unconfirmed" };
 
   let store: ReturnType<typeof createSupabaseAccessGrantStore>;
   try {
@@ -545,8 +548,10 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
   }
 
   try {
-    const activation = await activateBusinessTrial(store, { userId: user.id, email: user.email });
-    await recordAccessActivity(store, { userId: user.id, email: user.email, action: "visit" });
+    const activation = principal.kind === "guest"
+      ? await readGuestBusinessAccess(principal)
+      : await activateBusinessTrial(store, { userId: user.id, email: user.email! });
+    if (principal.kind === "email") await recordAccessActivity(store, { userId: user.id, email: user.email!, action: "visit" });
     const status = activation.access.mode === "none" ? "unavailable" : activation.access.mode;
     const endsAtLabel = activation.access.endsAt
       ? formatMoscowDateTime(new Date(activation.access.endsAt))
@@ -597,7 +602,7 @@ export type WorkspaceActor =
       ok: true;
       device: false;
       userId: string;
-      email: string;
+      email: string | null;
       playerOpen: boolean;
       locationId: string | null;
       space: ReturnType<typeof resolveBusinessSpace>;
@@ -636,17 +641,19 @@ export async function loadWorkspaceActor(spaceParam: string | null): Promise<Wor
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email || !isEmailConfirmed(user)) return { ok: false, reason: "no_access" };
+  const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
+  if (!user || !principal) return { ok: false, reason: "no_access" };
   try {
-    const store = createSupabaseAccessGrantStore();
-    const activation = await activateBusinessTrial(store, { userId: user.id, email: user.email });
+    const activation = principal.kind === "guest"
+      ? await readGuestBusinessAccess(principal)
+      : await activateBusinessTrial(createSupabaseAccessGrantStore(), { userId: user.id, email: user.email! });
     const domain = await loadBusinessOwnerHomeContext();
     const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
     const playerOpen = workspacePlayerOpen({
       status: activation.access.mode === "none" ? "unavailable" : activation.access.mode,
       spaceEnabled: space.enabled,
     });
-    return { ok: true, device: false, userId: user.id, email: user.email, playerOpen, locationId, space };
+    return { ok: true, device: false, userId: user.id, email: principal.kind === "guest" ? null : user.email!, playerOpen, locationId, space };
   } catch {
     return { ok: false, reason: "unavailable" };
   }

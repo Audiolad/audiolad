@@ -1,3 +1,8 @@
+import BusinessWorkspace from "@/components/business-app/workspace/BusinessWorkspace";
+import { businessAccessPrincipal } from "@/lib/access-grants/principal";
+import { loadWorkspacePage } from "@/lib/business-workspace/load.server";
+import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
@@ -23,6 +28,15 @@ export async function generateMetadata(): Promise<Metadata> {
  * PDF atlas). No account required. The demo stays here.
  * Signed-in venues use /music (the cabinet shelves and the one player).
  */
-export default function BusinessGuestCoffeePage() {
+export default async function BusinessGuestCoffeePage() {
+  if (process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1") {
+    const { data: { user } } = await (await createClient()).auth.getUser();
+    const principal = businessAccessPrincipal(user, true);
+    if (principal?.kind === "guest") {
+      const { data, error } = await createServiceRoleClient().from("business_guest_starts")
+        .select("id").eq("user_id", principal.userId).eq("status", "ready").maybeSingle();
+      if (!error && data) return <BusinessWorkspace model={await loadWorkspacePage("cafe")} />;
+    }
+  }
   return <BusinessMusicSection />;
 }

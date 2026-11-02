@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Audiolad Business guest-start retention every hour
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=true
+Unit=audiolad-business-guest-start-purge.service
+
+[Install]
+WantedBy=timers.target

@@ -21,7 +21,8 @@ export function createMemoryAccessGrantStore(): AccessGrantStore & {
   const playback: PlaybackRow[] = [];
 
   const bindings: { emailHash: string; userId: string; kind: string }[] = [];
-  function resolve(emailHash: string, userId: string, kind: string): GrantRow | null {
+  function resolve(emailHash: string | null, userId: string, kind: string): GrantRow | null {
+    if (emailHash === null) return grants.find((g) => g.userId === userId && g.kind === kind) ?? null;
     if (!bindings.some((b) => b.emailHash === emailHash && b.userId === userId && b.kind === kind)) {
       bindings.push({ emailHash, userId, kind });
     }
@@ -32,15 +33,15 @@ export function createMemoryAccessGrantStore(): AccessGrantStore & {
     while (changed) {
       const size = emails.size + users.size;
       for (const edge of edges) {
-        if (emails.has(edge.emailHash) || users.has(edge.userId)) {
-          emails.add(edge.emailHash);
+        if ((edge.emailHash !== null && emails.has(edge.emailHash)) || users.has(edge.userId)) {
+          if (edge.emailHash !== null) emails.add(edge.emailHash);
           users.add(edge.userId);
         }
       }
       changed = size !== emails.size + users.size;
     }
-    return grants.filter((g) => g.kind === kind && (emails.has(g.emailHash) || users.has(g.userId)))
-      .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || Date.parse(a.endsAt) - Date.parse(b.endsAt) || a.emailHash.localeCompare(b.emailHash))[0] ?? null;
+    return grants.filter((g) => g.kind === kind && ((g.emailHash !== null && emails.has(g.emailHash)) || users.has(g.userId)))
+      .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || Date.parse(a.endsAt) - Date.parse(b.endsAt) || (a.emailHash === null ? (b.emailHash === null ? 0 : 1) : b.emailHash === null ? -1 : a.emailHash.localeCompare(b.emailHash)))[0] ?? null;
   }
 
   return {

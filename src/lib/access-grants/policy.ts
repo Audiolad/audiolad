@@ -11,7 +11,7 @@ import type { AccessGrantEventName } from "./events";
 export const BUSINESS_NEW_CLIENT_GRANT_KIND = "business_new_client";
 
 export type GrantRow = {
-  emailHash: string;
+  emailHash: string | null;
   userId: string;
   kind: string;
   startsAt: string;

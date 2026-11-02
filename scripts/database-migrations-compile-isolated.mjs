@@ -279,6 +279,7 @@ applyFile(
   resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
 );
 applyFile("post-apply business guest Auth stage 1 smoke", resolve(root, "supabase/tests/business_guest_auth_stage1_smoke.sql"));
+applyFile("post-apply business guest start stage 3 smoke", resolve(root, "supabase/tests/business_guest_start_stage3_smoke.sql"));
 
 if (!pending.has("20270210180000")) {
   throw new Error("JWT claims trigger guard migration was not included in the disposable replay");

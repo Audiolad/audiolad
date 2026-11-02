@@ -4,6 +4,8 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import type { BusinessOwnerHomeContext } from "@/lib/business-app/domain";
 
+const GuestStartContext = createContext(false);
+
 const BusinessHostnameContext = createContext("");
 
 const BusinessDomainContext = createContext<BusinessOwnerHomeContext>({
@@ -13,16 +15,18 @@ const BusinessDomainContext = createContext<BusinessOwnerHomeContext>({
 export function BusinessDomainProvider({
   value,
   hostname = "",
+  guestStartEnabled = false,
   children,
 }: {
   value: BusinessOwnerHomeContext;
   hostname?: string;
+  guestStartEnabled?: boolean;
   children: ReactNode;
 }) {
   return (
     <BusinessHostnameContext.Provider value={hostname}>
       <BusinessDomainContext.Provider value={value}>
-        {children}
+        <GuestStartContext.Provider value={guestStartEnabled}>{children}</GuestStartContext.Provider>
       </BusinessDomainContext.Provider>
     </BusinessHostnameContext.Provider>
   );
@@ -34,4 +38,8 @@ export function useBusinessDomain(): BusinessOwnerHomeContext {
 
 export function useBusinessHostname(): string {
   return useContext(BusinessHostnameContext);
+}
+
+export function useGuestStartEnabled(): boolean {
+  return useContext(GuestStartContext);
 }

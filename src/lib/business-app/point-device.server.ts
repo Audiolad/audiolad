@@ -4,9 +4,8 @@ import { cookies } from "next/headers";
 
 import type { BusinessChromeAccess } from "@/lib/access-grants/access-line";
 import { BUSINESS_NO_ACCESS } from "@/lib/access-grants/access-line";
-import { hashAccessEmail } from "@/lib/access-grants/email-hash";
 import { peekBusinessAccessFor } from "@/lib/access-grants/peek.server";
-import { isEmailConfirmed } from "@/lib/access-grants/policy";
+import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import type { PointDeviceVenue } from "@/lib/business-app/point-device";
 import { BUSINESS_POINT_COOKIE, isPointToken } from "@/lib/business-app/point-session";
 import { createClient } from "@/lib/supabase/server";
@@ -63,8 +62,9 @@ export async function loadPointDeviceAccess(venue: PointDeviceVenue, now: Date =
     if (typeof ownerId !== "string") return BUSINESS_NO_ACCESS;
     const { data: owner } = await db.auth.admin.getUserById(ownerId);
     const user = owner?.user ?? null;
-    if (!user || !isEmailConfirmed(user)) return BUSINESS_NO_ACCESS;
-    return await peekBusinessAccessFor({ userId: ownerId, emailHash: hashAccessEmail(user.email) ?? null }, now);
+    const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
+    if (!principal) return BUSINESS_NO_ACCESS;
+    return await peekBusinessAccessFor(principal, now);
   } catch {
     return BUSINESS_NO_ACCESS;
   }

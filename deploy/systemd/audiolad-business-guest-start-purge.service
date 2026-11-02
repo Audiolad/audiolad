@@ -1,0 +1,20 @@
+[Unit]
+Description=Audiolad Business guest-start 48h network id retention
+Documentation=file:/var/www/audiolad/docs/business/GUEST_GIFT_STAGE3_GUEST_START_RU.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/audiolad/run-business-guest-start-purge.sh
+Environment=DEPLOY_ROOT=/var/www/audiolad-deploy
+Environment=LOCK_FILE=/run/audiolad-business-guest-start-purge.lock
+Environment=LOG_FILE=/var/log/audiolad/business-guest-start-purge.log
+Environment=TIMEOUT_SECONDS=90
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=120
+SyslogIdentifier=audiolad-business-guest-start-purge
+StandardOutput=journal
+StandardError=journal

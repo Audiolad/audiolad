@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:business-guest-start": "node --import tsx scripts/business-guest-start-unit.mts",
+    "test:business-guest-principal": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-guest-principal-unit.mts",
     "test:business-guest-auth-hook": "node --import tsx scripts/business-guest-auth-hook-unit.mts",
     "test:anonymous-rls-audit": "node scripts/anonymous-rls-audit-unit.mjs",
     "test:business-track-sound-review": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-track-sound-review-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import ./scripts/author-business-tab-test-register.mjs --import tsx scripts/business-track-sound-review-mounted-unit.mts && python3 scripts/business-track-sound-review-isolated.py",
@@ -470,6 +472,7 @@
     "test:jazz-relax-music-passport": "npx tsx scripts/jazz-relax-music-passport-unit.mts && npx tsx scripts/jazz-relax-passport-registration-unit.mts",
     "test:product-video-export": "npx tsx scripts/product-video-export-unit.mts",
     "test:author-product-publish-preview-flow": "npx tsx scripts/author-product-publish-preview-flow-unit.mts",
+    "run:business-guest-start-purge": "npx tsx scripts/process-business-guest-start-purge.ts",
     "run:seo-reservation-5d-reminder": "npx tsx scripts/process-seo-reservation-5d-reminders.ts",
     "test:seo-reservation-5d-reminder": "npx tsx scripts/seo-reservation-5d-reminder-unit.mts && bash scripts/seo-reservation-5d-reminder-timer-unit.sh",
     "test:business-app-client-documents": "npx tsx scripts/business-app-client-documents-unit.mts && npx tsx scripts/business-public-documents-text-unit.mts",

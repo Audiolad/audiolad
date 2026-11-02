@@ -2,7 +2,7 @@ import "server-only";
 
 import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
-import { isEmailConfirmed } from "@/lib/access-grants/policy";
+import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import {
   authorizeOnboardingPreview,
@@ -43,7 +43,7 @@ export async function loadOnboardingPreviewGate(): Promise<"allow" | "no_access"
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user || !isEmailConfirmed(user)) return "no_access";
+    if (!businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1")) return "no_access";
     const chrome = await peekBusinessChromeAccess();
     const domain = await loadBusinessOwnerHomeContext();
     const hasActiveVenue = domain.status === "authenticated" && domain.location != null;

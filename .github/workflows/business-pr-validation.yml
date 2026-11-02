@@ -86,6 +86,8 @@ jobs:
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:supabase-cookie-domain
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-host
           npm run test:business-guest-auth-hook
+          npm run test:business-guest-start
+          npm run test:business-guest-principal
           npm run test:anonymous-rls-audit
           npm run test:business-guest-shell
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-guest-shell

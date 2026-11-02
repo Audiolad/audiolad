@@ -1,5 +1,7 @@
 "use client";
 
+import BusinessGuestStartCta from "../BusinessGuestStartCta";
+
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
@@ -22,13 +24,13 @@ export default function GuestCoffeeGiftCta() {
   const card = BUSINESS_TRIAL_CARD.charAt(0).toLowerCase() + BUSINESS_TRIAL_CARD.slice(1);
   return (
     <div className="business-atmosphere-action" data-testid="biz-guest-gift">
-      <a
+      <BusinessGuestStartCta
         href={businessAuthHref(hostname, "sign-up", true)}
         className="business-app-btn business-app-btn-cta business-app-focus-ring business-atmosphere-assemble"
-        data-testid="biz-guest-gift-cta"
+        testId="biz-guest-gift-cta"
       >
         {`Получить ${BUSINESS_GIFT_TITLE}`}
-      </a>
+      </BusinessGuestStartCta>
       <p className="text-center text-sm text-[var(--biz-text-muted)]">
         {`Со всеми функциями. Далее ${GUEST_COFFEE_PRICE} ${BUSINESS_PLAN_PERIOD_LABEL} (${card})`}
       </p>

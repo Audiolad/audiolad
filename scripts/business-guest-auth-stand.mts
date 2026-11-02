@@ -292,6 +292,143 @@ await scenario("RLS with real guest JWT via PostgREST", async () => {
   }
 });
 
+// ---------------------------------------------------------------- stage 3: «Начать как гость»
+process.env.AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SECRET ??= randomBytes(32).toString("hex");
+const { handleBusinessGuestStart } = await import("../src/lib/business-guest/start");
+const { businessGuestStartConfig } = await import("../src/lib/business-guest/start-config");
+const { guestNetworkKey } = await import("../src/lib/business-guest/network-key");
+const { createServiceRoleClient } = await import("../src/lib/supabase/service-role");
+
+// Same deps as src/app/api/business/guest-start/route.ts; only the cookie session is a supabase-js client here.
+async function guestStart(client: SupabaseClient, ip: string, opts: { origin?: string; idempotencyKey?: string } = {}) {
+  const config = businessGuestStartConfig(process.env);
+  const body = JSON.stringify({ accepted: true, idempotencyKey: opts.idempotencyKey ?? randomUUID() });
+  const headers = new Headers({ origin: opts.origin ?? "https://coffee.audiolad.ru", "content-type": "application/json", "sec-fetch-site": "same-origin" });
+  return handleBusinessGuestStart({ method: "POST", headers, text: async () => body }, {
+    config,
+    networkHash: () => guestNetworkKey(ip, config.networkSecret),
+    currentUser: async () => {
+      const { data, error } = await client.auth.getUser();
+      if (error && error.name !== "AuthSessionMissingError") throw new Error("guest_start_failed");
+      return data.user;
+    },
+    ready: async (userId) => {
+      const { data, error } = await createServiceRoleClient().from("business_guest_starts").select("id").eq("user_id", userId).eq("status", "ready").maybeSingle();
+      if (error) throw new Error("guest_start_failed");
+      return Boolean(data);
+    },
+    reserve: async (hash, limit, seconds) => {
+      const { data, error } = await createServiceRoleClient().rpc("business_guest_start_reserve", { p_network_hash: hash, p_limit: limit, p_window_seconds: seconds });
+      if (error || typeof data !== "boolean") throw new Error("guest_start_failed");
+      return data;
+    },
+    ticket: issueBusinessGuestStartTicket,
+    signIn: async (ticket) => {
+      const { data, error } = await client.auth.signInAnonymously({ options: { data: { business_guest_ticket: ticket } } });
+      if (error || !data.user) throw new Error("guest_start_failed");
+      return data.user;
+    },
+    bootstrap: async (input) => {
+      const { data, error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {
+        p_user_id: input.userId, p_idempotency_hash: input.idempotencyHash, p_network_hash: input.networkHash,
+        p_gift_seconds: input.giftSeconds, p_venue_name: input.venueName,
+      });
+      if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
+    },
+    clearTicket: async (userId) => {
+      const { error } = await createServiceRoleClient().auth.admin.updateUserById(userId, { user_metadata: { business_guest_ticket: null } });
+      if (error) throw new Error("guest_start_ticket_clear_failed");
+    },
+    log: () => undefined,
+  });
+}
+const startIp = "203.0.113.10";
+const startNetworkHash = () => guestNetworkKey(startIp, process.env.AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SECRET ?? "") as string;
+const networkHits = () => psql(`SELECT count(*) FROM public.business_guest_start_network_hits WHERE network_hash = '${startNetworkHash()}'`);
+let startedClient: SupabaseClient | null = null;
+let startedId = "";
+
+await scenario("stage 3: guest start creates one point with a 7-day gift", async () => {
+  const client = freshClient();
+  const result = await guestStart(client, startIp);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  const { data } = await client.auth.getUser();
+  assert.ok(data.user);
+  startedId = data.user.id;
+  startedClient = client;
+  assert.equal(psql(`SELECT is_anonymous FROM auth.users WHERE id = '${startedId}'`), "t");
+  assert.equal(psql(`SELECT count(*) || '|' || string_agg(role, ',') FROM public.business_organization_members WHERE user_id = '${startedId}'`), "1|owner");
+  assert.equal(psql(`SELECT count(*) FROM public.business_locations l JOIN public.business_organization_members m ON m.organization_id = l.organization_id WHERE m.user_id = '${startedId}'`), "1");
+  assert.equal(psql(`SELECT count(*) || '|' || bool_and(email_hash IS NULL) || '|' || bool_and(ends_at - starts_at BETWEEN interval '6 days 23 hours' AND interval '7 days 1 hour')
+    FROM public.access_grants WHERE user_id = '${startedId}' AND kind = 'business_new_client'`), "1|true|true");
+  assert.equal(psql(`SELECT status FROM public.business_guest_starts WHERE user_id = '${startedId}'`), "ready");
+  assert.equal(psql(`SELECT coalesce(raw_user_meta_data->>'business_guest_ticket', '<cleared>') FROM auth.users WHERE id = '${startedId}'`), "<cleared>");
+  assert.equal(networkHits(), "1");
+  assert.equal(psql(`SELECT count(*) FROM public.business_guest_start_network_hits WHERE network_hash LIKE '%203.0.113%'`), "0", "raw IP must not be stored");
+});
+await scenario("stage 3: repeat from the same guest session is idempotent and free", async () => {
+  assert.ok(startedClient);
+  const result = await guestStart(startedClient as SupabaseClient, startIp);
+  assert.equal(result.status, 200);
+  assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${startedId}'`), "1");
+  assert.equal(networkHits(), "1", "a ready guest does not spend the network quota");
+});
+await scenario("stage 3: network limit 3 per window, configurable, per network", async () => {
+  for (let i = 0; i < 2; i += 1) assert.equal((await guestStart(freshClient(), startIp)).status, 200);
+  assert.equal(networkHits(), "3");
+  const before = anonymousCount();
+  const limited = await guestStart(freshClient(), startIp);
+  assert.equal(limited.status, 429);
+  assert.equal(limited.body.code, "guest_start_limit");
+  assert.equal(anonymousCount(), before, "limited start creates no user");
+  assert.equal((await guestStart(freshClient(), "198.51.100.7")).status, 200, "another network has its own quota");
+  process.env.AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT = "4";
+  try {
+    assert.equal((await guestStart(freshClient(), startIp)).status, 200, "limit is configurable");
+  } finally {
+    delete process.env.AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT;
+  }
+});
+await scenario("stage 3: flag off and foreign origin create nothing", async () => {
+  const before = anonymousCount();
+  process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED = "0";
+  try {
+    assert.equal((await guestStart(freshClient(), "192.0.2.1")).status, 404);
+  } finally {
+    process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED = "1";
+  }
+  assert.equal((await guestStart(freshClient(), "192.0.2.1", { origin: "https://evil.example" })).status, 403);
+  assert.equal(anonymousCount(), before);
+});
+await scenario("stage 3: guest sees only its own point; server RPCs and tables are closed", async () => {
+  assert.ok(startedClient);
+  const guest = startedClient as SupabaseClient;
+  const orgs = await guest.from("business_organizations").select("id");
+  assert.equal(orgs.error, null, orgs.error?.message);
+  assert.deepEqual((orgs.data ?? []).map((row) => row.id),
+    [psql(`SELECT organization_id FROM public.business_organization_members WHERE user_id = '${startedId}'`)]);
+  const reserve = await guest.rpc("business_guest_start_reserve", { p_network_hash: "a".repeat(64), p_limit: 1000, p_window_seconds: 60 });
+  assert.ok(reserve.error, "guest must not reserve quota");
+  const boot = await guest.rpc("business_guest_bootstrap", { p_user_id: startedId, p_idempotency_hash: "b".repeat(64), p_network_hash: "a".repeat(64), p_gift_seconds: 2592000, p_venue_name: "x" });
+  assert.ok(boot.error, "guest must not call bootstrap");
+  for (const table of ["business_guest_starts", "business_guest_start_network_hits"]) {
+    const rows = await guest.from(table).select("*");
+    assert.ok(rows.error || (rows.data ?? []).length === 0, `guest must not read ${table}`);
+  }
+  const second = await guest.rpc("create_business_organization_with_location", {
+    p_organization_name: "Second", p_location_name: "Second point", p_business_category: "cafe", p_country_code: "RU", p_timezone: "Europe/Moscow",
+  });
+  assert.ok(second.error || (second.data as { ok?: boolean })?.ok === false, "guest gets exactly one point");
+  assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${startedId}'`), "1");
+});
+await scenario("stage 3: bootstrap refuses a registered (non-anonymous) user", async () => {
+  const { error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {
+    p_user_id: ownerId, p_idempotency_hash: "c".repeat(64), p_network_hash: "a".repeat(64), p_gift_seconds: 604800, p_venue_name: null,
+  });
+  assert.ok(error, "bootstrap is guest-only");
+});
+
 hookServer.close();
 proxyServer.close();
 const failed = results.filter((result) => !result.ok);

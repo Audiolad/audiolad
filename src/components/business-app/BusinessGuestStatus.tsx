@@ -1,5 +1,7 @@
 "use client";
 
+import BusinessGuestStartCta from "./BusinessGuestStartCta";
+
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
@@ -83,21 +85,22 @@ export function BusinessGuestStatusBar() {
       ) : null}
       <div className="business-app-guest-bar__actions">
         {exhausted ? (
-          <a
+          <BusinessGuestStartCta
             href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
-            data-testid="biz-guest-register"
+            testId="biz-guest-register"
+            enabledLabel={BUSINESS_GIFT_CTA}
           >
             {GUEST_COFFEE_COPY.exhaustedRegister}
-          </a>
+          </BusinessGuestStartCta>
         ) : (
-          <a
+          <BusinessGuestStartCta
             href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
-            data-testid="biz-trial-cta"
+            testId="biz-trial-cta"
           >
             {BUSINESS_GIFT_CTA}
-          </a>
+          </BusinessGuestStartCta>
         )}
       </div>
     </section>
