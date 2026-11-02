@@ -27,7 +27,7 @@ function unwrap<T>(result: { data: T; error: DbError }): T {
 
 function asGrant(row: Record<string, unknown> | null): GrantRow | null {
   if (!row) return null;
-  if (typeof row.email_hash !== "string" || typeof row.user_id !== "string") return null;
+  if ((row.email_hash !== null && typeof row.email_hash !== "string") || typeof row.user_id !== "string") return null;
   if (typeof row.kind !== "string" || typeof row.starts_at !== "string" || typeof row.ends_at !== "string") return null;
   return {
     emailHash: row.email_hash,

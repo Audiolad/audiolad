@@ -21,7 +21,7 @@ function edgeOf(row: Row): PeekEdge | null {
 }
 
 function grantOf(row: Row): GrantRow | null {
-  if (typeof row.email_hash !== "string" || typeof row.user_id !== "string") return null;
+  if ((row.email_hash !== null && typeof row.email_hash !== "string") || typeof row.user_id !== "string") return null;
   if (typeof row.starts_at !== "string" || typeof row.ends_at !== "string") return null;
   return {
     emailHash: row.email_hash,

@@ -4,9 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { BUSINESS_NO_ACCESS, type BusinessChromeAccess } from "./access-line";
-import { hashAccessEmail } from "./email-hash";
 import { peekChromeAccessWith } from "./peek-closure";
-import { isEmailConfirmed } from "./policy";
+import { businessAccessPrincipal } from "./principal";
 import { createPeekReader } from "./peek-reader.server";
 
 /**
@@ -22,8 +21,9 @@ export async function peekBusinessChromeAccess(now: Date = new Date()): Promise<
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user || !isEmailConfirmed(user)) return BUSINESS_NO_ACCESS;
-    return await peekBusinessAccessFor({ userId: user.id, emailHash: hashAccessEmail(user.email) ?? null }, now);
+    const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
+    if (!principal) return BUSINESS_NO_ACCESS;
+    return await peekBusinessAccessFor(principal, now);
   } catch {
     return BUSINESS_NO_ACCESS;
   }
@@ -35,7 +35,7 @@ export async function peekBusinessChromeAccess(now: Date = new Date()): Promise<
  * Never issues a gift, never writes. Any failure is «no access».
  */
 export async function peekBusinessAccessFor(
-  start: { userId: string; emailHash: string | null },
+  start: { userId: string; emailHash: string | null; kind?: "email" | "guest" },
   now: Date = new Date(),
 ): Promise<BusinessChromeAccess> {
   try {

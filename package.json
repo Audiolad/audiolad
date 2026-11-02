@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:business-guest-start": "node --import tsx scripts/business-guest-start-unit.mts",
+    "test:business-guest-principal": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-guest-principal-unit.mts",
     "test:business-guest-auth-hook": "node --import tsx scripts/business-guest-auth-hook-unit.mts",
     "test:anonymous-rls-audit": "node scripts/anonymous-rls-audit-unit.mjs",
     "test:business-track-sound-review": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-track-sound-review-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import ./scripts/author-business-tab-test-register.mjs --import tsx scripts/business-track-sound-review-mounted-unit.mts && python3 scripts/business-track-sound-review-isolated.py",

@@ -1,5 +1,8 @@
 "use client";
 
+import BusinessGuestStartCta from "../BusinessGuestStartCta";
+import { useGuestStartEnabled } from "../BusinessDomainProvider";
+
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -54,6 +57,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
 
 function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageModel }) {
   const hostname = useBusinessHostname();
+  const guestStartEnabled = useGuestStartEnabled();
   const player = useCabinetPlayer();
   const adopt = player.adopt;
   const release = player.release;
@@ -245,11 +249,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
       {model.status === "anonymous" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
-          <p>Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна.</p>
+          <p>{guestStartEnabled ? "Откройте кабинет без регистрации. Карта не нужна." : "Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна."}</p>
           <div className="flex flex-wrap gap-2">
-            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={businessAuthHref(hostname, "sign-up", true)} data-testid="biz-workspace-signup">
+            <BusinessGuestStartCta className="business-app-btn business-app-btn-primary business-app-focus-ring" href={businessAuthHref(hostname, "sign-up", true)} testId="biz-workspace-signup">
               {BUSINESS_GIFT_CTA}
-            </a>
+            </BusinessGuestStartCta>
             <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={businessAuthHref(hostname, "sign-in", true)}>
               Войти
             </a>

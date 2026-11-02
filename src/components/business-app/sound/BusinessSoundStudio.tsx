@@ -1,5 +1,8 @@
 "use client";
 
+import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
+import BusinessGuestStartCta from "../BusinessGuestStartCta";
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -455,9 +458,9 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               ) : null}
               {offerGift ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-guest-register">
+                  <BusinessGuestStartCta href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-primary business-app-focus-ring" testId="biz-guest-register" enabledLabel={BUSINESS_GIFT_CTA}>
                     {GUEST_COFFEE_COPY.exhaustedRegister}
-                  </a>
+                  </BusinessGuestStartCta>
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring">
                     Подключить
                   </Link>

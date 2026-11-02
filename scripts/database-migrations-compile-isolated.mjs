@@ -268,6 +268,7 @@ applyFile(
   resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
 );
 applyFile("post-apply business guest Auth stage 1 smoke", resolve(root, "supabase/tests/business_guest_auth_stage1_smoke.sql"));
+applyFile("post-apply business guest start stage 3 smoke", resolve(root, "supabase/tests/business_guest_start_stage3_smoke.sql"));
 
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");

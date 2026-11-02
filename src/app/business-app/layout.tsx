@@ -1,3 +1,4 @@
+import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
@@ -60,7 +61,7 @@ export default async function BusinessAppLayout({
 
   return (
     <div className="business-app-root" data-biz-theme={theme}>
-      <BusinessDomainProvider value={domain} hostname={hostname}>
+      <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available}>
         <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       });
     },
     recordPlay: async () => {
-      if (!account) return;
+      if (!account?.email) return;
       await recordAccessActivity(createSupabaseAccessGrantStore(), {
         userId: account.userId,
         email: account.email,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       });
     },
     recordOfferClick: async () => {
-      if (!account) return;
+      if (!account?.email) return;
       await recordAccessActivity(createSupabaseAccessGrantStore(), {
         userId: account.userId,
         email: account.email,
