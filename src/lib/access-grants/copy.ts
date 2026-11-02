@@ -1,4 +1,4 @@
-import { BUSINESS_GIFT_DAYS, BUSINESS_GRACE_DAYS, BUSINESS_PAID_PERIOD_DAYS, formatBusinessMonthlyPrice } from "@/lib/business/plan";
+import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 
 /** Unified phrase for the landing, registration and cabinet (task 1e008ee8). */
 export const BUSINESS_GIFT_TITLE = `${BUSINESS_GIFT_DAYS} дней в подарок`;
@@ -18,9 +18,16 @@ export const BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO =
 export const BUSINESS_REGISTERED_NOTE =
   `Регистрация прошла успешно. Подтвердите адрес по письму и войдите: кабинет откроется с периодом «${BUSINESS_GIFT_TITLE}».`;
 
-/** One short line on the gift card while the gift days are still running. */
+/**
+ * One short line on the gift card while the gift days are still running.
+ * Owner decision 02.11.2026 (task 253821e0): the grace days after the period are not shown to users.
+ * The grace logic itself (BUSINESS_GRACE_DAYS) is unchanged.
+ */
 export const BUSINESS_GIFT_CLOSING_NOTE =
-  `После подарочного периода требуется оплата. Музыка играет ещё ${BUSINESS_GRACE_DAYS} дня, затем плеер закрыт до оплаты.`;
+  `После ${BUSINESS_GIFT_DAYS} подарочных дней нужна оплата, чтобы музыка продолжала играть.`;
+
+/** Grace state (music still plays after the period): a neutral line, no countdown and no stop date. */
+export const BUSINESS_PERIOD_ENDED_PAY_NOTE = "Оплатите, чтобы музыка продолжала играть.";
 
 /** Owner wording, 2026-10-28: the gift days include the venue's music rights and licence. */
 export const BUSINESS_GIFT_LICENSE_NOTE =
