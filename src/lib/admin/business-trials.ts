@@ -50,6 +50,8 @@ export type BusinessTrialFacts = {
   paidUntil?: string | null;
   /** business_guest_starts row with status ready. */
   guestStart?: boolean;
+  /** Venue of the account (guest-start organization, else the earliest owner membership). */
+  organizationId?: string | null;
   organizationName?: string | null;
   /** access_grant_events first_useful_action (email accounts only). */
   firstUsefulAction?: boolean;
@@ -123,6 +125,8 @@ export type BusinessTrialStats = {
   activeMinutes: number;
   totals: BusinessTrialTotals;
   rows: BusinessTrialRow[];
+  /** Accounts skipped because their venue is in AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS. */
+  hiddenTests: number;
 };
 
 export function businessTrialStatusFromMode(mode: CustomerAccessMode): BusinessTrialStatus {
@@ -209,6 +213,8 @@ export function buildBusinessTrialStats(input: {
   facts?: ReadonlyMap<string, BusinessTrialFacts>;
   /** PR 2 recording flag and the «не меньше N минут» threshold. Off by default. */
   activity?: { enabled: boolean; activeMinutes: number };
+  /** Our test venues: not counted, not listed, only «Скрыто тестовых: N». */
+  excludedOrgIds?: ReadonlySet<string>;
 }): BusinessTrialStats {
   const activityEnabled = input.activity?.enabled === true;
   const activeMinutes = Math.max(1, Math.floor(input.activity?.activeMinutes ?? 60));
@@ -225,6 +231,7 @@ export function buildBusinessTrialStats(input: {
   };
   const rows: BusinessTrialRow[] = [];
   const seen = new Set<string>();
+  let hiddenTests = 0;
 
   for (const grant of input.grants) {
     if (grant.kind !== BUSINESS_NEW_CLIENT_GRANT_KIND) continue;
@@ -233,6 +240,11 @@ export function buildBusinessTrialStats(input: {
     seen.add(grant.userId);
 
     const facts = input.facts?.get(grant.userId) ?? {};
+    const orgId = facts.organizationId?.toLowerCase();
+    if (orgId && input.excludedOrgIds?.has(orgId)) {
+      hiddenTests += 1;
+      continue;
+    }
     const access = resolveCustomerAccess({
       now: input.now,
       // A stored grant means the start was accepted: email confirmed or guest-start (as principal.server.ts).
@@ -283,5 +295,5 @@ export function buildBusinessTrialStats(input: {
   }
 
   rows.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt) || a.userId.localeCompare(b.userId));
-  return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows };
+  return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows, hiddenTests };
 }

@@ -10,6 +10,7 @@ import {
   type BusinessTrialStats,
 } from "@/lib/admin/business-trials";
 import { BUSINESS_NEW_CLIENT_GRANT_KIND } from "@/lib/access-grants/policy";
+import { businessTrialExcludedOrgIds } from "@/lib/admin/business-trials-excluded";
 import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -44,6 +45,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
   // PR 2 columns exist only after migration 20270213120000: read them only with the flag on.
   const config = businessTrialActivityConfig(process.env);
   const activity = { enabled: config.enabled, activeMinutes: config.activeMinutes };
+  const excludedOrgIds = businessTrialExcludedOrgIds(process.env);
 
   const grantRows = await fetchAllPages<Row>((from, to) =>
     db
@@ -77,7 +79,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     return value;
   };
   const userIds = [...new Set(grants.map((grant) => grant.userId))];
-  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts, activity });
+  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds });
 
   const kindFilter = { kind: BUSINESS_NEW_CLIENT_GRANT_KIND };
   const [paidByUser, paidByHash, events, guestStarts, members, playback] = await Promise.all([
@@ -178,6 +180,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     const deviceByOrg = latestBy(heartbeats);
     for (const [userId, orgId] of orgByUser) {
       const value = factsOf(userId);
+      value.organizationId = orgId;
       value.organizationName = nameByOrg.get(orgId) ?? null;
       value.pointSeenAt = pointByOrg.get(orgId) ?? null;
       value.deviceSeenAt = deviceByOrg.get(orgId) ?? null;
@@ -185,5 +188,5 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     }
   }
 
-  return buildBusinessTrialStats({ now, grants, facts, activity });
+  return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds });
 }
