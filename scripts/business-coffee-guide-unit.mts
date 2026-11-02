@@ -20,6 +20,8 @@ import { ATLAS_CARD_NAMES_RU, ATLAS_CARD_THEMES } from "../src/lib/business/vert
 import {
   FOUR_CUPS_FINAL_IMAGE,
   FOUR_CUPS_MAX_HREF,
+  FOUR_CUPS_TG_HREF,
+  FOUR_CUPS_TG_LABEL,
   FOUR_CUPS_MAX_LABEL,
   FOUR_CUPS_SLIDES,
 } from "../src/lib/business/vertical-guides/four-cups";
@@ -448,9 +450,11 @@ assert.match(cups, /<GuideMaxButton placement="slider" \/>/);
 assert.doesNotMatch(cups, /role="tablist"/);
 const maxButton = read(`${guideDir}/GuideMaxButton.tsx`);
 assert.match(maxButton, /target="_blank"/);
-assert.match(maxButton, /rel="noopener noreferrer"/);
+assert.equal(maxButton.match(/rel="nofollow noopener noreferrer"/g)?.length, 2, "MAX and Telegram buttons are nofollow");
 assert.match(maxButton, /data-four-cups-max="true"/);
+assert.match(maxButton, /data-four-cups-tg="true"/);
 assert.match(maxButton, /\/school\/messengers\/max\.png/);
+assert.match(maxButton, /\/school\/messengers\/telegram\.png/);
 assert.match(read(`${guideDir}/GuideFinalCups.tsx`), /<GuideMaxButton placement="final" \/>/);
 assert.equal(FOUR_CUPS_MAX_LABEL, "Выбрать чашку и узнать характер кофейни в Максе");
 const slideSource = read("src/lib/business/vertical-guides/four-cups.ts");
@@ -458,6 +462,8 @@ assert.equal(slideSource.includes(EM_DASH), false);
 assert.equal(slideSource.includes("http://"), false);
 assert.equal(slideSource.split("https://").length - 1, 1);
 assert.equal(FOUR_CUPS_MAX_HREF, "https://max-potok.ru/r/gqwvf");
+assert.equal(FOUR_CUPS_TG_HREF, "https://max-potok.ru/r/gqwvf?ch=tg");
+assert.equal(FOUR_CUPS_TG_LABEL, "Открыть в Телеграм");
 assert.equal(FOUR_CUPS_SLIDES.length, 7);
 for (const slide of [...FOUR_CUPS_SLIDES, FOUR_CUPS_FINAL_IMAGE]) {
   assert.equal(slide.alt.includes(EM_DASH), false, slide.src);
@@ -552,9 +558,10 @@ const bodyLinks = [...bodyHtml.matchAll(/<a\s[^>]*>/g)].map((match) => match[0])
 assert.ok(bodyLinks.length >= 5, `expected body links, got ${bodyLinks.length}`);
 for (const tag of bodyLinks) {
   assert.ok(/\starget="_blank"/.test(tag), `body link must open in a new tab: ${tag}`);
-  assert.ok(/\srel="noopener(?: noreferrer)?"/.test(tag), `body link needs rel="noopener": ${tag}`);
+  assert.ok(/\srel="(?:nofollow )?noopener(?: noreferrer)?"/.test(tag), `body link needs rel="noopener": ${tag}`);
+  if (/data-four-cups-(?:max|tg)="true"/.test(tag)) assert.ok(/\srel="nofollow noopener noreferrer"/.test(tag), `four cups buttons are nofollow: ${tag}`);
 }
-for (const required of ['data-guide-banner="atlas-hero"', 'data-guide-banner="atlas-cards"', 'data-max-placement="final"']) {
+for (const required of ['data-guide-banner="atlas-hero"', 'data-guide-banner="atlas-cards"', 'data-max-placement="final"', 'data-four-cups-tg="true"']) {
   assert.ok(bodyLinks.some((tag) => tag.includes(required)), `new-tab link missing: ${required}`);
 }
 // Whole article (top strip, crumbs, body, footer): only the rubric brand link and the plain crumbs to Home / rubric
@@ -572,7 +579,7 @@ for (const tag of articleLinks) {
     continue;
   }
   assert.ok(/\starget="_blank"/.test(tag), `article link must open in a new tab: ${tag}`);
-  assert.ok(/\srel="noopener(?: noreferrer)?"/.test(tag), `article link needs rel="noopener": ${tag}`);
+  assert.ok(/\srel="(?:nofollow )?noopener(?: noreferrer)?"/.test(tag), `article link needs rel="noopener": ${tag}`);
 }
 const headerAtlas = articleLinks.find((tag) => tag.includes('data-guide-header-link="atlas"'));
 assert.ok(headerAtlas && headerAtlas.includes('href="/b/atlas-kofeen"') && headerAtlas.includes('target="_blank"'), "top-strip atlas link opens in a new tab");
@@ -700,10 +707,14 @@ for (const slug of SET_SLUGS) {
     const allowedSameTab = (href === "/" || href === "/b/coffee") && !attributes.includes('target="_blank"');
     if (allowedSameTab) continue;
     assert.match(attributes, /target="_blank"/);
-    assert.match(attributes, /rel="noopener(?: noreferrer)?"/);
-    assert.ok(knownTargets.has(href) || href === FOUR_CUPS_MAX_HREF, `${slug}: sole external target is MAX`);
+    const fourCups = href === FOUR_CUPS_MAX_HREF || href === FOUR_CUPS_TG_HREF;
+    assert.match(attributes, fourCups ? /rel="nofollow noopener noreferrer"/ : /rel="noopener(?: noreferrer)?"/);
+    assert.ok(knownTargets.has(href) || fourCups, `${slug}: sole external targets are the MAX and Telegram buttons`);
   }
   for (const column of article.table.columns) assert.ok(html.includes(`data-label="${column}"`));
+  // Slider and final block: a MAX and a Telegram button each.
+  assert.equal(html.split(`href="${FOUR_CUPS_MAX_HREF}"`).length - 1, 2, `${slug}: two MAX buttons`);
+  assert.equal(html.split(`href="${FOUR_CUPS_TG_HREF}"`).length - 1, 2, `${slug}: two Telegram buttons`);
 }
 // ---------- Dates, summary, og cover, in-text links (SEO round 2026-10-30) ----------
 const sitemapEntries = listVerticalGuideSitemapEntries();

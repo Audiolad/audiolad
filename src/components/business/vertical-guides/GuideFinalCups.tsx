@@ -4,7 +4,7 @@ import { FOUR_CUPS_FINAL_IMAGE } from "@/lib/business/vertical-guides/four-cups"
 
 import GuideMaxButton from "./GuideMaxButton";
 
-/** Bottom block: bold question, the single «all four cups» picture and the MAX button. */
+/** Bottom block: bold question, the single «all four cups» picture and the MAX and Telegram buttons. */
 export default function GuideFinalCups({ question }: { question: string }) {
   return (
     <section className="guide-wrap guide-block guide-final" aria-labelledby="guide-final-title">
