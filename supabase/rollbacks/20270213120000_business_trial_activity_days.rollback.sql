@@ -3,6 +3,7 @@
 -- Sergey's OK and with AUDIOLAD_BUSINESS_TRIAL_ACTIVITY_ENABLED already off.
 -- Drops only the new objects; business_guest_starts rows stay, only start_host goes.
 BEGIN;
+SET LOCAL lock_timeout = '3s';
 DROP FUNCTION IF EXISTS public.purge_business_trial_activity_days(integer);
 DROP FUNCTION IF EXISTS public.record_business_trial_point_listen(text, integer, integer);
 DROP FUNCTION IF EXISTS public.record_business_trial_activity(uuid, text, integer, integer, integer);

@@ -139,7 +139,7 @@ assert.ok(read("src/app/api/business/guest-start/route.ts").includes("recordBusi
 const queries = read("src/lib/admin/business-trials-queries.ts");
 assert.ok(!/\.(insert|update|upsert|delete|rpc)\(/.test(queries));
 assert.ok(/config\.enabled \? "user_id, organization_id, status, start_host"/.test(queries));
-assert.ok(/config\.enabled\s*\?\s*selectIn\(db, "business_trial_activity_days"/.test(queries));
+assert.ok(/config\.enabled && earliestDay\s*\?\s*selectIn\(db, "business_trial_activity_days"/.test(queries));
 
 // Migration: not applied, service_role only, no personal data, rollback alongside.
 const migration = read("supabase/migrations/20270213120000_business_trial_activity_days.sql");

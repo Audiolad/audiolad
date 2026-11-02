@@ -10,6 +10,10 @@
 -- Only service_role can read or write; anon/authenticated get nothing.
 -- Functions are SECURITY DEFINER with a fixed search_path, EXECUTE for service_role only.
 BEGIN;
+-- Fail fast instead of queueing behind live traffic: the ALTER on business_guest_starts
+-- and the FK to business_organizations need table locks. 55P03 after 3s rolls the whole
+-- file back; deploy can simply retry later.
+SET LOCAL lock_timeout = '3s';
 
 CREATE TABLE IF NOT EXISTS public.business_trial_activity_days (
   organization_id uuid NOT NULL REFERENCES public.business_organizations(id) ON DELETE CASCADE,
@@ -81,14 +85,15 @@ BEGIN
           greatest(0, floor(extract(epoch FROM (v_now - d.last_listen_report_at)))::integer)))
       ELSE d.listened_seconds
     END,
-    last_listen_report_at = CASE WHEN p_kind = 'listen' THEN v_now ELSE d.last_listen_report_at END,
+    -- greatest(): a report with an older statement time never moves the marker back.
+    last_listen_report_at = CASE WHEN p_kind = 'listen' THEN greatest(d.last_listen_report_at, v_now) ELSE d.last_listen_report_at END,
     cabinet_visits = CASE
       WHEN p_kind = 'visit' AND (d.last_visit_at IS NULL OR v_now - d.last_visit_at > make_interval(secs => v_gap))
         THEN least(100000, d.cabinet_visits + 1)
       ELSE d.cabinet_visits
     END,
-    last_visit_at = CASE WHEN p_kind = 'visit' THEN v_now ELSE d.last_visit_at END,
-    last_seen_at = v_now;
+    last_visit_at = CASE WHEN p_kind = 'visit' THEN greatest(d.last_visit_at, v_now) ELSE d.last_visit_at END,
+    last_seen_at = greatest(d.last_seen_at, v_now);
 
   DELETE FROM public.business_trial_activity_days
     WHERE organization_id = p_organization_id AND day < v_day - v_keep;
@@ -152,6 +157,7 @@ COMMIT;
 -- AUDIOLAD_BUSINESS_TRIAL_ACTIVITY_ENABLED unset, redeploy; then the app calls
 -- none of these functions. Same SQL is in supabase/rollbacks/ next to this file.
 -- BEGIN;
+-- SET LOCAL lock_timeout = '3s';
 -- DROP FUNCTION IF EXISTS public.purge_business_trial_activity_days(integer);
 -- DROP FUNCTION IF EXISTS public.record_business_trial_point_listen(text, integer, integer);
 -- DROP FUNCTION IF EXISTS public.record_business_trial_activity(uuid, text, integer, integer, integer);
