@@ -90,13 +90,17 @@ export function deriveDefaultPublicName(fullName: string | null | undefined): st
 export function insertImpressionEmoji(input: {
   body: string;
   emoji: string;
-  selectionStart: number;
-  selectionEnd: number;
+  selectionStart: number | null | undefined;
+  selectionEnd: number | null | undefined;
   maxLength: number;
 }): { body: string; caret: number } | null {
   const length = input.body.length;
-  const start = Math.min(Math.max(input.selectionStart, 0), length);
-  const end = Math.min(Math.max(input.selectionEnd, start), length);
+  let start = length;
+  let end = length;
+  if (input.selectionStart != null && input.selectionEnd != null) {
+    start = Math.min(Math.max(input.selectionStart, 0), length);
+    end = Math.min(Math.max(input.selectionEnd, start), length);
+  }
   const next = input.body.slice(0, start) + input.emoji + input.body.slice(end);
   if (next.length > input.maxLength) return null;
   return { body: next, caret: start + input.emoji.length };
