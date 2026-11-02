@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   buildBusinessTrialStats,
   latestIso,
@@ -8,6 +10,7 @@ import {
 import { BUSINESS_NEW_CLIENT_GRANT_KIND } from "@/lib/access-grants/policy";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { selectInPaged, type BusinessTrialsDb, type SelectInOptions } from "@/lib/admin/business-trials-select";
 
 /**
  * Read-only loader for «Подарочная неделя» (task 253821e0). SELECT only, service role.
@@ -16,8 +19,6 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
  */
 
 // 50 sha256 hex values keep the PostgREST GET URL well under common 8 KB proxy limits.
-const CHUNK = 50;
-
 type Db = ReturnType<typeof createServiceRoleClient>;
 type Row = Record<string, unknown>;
 
@@ -25,29 +26,15 @@ function str(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function chunks<T>(values: readonly T[]): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < values.length; i += CHUNK) out.push(values.slice(i, i + CHUNK));
-  return out;
-}
-
-async function selectIn(
+function selectIn(
   db: Db,
   table: string,
   columns: string,
   column: string,
   values: readonly string[],
-  eq: Readonly<Record<string, string>> = {},
+  options: SelectInOptions,
 ): Promise<Row[]> {
-  const rows: Row[] = [];
-  for (const part of chunks(values)) {
-    let query = db.from(table).select(columns).in(column, part);
-    for (const [key, value] of Object.entries(eq)) query = query.eq(key, value);
-    const { data, error } = await query;
-    if (error) throw new Error(`business_trials_${table}_failed: ${error.message}`);
-    rows.push(...((data ?? []) as unknown as Row[]));
-  }
-  return rows;
+  return selectInPaged(db as unknown as BusinessTrialsDb, table, columns, column, values, options);
 }
 
 export async function loadBusinessTrialStats(now: Date = new Date()): Promise<BusinessTrialStats> {
@@ -89,15 +76,15 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
 
   const kindFilter = { kind: BUSINESS_NEW_CLIENT_GRANT_KIND };
   const [paidByUser, paidByHash, events, guestStarts, members, playback] = await Promise.all([
-    selectIn(db, "access_paid_periods", "user_id, paid_until", "user_id", userIds, kindFilter),
-    selectIn(db, "access_paid_periods", "email_hash, paid_until", "email_hash", [...userByHash.keys()], kindFilter),
+    selectIn(db, "access_paid_periods", "user_id, paid_until", "user_id", userIds, { eq: kindFilter, order: ["email_hash"] }),
+    selectIn(db, "access_paid_periods", "email_hash, paid_until", "email_hash", [...userByHash.keys()], { eq: kindFilter, order: ["email_hash"] }),
     selectIn(db, "access_grant_events", "user_id, event_name", "user_id", userIds, {
-      kind: BUSINESS_NEW_CLIENT_GRANT_KIND,
-      event_name: "first_useful_action",
+      eq: { kind: BUSINESS_NEW_CLIENT_GRANT_KIND, event_name: "first_useful_action" },
+      order: ["id"],
     }),
-    selectIn(db, "business_guest_starts", "user_id, organization_id, status", "user_id", userIds, { status: "ready" }),
-    selectIn(db, "business_organization_members", "user_id, organization_id, created_at", "user_id", userIds, { role: "owner" }),
-    selectIn(db, "business_workspace_playback", "user_id, updated_at", "user_id", userIds),
+    selectIn(db, "business_guest_starts", "user_id, organization_id, status", "user_id", userIds, { eq: { status: "ready" }, order: ["id"] }),
+    selectIn(db, "business_organization_members", "user_id, organization_id, created_at", "user_id", userIds, { eq: { role: "owner" }, order: ["id"] }),
+    selectIn(db, "business_workspace_playback", "user_id, updated_at", "user_id", userIds, { order: ["user_id", "space_id"] }),
   ]);
 
   for (const row of paidByUser) {
@@ -138,9 +125,9 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
   const orgIds = [...new Set(orgByUser.values())];
   if (orgIds.length > 0) {
     const [orgs, sessions, heartbeats] = await Promise.all([
-      selectIn(db, "business_organizations", "id, name", "id", orgIds),
-      selectIn(db, "business_point_sessions", "organization_id, last_seen_at", "organization_id", orgIds),
-      selectIn(db, "business_player_device_heartbeat", "organization_id, last_seen_at", "organization_id", orgIds),
+      selectIn(db, "business_organizations", "id, name", "id", orgIds, { order: ["id"] }),
+      selectIn(db, "business_point_sessions", "organization_id, last_seen_at", "organization_id", orgIds, { order: ["id"] }),
+      selectIn(db, "business_player_device_heartbeat", "organization_id, last_seen_at", "organization_id", orgIds, { order: ["player_id"] }),
     ]);
     const nameByOrg = new Map<string, string>();
     for (const row of orgs) {

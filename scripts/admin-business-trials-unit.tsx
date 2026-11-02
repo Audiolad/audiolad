@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import AdminBusinessTrials from "../src/components/admin/AdminBusinessTrials";
 import AdminNavTabs from "../src/components/admin/AdminNavTabs";
+import { BUSINESS_TRIALS_IN_CHUNK, BUSINESS_TRIALS_PAGE_SIZE, chunkValues, selectInPaged, type BusinessTrialsDb, type BusinessTrialsQuery } from "../src/lib/admin/business-trials-select";
 import {
   BUSINESS_TRIAL_STATUS_LABELS,
   buildBusinessTrialStats,
@@ -173,7 +174,7 @@ assert.match(navHtml, /data-nav-href="\/admin\/business-trials"[^>]*aria-current
 
 // Static render of the screen.
 const html = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: stats }));
-for (const text of ["Начали", "Сейчас в подарке", "Льготный период", "Оплатили", "Закрыто", "Моя кофейня", "Кофе на углу", "гость", "зарегистрирован (начинал гостем)", "подарок", "льготный период", "оплачено", "закрыто", "неизвестно", "5 дней", "2 дня", "МСК"]) {
+for (const text of ["Начали", "Сейчас в подарке", "Льготный период", "Сейчас оплачено", "Закрыто", "Моя кофейня", "Кофе на углу", "гость", "зарегистрирован (начинал гостем)", "подарок", "льготный период", "оплачено", "закрыто", "неизвестно", "5 дней", "2 дня", "МСК"]) {
   assert.ok(html.includes(text), text);
 }
 assert.doesNotMatch(html, /—/, "en dash only");
@@ -182,8 +183,93 @@ assert.doesNotMatch(page + read("src/components/admin/AdminBusinessTrials.tsx") 
 const empty = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: buildBusinessTrialStats({ now, grants: [] }) }));
 assert.match(empty, /Пока никто не начинал подарочную неделю/);
 
+// Paging: every IN-chunk is read page by page with a stable order; >1000 rows are never truncated.
+type FakeCall = { table: string; columns: string; in?: [string, readonly string[]]; eq: [string, string][]; gte: [string, string][]; order: string[]; range?: [number, number] };
+function fakeDb(rowsFor: (call: FakeCall) => Record<string, unknown>[], calls: FakeCall[], cap = BUSINESS_TRIALS_PAGE_SIZE): BusinessTrialsDb {
+  return {
+    from(table) {
+      return {
+        select(columns) {
+          const call: FakeCall = { table, columns, eq: [], gte: [], order: [] };
+          const q: BusinessTrialsQuery = {
+            in(column, values) { call.in = [column, values]; return q; },
+            eq(column, value) { call.eq.push([column, value]); return q; },
+            gte(column, value) { call.gte.push([column, value]); return q; },
+            order(column) { call.order.push(column); return q; },
+            range(from, to) { call.range = [from, to]; return q; },
+            then(resolve, reject) {
+              calls.push(call);
+              const all = rowsFor(call);
+              const [from, to] = call.range ?? [0, all.length - 1];
+              const data = all.slice(from, Math.min(to + 1, from + cap));
+              return Promise.resolve({ data, error: null }).then(resolve, reject);
+            },
+          };
+          return q;
+        },
+      };
+    },
+  };
+}
+async function pagingTests(): Promise<void> {
+  assert.equal(BUSINESS_TRIALS_IN_CHUNK, 50);
+  assert.deepEqual(chunkValues(["a", "b", "c"], 2), [["a", "b"], ["c"]]);
+  const orgs = Array.from({ length: 51 }, (_, i) => `org-${i}`);
+  // First chunk holds 2500 rows (3 pages), second chunk 1000 exactly (2 pages: 1000 + 0).
+  const rowsFor = (call: FakeCall) => {
+    const part = call.in?.[1] ?? [];
+    const n = part.length === 50 ? 2500 : 1000;
+    return Array.from({ length: n }, (_, i) => ({ organization_id: part[i % part.length], i }));
+  };
+  const calls: FakeCall[] = [];
+  const rows = await selectInPaged(fakeDb(rowsFor, calls), "business_point_sessions", "organization_id, last_seen_at", "organization_id", orgs, {
+    order: ["id"],
+    eq: { kind: "k" },
+    gte: { day: "2026-11-01" },
+  });
+  assert.equal(rows.length, 3500, "no silent 1000-row truncation");
+  assert.equal(calls.length, 5, "3 pages for chunk 1, 2 pages for chunk 2");
+  assert.deepEqual(calls.map((c) => c.range), [[0, 999], [1000, 1999], [2000, 2999], [0, 999], [1000, 1999]]);
+  for (const c of calls) {
+    assert.deepEqual(c.order, ["id"], "stable order on every page");
+    assert.deepEqual(c.eq, [["kind", "k"]]);
+    assert.deepEqual(c.gte, [["day", "2026-11-01"]]);
+    assert.ok((c.in?.[1].length ?? 0) <= 50);
+  }
+  await assert.rejects(
+    selectInPaged(fakeDb(rowsFor, []), "t", "a", "a", ["x"], { order: [] }),
+    /business_trials_t_order_required/,
+  );
+  const erroring: BusinessTrialsDb = {
+    from: () => ({
+      select: () => {
+        const q: BusinessTrialsQuery = {
+          in: () => q, eq: () => q, gte: () => q, order: () => q, range: () => q,
+          then: (resolve, reject) => Promise.resolve({ data: null, error: { message: "boom" } }).then(resolve, reject),
+        };
+        return q;
+      },
+    }),
+  };
+  await assert.rejects(selectInPaged(erroring, "t", "a", "a", ["x"], { order: ["a"] }), /business_trials_t_failed: .*boom/);
+}
+{
+  const queries = read("src/lib/admin/business-trials-queries.ts");
+  assert.match(queries, /^import "server-only";/, "loader is server-only");
+  assert.doesNotMatch(queries, /\.in\(/, "every IN read goes through the paged helper");
+  const calls = queries.split(/selectIn\(\s*db,/).slice(1);
+  assert.ok(calls.length >= 9, `selectIn calls: ${calls.length}`);
+  for (const call of calls) assert.match(call.slice(0, 320), /order: \[/, `stable order: ${call.slice(0, 80)}`);
+}
+
 if (process.env.BUSINESS_TRIALS_RENDER_OUT) {
   writeFileSync(process.env.BUSINESS_TRIALS_RENDER_OUT, `${navHtml}\n<div class="mt-6">${html}</div>`);
 }
 
-console.log("admin-business-trials-unit: ok");
+pagingTests().then(
+  () => console.log("admin-business-trials-unit: ok"),
+  (error: unknown) => {
+    console.error(error);
+    process.exit(1);
+  },
+);
