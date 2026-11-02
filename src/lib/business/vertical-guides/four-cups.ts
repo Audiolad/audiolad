@@ -9,7 +9,8 @@ export const FOUR_CUPS_TG_HREF = `${FOUR_CUPS_MAX_HREF}?ch=tg`;
 
 export const FOUR_CUPS_MAX_LABEL = "Выбрать чашку и узнать характер кофейни в Максе";
 
-export const FOUR_CUPS_TG_LABEL = "Открыть в Телеграм";
+/** Telegram label mirrors the MAX one: same text, «в Максе» → «в Телеграме». */
+export const FOUR_CUPS_TG_LABEL = FOUR_CUPS_MAX_LABEL.replace(/в Максе$/, "в Телеграме");
 
 export const FOUR_CUPS_SLIDES = [
   {

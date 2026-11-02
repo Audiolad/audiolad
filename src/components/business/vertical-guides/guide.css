@@ -319,12 +319,13 @@
   text-decoration: none;
 }
 
-/* Telegram: the same pill under the MAX one, in Telegram blue. */
+/* Telegram: the same pill under the MAX one, in a deep Telegram blue.
+   Every stop keeps white bold text at WCAG AA (>= 4.5:1): #0e64a8 6.2:1, #1572bd 5.0:1, #1677c0 4.7:1. */
 .b2b-guide a.guide-max.guide-max--tg,
 .b2b-guide a.guide-max.guide-max--tg:hover {
   margin-top: 12px;
-  background: linear-gradient(100deg, #1f8fd6, #2aabee 55%, #37b6f0);
-  box-shadow: 0 12px 28px rgba(34, 150, 220, 0.26);
+  background: linear-gradient(100deg, #0e64a8, #1572bd 55%, #1677c0);
+  box-shadow: 0 12px 28px rgba(21, 114, 189, 0.26);
 }
 
 .guide-max__icon {
