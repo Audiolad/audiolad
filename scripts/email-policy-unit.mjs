@@ -294,7 +294,7 @@ function testRecovery() {
     "forgot-password action accepts next",
   );
   assert(
-    forgotAction.includes("buildPasswordRecoveryRedirectUrl(input.next)"),
+    forgotAction.includes("buildPasswordRecoveryRedirectUrl(input.next, hostnameFromHeaders(await headers()))"),
     "forgot-password passes ultimate next to redirect",
   );
   assert(
