@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   buildBusinessTrialStats,
+  earliestBusinessTrialDay,
   latestIso,
   type BusinessTrialActivityDay,
   type BusinessTrialFacts,
@@ -137,13 +138,16 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
 
   const orgIds = [...new Set(orgByUser.values())];
   if (orgIds.length > 0) {
+    // Activity rows older than the earliest gift start are never used: skip them in SQL.
+    const earliestDay = earliestBusinessTrialDay(grants);
     const [orgs, sessions, heartbeats, activityRows] = await Promise.all([
       selectIn(db, "business_organizations", "id, name", "id", orgIds, { order: ["id"] }),
       selectIn(db, "business_point_sessions", "organization_id, last_seen_at", "organization_id", orgIds, { order: ["id"] }),
       selectIn(db, "business_player_device_heartbeat", "organization_id, last_seen_at", "organization_id", orgIds, { order: ["player_id"] }),
-      config.enabled
+      config.enabled && earliestDay
         ? selectIn(db, "business_trial_activity_days", "organization_id, day, listened_seconds, cabinet_visits", "organization_id", orgIds, {
             order: ["organization_id", "day"],
+            gte: { day: earliestDay },
           })
         : Promise.resolve([] as Row[]),
     ]);

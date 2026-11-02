@@ -169,6 +169,17 @@ export function moscowDay(iso: string): string {
   return MOSCOW_DAY.format(new Date(iso));
 }
 
+/** Earliest Moscow day of any gift start (YYYY-MM-DD), or null when there are no valid grants. */
+export function earliestBusinessTrialDay(grants: readonly Pick<BusinessTrialGrantInput, "startsAt">[]): string | null {
+  let earliest: string | null = null;
+  for (const grant of grants) {
+    if (!Number.isFinite(Date.parse(grant.startsAt))) continue;
+    const day = moscowDay(grant.startsAt);
+    if (earliest === null || day < earliest) earliest = day;
+  }
+  return earliest;
+}
+
 const MUSIC_DAY_SECONDS = 60;
 
 export function summarizeBusinessTrialActivity(
