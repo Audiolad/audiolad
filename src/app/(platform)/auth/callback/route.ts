@@ -1,4 +1,5 @@
-import { BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
+import { isCoffeeHostRequest } from "@/lib/business-app/host";
+import { businessReturnPath, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
 import { getSafeNextPath } from "@/lib/auth/routes";
 import { bindPracticePricePromotionStarts } from "@/lib/pricing/rpc";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
@@ -42,7 +43,11 @@ export async function GET(request: Request) {
   const metadataTrial =
     user?.user_metadata &&
     (user.user_metadata as { business_trial?: unknown }).business_trial === "1";
-  const next = getSafeNextPath(url.searchParams.get("next"), metadataTrial ? BUSINESS_TRIAL_RETURN_PATH : "/profile");
+  const coffee = isCoffeeHostRequest(request.headers);
+  const fallback = metadataTrial
+    ? businessReturnPath(BUSINESS_TRIAL_RETURN_PATH, coffee ? "coffee" : undefined)
+    : coffee ? "/cabinet" : "/profile";
+  const next = getSafeNextPath(url.searchParams.get("next"), fallback);
 
   return NextResponse.redirect(buildPublicRedirectUrl(next, request));
 }

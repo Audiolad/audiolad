@@ -79,6 +79,7 @@ export default function CheckoutResultClient() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
   const checkoutToken = searchParams.get("token");
+  const returnSite = searchParams.get("site") ?? undefined;
   const hasCheckoutParams = Boolean(orderId && checkoutToken);
 
   const [status, setStatus] = useState<CheckoutStatusResponseBody | null>(null);
@@ -300,7 +301,7 @@ export default function CheckoutResultClient() {
   }
 
   if (businessSubscription && isBusinessCheckoutResultView(viewState)) {
-    const card = businessCheckoutResultCard(viewState, status?.authenticated === true);
+    const card = businessCheckoutResultCard(viewState, status?.authenticated === true, returnSite);
     return (
       <ResultCard
         title={card.title}

@@ -1,3 +1,4 @@
+import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { NextResponse } from "next/server";
 
 import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
+  const returnSite = isCoffeeHostRequest(request.headers) ? "coffee" : undefined;
   const started = await startTochkaCheckoutForPendingOrder({
     orderRow: {
       ...(payable as OrderRow),
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
     userId: user.id,
     customerEmail,
     serviceRoleClient,
+    returnSite,
   });
 
   if (!started.ok) {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import AuthBottomNav, { CoffeeAuthProvider } from "../src/components/auth/AuthHostNavigation";
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
@@ -13,6 +14,8 @@ import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/
 import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
 import { resolveSignInIntroCopy } from "../src/lib/auth/buy-sign-in";
 import { businessCheckoutResultCard, buildBusinessSubscriptionPaidHref, buildBusinessSubscriptionSignInHref, isBusinessSubscriptionCheckout, type BusinessCheckoutResultView } from "../src/lib/payments/checkout-result-cta";
+import { buildCreatePaymentData } from "../src/lib/payments/tochka-client";
+import type { TochkaConfig } from "../src/lib/payments/tochka-config";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 
 const END = "2026-11-22T14:11:37.000Z";
@@ -157,5 +160,77 @@ for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src
   assert.match(source, /businessPointSessionAlive/);
   assert.ok(source.indexOf("businessPointSessionAlive") < source.indexOf(".rpc("), route);
 }
+
+
+
+// Return markers affect only the two URLs; the provider remains on the configured apex.
+const config: TochkaConfig = {
+  apiBaseUrl: "https://provider.test", jwtToken: "test", customerCode: "customer",
+  merchantId: null, clientId: "client", paymentModes: ["card", "sbp"],
+  useReceipt: false, taxSystemCode: null, receiptVatType: null,
+  receiptPaymentMethod: "full_payment", receiptPaymentObject: "service",
+  siteUrl: "https://audiolad.ru",
+};
+const paymentInput = {
+  orderId: "test-order", checkoutToken: "test-token", amountMinor: 79900,
+  purpose: "Test purpose", consumerId: "user", customerEmail: "test@example.test", itemName: "Test item",
+};
+for (const useReceipt of [false, true]) {
+  const receiptConfig: TochkaConfig = { ...config, useReceipt, taxSystemCode: "patent", receiptVatType: "none" };
+  const legacy = buildCreatePaymentData(receiptConfig, paymentInput);
+  assert.equal(legacy.redirectUrl, "https://audiolad.ru/checkout/result?order_id=test-order&token=test-token");
+  assert.equal(legacy.failRedirectUrl, `${legacy.redirectUrl}&status=failed`);
+  assert.deepEqual(buildCreatePaymentData(receiptConfig, { ...paymentInput, returnSite: undefined }), legacy);
+  const coffee = buildCreatePaymentData(receiptConfig, { ...paymentInput, returnSite: "coffee" });
+  assert.equal(coffee.redirectUrl, `${legacy.redirectUrl}&site=coffee`);
+  assert.equal(coffee.failRedirectUrl, `${legacy.failRedirectUrl}&site=coffee`);
+  assert.deepEqual(coffee, { ...legacy, redirectUrl: coffee.redirectUrl, failRedirectUrl: coffee.failRedirectUrl });
+}
+
+const coffeeFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+try {
+  for (const enabled of [undefined, "1"]) {
+    if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
+    else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    for (const site of [undefined, "evil", "Coffee", "https://evil.test", "coffee"]) {
+      for (const view of views) {
+        for (const authenticated of [false, true]) {
+          const legacy = businessCheckoutResultCard(view, authenticated);
+          const actual = businessCheckoutResultCard(view, authenticated, site);
+          if (!enabled || site !== "coffee") {
+            assert.deepEqual(actual, legacy);
+            continue;
+          }
+          const target = view === "paid_authenticated" || (authenticated && view !== "paid_unauthenticated")
+            ? "https://coffee.audiolad.ru/cabinet#dostup"
+            : "https://coffee.audiolad.ru/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee";
+          assert.deepEqual(actual, {
+            ...legacy,
+            actionHref: view === "processing" ? null : target,
+            secondaryHref: view === "processing" ? target : null,
+          });
+        }
+      }
+    }
+  }
+} finally {
+  if (coffeeFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlag;
+}
+const checkoutRoute = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
+assert.match(checkoutRoute, /isCoffeeHostRequest\(request.headers\) \? "coffee" : undefined/);
+assert.match(checkoutRoute, /returnSite,/);
+assert.match(catalogClient, /const returnSite = searchParams.get\("site"\)/);
+assert.match(catalogClient, /businessSubscription && isBusinessCheckoutResultView/);
+assert.match(catalogClient, /businessCheckoutResultCard\(viewState, status\?\.authenticated === true, returnSite\)/);
+// Polling and manual re-check keep the page URL (and site marker) intact.
+assert.doesNotMatch(catalogClient, /router\.replace|history\.replaceState|window\.location\s*=/);
+
+const authNav = renderToStaticMarkup(<CoffeeAuthProvider><AuthBottomNav /></CoffeeAuthProvider>);
+for (const href of ["/", "/cabinet", "/documents"]) assert.ok(authNav.includes(`href="${href}"`));
+assert.doesNotMatch(authNav, /href="\/(?:catalog|my-practices|playlists|profile)"/);
+const platformLayout = readFileSync("src/app/(platform)/layout.tsx", "utf8");
+assert.match(platformLayout, /isCoffeeHostRequest\(await headers\(\)\)/);
+assert.ok(platformLayout.indexOf("return <CoffeeAuthProvider>") < platformLayout.indexOf("return <PlatformProviders>"));
 
 console.log("business-subscription-payment-unit: ok");

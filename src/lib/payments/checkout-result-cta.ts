@@ -1,7 +1,7 @@
 import { AUTHOR_PROJECT_CAPACITY_ORDER_KIND } from "@/lib/author-projects/capacity-catalog";
 import { BUSINESS_CABINET_RETURN_PATH } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
-import { BUSINESS_ORIGIN } from "@/lib/business-app/host";
+import { BUSINESS_ORIGIN, COFFEE_ORIGIN, coffeeHostEnabled } from "@/lib/business-app/host";
 import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { STUDIO_MUSIC_ORDER_KIND } from "@/lib/studio-music/access";
 import { buildPracticePublicPath } from "@/lib/products/paths";
@@ -30,12 +30,16 @@ export function isBusinessSubscriptionCheckout(orderKind?: string | null): boole
   return orderKind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
 }
 
-export function buildBusinessSubscriptionPaidHref(): string {
+export function buildBusinessSubscriptionPaidHref(site?: string): string {
+  if (coffeeHostEnabled() && site === "coffee") return `${COFFEE_ORIGIN}/cabinet#dostup`;
   return `${BUSINESS_ORIGIN}/#dostup`;
 }
 
 /** Apex sign-in. After the session exists, /auth/business-cabinet opens the cabinet anchor. */
-export function buildBusinessSubscriptionSignInHref(): string {
+export function buildBusinessSubscriptionSignInHref(site?: string): string {
+  if (coffeeHostEnabled() && site === "coffee") {
+    return `${COFFEE_ORIGIN}${buildAuthRouteHref("/auth/sign-in", `${BUSINESS_CABINET_RETURN_PATH}?site=coffee`)}`;
+  }
   return buildAuthRouteHref("/auth/sign-in", BUSINESS_CABINET_RETURN_PATH);
 }
 
@@ -57,25 +61,26 @@ export type BusinessCheckoutResultCard = {
   secondaryLabel: string | null;
 };
 
-function businessCabinetReturn(authenticated: boolean): { href: string; label: string } {
+function businessCabinetReturn(authenticated: boolean, site?: string): { href: string; label: string } {
   if (authenticated) {
-    return { href: buildBusinessSubscriptionPaidHref(), label: "Вернуться в кабинет" };
+    return { href: buildBusinessSubscriptionPaidHref(site), label: "Вернуться в кабинет" };
   }
-  return { href: buildBusinessSubscriptionSignInHref(), label: "Войти и вернуться в кабинет" };
+  return { href: buildBusinessSubscriptionSignInHref(site), label: "Войти и вернуться в кабинет" };
 }
 
 /** Wording for a business_subscription return. Catalogue orders do not use this. */
 export function businessCheckoutResultCard(
   view: BusinessCheckoutResultView,
   authenticated: boolean,
+  site?: string,
 ): BusinessCheckoutResultCard {
-  const back = businessCabinetReturn(view === "paid_unauthenticated" ? false : authenticated);
+  const back = businessCabinetReturn(view === "paid_unauthenticated" ? false : authenticated, site);
 
   if (view === "paid_authenticated") {
     return {
       title: "Оплата прошла. Доступ открыт.",
       description: "30 дней кабинета АудиоЛад Бизнес. Автосписания нет.",
-      actionHref: buildBusinessSubscriptionPaidHref(),
+      actionHref: buildBusinessSubscriptionPaidHref(site),
       actionLabel: "Вернуться в кабинет",
       secondaryHref: null,
       secondaryLabel: null,

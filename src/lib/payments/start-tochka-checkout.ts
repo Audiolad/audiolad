@@ -1,3 +1,4 @@
+import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { COURSE_UPGRADE_CHECKOUT_STAGES } from "@/lib/course-content/course-upgrade-stages";
 import {
   mapOrderStatusToHttpError,
@@ -106,6 +107,7 @@ async function createTochkaPaymentForOrder(input: {
   userId: string;
   customerEmail: string;
   serviceRoleClient: SupabaseClient;
+  returnSite?: "coffee";
 }): Promise<
   | { ok: true; paymentUrl: string }
   | {
@@ -130,6 +132,7 @@ async function createTochkaPaymentForOrder(input: {
     const tochkaPayment = await createTochkaPaymentOperation({
       orderId: input.orderRow.id,
       checkoutToken,
+      returnSite: input.orderRow.order_kind === BUSINESS_SUBSCRIPTION_ORDER_KIND ? input.returnSite : undefined,
       amountMinor: input.orderRow.amount_minor,
       purpose: isStudioMusicLicense
         ? formatStudioMusicLicensePaymentPurpose(
@@ -195,6 +198,7 @@ export async function startTochkaCheckoutForPendingOrder(input: {
   userId: string;
   customerEmail: string;
   serviceRoleClient: SupabaseClient;
+  returnSite?: "coffee";
 }): Promise<StartTochkaCheckoutResult> {
   if (!getTochkaConfig()) {
     return {
@@ -330,6 +334,7 @@ export async function startTochkaCheckoutForPendingOrder(input: {
         userId: input.userId,
         customerEmail: input.customerEmail,
         serviceRoleClient: input.serviceRoleClient,
+        returnSite: input.returnSite,
       });
 
       if (!recreated.ok) {
@@ -407,6 +412,7 @@ export async function startTochkaCheckoutForPendingOrder(input: {
     userId: input.userId,
     customerEmail: input.customerEmail,
     serviceRoleClient: input.serviceRoleClient,
+    returnSite: input.returnSite,
   });
 
   if (!created.ok) {

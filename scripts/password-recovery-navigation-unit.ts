@@ -108,3 +108,20 @@ function runTests() {
 }
 
 runTests();
+
+const coffeeFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+try {
+  for (const enabled of [undefined, "1"]) {
+    if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
+    else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    const next = "/auth/business-cabinet?site=coffee";
+    for (const host of ["coffee.audiolad.ru", "business.audiolad.ru", "audiolad.ru", "evil.test"]) {
+      const origin = enabled && host === "coffee.audiolad.ru" ? "https://coffee.audiolad.ru" : ORIGIN;
+      assert.equal(buildPasswordRecoveryRedirectUrl(next, host), `${origin}/auth/recovery?next=${encodeURIComponent(next)}`);
+      assert.equal(buildPasswordRecoveryRedirectUrl("https://evil.test", host), `${origin}/auth/recovery`);
+    }
+  }
+} finally {
+  if (coffeeFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlag;
+}
