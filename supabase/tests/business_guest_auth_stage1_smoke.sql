@@ -16,8 +16,10 @@ BEGIN
   END IF;
 END $$;
 
--- Only the disposable compiler fixture lacks the Auth-owned anonymous column.
+-- Only the disposable compiler fixture lacks these Auth-owned columns
+-- (real GoTrue has both; profiles insert trigger reads email_confirmed_at).
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_anonymous boolean NOT NULL DEFAULT false;
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
 INSERT INTO auth.users(id, email, is_anonymous, raw_user_meta_data)
 VALUES ('253821e0-0000-4000-8000-000000000001', NULL, true, '{}');
 SELECT set_config('request.jwt.claim.sub', '253821e0-0000-4000-8000-000000000001', true);
