@@ -57,7 +57,7 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
         <Total label="Начали" value={totals.started} />
         <Total label="Сейчас в подарке" value={totals.trial} />
         <Total label="Льготный период" value={totals.grace} />
-        <Total label="Оплатили" value={totals.paid} />
+        <Total label="Сейчас оплачено" value={totals.paid} />
         <Total label="Закрыто" value={totals.closed} />
       </div>
       <p className="text-sm text-[#796ba0]">
