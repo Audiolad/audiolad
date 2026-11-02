@@ -1,9 +1,9 @@
 import {
   BUSINESS_GIFT_TITLE,
+  BUSINESS_PERIOD_ENDED_PAY_NOTE,
   BUSINESS_SUBSCRIPTION_NOTE,
   BUSINESS_UNCONFIRMED_NOTE,
 } from "@/lib/access-grants/copy";
-import { ruDaysWord } from "@/lib/access-grants/policy";
 import { BUSINESS_BRAND_MARK_SRC, BUSINESS_BRAND_NAME } from "@/lib/business-app/brand-icons";
 import { CLIENT_DOCUMENT_EDITION_LABEL, CLIENT_DOCUMENT_REQUISITES } from "@/lib/business-app/client-documents";
 import { BUSINESS_INQUIRY_EMAIL, BUSINESS_SUPPORT_LEAD, BUSINESS_SUPPORT_TITLE } from "@/lib/business/landing";
@@ -111,12 +111,13 @@ function StatusCopy({ view }: { view: VenueLicenceView }) {
     );
   }
   if (view.status === "grace") {
-    const days = view.graceDaysLeft ?? 0;
+    // 253821e0: no grace countdown in user-visible copy.
+    const ended = view.clock === "subscription" ? "Подписка закончилась" : "Подарочный период закончился";
     return (
       <>
         <p className="mt-2 text-base font-semibold">Срок закончился</p>
         <p className="mt-2 text-sm leading-6" data-testid="venue-grace">
-          Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {view.periodEndLabel}.
+          {view.periodEndLabel ? `${ended} ${view.periodEndLabel}.` : `${ended}.`} {BUSINESS_PERIOD_ENDED_PAY_NOTE}
         </p>
         <Period view={view} />
       </>

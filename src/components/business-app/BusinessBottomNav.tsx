@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
-import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+import { businessCabinetHomePath, businessNavPathname } from "@/lib/business-app/host";
 
 import {
   BizDocumentsIcon,
@@ -25,7 +25,7 @@ import {
 } from "@/lib/business-app/access";
 import {
   BUSINESS_MOBILE_NAV_ITEMS,
-  isBusinessNavItemCurrent,
+  businessActiveNavItemId,
   type BusinessNavIconKey,
 } from "@/lib/business-app/nav";
 
@@ -46,18 +46,19 @@ const ICONS: Record<
  */
 export default function BusinessBottomNav() {
   const hostname = useBusinessHostname();
-  const pathname = normalizeBusinessAppPathname(usePathname() || "/");
+  const pathname = businessNavPathname(usePathname() || "/", hostname);
   const pointMode = usePointMode();
   const items = pointMode
     ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music" || item.id === "settings")
     : BUSINESS_MOBILE_NAV_ITEMS;
   const access = resolveBusinessAccess(useBusinessDomain(), pointMode);
   const { showLocked } = useBusinessGuestStatus();
+  const activeId = businessActiveNavItemId(pathname, items);
 
   return (
     <nav className="business-app-bottom-nav" aria-label="Мобильная навигация">
       {items.map((item) => {
-        const active = isBusinessNavItemCurrent(pathname, item);
+        const active = item.id === activeId;
         const locked = isBusinessNavItemLocked(item, access);
         const Icon = ICONS[item.icon as keyof typeof ICONS];
         const name = locked ? `${item.title} – ${BUSINESS_LOCKED_LABEL}` : item.title;
@@ -77,7 +78,8 @@ export default function BusinessBottomNav() {
               aria-label={name}
               title={name}
               onClick={() => showLocked(item.title)}
-              className="business-app-focus-ring business-app-bottom-nav__item business-app-nav-locked"
+              className={`business-app-focus-ring business-app-bottom-nav__item business-app-nav-locked${active ? " is-active" : ""}`}
+              aria-current={active ? "page" : undefined}
             >
               {icon}
             </button>
