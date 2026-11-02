@@ -153,8 +153,7 @@ async function expectGuestRejected(ticket: string | undefined) {
 // Seed one real starter practice so "guest gets no starter practices" is not vacuous.
 const authorId = randomUUID();
 const practiceId = randomUUID();
-psql(`INSERT INTO auth.users(id, instance_id, aud, role, email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-  VALUES ('${authorId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'stand-author-${authorId.slice(0, 8)}@example.invalid', now(), '{}', '{}', now(), now())`);
+psql(`INSERT INTO public.authors(id, name, slug) VALUES ('${authorId}', 'Stand author', 'stand-author-${authorId.slice(0, 8)}')`);
 // Trusted fixture path: the same session switch the publication RPC uses.
 psql(`SET audiolad.allow_practice_publish = 'on'; INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, is_catalog_listed, audio_url)
   VALUES ('${practiceId}', '${authorId}', 'Stand starter', 'stand-starter-${practiceId.slice(0, 8)}', 'published', true, 0, true, 'https://example.invalid/a.mp3')`);
