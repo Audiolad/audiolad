@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS public.business_guest_start_network_hits (
 );
 CREATE INDEX IF NOT EXISTS business_guest_start_network_hits_network_created_idx
   ON public.business_guest_start_network_hits(network_hash, created_at);
+CREATE INDEX IF NOT EXISTS business_guest_start_network_hits_expires_idx
+  ON public.business_guest_start_network_hits(expires_at);
 CREATE TABLE IF NOT EXISTS public.business_guest_starts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   idempotency_hash text UNIQUE NOT NULL CHECK (idempotency_hash ~ '^[0-9a-f]{64}$'),
@@ -70,6 +72,8 @@ CREATE TABLE IF NOT EXISTS public.business_guest_starts (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS business_guest_starts_network_retention_idx
+  ON public.business_guest_starts(created_at) WHERE network_hash IS NOT NULL;
 ALTER TABLE public.business_guest_start_network_hits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_guest_starts ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.business_guest_start_network_hits, public.business_guest_starts FROM PUBLIC, anon, authenticated;
@@ -83,11 +87,14 @@ DECLARE v_hits bigint;
 BEGIN
   IF p_network_hash IS NULL OR p_network_hash !~ '^[0-9a-f]{64}$'
     OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 1000
-    OR p_window_seconds IS NULL OR p_window_seconds NOT BETWEEN 60 AND 604800 THEN
+    OR p_window_seconds IS NULL OR p_window_seconds NOT BETWEEN 60 AND 172800 THEN
     RAISE EXCEPTION 'invalid_guest_start_input' USING ERRCODE = '22023';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtext('business_guest_start:' || p_network_hash));
-  DELETE FROM public.business_guest_start_network_hits WHERE network_hash = p_network_hash AND expires_at <= now();
+  -- Retention 48 h for every network identifier, not only the calling network (window max = retention).
+  DELETE FROM public.business_guest_start_network_hits WHERE expires_at <= now();
+  UPDATE public.business_guest_starts SET network_hash = NULL
+    WHERE network_hash IS NOT NULL AND created_at <= now() - interval '48 hours';
   SELECT count(*) INTO v_hits FROM public.business_guest_start_network_hits
     WHERE network_hash = p_network_hash AND created_at > now() - make_interval(secs => p_window_seconds);
   IF v_hits >= p_limit THEN RETURN false; END IF;

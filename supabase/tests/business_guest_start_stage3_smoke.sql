@@ -25,6 +25,34 @@ INSERT INTO auth.users(id, email, is_anonymous, email_confirmed_at, raw_user_met
   ('253821e0-0000-4000-8000-000000000032', NULL, true, NULL, '{}'),
   ('253821e0-0000-4000-8000-000000000034', NULL, true, NULL, '{}'),
   ('253821e0-0000-4000-8000-000000000033', 'stage3-owner@example.invalid', false, now(), '{}');
+-- Retention fixtures (superuser): an expired hit of another network and an old start with network_hash.
+INSERT INTO public.business_guest_start_network_hits(network_hash, created_at, expires_at)
+  VALUES (repeat('a', 64), now() - interval '49 hours', now() - interval '1 hour');
+INSERT INTO public.business_guest_starts(idempotency_hash, network_hash, status, created_at)
+  VALUES (repeat('f', 64), repeat('a', 64), 'failed', now() - interval '49 hours');
+SET LOCAL ROLE service_role;
+DO $$
+BEGIN
+  IF NOT public.business_guest_start_reserve(repeat('e', 64), 3, 86400) THEN RAISE EXCEPTION 'retention reserve refused'; END IF;
+  BEGIN
+    PERFORM public.business_guest_start_reserve(repeat('e', 64), 3, 172801);
+    RAISE EXCEPTION 'window above retention accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+END $$;
+RESET ROLE;
+DO $$
+DECLARE v_n int;
+BEGIN
+  SELECT count(*) INTO v_n FROM public.business_guest_start_network_hits WHERE network_hash = repeat('a', 64);
+  IF v_n <> 0 THEN RAISE EXCEPTION 'expired network hit kept'; END IF;
+  SELECT count(*) INTO v_n FROM public.business_guest_starts WHERE idempotency_hash = repeat('f', 64) AND network_hash IS NOT NULL;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'old start network_hash kept'; END IF;
+  SELECT count(*) INTO v_n FROM public.business_guest_start_network_hits WHERE network_hash = repeat('e', 64);
+  IF v_n <> 1 THEN RAISE EXCEPTION 'retention reserve did not record exactly one hit'; END IF;
+  DELETE FROM public.business_guest_starts WHERE idempotency_hash = repeat('f', 64);
+  DELETE FROM public.business_guest_start_network_hits WHERE network_hash = repeat('e', 64);
+END $$;
 SET LOCAL ROLE service_role;
 DO $$
 DECLARE v_first record; v_again record; v_other record; v_grant public.access_grants%ROWTYPE; v_n int;

@@ -100,7 +100,7 @@ assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SEC
 assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT: "2000" }).networkLimit, 1000);
 assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT: "-2" }).networkLimit, 1);
 assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT: "bad" }).networkLimit, 3);
-assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_WINDOW_HOURS: "2000" }).windowSeconds, 168 * 3600);
+assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_WINDOW_HOURS: "2000" }).windowSeconds, 48 * 3600);
 assert.equal(businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_START_WINDOW_HOURS: "0" }).windowSeconds, 3600);
 assert.equal(businessGuestStartConfig({}).windowSeconds, 86400);
 const a = guestNetworkKey("2001:db8:abcd:1::1", secret);

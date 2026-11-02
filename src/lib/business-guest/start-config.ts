@@ -19,7 +19,7 @@ export function businessGuestStartConfig(env: Record<string, string | undefined>
     enabled,
     available: enabled && new TextEncoder().encode(networkSecret).byteLength >= 32,
     networkLimit: bounded(env.AUDIOLAD_BUSINESS_GUEST_START_NETWORK_LIMIT, 3, 1000),
-    windowSeconds: bounded(env.AUDIOLAD_BUSINESS_GUEST_START_WINDOW_HOURS, 24, 168) * 3600,
+    windowSeconds: bounded(env.AUDIOLAD_BUSINESS_GUEST_START_WINDOW_HOURS, 24, 48) * 3600,
     networkSecret,
     production: env.NODE_ENV === "production",
   };
