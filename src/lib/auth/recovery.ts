@@ -1,3 +1,5 @@
+import { COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "@/lib/business-app/host";
+
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
 import { resolveValidatedNextPath } from "./routes";
@@ -52,9 +54,10 @@ export function buildPostPasswordResetSignInHref(
  */
 export function buildPasswordRecoveryRedirectUrl(
   ultimateNext: string | null | undefined,
+  hostname?: string,
 ): string {
   const recoveryRoute = buildRecoveryRouteWithNext(ultimateNext);
-  const origin = getAppOrigin();
+  const origin = coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? COFFEE_ORIGIN : getAppOrigin();
 
   return `${origin}${recoveryRoute}`;
 }

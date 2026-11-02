@@ -236,3 +236,25 @@ function runTests() {
 }
 
 runTests();
+
+const coffeeFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+try {
+  for (const enabled of [undefined, "1"]) {
+    if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
+    else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    const coffee = requestAt("http://localhost:3000/auth/callback", {
+      host: "coffee.audiolad.ru", "x-forwarded-host": "audiolad.ru",
+    });
+    assert.equal(buildPublicRedirectUrl("/auth/sign-in?error=auth_callback", coffee).href,
+      `https://${enabled ? "coffee.audiolad.ru" : "audiolad.ru"}/auth/sign-in?error=auth_callback`);
+    for (const host of ["evil.test", "business.audiolad.ru", "coffee.audiolad.ru.evil.test"]) {
+      assert.equal(getPublicRequestOrigin(requestAt(`https://${host}/auth/callback`, { host })), PRODUCTION_APP_ORIGIN);
+    }
+    assert.equal(getPublicRequestOrigin(requestAt("https://audiolad.ru/auth/callback", {
+      host: "audiolad.ru", "x-forwarded-host": "coffee.audiolad.ru",
+    })), PRODUCTION_APP_ORIGIN);
+  }
+} finally {
+  if (coffeeFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlag;
+}
