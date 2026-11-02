@@ -8,6 +8,7 @@ import {
   BUSINESS_LIVE_REFRESH_MS,
   businessEntryCookieValue,
   businessEntrySwitchAction,
+  businessLiveRefreshActive,
   businessLiveRefreshPath,
   isTypingTarget,
   parseBusinessEntry,
@@ -152,5 +153,18 @@ assert.match(live, /visibilityState === "hidden"/);
 const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8");
 assert.match(home, /data-entry=\{venueSide \? "venue" : "person"\}/);
 assert.match(home, /venueSide \? locationName \|\| "Кофейня" : greeting/);
+
+// 253821e0: the coffee.audiolad.ru root is the guest player, not the owner home – no refresh there.
+{
+  const at = (hostname: string, pathname: string, normalizedPathname = pathname) =>
+    businessLiveRefreshActive({ hostname, pathname, normalizedPathname });
+  assert.equal(at("coffee.audiolad.ru", "/"), false, "coffee root = guest player with the queue");
+  assert.equal(at("coffee.audiolad.ru", "/cabinet", "/"), true, "coffee owner home still refreshes");
+  assert.equal(at("coffee.audiolad.ru", "/music"), false);
+  assert.equal(at("coffee.audiolad.ru", "/documents"), true);
+  assert.equal(at("business.audiolad.ru", "/"), true, "business owner home still refreshes");
+  assert.equal(at("business.audiolad.ru", "/guest/coffee"), false);
+}
+assert.match(live, /businessLiveRefreshActive\(\{/);
 
 console.log("business-live-refresh-unit OK");

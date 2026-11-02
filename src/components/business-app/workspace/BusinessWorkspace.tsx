@@ -23,7 +23,7 @@ import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
 import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
-import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
@@ -91,8 +91,21 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       });
     }
   }, [model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
-  const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
-  const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
+  // The live refresh (router.refresh every few seconds) passes a new model object with the same
+  // tracks. The queue request depends on this key, not on object identity: an unchanged key keeps
+  // the queue the player already has instead of asking the server for a new random mix.
+  const queueBuildKey = cafeQueueBuildKey({
+    spaceId: model.spaceId,
+    tracks: model.tracks,
+    character: queue.profile.character,
+    direction: queue.profile.direction,
+    daypart: queue.effectiveDaypart,
+    feedback: queue.feedback,
+  });
+  const queueInputRef = useRef({ model, queue });
+  useLayoutEffect(() => {
+    queueInputRef.current = { model, queue };
+  });
   const boundaryRef = useRef<string | null>(null);
   const statusRef = useRef(player.view.status);
   useEffect(() => {
@@ -120,6 +133,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   };
   useEffect(() => {
     if (player.pointDevice) return;
+    const { model, queue } = queueInputRef.current;
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
     let cancelled = false;
@@ -183,14 +197,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     player.pointDevice,
     open,
     queue.ready,
-    queue.effectiveDaypart,
-    queue.profile.character,
-    queue.profile.direction,
-    queue.feedback,
-    feedbackKey,
-    trackKey,
-    model.spaceId,
-    model.tracks,
+    queueBuildKey,
     setQueueOrder,
     applyAtmosphereQueue,
   ]);
