@@ -69,6 +69,11 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
           : `Слушали не меньше ${data.activeMinutes} минут: ${totals.activeEnough.toLocaleString("ru-RU")}.`}
         {" "}Обновлено: {formatBusinessTrialMoscow(data.generatedAt)}.
       </p>
+      {data.hiddenTests > 0 ? (
+        <p className="text-xs text-[#9a8fb8]" data-trial-hidden-tests>
+          Скрыто тестовых: {data.hiddenTests.toLocaleString("ru-RU")}
+        </p>
+      ) : null}
       {!data.activityEnabled ? (
         <p className="text-xs text-[#9a8fb8]" data-trial-activity-off>
           Минуты, дни с музыкой и заходы в кабинет начнут считаться после включения записи. До этого в колонках «{BUSINESS_TRIAL_NO_DATA}».

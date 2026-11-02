@@ -19,6 +19,7 @@ import {
   latestIso,
   type BusinessTrialFacts,
 } from "../src/lib/admin/business-trials";
+import { businessTrialExcludedOrgIds } from "../src/lib/admin/business-trials-excluded";
 import { ADMIN_NAV_ITEMS, BUSINESS_TRIALS_HREF, canSeeBusinessTrialStats, getVisibleAdminNavItems } from "../src/lib/admin/nav";
 import { groupAudioladBusinessNav } from "../src/lib/admin/nav-group";
 import type { PlatformAccessSnapshot } from "../src/lib/auth/platform-access";
@@ -184,6 +185,36 @@ assert.doesNotMatch(html, /@|email_hash/);
 assert.doesNotMatch(page + read("src/components/admin/AdminBusinessTrials.tsx") + read("src/lib/admin/business-trials.ts"), /—/);
 const empty = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: buildBusinessTrialStats({ now, grants: [] }) }));
 assert.match(empty, /Пока никто не начинал подарочную неделю/);
+assert.doesNotMatch(html, /Скрыто тестовых/, "no hidden line when nothing is hidden");
+assert.equal(stats.hiddenTests, 0);
+
+// Our test venues: skipped from totals and rows, counted in «Скрыто тестовых: N», nothing deleted.
+const ORG_TEST_A = "45189ad3-5a07-45f7-bd74-8d0a49f572f0";
+const ORG_TEST_B = "f8c497f9-7925-44e0-a4bc-f1ba5ed0438a";
+const ORG_REAL = "94c2b588-2076-4a0f-958e-3ebfdfa9b9bc";
+assert.deepEqual(
+  [...businessTrialExcludedOrgIds({ AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS: ` ${ORG_TEST_A.toUpperCase()},${ORG_TEST_B}\n not-a-uuid ;; 45189ad3 ` })],
+  [ORG_TEST_A, ORG_TEST_B],
+);
+assert.equal(businessTrialExcludedOrgIds({}).size, 0);
+assert.equal(businessTrialExcludedOrgIds({ AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS: "" }).size, 0);
+const hiddenFacts = new Map<string, BusinessTrialFacts>([
+  [uid(1), { organizationId: ORG_TEST_A, organizationName: "Моя кофейня", guestStart: true, workspacePlaybackAt: at(-0.5) }],
+  [uid(2), { organizationId: ORG_REAL, organizationName: "Настоящая кофейня" }],
+  [uid(3), { organizationId: ORG_TEST_B.toUpperCase(), paidUntil: at(20) }],
+  [uid(4), { guestStart: true }],
+]);
+const hidden = buildBusinessTrialStats({ now, grants, facts: hiddenFacts, excludedOrgIds: businessTrialExcludedOrgIds({ AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS: `${ORG_TEST_A},${ORG_TEST_B}` }) });
+assert.equal(hidden.hiddenTests, 2);
+assert.equal(hidden.totals.started, 2);
+assert.equal(hidden.totals.paid, 0);
+assert.equal(hidden.totals.firstPlayYes, 0);
+assert.deepEqual(hidden.rows.map((row) => row.userId).sort(), [uid(2), uid(4)]);
+assert.equal(buildBusinessTrialStats({ now, grants, facts: hiddenFacts }).hiddenTests, 0, "no env list -> nothing hidden");
+const hiddenHtml = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: hidden }));
+assert.match(hiddenHtml, /data-trial-hidden-tests[^>]*>Скрыто тестовых: (<!-- -->)?2</);
+assert.doesNotMatch(hiddenHtml, /Моя кофейня/);
+assert.doesNotMatch(hiddenHtml, /—/, "en dash only");
 
 // Paging: every IN-chunk is read page by page with a stable order; >1000 rows are never truncated.
 type FakeCall = { table: string; columns: string; in?: [string, readonly string[]]; eq: [string, string][]; gte: [string, string][]; order: string[]; range?: [number, number] };
