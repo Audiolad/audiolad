@@ -91,7 +91,8 @@ function card(domain: BusinessOwnerHomeContext, access: { mode: "grace" | "offer
 
 const graceHtml = card(ownerDomain, grace);
 assert.match(graceHtml, /data-mode="grace"/);
-assert.match(graceHtml, /Музыка играет ещё/);
+assert.match(graceHtml, /Оплатите, чтобы музыка продолжала играть\./);
+assert.doesNotMatch(graceHtml, /[её]щ[её] \d+ (день|дня|дней)|остановится|льготн/u, "no grace countdown (253821e0)");
 assert.match(graceHtml, /href="\/documents\/b2b-terms"/);
 assert.match(graceHtml, /data-testid="biz-home-accept"/);
 assert.doesNotMatch(graceHtml, /data-testid="biz-home-pay-button"/);

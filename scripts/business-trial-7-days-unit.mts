@@ -38,7 +38,8 @@ assert.equal(BUSINESS_PAID_PERIOD_DAYS, 30, "the paid period is unchanged");
 assert.equal(BUSINESS_GIFT_TITLE, "7 дней в подарок");
 assert.equal(BUSINESS_GIFT_CTA, "Получить 7 дней бесплатно");
 assert.equal(businessGiftPriceNote().replace(/\s/gu, " "), "799 ₽ за 30 дней, картой или по СБП. Автосписания нет.");
-assert.match(BUSINESS_GIFT_CLOSING_NOTE, /требуется оплата.*ещё 3 дня.*до оплаты/u);
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.");
+assert.doesNotMatch(BUSINESS_GIFT_CLOSING_NOTE, /[её]щ[её] \d+ дн|льготн/u, "grace days are not shown (253821e0)");
 for (const text of [BUSINESS_GIFT_TITLE, BUSINESS_GIFT_CTA, BUSINESS_GIFT_CLOSING_NOTE, businessGiftPriceNote()]) {
   assert.doesNotMatch(text, /\u2014/u, "no em dash in visible copy");
   assert.doesNotMatch(text, /30 дней в подарок|30 дней бесплатно/u);

@@ -93,6 +93,7 @@ jobs:
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-guest-shell
           npm run test:business-nav-active
           npm run test:business-ru-copy
+          npm run test:business-no-grace-copy
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
