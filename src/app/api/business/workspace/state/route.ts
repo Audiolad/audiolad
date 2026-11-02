@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { recordAccessActivity } from "@/lib/access-grants/apply";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
@@ -6,6 +6,8 @@ import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { loadWorkspaceActor, loadWorkspacePage } from "@/lib/business-workspace/load.server";
 import { clampWorkspacePlayback } from "@/lib/business-workspace/playback";
 import { handleWorkspaceState } from "@/lib/business-workspace/routes";
+import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
+import { recordBusinessTrialListen } from "@/lib/business-trial-activity/record.server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,12 @@ export async function POST(request: Request) {
     userId: async () => (actor.ok ? (actor.device ? POINT_DEVICE_STATE_ACTOR : actor.userId) : null),
     playerOpen: async () => actor.ok && actor.playerOpen,
     savePlayback: async (input) => {
+      // Gift-week minutes (flag OFF by default). Counted per venue, device included; the SQL
+      // caps each report by real elapsed time, so the cabinet and the point cannot double count.
+      const venueLocationId = actor.ok ? actor.locationId : null;
+      if (venueLocationId && businessTrialActivityConfig(process.env).enabled) {
+        after(() => recordBusinessTrialListen(venueLocationId));
+      }
       if (!account) return;
       const store = createSupabaseAccessGrantStore();
       const clamped = clampWorkspacePlayback({ ...input, updatedAt: new Date().toISOString() }, 10_000);

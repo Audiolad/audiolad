@@ -6374,6 +6374,21 @@
       "file": "supabase/migrations/20270212120000_business_guest_start_stage3.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_bootstrap(uuid, text, text, int, text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270213120000_business_trial_activity_days.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.record_business_trial_activity(uuid, text, integer, integer, integer) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270213120000_business_trial_activity_days.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.record_business_trial_point_listen(text, integer, integer) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270213120000_business_trial_activity_days.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.purge_business_trial_activity_days(integer) TO service_role;"
     }
   ]
 }

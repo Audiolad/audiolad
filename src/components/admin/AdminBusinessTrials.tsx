@@ -1,6 +1,8 @@
 import {
   BUSINESS_TRIAL_ACCOUNT_LABELS,
   BUSINESS_TRIAL_FIRST_PLAY_LABELS,
+  BUSINESS_TRIAL_NO_DATA,
+  BUSINESS_TRIAL_START_HOST_LABELS,
   BUSINESS_TRIAL_STATUS_LABELS,
   type BusinessTrialStats,
   type BusinessTrialStatus,
@@ -43,6 +45,10 @@ function Total({ label, value }: { label: string; value: number }) {
   );
 }
 
+function NoData() {
+  return <span className="text-[#9a8fb8]">{BUSINESS_TRIAL_NO_DATA}</span>;
+}
+
 export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats }) {
   const { totals, rows } = data;
   return (
@@ -57,8 +63,17 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
       <p className="text-sm text-[#796ba0]">
         Гостей: {totals.guests.toLocaleString("ru-RU")}, зарегистрированных: {totals.registered.toLocaleString("ru-RU")}.
         {" "}Включали музыку (видно по данным): {totals.firstPlayYes.toLocaleString("ru-RU")}.
+        {" "}
+        {totals.activeEnough === null
+          ? `Слушали не меньше ${data.activeMinutes} минут: ${BUSINESS_TRIAL_NO_DATA}.`
+          : `Слушали не меньше ${data.activeMinutes} минут: ${totals.activeEnough.toLocaleString("ru-RU")}.`}
         {" "}Обновлено: {formatBusinessTrialMoscow(data.generatedAt)}.
       </p>
+      {!data.activityEnabled ? (
+        <p className="text-xs text-[#9a8fb8]" data-trial-activity-off>
+          Минуты, дни с музыкой и заходы в кабинет начнут считаться после включения записи. До этого в колонках «{BUSINESS_TRIAL_NO_DATA}».
+        </p>
+      ) : null}
 
       {rows.length === 0 ? (
         <div className="rounded-[22px] border border-[#e4d7f4] bg-white p-5 text-sm text-[#796ba0]">
@@ -76,6 +91,9 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
                 <th className="px-4 py-3">Статус</th>
                 <th className="px-4 py-3">Первое включение</th>
                 <th className="px-4 py-3">Последняя активность плеера</th>
+                <th className="px-4 py-3">Минуты музыки</th>
+                <th className="px-4 py-3">Дни с музыкой</th>
+                <th className="px-4 py-3">Заходы в кабинет</th>
               </tr>
             </thead>
             <tbody>
@@ -85,7 +103,12 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
                     <p className="font-semibold text-[#2b2140]">{row.title}</p>
                     <p className="text-xs text-[#9a8fb8]">id {row.shortId}</p>
                   </td>
-                  <td className="px-4 py-3">{BUSINESS_TRIAL_ACCOUNT_LABELS[row.account]}</td>
+                  <td className="px-4 py-3">
+                    {BUSINESS_TRIAL_ACCOUNT_LABELS[row.account]}
+                    {row.startHost ? (
+                      <span className="block text-xs text-[#9a8fb8]">старт: {BUSINESS_TRIAL_START_HOST_LABELS[row.startHost]}</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatBusinessTrialMoscow(row.startsAt)}</td>
                   <td className="px-4 py-3 whitespace-nowrap tabular-nums">
                     {row.status === "closed" ? EMPTY : `${row.daysLeft} ${ruDaysWord(row.daysLeft)}`}
@@ -97,6 +120,15 @@ export default function AdminBusinessTrials({ data }: { data: BusinessTrialStats
                   </td>
                   <td className="px-4 py-3">{BUSINESS_TRIAL_FIRST_PLAY_LABELS[row.firstPlay]}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatBusinessTrialMoscow(row.lastActivityAt)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums" data-trial-cell="minutes">
+                    {row.activity ? row.activity.listenedMinutes.toLocaleString("ru-RU") : <NoData />}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums" data-trial-cell="music-days">
+                    {row.activity ? row.activity.musicDays.toLocaleString("ru-RU") : <NoData />}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums" data-trial-cell="visits">
+                    {row.activity ? row.activity.cabinetVisits.toLocaleString("ru-RU") : <NoData />}
+                  </td>
                 </tr>
               ))}
             </tbody>

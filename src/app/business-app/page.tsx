@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import BusinessHomePage from "@/components/business-app/BusinessHomePage";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { pointDeviceHomeRedirect } from "@/lib/business-app/point-device";
 import { loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
+import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
+import { recordBusinessTrialVisit } from "@/lib/business-trial-activity/record.server";
 
 /**
  * Owner Home. Domain + player-health signals load in layout (P0-01 / P1-05).
@@ -18,6 +21,10 @@ export default async function BusinessAppHomePage() {
   const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
   const devicePlayer = pointDeviceHomeRedirect(await loadPointDeviceVenue(), locationId);
   if (devicePlayer) redirect(devicePlayer);
+  // Gift-week cabinet visits (flag OFF by default); 30-minute sessions are counted in SQL.
+  if (locationId && businessTrialActivityConfig(process.env).enabled) {
+    after(() => recordBusinessTrialVisit(locationId));
+  }
   const saved = locationId ? await loadLocationSoundSettings(locationId) : null;
   return <BusinessHomePage pointCanEdit={saved ? saved.pointCanEditSettings : true} />;
 }

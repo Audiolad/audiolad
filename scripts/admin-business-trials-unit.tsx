@@ -15,6 +15,7 @@ import {
   BUSINESS_TRIAL_STATUS_LABELS,
   buildBusinessTrialStats,
   businessTrialFirstPlay,
+  earliestBusinessTrialDay,
   latestIso,
   type BusinessTrialFacts,
 } from "../src/lib/admin/business-trials";
@@ -63,6 +64,7 @@ assert.deepEqual(stats.totals, {
   guests: 1,
   registered: 3,
   firstPlayYes: 2,
+  activeEnough: null,
 });
 assert.equal(stats.generatedAt, now.toISOString());
 assert.deepEqual(stats.rows.map((row) => row.userId), [uid(1), uid(2), uid(4), uid(3)], "newest start first");
@@ -236,6 +238,32 @@ async function pagingTests(): Promise<void> {
     assert.deepEqual(c.gte, [["day", "2026-11-01"]]);
     assert.ok((c.in?.[1].length ?? 0) <= 50);
   }
+  // Activity days: 1 org x 1500 days > 1000 rows, all read across two pages with the day bound.
+  {
+    const activityCalls: FakeCall[] = [];
+    const days = Array.from({ length: 1500 }, (_, i) => ({ organization_id: "org-1", day: `d${String(i).padStart(4, "0")}`, listened_seconds: 60, cabinet_visits: 1 }));
+    const activityRows = await selectInPaged(
+      fakeDb(() => days, activityCalls),
+      "business_trial_activity_days",
+      "organization_id, day, listened_seconds, cabinet_visits",
+      "organization_id",
+      ["org-1"],
+      { order: ["organization_id", "day"], gte: { day: "2026-10-01" } },
+    );
+    assert.equal(activityRows.length, 1500, "activity days beyond 1000 rows are not dropped");
+    assert.equal(activityCalls.length, 2);
+    for (const c of activityCalls) {
+      assert.deepEqual(c.order, ["organization_id", "day"]);
+      assert.deepEqual(c.gte, [["day", "2026-10-01"]]);
+    }
+  }
+  assert.equal(earliestBusinessTrialDay([]), null);
+  assert.equal(earliestBusinessTrialDay([{ startsAt: "bad" }]), null);
+  assert.equal(
+    earliestBusinessTrialDay([{ startsAt: "2026-11-01T10:00:00.000Z" }, { startsAt: "2026-10-20T21:30:00.000Z" }, { startsAt: "2026-10-25T00:00:00.000Z" }]),
+    "2026-10-21",
+    "Moscow day: 21:30Z on 20 Oct is 00:30 MSK on 21 Oct",
+  );
   await assert.rejects(
     selectInPaged(fakeDb(rowsFor, []), "t", "a", "a", ["x"], { order: [] }),
     /business_trials_t_order_required/,
@@ -256,6 +284,13 @@ async function pagingTests(): Promise<void> {
 {
   const queries = read("src/lib/admin/business-trials-queries.ts");
   assert.match(queries, /^import "server-only";/, "loader is server-only");
+  // B1: activity days are paged with (organization_id, day) order and cut at the earliest gift start day.
+  assert.match(
+    queries,
+    /"business_trial_activity_days",[\s\S]*?order: \["organization_id", "day"\],\s*gte: \{ day: earliestDay \}/,
+    "activity days paged and bounded by earliest start day",
+  );
+  assert.match(queries, /const earliestDay = earliestBusinessTrialDay\(grants\);/);
   assert.doesNotMatch(queries, /\.in\(/, "every IN read goes through the paged helper");
   const calls = queries.split(/selectIn\(\s*db,/).slice(1);
   assert.ok(calls.length >= 9, `selectIn calls: ${calls.length}`);
