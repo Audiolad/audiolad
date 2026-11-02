@@ -13,7 +13,7 @@ import { mapBusinessSubscriptionRpcError, ownerCanPayFromThisBrowser } from "../
 import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/copy";
 import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
 import { resolveSignInIntroCopy } from "../src/lib/auth/buy-sign-in";
-import { businessCheckoutResultCard, buildBusinessSubscriptionPaidHref, buildBusinessSubscriptionSignInHref, isBusinessSubscriptionCheckout, type BusinessCheckoutResultView } from "../src/lib/payments/checkout-result-cta";
+import { CHECKOUT_RETURN_SITE_COOKIE, businessCheckoutResultCard, buildBusinessSubscriptionPaidHref, readCheckoutReturnSiteCookie, resolveCheckoutReturnSite, buildBusinessSubscriptionSignInHref, isBusinessSubscriptionCheckout, type BusinessCheckoutResultView } from "../src/lib/payments/checkout-result-cta";
 import { buildCreatePaymentData } from "../src/lib/payments/tochka-client";
 import type { TochkaConfig } from "../src/lib/payments/tochka-config";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -220,7 +220,26 @@ try {
 const checkoutRoute = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
 assert.match(checkoutRoute, /isCoffeeHostRequest\(request.headers\) \? "coffee" : undefined/);
 assert.match(checkoutRoute, /returnSite,/);
-assert.match(catalogClient, /const returnSite = searchParams.get\("site"\)/);
+assert.match(catalogClient, /const siteParam = searchParams.get\("site"\)/);
+assert.match(catalogClient, /readCheckoutReturnSiteCookie\(document\.cookie\)/);
+assert.match(catalogClient, /resolveCheckoutReturnSite\(returnSiteCookie, siteParam\)/);
+assert.match(checkoutRoute, /response\.cookies\.set\(CHECKOUT_RETURN_SITE_COOKIE, returnSite \?\? "business"/);
+assert.match(checkoutRoute, /getSupabaseCookieOptions\(hostnameFromHeaders\(request\.headers\)\)/);
+// Latest start wins over the marker of a reused pending link (business -> coffee and coffee -> business).
+assert.equal(CHECKOUT_RETURN_SITE_COOKIE, "al_checkout_return_site");
+assert.equal(resolveCheckoutReturnSite("coffee", null), "coffee");
+assert.equal(resolveCheckoutReturnSite("coffee", "business"), "coffee");
+assert.equal(resolveCheckoutReturnSite("business", "coffee"), undefined);
+assert.equal(resolveCheckoutReturnSite(null, "coffee"), "coffee");
+assert.equal(resolveCheckoutReturnSite(null, null), undefined);
+for (const bad of ["Coffee", "https://evil.test", "coffee ", "", "evil"]) {
+  assert.equal(resolveCheckoutReturnSite(bad, null), undefined);
+  assert.equal(resolveCheckoutReturnSite(bad, "coffee"), "coffee");
+  assert.equal(resolveCheckoutReturnSite(null, bad), undefined);
+}
+assert.equal(readCheckoutReturnSiteCookie("a=1; al_checkout_return_site=coffee; b=2"), "coffee");
+assert.equal(readCheckoutReturnSiteCookie("x_al_checkout_return_site=coffee"), null);
+assert.equal(readCheckoutReturnSiteCookie(""), null);
 assert.match(catalogClient, /businessSubscription && isBusinessCheckoutResultView/);
 assert.match(catalogClient, /businessCheckoutResultCard\(viewState, status\?\.authenticated === true, returnSite\)/);
 // Polling and manual re-check keep the page URL (and site marker) intact.

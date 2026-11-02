@@ -6,7 +6,12 @@ import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-che
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import type { OrderRow } from "@/lib/payments/payment-api";
+import {
+  CHECKOUT_RETURN_SITE_COOKIE,
+  CHECKOUT_RETURN_SITE_MAX_AGE_SECONDS,
+} from "@/lib/payments/checkout-result-cta";
 import { startTochkaCheckoutForPendingOrder } from "@/lib/payments/start-tochka-checkout";
+import { getSupabaseCookieOptions, hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -100,8 +105,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: started.error }, { status: started.status });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     payment_url: started.body.payment.payment_url,
   });
+  // Return target of THIS start, also when a pending payment link is reused.
+  response.cookies.set(CHECKOUT_RETURN_SITE_COOKIE, returnSite ?? "business", {
+    ...getSupabaseCookieOptions(hostnameFromHeaders(request.headers)),
+    path: "/",
+    sameSite: "lax",
+    httpOnly: false,
+    maxAge: CHECKOUT_RETURN_SITE_MAX_AGE_SECONDS,
+  });
+  return response;
 }

@@ -26,6 +26,32 @@ export function isAuthorProjectCapacityCheckout(
   return orderKind === AUTHOR_PROJECT_CAPACITY_ORDER_KIND;
 }
 
+/**
+ * Site where the latest business subscription checkout was started in this browser.
+ * Set by the checkout API on `.audiolad.ru`, so a reused pending payment link (which keeps
+ * the return URL of its first start) still returns to the current cabinet. Only an exact
+ * allowlisted value is honoured; anything else falls back to the URL marker.
+ */
+export const CHECKOUT_RETURN_SITE_COOKIE = "al_checkout_return_site";
+export const CHECKOUT_RETURN_SITE_MAX_AGE_SECONDS = 24 * 60 * 60;
+
+export function resolveCheckoutReturnSite(
+  cookieValue: string | null | undefined,
+  paramValue: string | null | undefined,
+): "coffee" | undefined {
+  if (cookieValue === "coffee") return "coffee";
+  if (cookieValue === "business") return undefined;
+  return paramValue === "coffee" ? "coffee" : undefined;
+}
+
+export function readCheckoutReturnSiteCookie(cookieHeader: string): string | null {
+  for (const part of cookieHeader.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+    if (name === CHECKOUT_RETURN_SITE_COOKIE) return rest.join("=");
+  }
+  return null;
+}
+
 export function isBusinessSubscriptionCheckout(orderKind?: string | null): boolean {
   return orderKind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
 }

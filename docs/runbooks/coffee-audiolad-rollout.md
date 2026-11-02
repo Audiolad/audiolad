@@ -201,9 +201,13 @@ Tochka redirectUrl и failRedirectUrl остаются на `config.siteUrl` (ap
 Это фиксированные константы, а не отражение query/Host. Остальные значения выбирают
 прежние business цели. Poll/re-check сохраняет URL страницы и marker.
 
-**Ограничение повторного платежа:** существующая валидная pending payment link
-используется без изменений. Она сохраняет return site, выбранный при её создании,
-даже если повторный запрос пришёл с другого host. Reuse logic не менялась.
+**Повторный платёж:** существующая валидная pending payment link используется без
+изменений (reuse logic не менялась) и сохраняет marker, выбранный при её создании.
+Поэтому checkout API при каждом старте ставит cookie `al_checkout_return_site`
+(`coffee` или `business`, Domain=.audiolad.ru, Secure, SameSite=Lax, 24 часа, не
+httpOnly, без персональных данных). checkout/result берёт сайт из cookie последнего
+старта, а marker `site=coffee` в URL – только если cookie нет. Принимаются только
+точные значения `coffee`/`business`; цели – те же фиксированные константы.
 
 При откате OFF coffee снова возвращает 404, а apex checkout/result даже с
 `site=coffee` выбирает прежние business цели. Ранее выданные coffee email-ссылки
