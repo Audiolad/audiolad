@@ -30,11 +30,11 @@ export const GUEST_COFFEE_COPY = {
   exhaustedBanner:
     `Гостевые 30 минут закончились. Зарегистрируйтесь – и получите ${BUSINESS_GIFT_TITLE} с полным доступом.`,
   /**
-   * 253821e0: the «Ваша атмосфера» block after the meter when the no-registration guest start
+   * 253821e0: the top banner and the «Ваша атмосфера» block after the meter when the no-registration guest start
    * is on. The guest start signs in anonymously and asks for no card (see BUSINESS_GUEST_START_COPY.terms).
    */
   exhaustedBannerGuestStart:
-    `Бесплатные 30 минут на этом устройстве закончились. Получите ${BUSINESS_GIFT_DAYS} дней бесплатно – без регистрации и карты.`,
+    `Бесплатные 30 минут закончились. Получите ${BUSINESS_GIFT_DAYS} дней бесплатно – без регистрации и карты.`,
   exhaustedRegister: "Зарегистрироваться",
   exhaustedTrialTitle: "Знакомство с подборками завершено",
   exhaustedTrialText:

@@ -5,7 +5,7 @@ import BusinessGuestStartCta from "./BusinessGuestStartCta";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
-import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { useBusinessHostname, useGuestStartEnabled } from "@/components/business-app/BusinessDomainProvider";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 import { BUSINESS_GIFT_CTA, BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { businessLockedNotice } from "@/lib/business-app/access";
@@ -63,6 +63,8 @@ export function BusinessGuestStatusBar() {
   const hostname = useBusinessHostname();
   const { limit, notice } = useBusinessGuestStatus();
   const exhausted = limit === "exhausted";
+  // 253821e0: with the no-registration guest start on, the exhausted text does not ask to register.
+  const guestStartEnabled = useGuestStartEnabled();
   return (
     <section
       className="business-app-guest-bar"
@@ -72,7 +74,9 @@ export function BusinessGuestStatusBar() {
     >
       <div className="business-app-guest-bar__text">
         {exhausted ? (
-          <p data-testid="biz-guest-exhausted">{GUEST_COFFEE_COPY.exhaustedBanner}</p>
+          <p data-testid="biz-guest-exhausted">
+            {guestStartEnabled ? GUEST_COFFEE_COPY.exhaustedBannerGuestStart : GUEST_COFFEE_COPY.exhaustedBanner}
+          </p>
         ) : (
           <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS}.</p>
         )}

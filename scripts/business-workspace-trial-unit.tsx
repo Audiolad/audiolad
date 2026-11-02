@@ -589,6 +589,16 @@ const playlists: GuestCoffeePlaylist[] = [{
   assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/);
 }
 {
+  // 253821e0, guest start on: the whole exhausted page (top banner + «Ваша атмосфера») never asks to register.
+  const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="exhausted"><BusinessSoundStudio playlists={playlists} initialLimit="exhausted" /></BusinessAppShell>, "", true);
+  const bar = html.slice(html.indexOf('data-testid="biz-guest-status"'), html.indexOf("</section>", html.indexOf('data-testid="biz-guest-status"')));
+  assert.match(bar, /data-testid="biz-guest-exhausted">Бесплатные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\.</, "top banner: same text as the block");
+  assert.equal((bar.match(/<a |<button /g) ?? []).length, 1, "top banner: exactly one CTA");
+  assert.match(bar, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "top banner: green guest-start CTA");
+  assert.match(html, /data-testid="biz-sound-exhausted"/);
+  assert.doesNotMatch(html, /Зарегистрируйтесь|Зарегистрироваться|на этом устройстве закончились|\u2014/, "no registration wording anywhere on the exhausted page");
+}
+{
   const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   assert.match(html, /data-testid="biz-sound-exhausted"/);
   assert.match(html, /Зарегистрироваться/);
@@ -603,7 +613,7 @@ const playlists: GuestCoffeePlaylist[] = [{
   // 253821e0, AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED on: the same guest start as the top banner, no registration wording.
   const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "", true);
   const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
-  assert.match(block, /Бесплатные 30 минут на этом устройстве закончились\. Получите 7 дней бесплатно – без регистрации и карты\./);
+  assert.match(block, /Бесплатные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./);
   assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag on): exactly one CTA");
   assert.match(block, /<button type="button" class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "green guest-start button");
   assert.match(block, /data-testid="biz-guest-register-guest-start"/, "leads into the guest start flow");
