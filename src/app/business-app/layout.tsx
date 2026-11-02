@@ -60,7 +60,7 @@ export default async function BusinessAppLayout({
 
   return (
     <div className="business-app-root" data-biz-theme={theme}>
-      <BusinessDomainProvider value={domain}>
+      <BusinessDomainProvider value={domain} hostname={hostname}>
         <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>

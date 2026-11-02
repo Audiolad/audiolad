@@ -508,6 +508,10 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   const gift = await submit("/auth/business-return");
   assert.equal(gift.result.ok, true);
   assert.equal(gift.trial, "1");
+  const coffeeGift = await submit("/auth/business-return?site=coffee");
+  assert.equal(coffeeGift.result.ok, true);
+  assert.equal(coffeeGift.trial, "1");
+  if (coffeeGift.result.ok) assert.equal(coffeeGift.result.destination, "/auth/business-return?site=coffee");
   const listener = await submit("/profile");
   assert.equal(listener.result.ok, true);
   assert.equal(listener.trial, undefined);
@@ -520,11 +524,11 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 // ---------------------------------------------------------------- screens
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-function wrap(pathname: string, node: React.ReactNode) {
+function wrap(pathname: string, node: React.ReactNode, hostname = "") {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={fakeRouter}>
       <PathnameContext.Provider value={pathname}>
-        <BusinessDomainProvider value={anonymous}>{node}</BusinessDomainProvider>
+        <BusinessDomainProvider value={anonymous} hostname={hostname}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
   );
@@ -844,7 +848,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(html, /href="\/help"/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   assert.doesNotMatch(back, /href="\/help"/);
-  assert.match(back, /href=\{BUSINESS_TRIAL_RETURN_PATH\}/);
+  assert.match(back, /href=\{returnPath\}/);
   const landing = read("src/components/business/BusinessLandingView.tsx");
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
@@ -1084,7 +1088,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(businessOnboardingEntryHref("cafe"), /^https:\/\/business\.audiolad\.ru\/onboarding\?type=cafe&next=/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   assert.ok(back.indexOf("await activateBusinessTrial") < back.indexOf("await loadBusinessOwnerHomeContext"));
-  assert.match(back, /businessOnboardingEntryHref\("cafe"\)/);
+  assert.match(back, /businessReturnTarget\(\{ site, needsVenue \}\)/);
   assert.match(back, /!domain\.organizationId/);
 
   const connect = renderToStaticMarkup(<BusinessWorkspace model={model({
@@ -1199,6 +1203,21 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(cabinetLink, /data-testid="onboarding-open-cabinet"/);
   assert.match(cabinetLink, /href="\/workspace\?space=cafe"/);
   assert.match(cabinetLink, /Открыть кабинет/);
+}
+
+{
+  const previousFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
+  try {
+    const html = wrap("/onboarding", <BusinessOnboardingWizardPage />, "coffee.audiolad.ru");
+    assert.match(html, /href="https:\/\/audiolad.ru\/auth\/sign-in\?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee"/);
+    assert.match(html, /href="https:\/\/audiolad.ru\/auth\/sign-up\?next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee"/);
+    const workspace = wrap("/music", <BusinessWorkspace model={model({ status: "anonymous" })} />, "coffee.audiolad.ru");
+    assert.match(workspace, /next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee/);
+  } finally {
+    if (previousFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = previousFlag;
+  }
 }
 
 console.log("business-workspace-trial-unit: ok");

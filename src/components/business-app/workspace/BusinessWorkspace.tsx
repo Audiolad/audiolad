@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath } from "@/lib/business-app/host";
+
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
@@ -49,6 +53,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
 }
 
 function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageModel }) {
+  const hostname = useBusinessHostname();
   const player = useCabinetPlayer();
   const adopt = player.adopt;
   const release = player.release;
@@ -242,10 +247,10 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
           <p>Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна.</p>
           <div className="flex flex-wrap gap-2">
-            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.signUpHref} data-testid="biz-workspace-signup">
+            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={businessAuthHref(hostname, "sign-up", true)} data-testid="biz-workspace-signup">
               {BUSINESS_GIFT_CTA}
             </a>
-            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={model.signInHref}>
+            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={businessAuthHref(hostname, "sign-in", true)}>
               Войти
             </a>
           </div>
@@ -256,7 +261,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unconfirmed">
           <p>{BUSINESS_UNCONFIRMED_NOTE}</p>
           <p className="flex flex-wrap gap-3">
-            <a className="underline" href={model.signInHref}>Перейти и войти после подтверждения</a>
+            <a className="underline" href={businessAuthHref(hostname, "sign-in", true)}>Перейти и войти после подтверждения</a>
             <Link className="underline" href={model.helpHref}>Перейти и найти письмо</Link>
           </p>
         </section>
@@ -284,7 +289,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               : "Подарочный период закончился. Полный плеер закрыт."}
           </p>
           <p>
-            <Link className="underline" href="/#dostup" data-testid="biz-workspace-terms">Условия и подписка</Link>
+            <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
           </p>
         </section>
       ) : null}

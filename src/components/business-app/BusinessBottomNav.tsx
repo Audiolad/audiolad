@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+
 import {
   BizDocumentsIcon,
   BizHomeIcon,
@@ -12,7 +15,6 @@ import {
   BizProfileIcon,
   BizSettingsIcon,
 } from "@/components/business-app/BusinessIcons";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { usePointMode } from "@/components/business-app/BusinessPointMode";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
@@ -21,7 +23,6 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "@/lib/business-app/access";
-import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 import {
   BUSINESS_MOBILE_NAV_ITEMS,
   isBusinessNavItemCurrent,
@@ -44,6 +45,7 @@ const ICONS: Record<
  * name stays on aria-label and title. A locked section keeps a small lock on the icon.
  */
 export default function BusinessBottomNav() {
+  const hostname = useBusinessHostname();
   const pathname = normalizeBusinessAppPathname(usePathname() || "/");
   const pointMode = usePointMode();
   const items = pointMode
@@ -84,7 +86,7 @@ export default function BusinessBottomNav() {
         return (
           <Link
             key={item.id}
-            href={businessNavHref(item, access)}
+            href={item.href === "/" ? businessCabinetHomePath(hostname) : businessNavHref(item, access)}
             data-nav-id={item.id}
             aria-label={name}
             title={name}

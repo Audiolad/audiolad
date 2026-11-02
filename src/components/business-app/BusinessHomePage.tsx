@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
@@ -11,7 +14,6 @@ import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   buildBusinessGreeting,
   buildBusinessGreetingSubtitle,
@@ -153,6 +155,7 @@ export type BusinessHomePageProps = {
 
 export default function BusinessHomePage({ currentTrack, playbackConfirmation, pointCanEdit = true }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
+  const hostname = useBusinessHostname();
   const pointMode = usePointMode();
   const { entry } = useBusinessEntry();
   const rawSignals =
@@ -209,7 +212,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
               Настроить звучание
             </Link>
             <a
-              href="https://audiolad.ru/auth/sign-in"
+              href={businessAuthHref(hostname, "sign-in")}
               className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Войти

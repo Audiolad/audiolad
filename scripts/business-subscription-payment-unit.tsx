@@ -149,7 +149,7 @@ assert.match(catalogClient, /Перейти в каталог/);
 assert.match(catalogClient, /практика автоматически появится в вашей Аудиотеке/);
 assert.match(catalogClient, /Практика добавлена в ваш аккаунт/);
 const returnPage = readFileSync("src/app/(platform)/auth/business-cabinet/page.tsx", "utf8");
-assert.match(returnPage, /buildBusinessSubscriptionPaidHref/);
+assert.match(returnPage, /businessReturnTarget\(\{ site, cabinet: true \}\)/);
 assert.doesNotMatch(returnPage, /activateBusinessTrial/);
 assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /ownerCanPayFromThisBrowser/);
 for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src/app/api/business/subscription/accept/route.ts"]) {

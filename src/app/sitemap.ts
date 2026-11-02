@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 
+import { isCoffeeHostRequest } from "@/lib/business-app/host";
+import { buildCoffeeSitemap } from "@/lib/business-app/seo";
 import { isMaxHostname } from "@/lib/max/host";
 import {
   getHostnameFromHeaders,
@@ -14,7 +16,11 @@ import { buildSitemapEntries } from "@/lib/seo/sitemap-data";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const hostname = getHostnameFromHeaders(await headers());
+  const requestHeaders = await headers();
+  if (isCoffeeHostRequest(requestHeaders)) {
+    return buildCoffeeSitemap();
+  }
+  const hostname = getHostnameFromHeaders(requestHeaders);
 
   if (isSchoolHostname(hostname)) {
     return [

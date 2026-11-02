@@ -1,5 +1,9 @@
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
 
 import SimpleMarkdown from "@/components/legal/SimpleMarkdown";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
@@ -27,6 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
     robots: { index: false, follow: false },
+    ...buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), `/documents/${id}`, doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ", doc?.summary ?? "Документы АудиоЛад Кофе"),
   };
 }
 

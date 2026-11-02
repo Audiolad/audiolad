@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
-import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 import { businessEntrySwitchAction, type BusinessEntry } from "@/lib/business-app/live-refresh";
 
 type EntryOption = {
@@ -24,6 +26,7 @@ type EntryOption = {
  */
 export default function BusinessEntrySwitcher() {
   const domain = useBusinessDomain();
+  const hostname = useBusinessHostname();
   const point = usePointMode();
   const { entry, setEntry } = useBusinessEntry();
   const router = useRouter();
@@ -66,7 +69,7 @@ export default function BusinessEntrySwitcher() {
     setEntry(next);
     const action = businessEntrySwitchAction(pathname);
     if (action.kind === "navigate") {
-      router.push(action.href);
+      router.push(action.href === "/" ? businessCabinetHomePath(hostname) : action.href);
       return;
     }
     window.scrollTo({ top: 0 });
@@ -236,7 +239,7 @@ export default function BusinessEntrySwitcher() {
       {hint ? (
         <p className="business-entry-switcher__hint" role="status" data-testid="biz-entry-hint">
           {hint}{" "}
-          <a href="https://audiolad.ru/auth/sign-in">Войти</a>
+          <a href={businessAuthHref(hostname, "sign-in")}>Войти</a>
         </p>
       ) : null}
     </div>

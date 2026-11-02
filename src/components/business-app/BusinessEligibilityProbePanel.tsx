@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-
 import { useCallback, useState } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+
 import { resolveBusinessAirplayEligibilityProbe } from "@/app/business-app/actions";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   formatEligibilityDecisionLabel,
   venueAirplayEmptyStateCopy,
@@ -28,6 +29,7 @@ export default function BusinessEligibilityProbePanel({
   compact?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const hostname = useBusinessHostname();
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
 
   const runProbe = useCallback(async () => {
@@ -56,7 +58,7 @@ export default function BusinessEligibilityProbePanel({
       <section className="business-app-card">
         <h2 className="text-lg font-bold text-[var(--biz-text)]">Права на музыку</h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец</a>, чтобы проверить права на музыку.
+          <a href={businessAuthHref(hostname, "sign-in")} className="underline">Войдите как владелец</a>, чтобы проверить права на музыку.
         </p>
       </section>
     );

@@ -1,4 +1,4 @@
-import { BUSINESS_ORIGIN } from "@/lib/business-app/host";
+import { BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "@/lib/business-app/host";
 import { isBusinessSpaceId, type BusinessSpaceId } from "@/lib/business-workspace/spaces";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
@@ -75,4 +75,31 @@ export function safeBusinessWorkspaceReturn(next: string | null | undefined): st
   if (!space) return BUSINESS_WORKSPACE_PUBLIC_PATH;
   if (!isBusinessSpaceId(space)) return null;
   return businessWorkspacePublicPath(space);
+}
+
+/** Only the explicit marker and the build flag can select the coffee origin. */
+export function businessReturnPath(path: string, site?: string): string {
+  return coffeeHostEnabled() && site === "coffee" ? `${path}?site=coffee` : path;
+}
+
+export function businessReturnTarget({ site, needsVenue = false, cabinet = false }: {
+  site?: string;
+  needsVenue?: boolean;
+  cabinet?: boolean;
+}): string {
+  const coffee = coffeeHostEnabled() && site === "coffee";
+  if (cabinet) return coffee ? `${COFFEE_ORIGIN}/cabinet#dostup` : `${BUSINESS_ORIGIN}/#dostup`;
+  const path = needsVenue ? businessCabinetOnboardingPath("cafe") : businessWorkspacePublicPath("cafe");
+  return `${coffee ? COFFEE_ORIGIN : BUSINESS_ORIGIN}${path}`;
+}
+
+/** Preserve the exact legacy href on business, including links without a next parameter. */
+export function businessAuthHref(hostname: string, route: "sign-in" | "sign-up", gift = false): string {
+  const coffee = coffeeHostEnabled() && hostname === COFFEE_HOSTNAME;
+  if (!coffee) {
+    if (gift) return route === "sign-up" ? BUSINESS_TRIAL_SIGN_UP_HREF : BUSINESS_TRIAL_SIGN_IN_HREF;
+    return `${PRODUCTION_APP_ORIGIN}/auth/${route}`;
+  }
+  const next = businessReturnPath(gift || route === "sign-up" ? BUSINESS_TRIAL_RETURN_PATH : BUSINESS_CABINET_RETURN_PATH, "coffee");
+  return `${PRODUCTION_APP_ORIGIN}/auth/${route}?next=${encodeURIComponent(next)}`;
 }
