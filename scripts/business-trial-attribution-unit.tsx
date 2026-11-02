@@ -218,8 +218,8 @@ async function main() {
   assert.equal(businessTrialSourceLabel(origin("max")), "бот МАКС");
   assert.equal(businessTrialSourceLabel({ ...origin(null), utmSource: "vk", utmCampaign: "autumn", referrerDomain: "vk.com" }), "utm: vk / autumn; переход с vk.com");
   assert.equal(businessTrialSourceLabel(origin(null)), "без метки");
-  assert.ok(businessTrialPlaceLabel(origin("max")).includes("Kazan"));
-  assert.ok(businessTrialDeviceLabel(origin("max")).startsWith("телефон"));
+  assert.ok((businessTrialPlaceLabel(origin("max")) ?? "").includes("Kazan"));
+  assert.ok((businessTrialDeviceLabel(origin("max")) ?? "").startsWith("телефон"));
 
   // Stats + render: off → columns «нет данных», no DB-IP city; on → labels, funnel, attribution link.
   const now = new Date("2026-11-06T12:00:00.000Z");
