@@ -157,7 +157,9 @@ psql(`INSERT INTO public.authors(id, name, slug) VALUES ('${authorId}', 'Авт�
 // Trusted fixture path: the same session switch the publication RPC uses.
 psql(`SET audiolad.allow_practice_publish = 'on'; INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, is_catalog_listed, audio_url)
   VALUES ('${practiceId}', '${authorId}', 'Стартовая практика стенда', 'stand-starter-${practiceId.slice(0, 8)}', 'published', true, 0, true, 'https://example.invalid/a.mp3')`);
-psql(`INSERT INTO public.starter_practices(practice_id, sort_order) VALUES ('${practiceId}', 1)`);
+psql(`INSERT INTO public.starter_practices(practice_id, sort_order) SELECT '${practiceId}', coalesce(max(sort_order), 0) + 1 FROM public.starter_practices`);
+const expectedStarterCount = psql(`SELECT count(*) FROM public.starter_practices sp JOIN public.practices p ON p.id = sp.practice_id
+  WHERE sp.is_active AND p.status = 'published' AND p.is_free AND p.price = 0`);
 
 let guestSession: { access_token: string; user: { id: string } } | null = null;
 let guestClient: SupabaseClient | null = null;
@@ -231,7 +233,8 @@ await scenario("regular email sign-up still works (allowed domain, starter grant
   ownerId = data.session.user.id;
   ownerClient = client;
   assert.equal(psql(`SELECT (email IS NOT NULL)::text FROM public.profiles WHERE id = '${ownerId}'`), "true");
-  assert.equal(psql(`SELECT count(*) FROM public.user_practices WHERE user_id = '${ownerId}'`), "1");
+  assert.notEqual(expectedStarterCount, "0");
+  assert.equal(psql(`SELECT count(*) FROM public.user_practices WHERE user_id = '${ownerId}'`), expectedStarterCount);
 });
 await scenario("email sign-up with a disallowed domain is rejected by the hook", async () => {
   const { error } = await freshClient().auth.signUp({ email: `stand-${randomBytes(6).toString("hex")}@example.invalid`, password: randomBytes(18).toString("base64url") });
