@@ -58,10 +58,8 @@ export function effectiveChromeAccess(
 
 export function businessAccessLine(access: BusinessChromeAccess | null | undefined): string | null {
   if (!access || !hasLiveBusinessAccess(access) || !access.endsAt) return null;
-  if (access.mode === "grace" && access.graceEndsAt) {
-    const day = formatMoscowDay(access.graceEndsAt);
-    return day ? `Музыка играет до ${day}` : null;
-  }
+  // 253821e0: the grace days are not shown to users – no stop date, just the ended period.
+  if (access.mode === "grace") return "Срок закончился – нужна оплата";
   const day = formatMoscowDay(access.endsAt);
   if (!day) return null;
   return access.mode === "paid" ? `Подписка действует до ${day}` : `Бесплатный доступ до ${day}`;

@@ -8,6 +8,7 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import {
   BUSINESS_GIFT_CLOSING_NOTE,
   BUSINESS_GIFT_LICENSE_NOTE,
+  BUSINESS_PERIOD_ENDED_PAY_NOTE,
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
@@ -109,13 +110,12 @@ export default function BusinessHomeAccessCard() {
     />
   );
 
-  if (access.mode === "grace" && access.graceEndsAt) {
-    const days = trialDaysLeft(new Date(access.graceEndsAt), new Date());
+  if (access.mode === "grace") {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="grace">
         <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Срок закончился</h2>
         <p data-testid="biz-home-grace">
-          Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
+          {BUSINESS_PERIOD_ENDED_PAY_NOTE} Конец срока был {label}.
         </p>
         {pay}
       </section>
