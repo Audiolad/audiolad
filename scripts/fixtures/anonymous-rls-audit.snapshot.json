@@ -1,1566 +1,4 @@
 {
-  "sources": [
-    {
-      "file": "supabase/baseline/0001_core_schema.sql",
-      "sha256": "9b48a04429d244603dcd192e60d00143d457212b7a8f4fec8439181eb7ae75bd"
-    },
-    {
-      "file": "supabase/baseline/0002_functions_and_triggers.sql",
-      "sha256": "dcbe033d39adc9fdce0f6c7dd586814ca556203174d4abf1d74b61f3945cdab8"
-    },
-    {
-      "file": "supabase/baseline/0003_rls_and_policies.sql",
-      "sha256": "a28816bfec15b01e69e71c0ece2c376d6084ad541edcb2e83ecd9389a5fdf1f5"
-    },
-    {
-      "file": "supabase/baseline/0004_storage.sql",
-      "sha256": "aa1f3016ab59a9a96d985566e66e693b6b35f2cd8726690fc150c2ce39f3243b"
-    },
-    {
-      "file": "supabase/baseline/0005_required_seed.sql",
-      "sha256": "92c63361c58629f217c2a7c7ffb6cc04fef2dda981b369a2c86375520e90ec2d"
-    },
-    {
-      "file": "supabase/migrations/20260710115506_create_user_library.sql",
-      "sha256": "8d004211e93b7b94d186be7bd3c48cfc169d0690e48548b934e41084f8d72705"
-    },
-    {
-      "file": "supabase/migrations/20260710122053_configure_starter_practices.sql",
-      "sha256": "09cf1dde8bf486919c7beb47d50114a0211c3b6e5d881abed46ac2c4da2f7013"
-    },
-    {
-      "file": "supabase/migrations/20260710123015_backfill_starter_practices.sql",
-      "sha256": "08819cd3ce271eae9102813e088dac058ba0bc68eb82451f1298e69a2e0e1bd8"
-    },
-    {
-      "file": "supabase/migrations/20260710123518_require_zero_price_for_starter_grants.sql",
-      "sha256": "b6f2d2ab147a0cb63e9b1a478705ea258ef0e0c98f8b1f50ca6f448672f60545"
-    },
-    {
-      "file": "supabase/migrations/20260710125301_grant_starter_practices_on_signup.sql",
-      "sha256": "6e5b70832dadff03516adc6431aec5091ed36df6ac433c2b5d209b0b06b56bef"
-    },
-    {
-      "file": "supabase/migrations/20260711071529_create_private_practice_audio_bucket.sql",
-      "sha256": "72d9078195048c907d030608b548f74c8d8fd2164a2c246fe7f41e07f24de6c5"
-    },
-    {
-      "file": "supabase/migrations/20260713120000_create_commercial_mvp_core.sql",
-      "sha256": "7e470ea7a80b501e2cdbf186b8ab237be73b66bd3b1d104312135bf7f24400ae"
-    },
-    {
-      "file": "supabase/migrations/20260713140000_create_practice_order_function.sql",
-      "sha256": "402d4e04a70510c2ee16e1b70434b578ad4723463c46f496a1fbbdfa1db6a888"
-    },
-    {
-      "file": "supabase/migrations/20260713150000_seed_first_audio_course_practice.sql",
-      "sha256": "9d79f4496b998dccc0ac9004c4437f0a25a17b98a0a49951481ac1a7b3d350dc"
-    },
-    {
-      "file": "supabase/migrations/20260714180000_unified_audio_product_foundation.sql",
-      "sha256": "7697dd1203af4b6dcb85dcca06c33f188a4e94ea47bbb7c77dc6afd2cbf7e19e"
-    },
-    {
-      "file": "supabase/migrations/20260714190000_assign_platform_owner_memberships.sql",
-      "sha256": "990dbd6b52bd010f3bac8abbb93571c1785c63cf1893b4017b863ed41cf24df8"
-    },
-    {
-      "file": "supabase/migrations/20260714191000_author_dashboard_storage_and_rls.sql",
-      "sha256": "40eaa360f5cf0f8ca92416342cef2831d23b2f568f3338db70233b06d3566bb4"
-    },
-    {
-      "file": "supabase/migrations/20260714201600_rename_sergey_and_zoya_author.sql",
-      "sha256": "17a769a3a1dc6427322b53f3208d165e4df72a673eb0772e6b5321ee742e58a5"
-    },
-    {
-      "file": "supabase/migrations/20260715120000_add_audio_items_file_metadata.sql",
-      "sha256": "b3cff7c40d0da3026f0aa42ff176b17b7b3edc9aabad4599ca427d33a5442dd9"
-    },
-    {
-      "file": "supabase/migrations/20260715143000_personal_materials_foundation.sql",
-      "sha256": "85bc334b820bc270c063d2b24e4aca0b5c3ed9318bd3b3e3b2e09f9910a7fcc0"
-    },
-    {
-      "file": "supabase/migrations/20260715153000_practice_url_foundation.sql",
-      "sha256": "da20a1c8fecffd1747cdb31453dab41757f63058a7a96db49856599531da02ec"
-    },
-    {
-      "file": "supabase/migrations/20260715160000_archive_demo_catalog_practices.sql",
-      "sha256": "2e2f43a6f84e5cf2681f8efa31de522e520a371cf1f48357bd84a995215f1214"
-    },
-    {
-      "file": "supabase/migrations/20260715170000_practice_catalog_visibility_and_entitlement_access.sql",
-      "sha256": "2974ba67c04e6dc219d5b136d061ca298f0be3782581839969194fb5a59db2f2"
-    },
-    {
-      "file": "supabase/migrations/20260715200000_practice_audio_progress.sql",
-      "sha256": "948d790932709da3f245d425ec04add4d46a42b0f1c237d37c6f6f3520b74eee"
-    },
-    {
-      "file": "supabase/migrations/20260715210000_publish_audio_product_atomic.sql",
-      "sha256": "0c050cfe32bdedcbdad554618258524eeab67402726b3123a066b8fa1d34a151"
-    },
-    {
-      "file": "supabase/migrations/20260715230000_practice_lifecycle_unpublished.sql",
-      "sha256": "177f1b773faa5a9ba73c4d73ae692df93a468a726a181fdffcac3b5fa572044f"
-    },
-    {
-      "file": "supabase/migrations/20260715240000_repair_published_practice_audio_status.sql",
-      "sha256": "418dde86d4297bde9b53a7b710b261ea5fad9937fcd3909714252fa256dc7250"
-    },
-    {
-      "file": "supabase/migrations/20260715250000_starter_practices_catalog_listed.sql",
-      "sha256": "97c4cafd0e791c299588cd9a0aaa7e7916b2f541fa3dfb9b2fadb016ce94c722"
-    },
-    {
-      "file": "supabase/migrations/20260715260000_claim_free_practice.sql",
-      "sha256": "a01a85d4b9ba8199febf082b26e38a773efbb30cf0cfdbd23c13aacbaaf3bdd5"
-    },
-    {
-      "file": "supabase/migrations/20260715270000_create_playlists.sql",
-      "sha256": "0f15a066c456a3daf8e609bf7f2aa737c97a51ae2ed5aa6ba3c1776b9c90ac39"
-    },
-    {
-      "file": "supabase/migrations/20260715280000_playlist_membership_rpc.sql",
-      "sha256": "9d9761990c060a8d6f3519cf0ba4063e5126dd12556d77cdb244cb35e41ab112"
-    },
-    {
-      "file": "supabase/migrations/20260716120000_playlist_covers.sql",
-      "sha256": "805c3a28d25b0186358a1271fa00974c5f182799afb2970739ab5f1481baa568"
-    },
-    {
-      "file": "supabase/migrations/20260716121000_playlist_cover_path_cas.sql",
-      "sha256": "fa27b5a454dd7a83e2ba17b22fc3dda901ca273ac7d8b0a6698bd00619bd8b48"
-    },
-    {
-      "file": "supabase/migrations/20260716140000_move_playlist_item.sql",
-      "sha256": "3ce508e9d7b92f45f2f7fffcf500d22846e0940b738d66df773cf93fdfa7ff3f"
-    },
-    {
-      "file": "supabase/migrations/20260716150000_practice_guest_promo_funnel.sql",
-      "sha256": "b525974202bbe6db4f5cb77a6cecc32cef7d1e2354f5dff7a4d1ce7a65b65fc4"
-    },
-    {
-      "file": "supabase/migrations/20260716160000_editorial_playlists.sql",
-      "sha256": "57145e0c44831119e0eb79e91c4ed169de66b7084e143de60729b06677bd3997"
-    },
-    {
-      "file": "supabase/migrations/20260716170000_author_applications.sql",
-      "sha256": "3c339a9baf166e9aac5328a8f25cb720b855a9eb79a739b2d24e1f6ceb96677f"
-    },
-    {
-      "file": "supabase/migrations/20260716180000_author_applications_wants_training.sql",
-      "sha256": "45a2f32ceaef45dc98c782062ad2c0df65d7ebe7b9c8a28afbd192daa75b5e0c"
-    },
-    {
-      "file": "supabase/migrations/20260716181000_per_track_covers.sql",
-      "sha256": "3d3f905e445de08972b5d28bca88c8649a81de674fdb7689fe57cfb561dfd941"
-    },
-    {
-      "file": "supabase/migrations/20260716182000_promotion_campaigns.sql",
-      "sha256": "eb80cf061a988561b951effc62287cdc2b9440b6a81ec56fce393ce0c5d50c21"
-    },
-    {
-      "file": "supabase/migrations/20260716190000_author_applications_interested_in_school.sql",
-      "sha256": "014ae91915ccaab4a245c74eb09cce1b425d335b8094045446183e14d6d46526"
-    },
-    {
-      "file": "supabase/migrations/20260716191000_claim_promo_practice_by_id.sql",
-      "sha256": "d9382f5e9243d7f55a60a998d80461f3cc422855bb08a1142bb9c2d4df00b2e7"
-    },
-    {
-      "file": "supabase/migrations/20260716200000_pwa_install_tracking.sql",
-      "sha256": "2d87a0cc74e913b65ff0e971ba5d1df71cf96db1235260b1a687009d8c2c7328"
-    },
-    {
-      "file": "supabase/migrations/20260716210000_admin_panel_foundation.sql",
-      "sha256": "f1ee9c52186176370d93eab5b217c0325d4526f8e86810b8f6d4ac0523ee41e3"
-    },
-    {
-      "file": "supabase/migrations/20260717120000_platform_analytics.sql",
-      "sha256": "0350aa5d65be7b9248290735bd04d41beaed1452f61d5b6956a6d75d8b7910cc"
-    },
-    {
-      "file": "supabase/migrations/20260717130000_platform_analytics_signup_completion.sql",
-      "sha256": "47d647d4d34e3f4d50659da52bf0fc17d5eb6a9ad1c376953a3c72fbfd995bb0"
-    },
-    {
-      "file": "supabase/migrations/20260717140000_topics_foundation.sql",
-      "sha256": "c182da0e0609ed4a58b89df86e2e7fc0c195242d6645066686ac16fcedfb2f6a"
-    },
-    {
-      "file": "supabase/migrations/20260717150000_email_foundation.sql",
-      "sha256": "33aeb72f82f0c4b287af32e87471968daac940aa4786e9abee35608f92342059"
-    },
-    {
-      "file": "supabase/migrations/20260717151000_email_sync_and_profile.sql",
-      "sha256": "6d0b76b7cd9c844e71f261f322c0a28b78c824af35cff4ba7170227ae0d107bd"
-    },
-    {
-      "file": "supabase/migrations/20260717152000_user_avatars.sql",
-      "sha256": "0da63ec67b1da1b8d2a798776d973c5937ebca8fe1e5a4253ebddc8cb6d27443"
-    },
-    {
-      "file": "supabase/migrations/20260717160000_author_public_profile.sql",
-      "sha256": "7c7df575115aee423ba1cf15d3633c54381e56967676ed4088f1a0dd58efa058"
-    },
-    {
-      "file": "supabase/migrations/20260718120000_image_variant_manifests.sql",
-      "sha256": "d62dc78a643b1d22ff3fd3f3ce2a1b9abe66e8bbb2f0014dfded6e537b56ad4f"
-    },
-    {
-      "file": "supabase/migrations/20260718180000_author_banner_position.sql",
-      "sha256": "07487008d7c78c3b70fc7e6744c9effcc5e1ef8c97087040e983cf54c951f32e"
-    },
-    {
-      "file": "supabase/migrations/20260718210000_fix_playlist_cover_variant_cas.sql",
-      "sha256": "c4a14ad3166d00e0c7f9408b3c921c029a20e09fbb6a12dc93792a910b7f01e1"
-    },
-    {
-      "file": "supabase/migrations/20260718220000_practice_listening_notice.sql",
-      "sha256": "78ccfaab743ea304fda400c0bcf138bb9a687e38063cd1c8cbc47f0efad4f24c"
-    },
-    {
-      "file": "supabase/migrations/20260719120000_author_short_positioning.sql",
-      "sha256": "156bc95e80082aebac7ed07da937d5861b7a018e0d46391e3fde3d61f16d008a"
-    },
-    {
-      "file": "supabase/migrations/20260719130000_author_application_contact_email.sql",
-      "sha256": "9ffc66753bbb7dcc0a4c303ea2dec6578f032239a60a5f1549fc8ed846f24334"
-    },
-    {
-      "file": "supabase/migrations/20260719140000_clear_legacy_author_seed_description.sql",
-      "sha256": "1845a524cb654d458048566b694fa8fe1b0c230992922d1333b2d731837a9b1b"
-    },
-    {
-      "file": "supabase/migrations/20260719150000_promo_pages_foundation.sql",
-      "sha256": "5bab4921819bd525e02bda8e52179680327b229757169a0e05ef849d52241401"
-    },
-    {
-      "file": "supabase/migrations/20260719151000_promotion_campaigns_promo_pages.sql",
-      "sha256": "8cf28ac888bc70460f2febbf014cecaf412c8060f9efdb45cb2d192d2f45ced0"
-    },
-    {
-      "file": "supabase/migrations/20260719152000_promo_page_analytics_dimensions.sql",
-      "sha256": "a661e3ed346bff1a495932d4f5cb2200921979f14d8955168b56ff6dfdf2119f"
-    },
-    {
-      "file": "supabase/migrations/20260719153000_replace_promo_page_products.sql",
-      "sha256": "b7bc4aacf78b7b13540a8e522fc3b594d542aabe93903c68a903336f3a2971ab"
-    },
-    {
-      "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
-      "sha256": "62d516a2054e5e5dd5397e1178a8bb0513968ebf042db31a44d7064c790cb37a"
-    },
-    {
-      "file": "supabase/migrations/20260719155000_promo_pages_create_and_cta_hardening.sql",
-      "sha256": "ca48e731f535e0eb3925015797b6513af8c8329c0e2838e7b58bf2a5e7375818"
-    },
-    {
-      "file": "supabase/migrations/20260720140000_promotion_campaign_channels.sql",
-      "sha256": "9bab33801ba2e0d8fdc63c3a741303ac87886533f1e6c80a1c58c487795753ae"
-    },
-    {
-      "file": "supabase/migrations/20260720143000_personal_materials_clear_draft_audio.sql",
-      "sha256": "43d0e7554b7adf99ef05cd4323defe4ad888c2a693600696d41993f5eb9b14c6"
-    },
-    {
-      "file": "supabase/migrations/20260720180000_personal_materials_return_url.sql",
-      "sha256": "3a2c23607327afd58062d54ab7e3c9e6668b188d85e105249cfb5e9dc829f90e"
-    },
-    {
-      "file": "supabase/migrations/20260720181000_promo_page_external_cta.sql",
-      "sha256": "10a47f0af13ca3f8b3acdc236a02763a9c8a3724bafa999584b630ab91236de6"
-    },
-    {
-      "file": "supabase/migrations/20260720190000_personal_materials_owner_library.sql",
-      "sha256": "755e71da0454680a96a43f5c81d1ae738a8d86138e2b6577734241e7e3cbc714"
-    },
-    {
-      "file": "supabase/migrations/20260721103000_personal_materials_optional_last_name.sql",
-      "sha256": "e1ae1765abe3727b7fe4899fe869e2aa79b103fbaa3923d50db838c1b15705b5"
-    },
-    {
-      "file": "supabase/migrations/20260721120000_personal_materials_editable_after_activate.sql",
-      "sha256": "85b06fa77d7870fe36497c3d37a9363243f118d383c7917474c8a953a9873d3c"
-    },
-    {
-      "file": "supabase/migrations/20260721140000_personal_materials_editable_when_revoked.sql",
-      "sha256": "2b73fb0eb5e4293b691a0cd3415603326b08024cc6dd474c814be91d9d434c86"
-    },
-    {
-      "file": "supabase/migrations/20260721153000_personal_material_templates.sql",
-      "sha256": "0b37aee5e4849d1bd4b351aa676dcf68897aa10c3d2d56378e2e1d55d8df9d59"
-    },
-    {
-      "file": "supabase/migrations/20260721160000_personal_materials_optional_draft_first_name.sql",
-      "sha256": "3cfbee7d57a08be46735d98efa3b92ada39f6defad12b9a0bcac42350c74d676"
-    },
-    {
-      "file": "supabase/migrations/20260721170000_personal_materials_pdf_support.sql",
-      "sha256": "4a0f7162da9a3f83ebc103fe7a722a4189fc76e7ec383b68e63f7bc59f1d6fcc"
-    },
-    {
-      "file": "supabase/migrations/20260722100000_author_access_foundation.sql",
-      "sha256": "6165711cfd888d9e0d73b34de2f0f4cf065b116b28d7e621d759e03f57311dc9"
-    },
-    {
-      "file": "supabase/migrations/20260722101000_author_provisioning_rpcs.sql",
-      "sha256": "bd87cc2562a546f1fa8ca753c676e0e9edf34a790bf1ae65749a2d9452b295eb"
-    },
-    {
-      "file": "supabase/migrations/20260722102000_author_access_guards.sql",
-      "sha256": "79de1b846dd5e7e2e0929f8d9d5ec5ac67d7abfdfa66c9efa3b193311d90de17"
-    },
-    {
-      "file": "supabase/migrations/20260722103000_operational_email_deliveries.sql",
-      "sha256": "bedcca1cea0a60280be1cb3d0e7d47c932e50728bec2dcf75cb2979ed1f1cc2f"
-    },
-    {
-      "file": "supabase/migrations/20260722104000_author_application_staff_guard_fix.sql",
-      "sha256": "d4415726a93d24ea3f85673d5d2d12cd0f279efb8325d9a1f4fb38af817f705b"
-    },
-    {
-      "file": "supabase/migrations/20260722180000_test_user_reset_audit_log.sql",
-      "sha256": "91021c8d765c1a52de85917e2caeb0ea488c859b8c265c381b78b9dad4df15ea"
-    },
-    {
-      "file": "supabase/migrations/20260722190000_admin_operation_log_reconciliation.sql",
-      "sha256": "6aca586623f7e8421eb8635b500d4cd84edeb9de44fae9ed153b6a9a55c59a35"
-    },
-    {
-      "file": "supabase/migrations/20260722220000_first_save_retention.sql",
-      "sha256": "1cc64272c3cc06118569563c3e715e5ea3cb62847e6eeeb4330439bcf4241188"
-    },
-    {
-      "file": "supabase/migrations/20260723103000_first_save_retention_install_analytics.sql",
-      "sha256": "a7e99e40212decec646eef27debaddc41e16e4aef5c8258bdf981ca025f8fe7e"
-    },
-    {
-      "file": "supabase/migrations/20260723120000_author_client_message_template.sql",
-      "sha256": "adaa52a097e2476ac039b2fbfc632183eee4a5f959e34449a355995e50d1d593"
-    },
-    {
-      "file": "supabase/migrations/20260724160000_platform_analytics_topic_hub_events.sql",
-      "sha256": "ecaf2d559b024f8add19dcfdff39646dd3b7aec97c50d06a599de97d4030bca5"
-    },
-    {
-      "file": "supabase/migrations/20260724190000_platform_analytics_article_events.sql",
-      "sha256": "cb27815be024211626c39dc9e8a5ef2f98514c58f58f3196976050e528a7498b"
-    },
-    {
-      "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
-      "sha256": "e493755534c0b6c4443ae0c36983ab16fccacb9ccbee45e9dd5c466cb9fcf122"
-    },
-    {
-      "file": "supabase/migrations/20260725140000_admin_analytics_dashboard_snapshot.sql",
-      "sha256": "f2e2c74ba20bceb233935b7ef88b78705f9266e729eaea24f41bc80cc16330b5"
-    },
-    {
-      "file": "supabase/migrations/20260725160000_platform_analytics_p1_identity.sql",
-      "sha256": "6775037d27dde7222f47035f2f5963103da65de124cff0458cb64ba34b5e854b"
-    },
-    {
-      "file": "supabase/migrations/20260725161000_admin_analytics_dashboard_snapshot_p1.sql",
-      "sha256": "36421b7c73b66fb37d098a29e76236463bcf1d823c2e32894d0392eee95b868e"
-    },
-    {
-      "file": "supabase/migrations/20260725162000_unlink_analytics_identity.sql",
-      "sha256": "3faca32df9aeb8cd97c7d2bbbce42f3c470fcda45769129b66f0aca547811df4"
-    },
-    {
-      "file": "supabase/migrations/20260725180000_admin_analytics_p2_dashboard.sql",
-      "sha256": "38fe421a12e060cd23b3b945b468705b03677a74af63a704c1cb064d6de18921"
-    },
-    {
-      "file": "supabase/migrations/20260725190000_payments_p30_transactional_fulfill.sql",
-      "sha256": "dd162875f18a8985dd2cb905735baa4405f453badade14b9805a5860ed360a88"
-    },
-    {
-      "file": "supabase/migrations/20260725192000_admin_payments_p31_money.sql",
-      "sha256": "2a007fa4081001d6ec60625917a252e427c168b64fbcae3a1773b47b2fa57af4"
-    },
-    {
-      "file": "supabase/migrations/20260725192100_admin_payments_p31_authors_products_fix.sql",
-      "sha256": "77b23c900a05618a1a47b5070ab51b0cf5789caf804f23dff1a80fc54b9b0428"
-    },
-    {
-      "file": "supabase/migrations/20260725192200_admin_payments_p31_timeseries_range_fix.sql",
-      "sha256": "8fdbbeded4f32bbf7b38f6ef0e19ac5c018fb0cd912872c4b95bee63970362c8"
-    },
-    {
-      "file": "supabase/migrations/20260725194000_orders_p320_attribution_snapshot.sql",
-      "sha256": "a7197d953e66045580595142b951c1940413b75efdc32f77165829c3f0ff86a6"
-    },
-    {
-      "file": "supabase/migrations/20260725200000_analytics_p321_buy_click_path.sql",
-      "sha256": "bd18e0ee11b5074bdb947845e0aeba49abea966f67bde7598aaa92419b562591"
-    },
-    {
-      "file": "supabase/migrations/20260725210000_analytics_p322_first_touch.sql",
-      "sha256": "8852eb46788a3155e660d2fa56baf5bd74914ffc5af8194a7d500a384c88ca62"
-    },
-    {
-      "file": "supabase/migrations/20260725220000_analytics_p323_attribution_panel.sql",
-      "sha256": "188b7da1e504229a79da616b88d670eb71358ab4fb963af3d258352c5409766c"
-    },
-    {
-      "file": "supabase/migrations/20260725230000_author_commercial_applications.sql",
-      "sha256": "f5c17ef7db4329db9f44c640b1fc9dbe16304794e5d751f91df8f12f509a1c71"
-    },
-    {
-      "file": "supabase/migrations/20260726120000_payments_p331_refund_facts.sql",
-      "sha256": "435e588d7f51b92dbb26991e87ef3aa3dc5f4391d090ef6de702eebb8bf2b466"
-    },
-    {
-      "file": "supabase/migrations/20260726140000_payments_p332_author_ledger.sql",
-      "sha256": "52cf69386e1aa31468f164e9324f60d9b1ef5f3805a8aa964b2b712cc4734623"
-    },
-    {
-      "file": "supabase/migrations/20260727120000_payments_p333_author_payouts.sql",
-      "sha256": "03f6abb26071f9b1517119d1063aca09f8e97b9431f36f6c781f2adb47e7bd08"
-    },
-    {
-      "file": "supabase/migrations/20260727140000_payments_p334_author_finance.sql",
-      "sha256": "7e6dd9db2d333e088afc26c9b27fceb1fe9c692053ed88b8bf3a7482db4862df"
-    },
-    {
-      "file": "supabase/migrations/20260727180000_commercial_onboarding_access_statuses.sql",
-      "sha256": "0305ac45ce6b9f845100494b2d633fc0c296ec4e82f45c734b83c0918cd54402"
-    },
-    {
-      "file": "supabase/migrations/20260728120000_author_payout_profiles.sql",
-      "sha256": "f68abfec4dbad0cd75a50b8ff5f1bb165641232bd596a308e955eb8fd8177340"
-    },
-    {
-      "file": "supabase/migrations/20260728121000_practice_content_sale_lock.sql",
-      "sha256": "3cbbe50ea5b037b4ea37261690c40d286204a4817c4c71e4101e423ed623766f"
-    },
-    {
-      "file": "supabase/migrations/20260728140000_author_terms_acceptance.sql",
-      "sha256": "b9261dd00d320ed3478927129bebbd0423a5abb7a9a3ff75d0de1ff1da7d214c"
-    },
-    {
-      "file": "supabase/migrations/20260728150000_author_payout_profiles_method_display.sql",
-      "sha256": "e620305dc24f5a613ade89bfe141188238a95c93c816cab9008ccb616dc26d3e"
-    },
-    {
-      "file": "supabase/migrations/20260728160000_author_finance_empty_state_access_status.sql",
-      "sha256": "87f3123e27d4c4b4461826645bc60c91724aeacb7c8f02d5e2f31e41e8e358b0"
-    },
-    {
-      "file": "supabase/migrations/20260728170000_author_finance_author_terms_empty_state.sql",
-      "sha256": "5ae53b59965f6055bc1a5ffbeeff6beb8c607f8d8b5212b985c8be50bb16ee0c"
-    },
-    {
-      "file": "supabase/migrations/20260728180000_author_share_rounding_up.sql",
-      "sha256": "83881499e42141d47f69eb4c256092aa54b0ede511dccab7b7106ef484ad59ab"
-    },
-    {
-      "file": "supabase/migrations/20260728190000_admin_analytics_p2_privileges_harden.sql",
-      "sha256": "5689c5bad0c3db529d0ba98b350c154314ba6434d8965d15927687b0b1b97ddf"
-    },
-    {
-      "file": "supabase/migrations/20260728191000_author_page_view_event.sql",
-      "sha256": "7685bd498146b3ce22524701ca30525f0667b62920cb1068095645c77ed4cf97"
-    },
-    {
-      "file": "supabase/migrations/20260728192000_author_stats_aggregates.sql",
-      "sha256": "730917b119acdb427c4c8737aacea5be508fea5cb9344bda76e1c15b330dbad0"
-    },
-    {
-      "file": "supabase/migrations/20260729120000_has_claimed_personal_materials.sql",
-      "sha256": "5a5f1184b616d2d8cc9d9786b0c2e352d8d654de4a7eff33319a35ee426f0667"
-    },
-    {
-      "file": "supabase/migrations/20260729180000_support_requests.sql",
-      "sha256": "89f1798959cd50aedcdc41fe2ead466b5d84b4cc52f8fe39b4899c1c1b0dd304"
-    },
-    {
-      "file": "supabase/migrations/20260729181000_help_center_analytics_events.sql",
-      "sha256": "5da13f5605ac6429d84c7344180deb364eb2cf445e43955b18f44c0c796b0232"
-    },
-    {
-      "file": "supabase/migrations/20260729190000_private_audio_items.sql",
-      "sha256": "07b6883e9b262db9c7cc765c41bac6aa37c43bf0fb9778ca635455e0300e191f"
-    },
-    {
-      "file": "supabase/migrations/20260729200000_practice_product_kind_music.sql",
-      "sha256": "484c22cae5a775fe370e311ecda7bdb91913872b1bc0ca82d4d5a867d7ce775d"
-    },
-    {
-      "file": "supabase/migrations/20260730120000_author_multi_project_limits.sql",
-      "sha256": "03ef496b72b8fad4770e73698ba7defd5188951b312757b5cc235aa7712b6495"
-    },
-    {
-      "file": "supabase/migrations/20260730160000_author_canonical_sales.sql",
-      "sha256": "ddfa00fc662f6b45c4f86358759d905fdcc4806003bb13943d0af341870bfd7c"
-    },
-    {
-      "file": "supabase/migrations/20260731180000_practice_moderation_mvp_schema.sql",
-      "sha256": "6f206b119eb1483ad789b2fdd4972060ff883783ccf95285f0bd2075d9ce5b96"
-    },
-    {
-      "file": "supabase/migrations/20260731181000_practice_moderation_mvp_gates_and_rpcs.sql",
-      "sha256": "912870013562dc0aabeb827d99de77e0ae3e08b75a24477669aca6aa0ea31887"
-    },
-    {
-      "file": "supabase/migrations/20260801120000_aurafon_bypass_product_moderation.sql",
-      "sha256": "db9fb8a2bfde25e3c6140eed53cd82c3188a3100fc95795df52fab0d61e68cc0"
-    },
-    {
-      "file": "supabase/migrations/20260801140000_practice_moderation_email_outbox.sql",
-      "sha256": "f3e31d025bc11bf0c1774225b87f7356c94f28850602de2888fdb7e08c8039f0"
-    },
-    {
-      "file": "supabase/migrations/20260804090000_commercial_application_free_product_gate.sql",
-      "sha256": "27a5df68df5505a09f67a2633027df11dd35b102a90672a657122720e6e6dbc1"
-    },
-    {
-      "file": "supabase/migrations/20260804120000_practice_moderation_admin_email_outbox.sql",
-      "sha256": "17767187928a5a995d4e9524c2ecf46b5b9f47be4ebcf0928194dc469af17770"
-    },
-    {
-      "file": "supabase/migrations/20260804130000_remove_library_practice.sql",
-      "sha256": "519ce9beeb43b42eea5fe7527b49476637ac6b15ae61ffe1c68e7fa12e992534"
-    },
-    {
-      "file": "supabase/migrations/20260805120000_practice_product_kind_audio_post.sql",
-      "sha256": "75b37669326d23c75e058487e205c5a74a0b110d7554c66ae3008cd9c88099bb"
-    },
-    {
-      "file": "supabase/migrations/20260805193000_audio_post_optional_description.sql",
-      "sha256": "f8414370d2426f43c7d88b1535d5ef6028513e440652ea137165c44d6a0bfdff"
-    },
-    {
-      "file": "supabase/migrations/20260805194500_preserve_catalog_listed_on_publish.sql",
-      "sha256": "efc4501585a514bf16277ef7611169a07d35c6dc08431d0368d95f0cedf8e93e"
-    },
-    {
-      "file": "supabase/migrations/20260808150000_studio_projects.sql",
-      "sha256": "3ddb911c3ff36e75995c3865e61b29470265d5d6ed2f301076ddb6a87686ebf6"
-    },
-    {
-      "file": "supabase/migrations/20260808163000_studio_render_export_v1.sql",
-      "sha256": "3ddb911c3ff36e75995c3865e61b29470265d5d6ed2f301076ddb6a87686ebf6"
-    },
-    {
-      "file": "supabase/migrations/20260809150000_studio_persistence_v1.sql",
-      "sha256": "bb30f96d86371983fb5c6872390de64e4dfde305d419289cc02364cc176bb247"
-    },
-    {
-      "file": "supabase/migrations/20260810100000_platform_analytics_product_promo_clicked.sql",
-      "sha256": "2e40fb2fe6adc855455d14a501e36470e65a40b66d1164e5a1b643b437e91008"
-    },
-    {
-      "file": "supabase/migrations/20260810160000_studio_recording_webm_assets.sql",
-      "sha256": "26b7534caae2e2703e729680026f3db453f26e6c5d158449869cedcf3be32cb2"
-    },
-    {
-      "file": "supabase/migrations/20260812180000_studio_render_export_v2.sql",
-      "sha256": "b8385bfd30961a38fe74819116ff5695902b3b99934f0eaa7bd2c26a30429e79"
-    },
-    {
-      "file": "supabase/migrations/20260814120000_playlist_platform_ownership.sql",
-      "sha256": "60a4450054ab62ce8208a38603132592fe1e26747770300689fa26797c05ba7f"
-    },
-    {
-      "file": "supabase/migrations/20260814180000_replace_playlist_item.sql",
-      "sha256": "b15b5990470dc7c8c3868aa50acd7efac2e13b8070a1d373e46ea3af32d7a181"
-    },
-    {
-      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
-      "sha256": "b5b37dcea410e409a20680864c087ce2e2a319a40e45209f07da30d48a03f2b8"
-    },
-    {
-      "file": "supabase/migrations/20260816120000_playlist_description_max_300.sql",
-      "sha256": "6ee893731971178018d6f7bc5a2e7c4e21092aa3e386000811dc8b6515b13e72"
-    },
-    {
-      "file": "supabase/migrations/20260817190000_studio_guest_mode.sql",
-      "sha256": "013358d0a37e2c14bf56c31c6cccd6af263c9920f4d9022481f43ac4a2de60d0"
-    },
-    {
-      "file": "supabase/migrations/20260818180000_playlist_item_audio_track.sql",
-      "sha256": "d287bfa41feb926d1e54e05fcea4a5a4de620daa117f53059b39426f46d4ff80"
-    },
-    {
-      "file": "supabase/migrations/20260819120000_actor_bypass_product_moderation.sql",
-      "sha256": "efe89929093a31e9916b2706990e66894404a77b062dd91267645cce03f55aab"
-    },
-    {
-      "file": "supabase/migrations/20260819183000_studio_guest_handoff.sql",
-      "sha256": "94e05985f5f63c05a2f295fcce0f80e300a7ff627830c76bb3b82b4c48c8258c"
-    },
-    {
-      "file": "supabase/migrations/20260821140000_olga_nevskaya_author_project_limit_override.sql",
-      "sha256": "9a283f09c215e187d6e6a3cfcf2b7f5dbeb06cb53c4934e26037631324dbbb85"
-    },
-    {
-      "file": "supabase/migrations/20260822120000_analytics_ai_source_class.sql",
-      "sha256": "5b18f4606c5e4a013a8faf078927b6b8c1425da195f3831ea2371a31978b3ca8"
-    },
-    {
-      "file": "supabase/migrations/20260822200000_external_identities.sql",
-      "sha256": "806d255407c4007902c85481509cbf6b12af97743ac1bed3c21bf2a3dd5b47a3"
-    },
-    {
-      "file": "supabase/migrations/20260823120000_link_external_identity.sql",
-      "sha256": "d3305358f0b2d2ea378a662b7a4d43c2c0bf9997582bf84c8856a01df529de9a"
-    },
-    {
-      "file": "supabase/migrations/20260823180000_practice_price_promotions.sql",
-      "sha256": "a001d6599c8a4a1c6fdf0f018e36ab38818787644818409bc2c4257fde5f6e1b"
-    },
-    {
-      "file": "supabase/migrations/20260823181000_create_practice_order_price_promotions.sql",
-      "sha256": "9900d7551182d63b591d3a62421f7fa5a6f833cc5e44c956cc908827cbdc030c"
-    },
-    {
-      "file": "supabase/migrations/20260823183000_price_promotion_oneshot_bind.sql",
-      "sha256": "23f0f3d35f556231177691fd8f4aa4516580e577a98b9f02e042341baf3adc86"
-    },
-    {
-      "file": "supabase/migrations/20260823190000_start_practice_price_promotion_qualify_identifiers.sql",
-      "sha256": "766add48a2aebe7524cd7236a8bf97f83d96c21952eeae99aaf565a7dfdfdbec"
-    },
-    {
-      "file": "supabase/migrations/20260823191000_quick_offers.sql",
-      "sha256": "cdc95a029145b8c121884da403b0369d50d1513956c1e59691864c9d7bfb720c"
-    },
-    {
-      "file": "supabase/migrations/20260823200000_library_saves_and_preview_window.sql",
-      "sha256": "320303bc5f3f1f9634df077bc4bd8badb352d6b9ecdf0e3dfcbfa5583056d3a4"
-    },
-    {
-      "file": "supabase/migrations/20260825120000_topics_career_business_learning.sql",
-      "sha256": "c6de8731094b8494055baf33bcbff36cc169d93ab8420ce3d6106c2de363265a"
-    },
-    {
-      "file": "supabase/migrations/20260825133000_practice_publication_class.sql",
-      "sha256": "d6831ac70ddee6dc1f639ea44a7928dffa71f8d0107e118f80754727af7e4c2f"
-    },
-    {
-      "file": "supabase/migrations/20260825150000_publication_gallery_slides.sql",
-      "sha256": "a2f8af087cca4585f3a6184c1df9f789c2f30d9a1fa0ae35c4065ce8e50da8d8"
-    },
-    {
-      "file": "supabase/migrations/20260825163000_playlist_catalog_foundation.sql",
-      "sha256": "b7dd5eadb80b366078366bb9259fb7d90345e0b2506803bdd96c0c592a307a4f"
-    },
-    {
-      "file": "supabase/migrations/20260825164000_playlist_topics.sql",
-      "sha256": "d876978763a363b855441aa6aa66b76440dcdd853e4466ea0fd586fa30927808"
-    },
-    {
-      "file": "supabase/migrations/20260825165000_playlist_catalog_popular_index.sql",
-      "sha256": "927bbdbbba5e87bc08b082ad52c182710cf1aee4849b2f0f40444d01ab357386"
-    },
-    {
-      "file": "supabase/migrations/20260825166000_editorial_playlist_listed_at_backfill.sql",
-      "sha256": "b141db17ba470b937fb0f1d798eaa48f843e6ee6f5757679e3676bdf6202a073"
-    },
-    {
-      "file": "supabase/migrations/20260826120000_topics_spirituality.sql",
-      "sha256": "309e0fc69893151145d199204e9eae337d5281f25b0e4b9b4503444895d8e147"
-    },
-    {
-      "file": "supabase/migrations/20260826180000_move_playlist_item_target_position.sql",
-      "sha256": "7136a77803fbffa5c8d82e5c416d964397190819e04f6de17d2d7e36120a9aa5"
-    },
-    {
-      "file": "supabase/migrations/20260827120000_course_content_foundation.sql",
-      "sha256": "f083371f9f802814ab25c0b1db57ac47b39a5c2fd07e759bf55eb394b8818e90"
-    },
-    {
-      "file": "supabase/migrations/20260828120000_seed_25_meditation_solutions_practice.sql",
-      "sha256": "97cb7b072c3c04f50613f2e7f449e6b6afb0247d264c765001f9021b0be81130"
-    },
-    {
-      "file": "supabase/migrations/20260829120000_seed_25_meditation_solutions_gallery.sql",
-      "sha256": "9ad9c98f36c84a8d33c4a7eb5b061b4da364150897de3cc7a06d4a0ec967caf2"
-    },
-    {
-      "file": "supabase/migrations/20260829130000_author_contacts.sql",
-      "sha256": "dae23f523c0fd6fcfbdf03e26f848e1be59ec6a446d7e95d2afc824699511d9b"
-    },
-    {
-      "file": "supabase/migrations/20260830120000_personal_timer_promotion_copy.sql",
-      "sha256": "e9d9ab1b313ed4bdbc6b67238d480d5d8a4ad3b6c003ca547164928a24617c2e"
-    },
-    {
-      "file": "supabase/migrations/20260831120000_personal_start_sale_price_snapshot.sql",
-      "sha256": "b9f6cc3d212d3c3fba5d4d21ac3a23bf751d5277b667173325c206bd2e2742cf"
-    },
-    {
-      "file": "supabase/migrations/20260901120000_analytics_link_signup_idempotent.sql",
-      "sha256": "d49e853b7b4732cd8045e3a9f2f916b7fc7b666f47f994a2e5fb4644e0dc9797"
-    },
-    {
-      "file": "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql",
-      "sha256": "1e627d4d619947595d18f1f14aa8be681687beb2f9679b6314ca46c5a62c0b82"
-    },
-    {
-      "file": "supabase/migrations/20260901120200_create_practice_order_visibility.sql",
-      "sha256": "2ce2ba1065d0c262594347eb02ca281899ab88c2280c3bc422063b349832a280"
-    },
-    {
-      "file": "supabase/migrations/20260901120300_public_playlist_selected_visibility.sql",
-      "sha256": "018f0e8632e55b912a35d0a08616d6d06097c46eb151b57d3bde10c9b5538ff3"
-    },
-    {
-      "file": "supabase/migrations/20260901120400_fix_visibility_allowlist_author_policy.sql",
-      "sha256": "4c6fa9925d40f097cbd8eb3ea5b0a43ad6de9ca9c3df097cb428a6d81f1c3305"
-    },
-    {
-      "file": "supabase/migrations/20260902120000_course_moderation_readiness.sql",
-      "sha256": "956268e6922de05feb54558e02f2f5c7359c1ec27bd4d87a0bb167a91e35784f"
-    },
-    {
-      "file": "supabase/migrations/20260902120100_analytics_heavy_rpc_idempotent.sql",
-      "sha256": "11dda32495ff70f39f185abb8d79aa0a93e9754f38c4be34c84fd27905b86e7e"
-    },
-    {
-      "file": "supabase/migrations/20260902120200_author_support_mode.sql",
-      "sha256": "c6562af0be52a371151d6c6aff19e15833f6307b7a05a7b3f8acdf590a3258ad"
-    },
-    {
-      "file": "supabase/migrations/20260903120000_search_practice_visibility_users.sql",
-      "sha256": "4f2ff8c3478aa719d203ed98ee038e1c9a01fb5edea9ae65759167d0427b242c"
-    },
-    {
-      "file": "supabase/migrations/20260904120000_admin_operational_overview_snapshot.sql",
-      "sha256": "1655726e3e3c149f6985b8be495cdd6bcf7bff0370709cfc5aded08d960e8860"
-    },
-    {
-      "file": "supabase/migrations/20260905120000_author_onboarding_ui_state.sql",
-      "sha256": "da84401b78f920fcb24513a8393551b08bffa682889e041f6045e61a65179c33"
-    },
-    {
-      "file": "supabase/migrations/20260905120100_personal_materials_allow_m4a_mime.sql",
-      "sha256": "5f3d0ce9c0c38815b41e474bf23f1504be4e9b5388a8eb6920ac536ca28f1e7b"
-    },
-    {
-      "file": "supabase/migrations/20260906120000_practice_seo_fields.sql",
-      "sha256": "102baa0655cdf9c65f4c4fe54fbf50696135c1c4749294656cd755b9887d93be"
-    },
-    {
-      "file": "supabase/migrations/20260907120000_commercial_onboarding_legacy_complete.sql",
-      "sha256": "f489a4438b43ada3524fe4e44977687ad036f8da374b9a3f4586c502ff2f2b77"
-    },
-    {
-      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
-      "sha256": "26460c1fc02a4086f38239d53d517403ec7be72819627031f8251c6f85e3282b"
-    },
-    {
-      "file": "supabase/migrations/20260909090000_harden_product_seo_v2.sql",
-      "sha256": "f973ecca2fd4419c3d7ab0c5fa7e43a5b3416614a8399567f071c857a9c85e63"
-    },
-    {
-      "file": "supabase/migrations/20260910120000_topics_sleep.sql",
-      "sha256": "f0589eae9e845d4a35270f7ac027994ba3af5cb63ea036c3375cd664e8e33b5f"
-    },
-    {
-      "file": "supabase/migrations/20260910130000_remove_playlist_item.sql",
-      "sha256": "1f81f6af69ca3a45e9a2f8b586de1407b77b06b7817405a66a2f6b44d5f0410c"
-    },
-    {
-      "file": "supabase/migrations/20260911120000_author_recommendations_title.sql",
-      "sha256": "c3038fb8baa39c494dc46b93cae6aff1a7249eeabbc386ff5af8ee9dc693ad65"
-    },
-    {
-      "file": "supabase/migrations/20260911130000_audiobook_projects_and_chapters.sql",
-      "sha256": "6c47e4cec4c532bc671132574906d9927f62f22d8248826d566bfeccd87a9001"
-    },
-    {
-      "file": "supabase/migrations/20260911140000_audiobook_chapter_fragments.sql",
-      "sha256": "0958334aa0683a3d4841510163bcb92d9cc51dc2bbd2d9ad420bfc116cf001b3"
-    },
-    {
-      "file": "supabase/migrations/20260912120000_studio_shared_asset_sources_and_duplicate_project.sql",
-      "sha256": "89ca4858d64214d81fd28e6c51083fc5b80043b663308a284a489bcd3f2f27c5"
-    },
-    {
-      "file": "supabase/migrations/20260913120000_minimal_product_moderation_readiness.sql",
-      "sha256": "74584419696f41c61b6f257008bc8d2a1034a0694a5ae56fa559e857578d3620"
-    },
-    {
-      "file": "supabase/migrations/20260914120000_author_terms_v1_1.sql",
-      "sha256": "f5a7f431f5d90754cc473a739a975468c1f7ed4313205bbb32cdb89b6c41d84f"
-    },
-    {
-      "file": "supabase/migrations/20260914130000_audiobook_fragment_ascii_storage_keys.sql",
-      "sha256": "f9150e9f4859dfb6f4ac32a22815655e2b5d1e8587d2169cbe9929cb6a00ead5"
-    },
-    {
-      "file": "supabase/migrations/20260915120000_preserve_catalog_visibility_on_start_editing.sql",
-      "sha256": "f2be1693d4fb2621fe2b51da7cc95d305ed4843a7331caab4e88a394addf021e"
-    },
-    {
-      "file": "supabase/migrations/20260915130000_author_appreciation_settings.sql",
-      "sha256": "cf84b080bcb3016295fb33a011b7d5cbb7e017548d2ad475d0171db78117aaba"
-    },
-    {
-      "file": "supabase/migrations/20260916120000_author_appreciation_getcourse_intents.sql",
-      "sha256": "9e501f42e4845609ee365ab22b5ce7615b7c7ceb5fa07ea04f464a1049f2d282"
-    },
-    {
-      "file": "supabase/migrations/20260917120000_author_appreciation_finance_projection.sql",
-      "sha256": "d1370547a7c4d19aa83387bd1d5f3774c1ee89977e23aa448975d3eae3382fcf"
-    },
-    {
-      "file": "supabase/migrations/20260918120000_author_appreciation_finance_projection_status.sql",
-      "sha256": "bd1939c10cfeb069d9e17d976e26ed31fbcc33bdfaf387869955876edefe47ec"
-    },
-    {
-      "file": "supabase/migrations/20260919120000_harden_practice_audio_progress_rls.sql",
-      "sha256": "36e34caf3042b6aacce9e034229dc723af4b791c0569127d413a438da8d4b592"
-    },
-    {
-      "file": "supabase/migrations/20260920120000_practice_listen_stats.sql",
-      "sha256": "1a1736812d9c9a2ed67937bc2da3205bdfa51b18845dad950c18abac6478aea5"
-    },
-    {
-      "file": "supabase/migrations/20260921120000_practice_ratings.sql",
-      "sha256": "d2fae646bb59b9564ae7fc325a65fd9e738c11466f8d4258ddb5355c9447f36b"
-    },
-    {
-      "file": "supabase/migrations/20260922120000_admin_ratings_analytics.sql",
-      "sha256": "60d4430d03df118158a8fdc66f3566e6338b8b20fdcb44fe76d6dfc18042f901"
-    },
-    {
-      "file": "supabase/migrations/20260923120000_studio_render_job_lease_heartbeat.sql",
-      "sha256": "f41aca3f800c60b4d0f7c396559713bbd853e7f10f7876c667bb9d474338bb08"
-    },
-    {
-      "file": "supabase/migrations/20260923120100_course_access_levels_foundation.sql",
-      "sha256": "e252c35f7811980d924cef28587c0ff4ad4c27910cdbf1243672610094508dc9"
-    },
-    {
-      "file": "supabase/migrations/20260924120000_course_access_levels_moderation_readiness.sql",
-      "sha256": "5418875623464e0f9d109e339e2d93fa893adf632fa22b874763ff28fafce5bf"
-    },
-    {
-      "file": "supabase/migrations/20260925120000_course_upgrade_order_kind.sql",
-      "sha256": "d6ce0b35b542914bed8bb1be332baa4a584c31ac59a5b308a913de080daf83fd"
-    },
-    {
-      "file": "supabase/migrations/20260925120100_create_course_upgrade_order.sql",
-      "sha256": "93bdbeb66124c9d3009b0caa1911f129d39b2f051d174ba76ab9fa20e6726040"
-    },
-    {
-      "file": "supabase/migrations/20260925120200_fulfill_tochka_course_upgrade.sql",
-      "sha256": "cb8eb88441dd5cf39078820bd72b2870cd527a609ee54e4ea16668fd54c70244"
-    },
-    {
-      "file": "supabase/migrations/20260925120300_create_course_upgrade_order_idempotency.sql",
-      "sha256": "7b9a1848200bfabf2481e76a2c2de0ce6004bf86be31092ec009099efa9eea55"
-    },
-    {
-      "file": "supabase/migrations/20260925120400_course_upgrade_canonical_sale.sql",
-      "sha256": "5315521a4613a7e7f9b5e62fa4ae3deb71bc0261cd362c3af79966e01b80931b"
-    },
-    {
-      "file": "supabase/migrations/20260925120500_course_upgrade_canonical_sales_projection.sql",
-      "sha256": "e3a995cee1d3614351e988e1cc751b7a5e4b532d5473b878bcd8e89c525eee9a"
-    },
-    {
-      "file": "supabase/migrations/20260925120600_course_upgrade_canonical_sales_amount_match.sql",
-      "sha256": "cb119a18573231963a7c45c7bd1d6ed9233b4b98f13de9935c99648abde60f73"
-    },
-    {
-      "file": "supabase/migrations/20260926120000_practice_access_links.sql",
-      "sha256": "8ff88ec77a06a6da00c36cf368bd69b87079ee74e8906e68f920be496452ef30"
-    },
-    {
-      "file": "supabase/migrations/20260927120000_practice_access_link_permanent_entitlement.sql",
-      "sha256": "e3bf539414bf14a3f4f81655841a4a313bca0294c6ef5f34ab9aa6010b29aaa7"
-    },
-    {
-      "file": "supabase/migrations/20260928120000_studio_longform_asset_limits.sql",
-      "sha256": "ba925fbf034d10155136804a08e86c33334c4ff515753893f56b70f0587152b0"
-    },
-    {
-      "file": "supabase/migrations/20260929120000_preserve_catalog_visibility_on_unpublish.sql",
-      "sha256": "329cf06e3cc0957827df3b92f19eaf51f6cfa2654d0423b6fc70f9af33852671"
-    },
-    {
-      "file": "supabase/migrations/20260930120000_practice_audio_bucket_300mib.sql",
-      "sha256": "95f758c06e4ef62dd8654ef43504683751ca4400e8700efa7c12444c551db0ab"
-    },
-    {
-      "file": "supabase/migrations/20261001120000_course_upgrade_entitled_unpublished.sql",
-      "sha256": "b53ba9bb1a7c66e18eb0fc7194f2586abda3299082180ae3f6bf67ecd9fc5d59"
-    },
-    {
-      "file": "supabase/migrations/20261002120000_studio_duplicate_project_upload_state_ready.sql",
-      "sha256": "f309233b11c775057cd0f8dbcaf9c94a045d304142403ee28bf41a6d19e84569"
-    },
-    {
-      "file": "supabase/migrations/20261003120000_studio_music_entitlements.sql",
-      "sha256": "1ba16abdfe1167b04b4a9a18303e04a4c4d78b6bf8da6bd05796945075929ddd"
-    },
-    {
-      "file": "supabase/migrations/20261003120100_studio_music_license_orders.sql",
-      "sha256": "7247a01fa2627e2164ac6958a66c32589b28fbd39bdc4ddea30d49ec13a643a6"
-    },
-    {
-      "file": "supabase/migrations/20261003120200_create_practice_order_pending_kind.sql",
-      "sha256": "975ad685052b44afe15f5ea35480eb0e1e5b7bd6ac38591400a4125b66fb0d27"
-    },
-    {
-      "file": "supabase/migrations/20261003120300_create_course_upgrade_order_pending_kind.sql",
-      "sha256": "fde11d472bf4571bc27315d6e23736565d1bf1cf2e87d7e3cce2770637f5c4aa"
-    },
-    {
-      "file": "supabase/migrations/20261003120400_fulfill_tochka_studio_music_license.sql",
-      "sha256": "c0c19e29a1ff8c98a1da16230510b87468f79537163aa1ed0eeb3fddd8b04cf0"
-    },
-    {
-      "file": "supabase/migrations/20261003120500_studio_music_canonical_sales.sql",
-      "sha256": "e08c851ce5dc66b52bd53547684c5096afef40b913c314d257fb454dffaaaffc"
-    },
-    {
-      "file": "supabase/migrations/20261003120600_studio_music_entitlement_order_revoke.sql",
-      "sha256": "1ac5142d17932f6964719aac9c6f34c89b1ac96216005ceefa3a26b582cfd345"
-    },
-    {
-      "file": "supabase/migrations/20261003120700_studio_music_independent_pricing.sql",
-      "sha256": "d6cd415054a53c09102f8860ad1747399de1958547dd3367cf3b5671119121ee"
-    },
-    {
-      "file": "supabase/migrations/20261004120000_studio_catalog_project_assets.sql",
-      "sha256": "38b8f98535d063dbacbe173b259d1c0ab82ccadb2c76e55d432ced993b8b2284"
-    },
-    {
-      "file": "supabase/migrations/20261004120100_studio_catalog_attach_asset_id.sql",
-      "sha256": "953c4b853f604e8f3d5282fab2b734d912b1268f8aff0cb717bc1c388f0ce3d0"
-    },
-    {
-      "file": "supabase/migrations/20261004120200_studio_catalog_render_principal.sql",
-      "sha256": "be9ef8ff00d83493795397d60d19b120e9096cc15465edb28f7ba41d7181e421"
-    },
-    {
-      "file": "supabase/migrations/20261005120000_create_course_upgrade_order_base_price_snapshot.sql",
-      "sha256": "f7512b496eda659e504b1cef31a9710c2ef00af0837428f466df1a7f2565e374"
-    },
-    {
-      "file": "supabase/migrations/20261005121000_author_support_topics.sql",
-      "sha256": "93ad794abcce375dec2184500c84e8dc34f133c6882fb7b6ccc9d2b9db74571c"
-    },
-    {
-      "file": "supabase/migrations/20261006120000_analytics_shared_product_semantics.sql",
-      "sha256": "f39b6c02dd2c127c7e0551bfb1b2e8afc9e46476b7674ad579609ac41d572829"
-    },
-    {
-      "file": "supabase/migrations/20261006120100_topics_single_word_catalog.sql",
-      "sha256": "dd502e41aac31568ebdf4395117ff3855974ba372cccb1de7e77a57096f07c71"
-    },
-    {
-      "file": "supabase/migrations/20261006120200_analytics_nullable_visitor_identity.sql",
-      "sha256": "cf02abbbf40f3c550072d0e039dfb9b58cde73cf8ebf6a36967227b64d1a9614"
-    },
-    {
-      "file": "supabase/migrations/20261006120300_classical_catalog_foundation.sql",
-      "sha256": "5b895b9c24905757c0450a0a531f0b7b20f85bfe3181fd7e8a3642024ed8b5c0"
-    },
-    {
-      "file": "supabase/migrations/20261006120400_analytics_owner_overview.sql",
-      "sha256": "4d80ef5d0f2d4b13b1465b0e73a5bd9fe9582d5b6d168873b35278fd8ecc5634"
-    },
-    {
-      "file": "supabase/migrations/20261006130000_seo_core_v1.sql",
-      "sha256": "de03d5226c6fc40d9ac0d9627f4e19bffd6d9dacb3ce64198e03c04eae7768fb"
-    },
-    {
-      "file": "supabase/migrations/20261006130100_studio_author_workspace_provisioning.sql",
-      "sha256": "90132c09163daa1170cf29d5421235010ffe10c7d0b3fd22074e7afdbbc354a0"
-    },
-    {
-      "file": "supabase/migrations/20261006140000_studio_music_legal_foundation_v1_2.sql",
-      "sha256": "0af29e0295692d999bb2cf315185efd2987dcccd0a3c119f5496fc9254801934"
-    },
-    {
-      "file": "supabase/migrations/20261006140100_owner_unlimited_author_projects.sql",
-      "sha256": "33831843d90c4ad5e4c33d305b460602c70f3bfdd55ac41b1f6266189910e88d"
-    },
-    {
-      "file": "supabase/migrations/20261007120000_music_wav_master_foundation.sql",
-      "sha256": "3d02738bf781f6c347e995a46ed076fa5f766aed73b3f1b3ebf8ce6c756d26f1"
-    },
-    {
-      "file": "supabase/migrations/20261007120100_studio_guest_free_catalog_music.sql",
-      "sha256": "e410ad0bff81ea4b3d3b7a05c0b0c57b5ef89bf16dd68fbe186a0718ac4aa218"
-    },
-    {
-      "file": "supabase/migrations/20261007130000_topics_functional_scenarios.sql",
-      "sha256": "32b9976961b7a13b07cd37f02c453da69254c28192776e9ea683d4fbc3484684"
-    },
-    {
-      "file": "supabase/migrations/20261007140000_music_transcode_worker.sql",
-      "sha256": "ec6554b2f612d0e5e4f8c081623caed4a9876809b0dabc0ce6536c04f599f5e8"
-    },
-    {
-      "file": "supabase/migrations/20261007140100_acquire_free_studio_music_without_author_terms.sql",
-      "sha256": "826504f96998b06af6d10f469803d9d5d7f5436d49f9d2d13cfd40d67851d028"
-    },
-    {
-      "file": "supabase/migrations/20261007150000_music_delivery_promotion.sql",
-      "sha256": "99bd4190ebb1184be024db0a7ab8021239e246e3587e3d51f177be39d47ad1c2"
-    },
-    {
-      "file": "supabase/migrations/20261007160000_seo_query_analysis_review_gate.sql",
-      "sha256": "b8ff67fd43260e78d97d8c9c7981dc01c540e317e042bcbe2921d117e58da955"
-    },
-    {
-      "file": "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
-      "sha256": "00cc6abdd94571882a76ddcb23423e8eeb1591f1888d918b31f412152688f472"
-    },
-    {
-      "file": "supabase/migrations/20261007180000_music_publish_playable_audio.sql",
-      "sha256": "09e62366deaa1d8bcb2ebb6f4261111a0d44710d837fe912aa33d720f78e7e04"
-    },
-    {
-      "file": "supabase/migrations/20261007190000_seo_initial_opportunities_seed.sql",
-      "sha256": "12c6f7c4e95ab2ae248af3a098643558a7c5300dd429873a9db5c1ba6d9e15bb"
-    },
-    {
-      "file": "supabase/migrations/20261008120000_author_project_capacity_purchase.sql",
-      "sha256": "c552f776dbce5ef3386d7e1e6e55109a075bf01066ed8641cb24b1a37b328083"
-    },
-    {
-      "file": "supabase/migrations/20261008120100_studio_music_min_license_price.sql",
-      "sha256": "fbd1ac0bc592a41e6a71c12a7fc6e86ecff9388b7fe97020d0bf4472f8c6c857"
-    },
-    {
-      "file": "supabase/migrations/20261008120200_studio_license_terms_v1_1.sql",
-      "sha256": "1fd0c4aeb48095a58900baf81b982c07a8a33c51076e5cdb6dd85f1145795c21"
-    },
-    {
-      "file": "supabase/migrations/20261009120000_practice_audio_allow_m4a_aac_mime.sql",
-      "sha256": "d4586e771f245415581584bc42c11d1bc6baa1c26bcd57463c431790036df28f"
-    },
-    {
-      "file": "supabase/migrations/20261009120100_product_audio_normalize_jobs.sql",
-      "sha256": "779f26b24f2a9e10277c9cdf5643f67616e873ec55a922c601b649f61455b357"
-    },
-    {
-      "file": "supabase/migrations/20261009120200_practice_catalog_sections.sql",
-      "sha256": "556964c72d811dc87fe08c04a21ac073214aebdb15ce2020b34810c6135c112c"
-    },
-    {
-      "file": "supabase/migrations/20261009120300_studio_disable_new_free_music.sql",
-      "sha256": "c9272c871d3279dd1a85ba10067d0e0a1c5e3a099a906f5fb2e06803f295d2cb"
-    },
-    {
-      "file": "supabase/migrations/20261009120400_practice_audio_allow_wav_normalize.sql",
-      "sha256": "f9d5d00830dbff3063ee084688037f4093df80ee439ab8bc98b9b75b18adfef8"
-    },
-    {
-      "file": "supabase/migrations/20261009120500_studio_require_commercial_author.sql",
-      "sha256": "479a148cbad08973d0947dffa967d989853a7c62e7e1e18920460e8f735152b6"
-    },
-    {
-      "file": "supabase/migrations/20261019120000_author_slug_redirects_and_space_ops.sql",
-      "sha256": "326662daeb41d9a502a8a80acf4441ef7faadada1563ef1c6d61f32f87fcbf8e"
-    },
-    {
-      "file": "supabase/migrations/20261019120100_practice_audio_product_author.sql",
-      "sha256": "3d8219d10155e21a3153c0fb08babaae4d58bedfb5b0547d7a703d29ef8af5a8"
-    },
-    {
-      "file": "supabase/migrations/20261020120000_author_default_audio_product_author.sql",
-      "sha256": "913375dbc7f4a1cd583a88a06060990788952af147a710defd8c5b9aeb50a261"
-    },
-    {
-      "file": "supabase/migrations/20261021120000_seo_reservation_product_primary_sync.sql",
-      "sha256": "d0acb65e6a7d4b0bfd352d61285fccc7260cbd0b60c2a3c65d824c96b6d51c22"
-    },
-    {
-      "file": "supabase/migrations/20261022120000_seo_spa_massage_queries_seed.sql",
-      "sha256": "20d81fb45828946e48bdcb24ce7e165785291e6785111e7bec2bf274cea63916"
-    },
-    {
-      "file": "supabase/migrations/20261023120000_attach_published_seo_query_to_product.sql",
-      "sha256": "3336bbf9bba1457f388ec7abe3f008364505335d344943deecb97b54421435d6"
-    },
-    {
-      "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
-      "sha256": "566d9d760adeebb96d950caee9087a7a509e6400272435f08f34935d7d5df78c"
-    },
-    {
-      "file": "supabase/migrations/20261025120000_author_partner_attribution.sql",
-      "sha256": "fcadf90779c27d9fe77fb6a8ef8dc8901ee0936674c4de11d09b91c5a30af27a"
-    },
-    {
-      "file": "supabase/migrations/20261026120000_admin_review_seo_query_proposal.sql",
-      "sha256": "2e95c6b21104f729b05d4da9271c4a540461b6b4a0315e4b646e47e90c101d79"
-    },
-    {
-      "file": "supabase/migrations/20261026120100_commercial_activate_on_approve_if_terms.sql",
-      "sha256": "3f131133433e92edf2f240d14c091e33f4fb3cd2e6f51b0942ee63f6a1c9b8a7"
-    },
-    {
-      "file": "supabase/migrations/20261027120000_product_published_email_context_canonical.sql",
-      "sha256": "2006238379d38b16833bfe4a88676beb9245511ad50b3d5ffbbc73f7dc7be337"
-    },
-    {
-      "file": "supabase/migrations/20261027120100_author_partner_activation_bonus.sql",
-      "sha256": "fb3609ee75e4c609b34e1cbf416930613110a6f01ec33b514d124046030d0f32"
-    },
-    {
-      "file": "supabase/migrations/20261028120000_author_partner_generate_code_extensions_path.sql",
-      "sha256": "99236ad3380de88364ea3e787f04bcd5255e238643104bb482f3be8097e1d120"
-    },
-    {
-      "file": "supabase/migrations/20261029120000_analytics_first_touch_user_delete_cascade.sql",
-      "sha256": "a7bb92022e32cf81bd077a71b908f93e319f20ee8d5b8a83ae10bea6e0613f9e"
-    },
-    {
-      "file": "supabase/migrations/20261030120000_allowlisted_test_user_reset_db_cleanup.sql",
-      "sha256": "3116a18d512dea15c85c656e580ecaec9cbafa4237e908ff1ec2defb3493e700"
-    },
-    {
-      "file": "supabase/migrations/20261031120000_author_partner_invitees_and_activation_email.sql",
-      "sha256": "e13357f80bd5d5c455a4b26e7c028de5cb2b1dd5e6e5668aa5a1264440e9414c"
-    },
-    {
-      "file": "supabase/migrations/20261031120200_seo_reservation_link_music_gate.sql",
-      "sha256": "ea3a8341e8d32e52d5f0678e1e1734661505f0db330ac5b348e5ca9bec69f1cb"
-    },
-    {
-      "file": "supabase/migrations/20261101120000_seo_wordstat_music_queries_seed.sql",
-      "sha256": "149f1fdafe43f6afc54d1a99b2a7f112c3ee1c4632216aba8b8b7c0151c53b3b"
-    },
-    {
-      "file": "supabase/migrations/20261102120000_seo_wordstat_jazz_queries_seed.sql",
-      "sha256": "435ca6de66163ff75065a32a59d52da83d87a8215b7e006c3a440fa51a6bd172"
-    },
-    {
-      "file": "supabase/migrations/20261103120000_author_partner_reward_ledger_pr4a.sql",
-      "sha256": "554cef7fc0ff73647decff2f4c6e12262ed52dea18989adf8039a7bd4f3df485"
-    },
-    {
-      "file": "supabase/migrations/20261103120100_allowlisted_test_user_reset_partner_reward_blocker.sql",
-      "sha256": "8bb85aaf4d8429d81d2f8cf0056f21060e8f3709a91863fd52fbd0fd64c03cad"
-    },
-    {
-      "file": "supabase/migrations/20261103120200_author_partner_reward_dashboard_pr4b.sql",
-      "sha256": "35d0b488ce0b6cbfd9abd91450dd6575f0ce0884780f14dc20abc97978d77402"
-    },
-    {
-      "file": "supabase/migrations/20261104120000_author_partner_invite_template.sql",
-      "sha256": "ceac8748fec5d2e132f63626aed836ee2d9bb65df971a478342399c3a34005f5"
-    },
-    {
-      "file": "supabase/migrations/20261125120000_seo_reservation_published_occupancy.sql",
-      "sha256": "18b9e3ddff548cd21106c2a13a540c852776365632e934a9346add3fe0b1781b"
-    },
-    {
-      "file": "supabase/migrations/20261126120000_author_project_name_cyrillic.sql",
-      "sha256": "e9ff04bfa8090d1512c7bada921a7c8c5df4611133496e4181171386852b3ceb"
-    },
-    {
-      "file": "supabase/migrations/20261126130000_music_draft_track_teardown.sql",
-      "sha256": "d370a4b7bd9b3a8beb7a0235d2e22ab77b9c724453a3723930b780bd3f478b33"
-    },
-    {
-      "file": "supabase/migrations/20261127120000_playback_usage_facts.sql",
-      "sha256": "b916f831d1fce9d9fd035b1afd0a71a104a265f4fca19efe37613942bfe810cd"
-    },
-    {
-      "file": "supabase/migrations/20261128120000_seo_wordstat_calm_music_final_1.sql",
-      "sha256": "d8d7167181469d6f740b9349f908e46e113c51c2e3624839e2c547fc9dcfdc6f"
-    },
-    {
-      "file": "supabase/migrations/20261128120100_seo_wordstat_calm_music_final_2.sql",
-      "sha256": "2ebdf7ecb4050998f96dceb3411a0fab67b4025887175a42351e08cac2409c8f"
-    },
-    {
-      "file": "supabase/migrations/20261128120200_seo_wordstat_calm_music_final_3.sql",
-      "sha256": "8116e1160fa3e1506224cc8b28e54d05907c5f2317fef9266d67204e50abeee9"
-    },
-    {
-      "file": "supabase/migrations/20261128120300_seo_wordstat_calm_music_final_4.sql",
-      "sha256": "942db29525ee4c8552f7f86b627f6b10eb7406cec7cddf3d3fca51497babc540"
-    },
-    {
-      "file": "supabase/migrations/20261129120000_music_track_identity.sql",
-      "sha256": "7655ba9e6513b57655dbc63ce6c8e307f5082ac03fb8b65c7c62fe15f173c8f8"
-    },
-    {
-      "file": "supabase/migrations/20261130120000_author_stats_listening_time.sql",
-      "sha256": "ee88abc49f6c661c257a3eda4aab3d7580a35696c8fab36d679512857a5518e0"
-    },
-    {
-      "file": "supabase/migrations/20261201120000_business_domain_core.sql",
-      "sha256": "b03db3942c73458b2f7a49c63b583ae0a7c816640460907d42a80b87c895bfdb"
-    },
-    {
-      "file": "supabase/migrations/20261202120000_business_player_foundation.sql",
-      "sha256": "77cc6f018abd54d4c60a2bd6e55134888e6e80052fa7d6739645442bcf17820c"
-    },
-    {
-      "file": "supabase/migrations/20261203120000_business_playback_attribution.sql",
-      "sha256": "a0c666b8a46e97df583088b65169113ff4daa5bd9282e40263c466b28e51a1c1"
-    },
-    {
-      "file": "supabase/migrations/20261203120100_music_track_identity_definer.sql",
-      "sha256": "e23970dd598dd206e75a94d2a5ef49d62bdb59791fdcb69004e298aef7075464"
-    },
-    {
-      "file": "supabase/migrations/20261204120000_music_analyzer_lab_v01.sql",
-      "sha256": "6887cd4a3b396684f7094fb80e8e6855634e6b19cbb1cd6e200ed3cb5243f07a"
-    },
-    {
-      "file": "supabase/migrations/20261205120000_music_rights_foundation.sql",
-      "sha256": "6efd40311f9707241007b6040cff77906bf32b7c01443f60ff511ea35d4e3073"
-    },
-    {
-      "file": "supabase/migrations/20261206120100_stats_table_column_sort.sql",
-      "sha256": "36b9b7b6534adc30ff8d46a4537029e5ac96395136b0efa0ed209fffc521f8a6"
-    },
-    {
-      "file": "supabase/migrations/20261206120200_business_rights_eligibility.sql",
-      "sha256": "bd5c3ec788c43f4bdab0b9c0501b1d3db7aa590828c9c0349f7622f7ebc22cd4"
-    },
-    {
-      "file": "supabase/migrations/20261207120000_admin_delete_empty_author_users.sql",
-      "sha256": "41fa25f9f39960e13c5431729de727b1a670a853f1a0bf023ea48f4bf7718944"
-    },
-    {
-      "file": "supabase/migrations/20261208120000_author_support_full_author_cabinet.sql",
-      "sha256": "e8d8cd9495898825ad72f8a59234012fdec002412ddf9423b3ef0164b375ad88"
-    },
-    {
-      "file": "supabase/migrations/20261209120000_owner_overview_sequential_completion.sql",
-      "sha256": "d1056338a9eaed961af38e2c4129f45a32f9538c716608d38482cf3979af3a23"
-    },
-    {
-      "file": "supabase/migrations/20261210120000_practice_scheduled_publication.sql",
-      "sha256": "75f5eaba9ff0e61808ac5055674abb8aedea5e693a19315940434456fdeb8d2d"
-    },
-    {
-      "file": "supabase/migrations/20261211120000_claim_due_scheduled_practice_publications.sql",
-      "sha256": "11245c8f8e7869b507bba8fd210988e79b9db47a0e829754e2ecdb81d0571682"
-    },
-    {
-      "file": "supabase/migrations/20261212120000_scheduled_publish_notification_outbox.sql",
-      "sha256": "1f58612d344e91b9bc024febaa2a0bd145a23801ecd3fd5d1738536cf7d83399"
-    },
-    {
-      "file": "supabase/migrations/20261213120000_public_content_revision.sql",
-      "sha256": "66ff65ad15d84d6182e9e5cb43bab6f64b8ab7f9996e2476d78538052ed0fe59"
-    },
-    {
-      "file": "supabase/migrations/20261214120000_music_passport_basic.sql",
-      "sha256": "f05e90993ed7de89bb314a8edaa5f79f6a2b7763bd6108ed903338e9a4623037"
-    },
-    {
-      "file": "supabase/migrations/20261215120000_seo_sprint_autumn_sounds_seed.sql",
-      "sha256": "20c64ecc835d9b02957c26abef591d58789bb24bc6b316bd29c08c9080adeb83"
-    },
-    {
-      "file": "supabase/migrations/20261216120000_seo_reservation_link_practice_gate.sql",
-      "sha256": "34642e0faf3b912a83f3498e03a0b4e25222dfe32f51098fea8f816ccbacac21"
-    },
-    {
-      "file": "supabase/migrations/20261216121000_admin_seo_queries_preapproved.sql",
-      "sha256": "78811b254962d69d790df8c47958ca63b0b77599df82fd3f9de6716bfc58878f"
-    },
-    {
-      "file": "supabase/migrations/20261217120000_music_analyzer_runs_v01.sql",
-      "sha256": "1c000b2c55f49f331dd88b3d9be86fb5ced20eb40062201d468659e36988e1cf"
-    },
-    {
-      "file": "supabase/migrations/20261217120100_admin_release_seo_reservation_clear_product.sql",
-      "sha256": "f7069c400b4fc1027b2f42ac4c8b32c192d2ec4653aef55ba44a0c3e23b0efbc"
-    },
-    {
-      "file": "supabase/migrations/20261217120200_require_product_cover_for_moderation.sql",
-      "sha256": "b98a13cd4f8bf9897fd766ca40867b46105196f63672846a1b8ba991ba422dc4"
-    },
-    {
-      "file": "supabase/migrations/20261218120000_jazz_relax_album_passport.sql",
-      "sha256": "818f2449352bf2c7d4e3f7d15959f8d9237f19b6b29b08b1074ab7f5ba53d252"
-    },
-    {
-      "file": "supabase/migrations/20261218121000_transfer_seo_reservation_workspace.sql",
-      "sha256": "f5e3a35ee5e3203b9386ff831597f84881b31dcf494c8f1f807a4065058b9e31"
-    },
-    {
-      "file": "supabase/migrations/20261219120000_admin_author_mailings.sql",
-      "sha256": "c2dd7df39c71488ebed8e8f052df37e8888b2fa7fdbb71d952766b458612a30b"
-    },
-    {
-      "file": "supabase/migrations/20261219121000_seo_search_analytics_phase1.sql",
-      "sha256": "7ff5ec652b770f6955458fdda82c39dd81f1c70da371abcc6b3397a707333b07"
-    },
-    {
-      "file": "supabase/migrations/20261220120000_seo_search_snapshot_normalized_collapse.sql",
-      "sha256": "84127558a134a837c814230012ea1ea5e5662027ea3d240c1f645dc995d3363c"
-    },
-    {
-      "file": "supabase/migrations/20261220121000_studio_duplicate_unreferenced_quota.sql",
-      "sha256": "3899b2d09b8042d30ffc64ca34bffd918215b2ac0f29b6dfe973462140c79710"
-    },
-    {
-      "file": "supabase/migrations/20261220122000_count_matching_seo_queries.sql",
-      "sha256": "d5659ff71d8764f5b518530b9bdd8337b2438550c6d085fa5177bfdb44ebc5b1"
-    },
-    {
-      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
-      "sha256": "9e7a983ce28b2f44ad44d2336805d7615f670d27c5e82637b3c7b82f863dc72b"
-    },
-    {
-      "file": "supabase/migrations/20261220124000_seo_sprint_query_initial_caps.sql",
-      "sha256": "43fb0a3ef90d4b33e4f9b5473e0798df9e8ecc1a7cb2fc93ee190e9d96696d4f"
-    },
-    {
-      "file": "supabase/migrations/20261220125000_product_video_export.sql",
-      "sha256": "31ca2971467cb3340b8d77920a15fc745f63e3ede1d20d6992f028ac314b048f"
-    },
-    {
-      "file": "supabase/migrations/20261220130000_seo_reservation_5d_reminder.sql",
-      "sha256": "09cfb441571bfb3a16fabf3bc9ffc3f7fc63cbef8ad84e17b6e59cc0a7aae127"
-    },
-    {
-      "file": "supabase/migrations/20261220131000_product_video_cover_path_check_fix.sql",
-      "sha256": "f2990e4e6de66d384f266e9aaffd9805761ec598d9d541d3c0bc49ca6ce46957"
-    },
-    {
-      "file": "supabase/migrations/20261220140000_product_video_render_progress.sql",
-      "sha256": "b3f0cad685c4281444b278ca7bbe8e325ea1994f72e23fda2c926b058fe1536d"
-    },
-    {
-      "file": "supabase/migrations/20261221120000_admin_overview_analytics_timeout.sql",
-      "sha256": "e084a8dfc2d07f7d7fe8ee33405c23ee3378d03e25b17c93fcbf37e1aae38836"
-    },
-    {
-      "file": "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
-      "sha256": "19dd47dfe50fa7be8e50164062ec05b4cd50430ef3426fe64cbd2f2dc0d8b031"
-    },
-    {
-      "file": "supabase/migrations/20261223120000_admin_listening_time_keep_sum.sql",
-      "sha256": "4c28ca28e8148ffa7ac0d6ad1f9bcb33819b00c77e6cc9df09ddadf27db08654"
-    },
-    {
-      "file": "supabase/migrations/20261224120000_admin_listening_sum_grouped.sql",
-      "sha256": "c392814334e770dfbb93c0bea85cf44817aeba385e4992b5419e994d6ebbcc52"
-    },
-    {
-      "file": "supabase/migrations/20261225120000_product_video_render_recipe.sql",
-      "sha256": "6ac1c224738865359350b85caa2eb669c9a9506e1bbca95bc885538f9955791e"
-    },
-    {
-      "file": "supabase/migrations/20261226120000_admin_listening_timeseries_grouped.sql",
-      "sha256": "62054a40f288a4dfaf7ee7bc148ef6b94c4606e9d200e92e71869e751af68606"
-    },
-    {
-      "file": "supabase/migrations/20261227120000_ai_company_viewer_role.sql",
-      "sha256": "2a729b5dcd314a2b7c5f87d31235d7904ced17e417b716d8d24c188fdd23ed00"
-    },
-    {
-      "file": "supabase/migrations/20261228120000_music_passport_registrations.sql",
-      "sha256": "4eddd87a4905b705bc58358aab562f82c69e8225163a763331f50eb9c17c708e"
-    },
-    {
-      "file": "supabase/migrations/20261231120000_business_spa_programs_playback_log.sql",
-      "sha256": "5672456b284068707d450020fd4ffa37178719daf0c94881fc2c1eac4a8e1a0d"
-    },
-    {
-      "file": "supabase/migrations/20261231130000_business_spa_program_composition.sql",
-      "sha256": "2484727178b716265ca6cc16ad64217756f2b55be69d275d0c81bb57b3d8730d"
-    },
-    {
-      "file": "supabase/migrations/20261231140000_business_royalty_usage_ledger.sql",
-      "sha256": "aebe17bd11f7b3a72d2404940cd322cf52bf8319b9681816734483e13a3c84e4"
-    },
-    {
-      "file": "supabase/migrations/20261231150000_business_spa_program_manifest.sql",
-      "sha256": "dc70c7fee2c8db2253d93958e5d4ad6b13e4ef218b83709fa11832ba9e1af101"
-    },
-    {
-      "file": "supabase/migrations/20261231160000_business_player_live_state.sql",
-      "sha256": "f1581e2284bbdc4bc6b4f60640efddba4759ee9db4d800921bc36c15d06b3c2a"
-    },
-    {
-      "file": "supabase/migrations/20270101120000_business_rightsholder_onboarding.sql",
-      "sha256": "917a6853f466ee92c127430dcafda2150361d39290e5e5b48f59ce6b123efd5e"
-    },
-    {
-      "file": "supabase/migrations/20270102120000_business_rightsholder_providers.sql",
-      "sha256": "ed54b5f00bd4fa07b27f77b9b4abcdf43d5fe4657ef17ca26bc42a97358a6a59"
-    },
-    {
-      "file": "supabase/migrations/20270103120000_business_rightsholder_suno_single_link.sql",
-      "sha256": "ab3f2783c00b2acd605132990ac3e5f37fada1f2855e12b60f0bf38556e866ef"
-    },
-    {
-      "file": "supabase/migrations/20270104120000_ecompany_catalog_stats.sql",
-      "sha256": "24680ad8607caa06962741a19ae5733e7516f675526f4d975cc039b561ed390d"
-    },
-    {
-      "file": "supabase/migrations/20270105120000_business_consents_block_support_mode.sql",
-      "sha256": "5b696cf15280aa2c44e590c2f54fbdbd17ff55c6450f22978f2b53bb24569af0"
-    },
-    {
-      "file": "supabase/migrations/20270107120000_business_owner_self_moderation.sql",
-      "sha256": "14924068ea18a33f9ee1993a70ec673119828760d41662054c63840146a56433"
-    },
-    {
-      "file": "supabase/migrations/20270107190000_admin_ratings_listeners.sql",
-      "sha256": "c8d80e1ccdfd5e4eb848957f66ec28086b504623d7c49c6f55d9f84473cd6bfa"
-    },
-    {
-      "file": "supabase/migrations/20270108120000_business_guest_listening.sql",
-      "sha256": "17ad7ba3203bfcc064d5f0179144b1d4acf61c4b5692210797252838a2e09ce7"
-    },
-    {
-      "file": "supabase/migrations/20270109120000_unified_commercial_agreement.sql",
-      "sha256": "313f844f255a81e0f1ebc63905caed3c2f654bd505e3e3a9225a0523202c2130"
-    },
-    {
-      "file": "supabase/migrations/20270110120000_author_terms_account_level_acceptance.sql",
-      "sha256": "2a11ceab67d1a3257ca5b6d8744b9e80a5ef852ec03e5b9dc348ab082a2d4c97"
-    },
-    {
-      "file": "supabase/migrations/20270111120000_business_verification_draft_reuse.sql",
-      "sha256": "23917e46623f3e29b43f5ef0d0022bcbce0fb1758173178acd7e04364b650043"
-    },
-    {
-      "file": "supabase/migrations/20270112120000_business_declared_rightsholder.sql",
-      "sha256": "05175a434479b8bbc17dd82dc2620dd006433eb55c863194d53225e96efc3c78"
-    },
-    {
-      "file": "supabase/migrations/20270117120000_practice_covers_server_only_cover_writes.sql",
-      "sha256": "8c1e07aeb47b62d894c668695dacb0f681a0edb25632a43842bf6079a0d0bf48"
-    },
-    {
-      "file": "supabase/migrations/20270118120000_cover_columns_server_only.sql",
-      "sha256": "25a8806722aec5aadcf54e94586747295a2defd09591b55f46d1c0c9f011b8a2"
-    },
-    {
-      "file": "supabase/migrations/20270119120000_business_player_live_claim_atomic.sql",
-      "sha256": "08323eafb87d9adb64de001431ebe65d0ad49270e697b224fc421a2b7e541dc6"
-    },
-    {
-      "file": "supabase/migrations/20270120120000_access_grants_and_workspace.sql",
-      "sha256": "23180f995bb49c37cdece7deaafc23fea1806bd5375cc58f63970350ac6be064"
-    },
-    {
-      "file": "supabase/migrations/20270121120000_guest_practice_ratings.sql",
-      "sha256": "b6b00ff5c90447a80ce155ce728150b44c852b8ef8100c6f125757012823d57e"
-    },
-    {
-      "file": "supabase/migrations/20270122120000_business_onboarding_rights_context.sql",
-      "sha256": "e47b097c43b5dfb77f7a20608443b416381814167442869e5f2cdee69a53809f"
-    },
-    {
-      "file": "supabase/migrations/20270122130000_business_venue_player_cafe_programs.sql",
-      "sha256": "3cdd03c22b039f579592aa346fd7ab2822dd461e55bfa5ce07916d5c17efd3a6"
-    },
-    {
-      "file": "supabase/migrations/20270123120000_music_analyzer_feature_overrides.sql",
-      "sha256": "56ee5f2e07f740ce3fd469655e0e1bd331851fbc61d92b9934d2db4c6fe887ca"
-    },
-    {
-      "file": "supabase/migrations/20270124130000_business_catalog_approved_email.sql",
-      "sha256": "6ebe9f02f61b98ec62987c0dbef4eaa2fdc97b148f43296ed024bb56088ff1e5"
-    },
-    {
-      "file": "supabase/migrations/20270124140000_practice_listener_comments.sql",
-      "sha256": "1a9fdf5243480707cc845d2fb63bd9587b3a5d7cfcc0470d6d7762c37d63f352"
-    },
-    {
-      "file": "supabase/migrations/20270124150000_listener_comments_by_product_type.sql",
-      "sha256": "2f2909b4f25334a3a21721f861c28b2ec8f66f45bc409b4406ab0441d4c2c34f"
-    },
-    {
-      "file": "supabase/migrations/20270125120000_search_recrawl_queue.sql",
-      "sha256": "76439db17345344de5cb2d29c9826fe90e48a1c78d49f4fde6e925d79bf6da96"
-    },
-    {
-      "file": "supabase/migrations/20270126120000_listener_comments_all_product_kinds.sql",
-      "sha256": "16e650ba18f1c504d6b72b7352579344e21ef6cf29dda49d920bf67b17c2d07b"
-    },
-    {
-      "file": "supabase/migrations/20270127120000_listener_comments_public_visibility_owner_tx.sql",
-      "sha256": "b441317280db67d944d4b5ed0bd28fd4e3d15b056c2688f805ab59b33c79432c"
-    },
-    {
-      "file": "supabase/migrations/20270128120000_music_analyzer_seal_head_prefixes.sql",
-      "sha256": "5f76a4109bf35ada1e920e7f7a05e46e4cfb4fa92f8bd989e4d61337d7dc4f6b"
-    },
-    {
-      "file": "supabase/migrations/20270129120000_platform_promo_banner.sql",
-      "sha256": "702d10419201e01a45b8b85af4fbbe06c4e5450cc1eee90b68bcd13ca666d6fd"
-    },
-    {
-      "file": "supabase/migrations/20270130120000_school_graduates.sql",
-      "sha256": "3b6b71a65ba8e68ccf56af2062bd2f9a09e306137ce57987d5479cc71a5a103e"
-    },
-    {
-      "file": "supabase/migrations/20270131120000_business_manual_admissions.sql",
-      "sha256": "2ffc03e8540602f900c624cc0a9ae90ca85034906b94a875d5da669c1657dd15"
-    },
-    {
-      "file": "supabase/migrations/20270201120000_business_track_sound_reviews.sql",
-      "sha256": "4664c3d8319591f52a226f032e4d96644df3e1821deb56ee8d0511b095a2285c"
-    },
-    {
-      "file": "supabase/migrations/20270202120000_business_artist_sound_auto.sql",
-      "sha256": "9bd43b7a0d86a43ecbb48a0e7795b29607664d6c497e4e331d5e3ac1d43f9972"
-    },
-    {
-      "file": "supabase/migrations/20270203120000_seo_sprint_general_release.sql",
-      "sha256": "2fbb23d448c2e98dabed6814f86a11b7fd0b4702ad2d2e4efc44b2b6e9aaee3e"
-    },
-    {
-      "file": "supabase/migrations/20270204120000_business_four_sectors_hide_artists.sql",
-      "sha256": "e26b13931ab227de74cae04ef7c10c5b0986d617ff24393c03504c3277f54bed"
-    },
-    {
-      "file": "supabase/migrations/20270205120000_business_location_sound_settings.sql",
-      "sha256": "d8ac5becfefda8200ff569f8612a67f489429574425a314e8913bb2d99a2ef75"
-    },
-    {
-      "file": "supabase/migrations/20270205130000_business_subscription_payment.sql",
-      "sha256": "24441e012165a73cccada96d32eb8f18147f6747d2af678add4251f7dc9080d8"
-    },
-    {
-      "file": "supabase/migrations/20270206120000_business_point_pairing.sql",
-      "sha256": "1432abe1d8fe076cbbf37a03cb3be48e725ca228ca4bfb755095a002cc15175b"
-    },
-    {
-      "file": "supabase/migrations/20270207120000_business_point_commands.sql",
-      "sha256": "dee8bf41428a393a32d6a37d3eec664e340d7cbf4a2d969bdd0fd405a35270ea"
-    },
-    {
-      "file": "supabase/migrations/20270207130000_business_point_sound_read.sql",
-      "sha256": "ec807dd3682e52367d19f5c6726fdc5efef24da9553ce7b37113b16713550b13"
-    },
-    {
-      "file": "supabase/migrations/20270208120000_business_point_pairing_4digit.sql",
-      "sha256": "fe84ff5b8cb34ce537bd1576bceca113d6b701befa0daa036a41be1d8b115b56"
-    },
-    {
-      "file": "supabase/migrations/20270208130000_music_analyzer_queue_guards.sql",
-      "sha256": "4ee33e150a35ddb7122c752a8b42c1ca5f64905908348f7086ad02e0c7d397c9"
-    },
-    {
-      "file": "supabase/migrations/20270209120000_ogg_audio_upload.sql",
-      "sha256": "9e1f658f131f0246d182d2580fa8de10716bfc561bcf763ca7a5cd2b01d09f83"
-    },
-    {
-      "file": "supabase/migrations/20270210170000_business_location_licence_public_id.sql",
-      "sha256": "64a9685dd4df5a6e3bb5ca9160696632e0ceaa7ccc1da3c2cbec418950d1d733"
-    },
-    {
-      "file": "supabase/migrations/20270211120000_business_guest_auth_stage1.sql",
-      "sha256": "e45cdb969ca8fae422d58581f0e07049c668227d0a97af212ab8a7640a7c4be9"
-    }
-  ],
   "inventory": [
     {
       "file": "supabase/baseline/0003_rls_and_policies.sql",
@@ -1598,6 +36,31 @@
       "statement": "CREATE POLICY \"Users can view own purchases\" ON public.purchases FOR SELECT USING (auth.uid() = user_id);"
     },
     {
+      "file": "supabase/baseline/0003_rls_and_policies.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.authors TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/baseline/0003_rls_and_policies.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.practices TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/baseline/0003_rls_and_policies.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.profiles TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/baseline/0003_rls_and_policies.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.purchases TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/baseline/0003_rls_and_policies.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.user_practices TO authenticated;"
+    },
+    {
       "file": "supabase/baseline/0004_storage.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Authenticated users can read entitled practice audio\" ON storage.objects FOR SELECT TO authenticated USING ( bucket_id = 'practice-audio' AND split_part(name, '/', 1) = 'practices' AND split_part(name, '/', 2) <> '' AND split_part(name, '/', 3) <> '' AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.user_id = auth.uid() AND up.practice_id::text = split_part(name, '/', 2) AND ( up.expires_at IS NULL OR up.expires_at > now() ) ) );"
@@ -1608,6 +71,11 @@
       "statement": "CREATE POLICY \"Users can view own library\" ON public.user_practices FOR SELECT USING (auth.uid() = user_id);"
     },
     {
+      "file": "supabase/migrations/20260710115506_create_user_library.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.user_practices TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260711071529_create_private_practice_audio_bucket.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Authenticated users can read entitled practice audio\" ON storage.objects FOR SELECT TO authenticated USING ( bucket_id = 'practice-audio' AND split_part(name, '/', 1) = 'practices' AND split_part(name, '/', 2) <> '' AND split_part(name, '/', 3) <> '' AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.user_id = auth.uid() AND up.practice_id::text = split_part(name, '/', 2) AND ( up.expires_at IS NULL OR up.expires_at > now() ) ) );"
@@ -1616,6 +84,11 @@
       "file": "supabase/migrations/20260713120000_create_commercial_mvp_core.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users can view own orders\" ON public.orders FOR SELECT USING (auth.uid() = user_id);"
+    },
+    {
+      "file": "supabase/migrations/20260713120000_create_commercial_mvp_core.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.orders TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260713140000_create_practice_order_function.sql",
@@ -1661,6 +134,16 @@
       "file": "supabase/migrations/20260714180000_unified_audio_product_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Author members can read practice audio\" ON storage.objects FOR SELECT TO authenticated USING ( bucket_id = 'practice-audio' AND split_part(name, '/', 1) = 'practices' AND split_part(name, '/', 2) <> '' AND split_part(name, '/', 3) <> '' AND EXISTS ( SELECT 1 FROM public.practices AS pr INNER JOIN public.author_members AS am ON am.author_id = pr.author_id WHERE pr.id::text = split_part(name, '/', 2) AND am.user_id = auth.uid() ) );"
+    },
+    {
+      "file": "supabase/migrations/20260714180000_unified_audio_product_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.audio_items TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260714180000_unified_audio_product_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_members TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260714191000_author_dashboard_storage_and_rls.sql",
@@ -1729,6 +212,21 @@
     },
     {
       "file": "supabase/migrations/20260715143000_personal_materials_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.personal_materials TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715143000_personal_materials_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.personal_material_author_notes TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715143000_personal_materials_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.personal_material_progress TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715143000_personal_materials_foundation.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.create_personal_material(uuid, text, text, date, text, text, text, text, text) TO authenticated;"
     },
@@ -1791,6 +289,11 @@
       "file": "supabase/migrations/20260715200000_practice_audio_progress.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users manage own practice audio progress\" ON public.practice_audio_progress FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());"
+    },
+    {
+      "file": "supabase/migrations/20260715200000_practice_audio_progress.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.practice_audio_progress TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260715210000_publish_audio_product_atomic.sql",
@@ -1866,6 +369,26 @@
       "file": "supabase/migrations/20260715270000_create_playlists.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Owners can delete own playlist items\" ON public.playlist_items FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.playlists AS p WHERE p.id = playlist_items.playlist_id AND p.user_id = auth.uid() ) );"
+    },
+    {
+      "file": "supabase/migrations/20260715270000_create_playlists.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.playlists TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715270000_create_playlists.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.playlists TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715270000_create_playlists.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.playlist_items TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260715270000_create_playlists.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.playlist_items TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260715280000_playlist_membership_rpc.sql",
@@ -1948,6 +471,11 @@
       "statement": "CREATE POLICY \"Users can update own author applications\" ON public.author_applications FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());"
     },
     {
+      "file": "supabase/migrations/20260716170000_author_applications.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON TABLE public.author_applications TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260716182000_promotion_campaigns.sql",
       "kind": "policy",
       "statement": "CREATE POLICY promotion_campaigns_select ON public.promotion_campaigns FOR SELECT TO authenticated USING (public.user_can_read_author_promotion(author_id));"
@@ -1961,6 +489,11 @@
       "file": "supabase/migrations/20260716182000_promotion_campaigns.sql",
       "kind": "policy",
       "statement": "CREATE POLICY promotion_campaigns_update ON public.promotion_campaigns FOR UPDATE TO authenticated USING (public.user_can_read_author_promotion(author_id)) WITH CHECK ( public.user_can_read_author_promotion(author_id) AND author_id = (SELECT pc.author_id FROM public.promotion_campaigns AS pc WHERE pc.id = promotion_campaigns.id) AND practice_id = (SELECT pc.practice_id FROM public.promotion_campaigns AS pc WHERE pc.id = promotion_campaigns.id) AND created_by = (SELECT pc.created_by FROM public.promotion_campaigns AS pc WHERE pc.id = promotion_campaigns.id) );"
+    },
+    {
+      "file": "supabase/migrations/20260716182000_promotion_campaigns.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON public.promotion_campaigns TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260716182000_promotion_campaigns.sql",
@@ -2069,6 +602,16 @@
     },
     {
       "file": "supabase/migrations/20260717140000_topics_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.topics TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260717140000_topics_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_topics TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260717140000_topics_foundation.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.resolve_author_topic_limit(uuid) TO authenticated, service_role;"
     },
@@ -2101,6 +644,21 @@
       "file": "supabase/migrations/20260717150000_email_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY email_preferences_update_own ON public.email_preferences FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());"
+    },
+    {
+      "file": "supabase/migrations/20260717150000_email_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.email_contacts TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260717150000_email_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.email_consents TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260717150000_email_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, UPDATE ON TABLE public.email_preferences TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260717151000_email_sync_and_profile.sql",
@@ -2183,6 +741,26 @@
       "statement": "CREATE POLICY \"Author members can delete author assets\" ON storage.objects FOR DELETE TO authenticated USING ( bucket_id = 'author-assets' AND EXISTS ( SELECT 1 FROM public.author_members AS am WHERE am.author_id = split_part(name, '/', 2)::uuid AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') ) );"
     },
     {
+      "file": "supabase/migrations/20260717160000_author_public_profile.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_topics TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260717160000_author_public_profile.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.author_topics TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260717160000_author_public_profile.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_featured_products TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260717160000_author_public_profile.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.author_featured_products TO authenticated, service_role;"
+    },
+    {
       "file": "supabase/migrations/20260718210000_fix_playlist_cover_variant_cas.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.replace_playlist_cover_path(uuid, text, text) TO authenticated;"
@@ -2226,6 +804,16 @@
       "file": "supabase/migrations/20260719150000_promo_pages_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY promo_page_products_delete ON public.promo_page_products FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.promo_pages AS pp WHERE pp.id = promo_page_products.promo_page_id AND public.user_can_read_author_promotion(pp.author_id) ) );"
+    },
+    {
+      "file": "supabase/migrations/20260719150000_promo_pages_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON public.promo_pages TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260719150000_promo_pages_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.promo_page_products TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260719150000_promo_pages_foundation.sql",
@@ -2289,6 +877,21 @@
     },
     {
       "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.promo_pages TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT ON public.promo_pages TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.promo_page_products TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.replace_promo_page_products(uuid, uuid[]) TO authenticated;"
     },
@@ -2306,6 +909,16 @@
       "file": "supabase/migrations/20260719154000_promo_pages_security_hardening.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.update_promo_page_draft(uuid, text, text, text, text, text, text, text, uuid[]) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260719155000_promo_pages_create_and_cta_hardening.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.promo_pages TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260719155000_promo_pages_create_and_cta_hardening.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.promo_page_products TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260719155000_promo_pages_create_and_cta_hardening.sql",
@@ -2336,6 +949,11 @@
       "file": "supabase/migrations/20260720140000_promotion_campaign_channels.sql",
       "kind": "policy",
       "statement": "CREATE POLICY promotion_campaign_channels_delete ON public.promotion_campaign_channels FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.promotion_campaigns AS pc WHERE pc.id = promotion_campaign_channels.campaign_id AND public.user_can_read_author_promotion(pc.author_id) ) );"
+    },
+    {
+      "file": "supabase/migrations/20260720140000_promotion_campaign_channels.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.promotion_campaign_channels TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260720143000_personal_materials_clear_draft_audio.sql",
@@ -2396,6 +1014,11 @@
       "file": "supabase/migrations/20260721153000_personal_material_templates.sql",
       "kind": "policy",
       "statement": "CREATE POLICY personal_material_templates_delete_member ON public.personal_material_templates FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.author_members AS am WHERE am.author_id = personal_material_templates.author_id AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') ) );"
+    },
+    {
+      "file": "supabase/migrations/20260721153000_personal_material_templates.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.personal_material_templates TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260721170000_personal_materials_pdf_support.sql",
@@ -2506,6 +1129,26 @@
       "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY platform_user_roles_select_own ON public.platform_user_roles FOR SELECT TO authenticated USING ( user_id = auth.uid() OR public.has_platform_permission(auth.uid(), 'team.view') );"
+    },
+    {
+      "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.platform_permissions TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.platform_roles TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.platform_role_permissions TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.platform_user_roles TO authenticated, service_role;"
     },
     {
       "file": "supabase/migrations/20260725120000_platform_rbac_foundation.sql",
@@ -2896,6 +1539,16 @@
       "file": "supabase/migrations/20260725230000_author_commercial_applications.sql",
       "kind": "policy",
       "statement": "CREATE POLICY author_commercial_application_status_events_select_staff ON public.author_commercial_application_status_events FOR SELECT TO authenticated USING ( EXISTS ( SELECT 1 FROM public.author_commercial_applications AS aca WHERE aca.id = author_commercial_application_status_events.application_id AND public.can_access_author_commercial_application(aca.author_id) ) );"
+    },
+    {
+      "file": "supabase/migrations/20260725230000_author_commercial_applications.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_commercial_applications TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260725230000_author_commercial_applications.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_commercial_application_status_events TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260725230000_author_commercial_applications.sql",
@@ -3314,6 +1967,16 @@
     },
     {
       "file": "supabase/migrations/20260729190000_private_audio_items.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.private_audio_items TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260729190000_private_audio_items.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.private_audio_item_progress TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260729190000_private_audio_items.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.get_private_audio_item_progress(uuid) TO authenticated;"
     },
@@ -3411,6 +2074,11 @@
       "file": "supabase/migrations/20260731180000_practice_moderation_mvp_schema.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Entitled users can read entitled practices\" ON public.practices FOR SELECT TO authenticated USING ( deleted_at IS NULL AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.practice_id = practices.id AND up.user_id = auth.uid() AND (up.expires_at IS NULL OR up.expires_at > now()) ) );"
+    },
+    {
+      "file": "supabase/migrations/20260731180000_practice_moderation_mvp_schema.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_moderation_events TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260731181000_practice_moderation_mvp_gates_and_rpcs.sql",
@@ -3664,6 +2332,21 @@
     },
     {
       "file": "supabase/migrations/20260814120000_playlist_platform_ownership.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.playlist_collaborators TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260814120000_playlist_platform_ownership.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.playlist_collaborators TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260814120000_playlist_platform_ownership.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.playlist_audit_log TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260814120000_playlist_platform_ownership.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.is_playlist_collaborator(uuid, uuid) TO authenticated, service_role;"
     },
@@ -3789,6 +2472,31 @@
     },
     {
       "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.editorial_directions TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.editorial_directions TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.editorial_direction_members TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.editorial_direction_members TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.editorial_direction_audit_log TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260815120000_editorial_directions_and_playlist_admin.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.is_direction_editor(uuid, uuid) TO authenticated, service_role;"
     },
@@ -3884,6 +2592,16 @@
     },
     {
       "file": "supabase/migrations/20260823180000_practice_price_promotions.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.practice_price_promotions TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260823180000_practice_price_promotions.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_price_promotions TO anon;"
+    },
+    {
+      "file": "supabase/migrations/20260823180000_practice_price_promotions.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.resolve_practice_effective_price(uuid, text, text, uuid, timestamptz) TO anon, authenticated;"
     },
@@ -3941,6 +2659,16 @@
       "file": "supabase/migrations/20260823191000_quick_offers.sql",
       "kind": "policy",
       "statement": "CREATE POLICY quick_offer_materials_delete ON public.quick_offer_materials FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.quick_offers AS qo WHERE qo.id = quick_offer_materials.offer_id AND public.user_can_read_author_promotion(qo.author_id) ) );"
+    },
+    {
+      "file": "supabase/migrations/20260823191000_quick_offers.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.quick_offers TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260823191000_quick_offers.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.quick_offer_materials TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260823191000_quick_offers.sql",
@@ -4003,6 +2731,11 @@
       "statement": "CREATE POLICY \"Users can delete own library saves\" ON public.library_saves FOR DELETE TO authenticated USING (auth.uid() = user_id);"
     },
     {
+      "file": "supabase/migrations/20260823200000_library_saves_and_preview_window.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, DELETE ON TABLE public.library_saves TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260825150000_publication_gallery_slides.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Public can read published publication gallery slides\" ON public.publication_gallery_slides FOR SELECT TO public USING ( EXISTS ( SELECT 1 FROM public.practices AS p WHERE p.id = publication_gallery_slides.publication_id AND p.status = 'published' AND p.deleted_at IS NULL ) );"
@@ -4028,6 +2761,16 @@
       "statement": "CREATE POLICY \"Author members can delete publication gallery slides\" ON public.publication_gallery_slides FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.practices AS p INNER JOIN public.author_members AS am ON am.author_id = p.author_id WHERE p.id = publication_gallery_slides.publication_id AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') AND p.deleted_at IS NULL ) );"
     },
     {
+      "file": "supabase/migrations/20260825150000_publication_gallery_slides.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.publication_gallery_slides TO anon;"
+    },
+    {
+      "file": "supabase/migrations/20260825150000_publication_gallery_slides.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.publication_gallery_slides TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260825163000_playlist_catalog_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users can view own playlist saves\" ON public.playlist_saves FOR SELECT TO authenticated USING (auth.uid() = user_id);"
@@ -4044,6 +2787,11 @@
     },
     {
       "file": "supabase/migrations/20260825163000_playlist_catalog_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, DELETE ON TABLE public.playlist_saves TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260825163000_playlist_catalog_foundation.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.refresh_playlist_listing_aggregates(uuid) TO service_role;"
     },
@@ -4051,6 +2799,11 @@
       "file": "supabase/migrations/20260825164000_playlist_topics.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Public can read topics of listed playlists\" ON public.playlist_topics FOR SELECT TO anon, authenticated USING ( EXISTS ( SELECT 1 FROM public.playlists AS p WHERE p.id = playlist_topics.playlist_id AND p.visibility = 'public' AND p.published_at IS NOT NULL AND p.listed_at IS NOT NULL AND p.slug IS NOT NULL AND btrim(p.slug) <> '' ) );"
+    },
+    {
+      "file": "supabase/migrations/20260825164000_playlist_topics.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.playlist_topics TO anon, authenticated;"
     },
     {
       "file": "supabase/migrations/20260825164000_playlist_topics.sql",
@@ -4153,6 +2906,26 @@
       "statement": "CREATE POLICY \"Author members can delete course completion ctas\" ON public.course_completion_ctas FOR DELETE TO authenticated USING ( EXISTS ( SELECT 1 FROM public.practices AS p INNER JOIN public.author_members AS am ON am.author_id = p.author_id WHERE p.id = course_completion_ctas.publication_id AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') AND p.deleted_at IS NULL ) );"
     },
     {
+      "file": "supabase/migrations/20260827120000_course_content_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.course_lessons TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260827120000_course_content_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.course_lesson_blocks TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260827120000_course_content_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.publication_files TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260827120000_course_content_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.course_completion_ctas TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260829130000_author_contacts.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Public can read visible author contacts\" ON public.author_contacts FOR SELECT TO anon, authenticated USING (is_visible = true);"
@@ -4161,6 +2934,16 @@
       "file": "supabase/migrations/20260829130000_author_contacts.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Author members can manage author contacts\" ON public.author_contacts FOR ALL TO authenticated USING ( EXISTS ( SELECT 1 FROM public.author_members AS am WHERE am.author_id = author_contacts.author_id AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') ) ) WITH CHECK ( EXISTS ( SELECT 1 FROM public.author_members AS am WHERE am.author_id = author_contacts.author_id AND am.user_id = auth.uid() AND am.role IN ('owner', 'editor') ) );"
+    },
+    {
+      "file": "supabase/migrations/20260829130000_author_contacts.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_contacts TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260829130000_author_contacts.sql",
+      "kind": "table",
+      "statement": "GRANT ALL ON TABLE public.author_contacts TO authenticated, service_role;"
     },
     {
       "file": "supabase/migrations/20260901120000_analytics_link_signup_idempotent.sql",
@@ -4211,6 +2994,11 @@
       "file": "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Public can read author featured products\" ON public.author_featured_products FOR SELECT TO anon, authenticated USING ( EXISTS ( SELECT 1 FROM public.practices AS p WHERE p.id = author_featured_products.product_id AND p.deleted_at IS NULL AND p.status = 'published' AND p.catalog_visibility = 'listed' ) OR ( auth.uid() IS NOT NULL AND public.has_platform_permission(auth.uid(), 'admin_panel.access') ) );"
+    },
+    {
+      "file": "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_visibility_users TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260901120100_practice_catalog_visibility_modes.sql",
@@ -4509,6 +3297,11 @@
     },
     {
       "file": "supabase/migrations/20260905120000_author_onboarding_ui_state.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON TABLE public.author_onboarding_ui_state TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260905120000_author_onboarding_ui_state.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.sync_author_onboarding_ui_completion(uuid, boolean, boolean) TO service_role;"
     },
@@ -4556,6 +3349,46 @@
       "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Authors can manage practice related listens\" ON public.practice_related_listens FOR ALL TO authenticated USING (public.can_manage_practice_seo(practice_id)) WITH CHECK (public.can_manage_practice_seo(practice_id));"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_seo_usage_items TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_seo_faq_items TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_related_products TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_related_listens TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.practice_seo_usage_items TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.practice_seo_faq_items TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.practice_related_products TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON TABLE public.practice_related_listens TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260908120000_product_seo_v2.sql",
@@ -4658,6 +3491,21 @@
       "statement": "CREATE POLICY \"Author members can update appreciation settings\" ON public.author_appreciation_settings FOR UPDATE TO authenticated USING (public.author_members_can_mutate(author_id)) WITH CHECK (public.author_members_can_mutate(author_id));"
     },
     {
+      "file": "supabase/migrations/20260915130000_author_appreciation_settings.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_appreciation_settings TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260915130000_author_appreciation_settings.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE ON TABLE public.author_appreciation_settings TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20260915130000_author_appreciation_settings.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_appreciation_settings TO anon;"
+    },
+    {
       "file": "supabase/migrations/20260916120000_author_appreciation_getcourse_intents.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.apply_author_appreciation_getcourse_callback(text, text, text, bigint, text, bigint, bigint) TO service_role;"
@@ -4723,9 +3571,19 @@
       "statement": "CREATE POLICY \"Users select own practice audio progress\" ON public.practice_audio_progress FOR SELECT TO authenticated USING (user_id = auth.uid());"
     },
     {
+      "file": "supabase/migrations/20260919120000_harden_practice_audio_progress_rls.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_audio_progress TO authenticated;"
+    },
+    {
       "file": "supabase/migrations/20260920120000_practice_listen_stats.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users select own practice listen stats\" ON public.practice_listen_stats FOR SELECT TO authenticated USING (user_id = auth.uid());"
+    },
+    {
+      "file": "supabase/migrations/20260920120000_practice_listen_stats.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_listen_stats TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260920120000_practice_listen_stats.sql",
@@ -4736,6 +3594,11 @@
       "file": "supabase/migrations/20260921120000_practice_ratings.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users select own practice ratings\" ON public.practice_ratings FOR SELECT TO authenticated USING (user_id = auth.uid());"
+    },
+    {
+      "file": "supabase/migrations/20260921120000_practice_ratings.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_ratings TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260921120000_practice_ratings.sql",
@@ -4781,6 +3644,11 @@
       "file": "supabase/migrations/20260923120000_studio_render_job_lease_heartbeat.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.release_studio_render_job(uuid, uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20260923120100_course_access_levels_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.user_practices TO authenticated;"
     },
     {
       "file": "supabase/migrations/20260923120100_course_access_levels_foundation.sql",
@@ -4926,6 +3794,11 @@
       "file": "supabase/migrations/20261003120000_studio_music_entitlements.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Users can view own studio music entitlements\" ON public.studio_music_entitlements FOR SELECT TO authenticated USING (auth.uid() = user_id);"
+    },
+    {
+      "file": "supabase/migrations/20261003120000_studio_music_entitlements.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.studio_music_entitlements TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261003120000_studio_music_entitlements.sql",
@@ -5103,6 +3976,21 @@
       "statement": "CREATE POLICY \"Public can read visible classical work practices\" ON public.classical_work_practices FOR SELECT TO anon, authenticated USING ( public.can_current_viewer_read_practice(practice_id) AND EXISTS ( SELECT 1 FROM public.classical_works AS work JOIN public.classical_composers AS composer ON composer.id = work.composer_id WHERE work.id = classical_work_practices.classical_work_id AND work.editorial_status = 'published' AND composer.editorial_status = 'published' ) );"
     },
     {
+      "file": "supabase/migrations/20261006120300_classical_catalog_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.classical_composers TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261006120300_classical_catalog_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.classical_works TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261006120300_classical_catalog_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.classical_work_practices TO anon, authenticated;"
+    },
+    {
       "file": "supabase/migrations/20261006120400_analytics_owner_overview.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.analytics_overview_event_facts(timestamptz,timestamptz,uuid,uuid,boolean,text,text) TO service_role;"
@@ -5141,6 +4029,16 @@
       "file": "supabase/migrations/20261006130000_seo_core_v1.sql",
       "kind": "policy",
       "statement": "CREATE POLICY seo_query_reservations_manage_staff ON public.seo_query_reservations FOR ALL TO authenticated USING (public.is_platform_staff(auth.uid())) WITH CHECK (public.is_platform_staff(auth.uid()));"
+    },
+    {
+      "file": "supabase/migrations/20261006130000_seo_core_v1.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.seo_clusters, public.seo_queries, public.seo_query_reservations TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261006130000_seo_core_v1.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON public.seo_clusters, public.seo_queries, public.seo_query_reservations TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261006130000_seo_core_v1.sql",
@@ -5271,6 +4169,16 @@
       "file": "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
       "kind": "policy",
       "statement": "CREATE POLICY seo_query_proposals_manage_staff ON public.seo_query_proposals FOR ALL TO authenticated USING (public.is_platform_staff(auth.uid())) WITH CHECK (public.is_platform_staff(auth.uid()));"
+    },
+    {
+      "file": "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.seo_query_proposals TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261007170000_seo_query_author_proposals.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE, DELETE ON public.seo_query_proposals TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261007180000_music_publish_playable_audio.sql",
@@ -5416,6 +4324,21 @@
       "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Current referrer owner or invitee can read referrals\" ON public.author_referrals FOR SELECT TO authenticated USING ( public.author_partner_is_owner(referrer_author_id) OR invitee_user_id = auth.uid() );"
+    },
+    {
+      "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_partner_profiles TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_partner_code_aliases TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.author_referrals TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261024120000_author_partner_program_foundation.sql",
@@ -5704,6 +4627,26 @@
     },
     {
       "file": "supabase/migrations/20261201120000_business_domain_core.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_organizations TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261201120000_business_domain_core.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_organization_members TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261201120000_business_domain_core.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_locations TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261201120000_business_domain_core.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_zones TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261201120000_business_domain_core.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.is_business_organization_member(uuid, uuid) TO authenticated;"
     },
@@ -5741,6 +4684,16 @@
       "file": "supabase/migrations/20261202120000_business_player_foundation.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Business members can read player assignments\" ON public.business_player_assignments FOR SELECT TO authenticated USING ( EXISTS ( SELECT 1 FROM public.business_players AS p WHERE p.id = business_player_assignments.player_id AND public.is_business_organization_member(p.organization_id) ) );"
+    },
+    {
+      "file": "supabase/migrations/20261202120000_business_player_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_players TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261202120000_business_player_foundation.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_player_assignments TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261202120000_business_player_foundation.sql",
@@ -6064,6 +5017,11 @@
     },
     {
       "file": "supabase/migrations/20261213120000_public_content_revision.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.public_content_revision TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261213120000_public_content_revision.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.bump_public_content_revision_from_practice() TO authenticated, service_role;"
     },
@@ -6121,6 +5079,11 @@
       "file": "supabase/migrations/20261215120000_seo_sprint_autumn_sounds_seed.sql",
       "kind": "policy",
       "statement": "CREATE POLICY seo_sprint_queries_manage_staff ON public.seo_sprint_queries FOR ALL TO authenticated USING (public.is_platform_staff(auth.uid())) WITH CHECK (public.is_platform_staff(auth.uid()));"
+    },
+    {
+      "file": "supabase/migrations/20261215120000_seo_sprint_autumn_sounds_seed.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE, DELETE ON public.seo_sprints, public.seo_sprint_queries TO authenticated;"
     },
     {
       "file": "supabase/migrations/20261216120000_seo_reservation_link_practice_gate.sql",
@@ -6249,6 +5212,11 @@
     },
     {
       "file": "supabase/migrations/20261219121000_seo_search_analytics_phase1.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON public.seo_search_snapshots, public.seo_search_query_metrics TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261219121000_seo_search_analytics_phase1.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.import_seo_search_snapshot(text, date, date, text, jsonb) TO authenticated, service_role;"
     },
@@ -6336,6 +5304,41 @@
       "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
       "kind": "policy",
       "statement": "CREATE POLICY classica_public_storage_delete ON storage.objects FOR DELETE TO authenticated USING ( bucket_id = 'classica-public' AND public.has_platform_permission(auth.uid(), 'classica.production.admin') );"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_jobs TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_assets TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_events TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_reviews TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_prompts TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_production_accruals TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.classica_public_works TO anon, authenticated, service_role;"
     },
     {
       "file": "supabase/migrations/20261220123000_classica_production_v01.sql",
@@ -6569,6 +5572,21 @@
     },
     {
       "file": "supabase/migrations/20261231120000_business_spa_programs_playback_log.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT, UPDATE ON TABLE public.business_programs, public.business_program_items TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261231120000_business_spa_programs_playback_log.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_pilot_allowlist TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261231120000_business_spa_programs_playback_log.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT ON TABLE public.business_playback_log TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20261231120000_business_spa_programs_playback_log.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.has_business_pilot_access(uuid) TO authenticated, service_role;"
     },
@@ -6679,6 +5697,11 @@
     },
     {
       "file": "supabase/migrations/20270101120000_business_rightsholder_onboarding.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.%I TO authenticated, service_role',t);"
+    },
+    {
+      "file": "supabase/migrations/20270101120000_business_rightsholder_onboarding.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION %s TO authenticated', f.signature);"
     },
@@ -6746,6 +5769,11 @@
       "file": "supabase/migrations/20270109120000_unified_commercial_agreement.sql",
       "kind": "policy",
       "statement": "CREATE POLICY business_track_eligibility_reviews_read ON public.business_track_eligibility_reviews FOR SELECT TO authenticated USING ( public.business_onboarding_is_moderator() OR public.business_unified_is_author_member(author_id) );"
+    },
+    {
+      "file": "supabase/migrations/20270109120000_unified_commercial_agreement.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_track_eligibility_reviews TO authenticated, service_role;"
     },
     {
       "file": "supabase/migrations/20270109120000_unified_commercial_agreement.sql",
@@ -6914,6 +5942,16 @@
     },
     {
       "file": "supabase/migrations/20270124140000_practice_listener_comments.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_listener_comment_notices TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270124140000_practice_listener_comments.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.practice_listener_comment_feed TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270124140000_practice_listener_comments.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.practice_accepts_listener_comments(uuid) TO anon, authenticated, service_role;"
     },
@@ -7028,6 +6066,21 @@
       "statement": "CREATE POLICY platform_promo_update ON public.platform_promo_banners FOR UPDATE TO authenticated USING ( public.has_platform_permission(auth.uid(), 'admin_panel.access') AND public.has_platform_permission(auth.uid(), 'settings.manage') ) WITH CHECK ( public.has_platform_permission(auth.uid(), 'admin_panel.access') AND public.has_platform_permission(auth.uid(), 'settings.manage') );"
     },
     {
+      "file": "supabase/migrations/20270129120000_platform_promo_banner.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.platform_promo_banners TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270129120000_platform_promo_banner.sql",
+      "kind": "table",
+      "statement": "GRANT INSERT, UPDATE ON public.platform_promo_banners TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270130120000_school_graduates.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.school_graduate_showcase TO anon, authenticated;"
+    },
+    {
       "file": "supabase/migrations/20270130120000_school_graduates.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.validate_school_graduate_selection() TO service_role;"
@@ -7084,6 +6137,11 @@
     },
     {
       "file": "supabase/migrations/20270201120000_business_track_sound_reviews.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.business_track_sound_reviews, public.business_track_sound_review_history TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270201120000_business_track_sound_reviews.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.admin_business_sound_queue(text,uuid,uuid,text,integer) TO authenticated;"
     },
@@ -7109,6 +6167,11 @@
     },
     {
       "file": "supabase/migrations/20270202120000_business_artist_sound_auto.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.business_artist_sound_auto, public.business_artist_sound_auto_audit TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270202120000_business_artist_sound_auto.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_artist_sound_auto_enabled(uuid) TO service_role;"
     },
@@ -7129,6 +6192,11 @@
     },
     {
       "file": "supabase/migrations/20270204120000_business_four_sectors_hide_artists.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.business_admission_hidden_artists, public.business_admission_hidden_artists_audit TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270204120000_business_four_sectors_hide_artists.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.set_business_artist_admission_hidden(uuid, boolean) TO authenticated;"
     },
@@ -7136,6 +6204,11 @@
       "file": "supabase/migrations/20270205120000_business_location_sound_settings.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Business members can read location sound settings\" ON public.business_location_sound_settings FOR SELECT TO authenticated USING (public.is_business_organization_member(organization_id));"
+    },
+    {
+      "file": "supabase/migrations/20270205120000_business_location_sound_settings.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON TABLE public.business_location_sound_settings TO authenticated;"
     },
     {
       "file": "supabase/migrations/20270205120000_business_location_sound_settings.sql",
@@ -7221,6 +6294,11 @@
       "file": "supabase/migrations/20270207120000_business_point_commands.sql",
       "kind": "policy",
       "statement": "CREATE POLICY \"Business owners can insert location point commands\" ON public.business_point_commands FOR INSERT TO authenticated WITH CHECK ( created_by = auth.uid() AND public.is_business_organization_owner(organization_id) );"
+    },
+    {
+      "file": "supabase/migrations/20270207120000_business_point_commands.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT, INSERT ON TABLE public.business_point_commands TO authenticated;"
     },
     {
       "file": "supabase/migrations/20270207120000_business_point_commands.sql",

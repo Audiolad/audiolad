@@ -28,9 +28,11 @@ HTTP-обработчик выделен в `src/lib/auth/hooks/before-user-crea
 
 ## Статический аудит RLS/RPC
 
-Проверены baseline и история migrations. `scripts/anonymous-rls-audit-unit.mjs` сопоставляет точный список SQL-файлов, SHA-256 каждого файла и инвентарь всех найденных CREATE POLICY и явных GRANT EXECUTE/ALL ON FUNCTION. Snapshot: `scripts/fixtures/anonymous-rls-audit.snapshot.json` – 390 файлов, 1143 объявления. В нём сохранены также старые политики, заменённые функции и впоследствии отозванные гранты, чтобы новая широкая поверхность не исчезала из проверки из-за эвристики.
+Статический аудит читает baseline и историю migrations. `scripts/anonymous-rls-audit-unit.mjs` сопоставляет с `scripts/fixtures/anonymous-rls-audit.snapshot.json` только инвентарь объявлений: CREATE POLICY, явные GRANT EXECUTE/ALL ON FUNCTION (включая ALL FUNCTIONS IN SCHEMA), GRANT на таблицы (включая ALL TABLES IN SCHEMA) для anon, authenticated или PUBLIC и ALTER DEFAULT PRIVILEGES. Список исходников и хеши файлов в snapshot больше не входят. Исторические объявления сохраняются, включая впоследствии заменённые политики и отозванные гранты.
 
-Это консервативный контроль изменений, а не интерпретатор PostgreSQL: regex не вычисляет эффективные ACL, перегрузки, RLS OR/AND, SQL внутри динамических строк и транзитивный граф SECURITY DEFINER. Хеши всех исходников закрывают пропуски такого извлечения, включая изменение тела функции, PUBLIC/default privileges и динамического SQL. Любая новая миграция или изменение существующей останавливает тест до явного review и обновления snapshot. Обновлять snapshot автоматически в CI нельзя. После ручного review новой миграции snapshot обновляется явно: `ANONYMOUS_RLS_AUDIT_UPDATE=1 npm run test:anonymous-rls-audit`, и изменение fixture попадает в diff PR. Эффективные права после replay дополнительно проверяются SQL smoke и живым планом ниже.
+Тест сигнализирует об изменении извлечённых объявлений этой поверхности прав. Новая миграция без таких объявлений или изменение только тела функции не требует обновления snapshot. Это regex-инвентарь, а не интерпретатор PostgreSQL: он не вычисляет эффективные ACL, перегрузки, RLS OR/AND и транзитивный граф SECURITY DEFINER. Изменения тел функций, REVOKE, ALTER POLICY, включения RLS и динамически построенного SQL отдельно не контролируются. Объявления в строковых литералах могут давать ложные совпадения. Поэтому успешный snapshot не доказывает изоляцию гостя.
+
+После ручного review поверхность фиксируется явно: `ANONYMOUS_RLS_AUDIT_UPDATE=1 node scripts/anonymous-rls-audit-unit.mjs`, изменение fixture включается в diff PR. Автоматически обновлять snapshot в CI нельзя. В этом исправлении fixture оставлен прежним по заданию; до его пересоздания командой проверка snapshot ожидаемо не совпадёт с новым форматом. Эффективные права после replay требуют отдельных SQL-проверок и живого плана ниже.
 
 В таблицах ниже «широкий» означает отсутствие требования к роли, членству или владению у вызывающего. Публичный SELECT часто является намеренным. Проверка только наличия `auth.uid()` не отличает постоянного пользователя от anonymous authenticated. Проверки владельца/членства в других RPC не следует путать с простым EXECUTE-грантом.
 
@@ -79,7 +81,11 @@ HTTP-обработчик выделен в `src/lib/auth/hooks/before-user-crea
 
 Таблица билетов – не таблица гостевых подписок. Gift, существующие сроки, access_grants, договоры и платежи не изменены. Миграция **нигде не применялась**. Её комментарий содержит отдельный нерешённый вопрос price resolver. Общего запрета гостю всех RPC основного сайта пока нет.
 
-SQL smoke подключён к существующему disposable migration compiler и paths его workflow. Он проверяет закрытость таблицы/consume, однократное погашение, nullable-профиль, отсутствие стартовых практик/почтового контакта, отказ anonymous в bootstrap и невидимость чужого профиля/членства. Минимальная Auth-фикстура дополняется колонкой только внутри smoke-транзакции с ROLLBACK. Это не миграция Auth-схемы и не моделирование GoTrue. Конкурентность SQL consume следует из атомарного DELETE; unit дополнительно проверяет две одновременные доставки через имитацию атомарного хранилища.
+SQL smoke подключён к существующему disposable migration compiler и paths его workflow. В BEGIN … ROLLBACK он проверяет отсутствие SELECT/INSERT/UPDATE/DELETE на tickets и EXECUTE на consume у authenticated и anon; однократный consume выполняется под `SET LOCAL ROLE service_role`. Обычный подтверждённый владелец создаётся в Auth, затем под его JWT и ролью authenticated вызывается штатный bootstrap. После RESET ROLE привилегированная проверка подтверждает наличие профиля, организации, owner membership, location и zone.
+
+Под JWT гостя и ролью authenticated проверяются nullable-профиль, отказ в bootstrap и невидимость существующих строк владельца в profiles, business_organizations, business_organization_members, business_locations и business_zones (если таблица существует). UPDATE и DELETE каждой строки должны затронуть ноль строк либо получить insufficient_privilege. Привилегированная проверка также подтверждает отсутствие стартовых практик и почтового контакта гостя. Минимальная Auth-фикстура дополняется `is_anonymous` и `email_confirmed_at` через ADD COLUMN IF NOT EXISTS только внутри smoke-транзакции с ROLLBACK. Это не изменение рабочей Auth-схемы и не моделирование GoTrue. Последовательный consume smoke не проверяет реальную конкурентность; unit использует имитацию атомарного хранилища для двух одновременных доставок.
+
+Миграция допускает повторное применение к уже созданным ею объектам: CREATE TABLE IF NOT EXISTS и CREATE OR REPLACE FUNCTION. Клиентских политик таблицы tickets она не создаёт. Тела `handle_new_user` и `create_business_organization_with_location` в этом исправлении сохранены.
 
 ## Проверки и ограничения
 
@@ -88,6 +94,8 @@ SQL smoke подключён к существующему disposable migration 
 Codex-автор работал без npm/node_modules. Перед коммитом на отдельной машине проверяющего запущены: `test:business-guest-auth-hook`, `test:anonymous-rls-audit`, `database-migrations-plan-unit`, `duplicate-migration-versions-unit`, `migration-audit-unit`, `database-migrations-compile-workflow-unit`, `email-policy-unit`, `sign-up-policy-unit`, `business-domain-core-sql-unit`, `tsc --noEmit` и eslint по изменённым файлам – всё зелёное. Полный replay миграций и SQL smoke выполняет CI (Database Migrations Real Compile) на одноразовом Postgres. Браузерный сценарий не выполнялся, работающий стенд не поднимался.
 
 Исправлено при проверке: в проекте миграции `create_business_organization_with_location` сначала была переписана со старой версии из `20261201120000` и теряла вызов `business_ensure_location_rights_context` и поле `rights_context_id` (регресс миграции `20270122120000`). Теперь тело взято из `20270122120000` без изменений, добавлен только запрет для анонимного пользователя. В `database-migrations-plan-unit` добавлена новая версия `20270211120000` в ожидаемые списки.
+
+При исправлении REQUEST_CHANGES локально прошли `node --check scripts/anonymous-rls-audit-unit.mjs`, `git diff --check` и отдельная проверка аудита с фикстурой в памяти: изменение прав вызывает падение, изменение постороннего SQL не вызывает, режим обновления работает. Тела двух защищённых функций и неизменность snapshot сверены с HEAD. Проверка аудита с сохранённым старым fixture ожидаемо сообщает несовпадение; fixture требуется пересоздать указанной выше командой. `database-migrations-plan-unit` был остановлен после ожидания без результата, успешным не считается. npm, lint/build, браузерный сценарий, SQL smoke и повторное применение миграции в этой сессии не выполнялись. Подключений к БД не было, коммит не создавался.
 
 Не проверены: версия и настройки self-hosted GoTrue/Auth, фактическое включение hook, anonymous sign-ins, точный payload anonymous webhook, его повторные доставки, реальный профиль/ограничения установленной БД, шифрование/refresh Business-сессии, адаптеры внешнего входа VK/MAX. Последние относятся к последующим отдельным работам и не объявлены готовыми этим PR.
 
@@ -125,6 +133,7 @@ Codex-автор работал без npm/node_modules. Перед коммит
 - `src/lib/auth/business-guest/ticket.server.ts`
 - `scripts/business-guest-auth-hook-unit.mts`
 - `scripts/anonymous-rls-audit-unit.mjs`
+- `scripts/database-migrations-plan-unit.mjs`
 - `scripts/fixtures/anonymous-rls-audit.snapshot.json`
 - `supabase/migrations/20270211120000_business_guest_auth_stage1.sql`
 - `supabase/tests/business_guest_auth_stage1_smoke.sql`

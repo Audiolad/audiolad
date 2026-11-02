@@ -11,7 +11,7 @@
 BEGIN;
 
 -- Stage 1 proposal only. Never apply without the migration Human Gate.
-CREATE TABLE public.business_guest_auth_tickets (
+CREATE TABLE IF NOT EXISTS public.business_guest_auth_tickets (
   nonce_hash text PRIMARY KEY CHECK (nonce_hash ~ '^[a-f0-9]{64}$'),
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
@@ -21,7 +21,7 @@ ALTER TABLE public.business_guest_auth_tickets ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.business_guest_auth_tickets FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, DELETE ON public.business_guest_auth_tickets TO service_role;
 
-CREATE FUNCTION public.consume_business_guest_auth_ticket(p_nonce_hash text)
+CREATE OR REPLACE FUNCTION public.consume_business_guest_auth_ticket(p_nonce_hash text)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
   WITH consumed AS (
@@ -35,7 +35,7 @@ GRANT EXECUTE ON FUNCTION public.consume_business_guest_auth_ticket(text) TO ser
 
 -- Consult the Auth-owned record, not mutable metadata. to_jsonb also permits
 -- compiling against the repository's minimal historical Auth fixture.
-CREATE FUNCTION public.is_business_anonymous_user()
+CREATE OR REPLACE FUNCTION public.is_business_anonymous_user()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
   SELECT COALESCE((SELECT (to_jsonb(u)->>'is_anonymous')::boolean
