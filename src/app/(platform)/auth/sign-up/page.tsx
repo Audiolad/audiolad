@@ -1,6 +1,6 @@
 "use client";
 
-import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
+import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
   AUTH_NETWORK_ERROR_MESSAGE,
@@ -45,7 +45,6 @@ function fieldErrorId(field: SignUpFieldError["field"]): string {
 }
 
 function SignUpForm() {
-  const coffee = useCoffeeAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [firstName, setFirstName] = useState("");
@@ -485,11 +484,11 @@ function SignUpForm() {
               />
               <span className="text-sm leading-6 text-[#4c3d78]">
                 Я принимаю{" "}
-                <Link href={coffee ? "https://audiolad.ru/offer" : "/offer"} className="font-semibold text-[#7042c5]">
+                <Link href="/offer" className="font-semibold text-[#7042c5]">
                   Пользовательское соглашение
                 </Link>{" "}
                 и{" "}
-                <Link href={coffee ? "https://audiolad.ru/privacy" : "/privacy"} className="font-semibold text-[#7042c5]">
+                <Link href="/privacy" className="font-semibold text-[#7042c5]">
                   Политику обработки персональных данных
                 </Link>
                 .

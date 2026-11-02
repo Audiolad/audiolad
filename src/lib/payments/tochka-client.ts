@@ -18,7 +18,6 @@ import {
 export type CreateTochkaPaymentInput = {
   orderId: string;
   checkoutToken: string;
-  returnSite?: "coffee";
   amountMinor: number;
   purpose: string;
   consumerId: string;
@@ -111,19 +110,17 @@ function assertReceiptAmountsConsistent(
   }
 }
 
-export function buildCreatePaymentData(
+function buildCreatePaymentData(
   config: TochkaConfig,
   input: CreateTochkaPaymentInput,
 ): TochkaCreatePaymentData {
   const amount = minorToRubles(input.amountMinor);
-  const returnParams = input.returnSite === "coffee" ? { site: "coffee" } : undefined;
   const checkoutQuery = buildCheckoutResultQuery(
     input.orderId,
     input.checkoutToken,
-    returnParams,
   );
   const redirectUrl = `${config.siteUrl}/checkout/result?${checkoutQuery}`;
-  const failRedirectUrl = `${config.siteUrl}/checkout/result?${buildCheckoutResultQuery(input.orderId, input.checkoutToken, { status: "failed", ...returnParams })}`;
+  const failRedirectUrl = `${config.siteUrl}/checkout/result?${buildCheckoutResultQuery(input.orderId, input.checkoutToken, { status: "failed" })}`;
 
   const data: TochkaCreatePaymentData = {
     customerCode: config.customerCode,

@@ -1,4 +1,3 @@
-import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import {
   getSafeNextPath,
   isAuthEntryRoute,
@@ -228,7 +227,6 @@ async function updateSessionInner(
   if (authenticatedUser && isAuthEntryRoute(pathname)) {
     const destination = getSafeNextPath(
       request.nextUrl.searchParams.get("next"),
-      isCoffeeHostRequest(request.headers) ? "/cabinet" : undefined,
     );
 
     return redirectWithSupabaseCookies(

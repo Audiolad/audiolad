@@ -447,7 +447,7 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 // ---------------------------------------------------------------- registration metadata, not a second signup system
 {
   const actions = read("src/app/(platform)/auth/sign-up/actions.ts");
-  assert.match(actions, /emailRedirectTo/);
+  assert.doesNotMatch(actions, /emailRedirectTo/);
   assert.doesNotMatch(actions, /activateBusinessTrial|createSupabaseAccessGrantStore/);
   const callback = read("src/app/(platform)/auth/callback/route.ts");
   assert.match(callback, /getSafeNextPath/);
@@ -464,8 +464,8 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   const activateAt = back.indexOf("await activateBusinessTrial");
   assert.ok(confirmAt >= 0 && activateAt > confirmAt, "unconfirmed email never reaches activation");
 
-  async function submit(next: string | null, authError: string | null = null, host = "audiolad.ru") {
-    const box: { trial?: string; emailRedirectTo?: string } = {};
+  async function submit(next: string | null, authError: string | null = null) {
+    const box: { trial?: string } = {};
     const previousCorporateDomains = process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
     process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS = "example.test";
     try {
@@ -480,12 +480,10 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
           next,
         },
         {
-          requestHeaders: async () => new Headers({ host }),
           createClient: async () => ({
             auth: {
-              signUp: async (args: { options?: { data?: Record<string, string>; emailRedirectTo?: string } }) => {
+              signUp: async (args: { options?: { data?: Record<string, string> } }) => {
                 box.trial = args.options?.data?.business_trial;
-                box.emailRedirectTo = args.options?.emailRedirectTo;
                 return {
                   data: { user: authError ? null : { id: USER_A }, session: null },
                   error: authError ? { message: authError } : null,
@@ -497,7 +495,7 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
           onNewListenerCreated: async () => ({ ok: true, status: "sent" }),
         },
       );
-      return { result, trial: box.trial, emailRedirectTo: box.emailRedirectTo };
+      return { result, trial: box.trial };
     } finally {
       if (previousCorporateDomains === undefined) {
         delete process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
@@ -517,27 +515,6 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   const listener = await submit("/profile");
   assert.equal(listener.result.ok, true);
   assert.equal(listener.trial, undefined);
-  const savedFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-  try {
-    for (const enabled of [undefined, "1"]) {
-      if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
-      else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-      for (const host of ["audiolad.ru", "business.audiolad.ru", "coffee.audiolad.ru", "evil.test"]) {
-        for (const next of ["/auth/business-return?site=coffee", "https://evil.test", null]) {
-          const signup = await submit(next, null, host);
-          const coffee = enabled && host === "coffee.audiolad.ru";
-          const destination = getSafeNextPath(next, coffee ? "/cabinet" : "/my-practices");
-          assert.equal(signup.emailRedirectTo, coffee
-            ? `https://coffee.audiolad.ru/auth/callback?${new URLSearchParams({ next: destination })}`
-            : undefined);
-          if (signup.result.ok) assert.equal(signup.result.destination, destination);
-        }
-      }
-    }
-  } finally {
-    if (savedFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
-    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = savedFlag;
-  }
   const store = createMemoryAccessGrantStore();
   const duplicate = await submit(null, "User already registered");
   assert.equal(duplicate.result.ok, false);
@@ -1233,8 +1210,8 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
   try {
     const html = wrap("/onboarding", <BusinessOnboardingWizardPage />, "coffee.audiolad.ru");
-    assert.match(html, /href="https:\/\/coffee.audiolad.ru\/auth\/sign-in\?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee"/);
-    assert.match(html, /href="https:\/\/coffee.audiolad.ru\/auth\/sign-up\?next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee"/);
+    assert.match(html, /href="https:\/\/audiolad.ru\/auth\/sign-in\?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee"/);
+    assert.match(html, /href="https:\/\/audiolad.ru\/auth\/sign-up\?next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee"/);
     const workspace = wrap("/music", <BusinessWorkspace model={model({ status: "anonymous" })} />, "coffee.audiolad.ru");
     assert.match(workspace, /next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee/);
   } finally {

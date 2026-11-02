@@ -1,7 +1,7 @@
 import { AUTHOR_PROJECT_CAPACITY_ORDER_KIND } from "@/lib/author-projects/capacity-catalog";
 import { BUSINESS_CABINET_RETURN_PATH } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
-import { BUSINESS_ORIGIN, COFFEE_ORIGIN, coffeeHostEnabled } from "@/lib/business-app/host";
+import { BUSINESS_ORIGIN } from "@/lib/business-app/host";
 import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { STUDIO_MUSIC_ORDER_KIND } from "@/lib/studio-music/access";
 import { buildPracticePublicPath } from "@/lib/products/paths";
@@ -26,46 +26,16 @@ export function isAuthorProjectCapacityCheckout(
   return orderKind === AUTHOR_PROJECT_CAPACITY_ORDER_KIND;
 }
 
-/**
- * Site where the latest business subscription checkout was started in this browser.
- * Set by the checkout API on `.audiolad.ru`, so a reused pending payment link (which keeps
- * the return URL of its first start) still returns to the current cabinet. Only an exact
- * allowlisted value is honoured; anything else falls back to the URL marker.
- */
-export const CHECKOUT_RETURN_SITE_COOKIE = "al_checkout_return_site";
-export const CHECKOUT_RETURN_SITE_MAX_AGE_SECONDS = 24 * 60 * 60;
-
-export function resolveCheckoutReturnSite(
-  cookieValue: string | null | undefined,
-  paramValue: string | null | undefined,
-): "coffee" | undefined {
-  if (cookieValue === "coffee") return "coffee";
-  if (cookieValue === "business") return undefined;
-  return paramValue === "coffee" ? "coffee" : undefined;
-}
-
-export function readCheckoutReturnSiteCookie(cookieHeader: string): string | null {
-  for (const part of cookieHeader.split(";")) {
-    const [name, ...rest] = part.trim().split("=");
-    if (name === CHECKOUT_RETURN_SITE_COOKIE) return rest.join("=");
-  }
-  return null;
-}
-
 export function isBusinessSubscriptionCheckout(orderKind?: string | null): boolean {
   return orderKind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
 }
 
-export function buildBusinessSubscriptionPaidHref(site?: string): string {
-  if (coffeeHostEnabled() && site === "coffee") return `${COFFEE_ORIGIN}/cabinet#dostup`;
+export function buildBusinessSubscriptionPaidHref(): string {
   return `${BUSINESS_ORIGIN}/#dostup`;
 }
 
 /** Apex sign-in. After the session exists, /auth/business-cabinet opens the cabinet anchor. */
-export function buildBusinessSubscriptionSignInHref(site?: string): string {
-  if (coffeeHostEnabled() && site === "coffee") {
-    return `${COFFEE_ORIGIN}${buildAuthRouteHref("/auth/sign-in", `${BUSINESS_CABINET_RETURN_PATH}?site=coffee`)}`;
-  }
+export function buildBusinessSubscriptionSignInHref(): string {
   return buildAuthRouteHref("/auth/sign-in", BUSINESS_CABINET_RETURN_PATH);
 }
 
@@ -87,26 +57,25 @@ export type BusinessCheckoutResultCard = {
   secondaryLabel: string | null;
 };
 
-function businessCabinetReturn(authenticated: boolean, site?: string): { href: string; label: string } {
+function businessCabinetReturn(authenticated: boolean): { href: string; label: string } {
   if (authenticated) {
-    return { href: buildBusinessSubscriptionPaidHref(site), label: "Вернуться в кабинет" };
+    return { href: buildBusinessSubscriptionPaidHref(), label: "Вернуться в кабинет" };
   }
-  return { href: buildBusinessSubscriptionSignInHref(site), label: "Войти и вернуться в кабинет" };
+  return { href: buildBusinessSubscriptionSignInHref(), label: "Войти и вернуться в кабинет" };
 }
 
 /** Wording for a business_subscription return. Catalogue orders do not use this. */
 export function businessCheckoutResultCard(
   view: BusinessCheckoutResultView,
   authenticated: boolean,
-  site?: string,
 ): BusinessCheckoutResultCard {
-  const back = businessCabinetReturn(view === "paid_unauthenticated" ? false : authenticated, site);
+  const back = businessCabinetReturn(view === "paid_unauthenticated" ? false : authenticated);
 
   if (view === "paid_authenticated") {
     return {
       title: "Оплата прошла. Доступ открыт.",
       description: "30 дней кабинета АудиоЛад Бизнес. Автосписания нет.",
-      actionHref: buildBusinessSubscriptionPaidHref(site),
+      actionHref: buildBusinessSubscriptionPaidHref(),
       actionLabel: "Вернуться в кабинет",
       secondaryHref: null,
       secondaryLabel: null,
