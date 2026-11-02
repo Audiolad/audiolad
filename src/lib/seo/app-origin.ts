@@ -1,3 +1,5 @@
+import { COFFEE_ORIGIN, isCoffeeHostRequest } from "@/lib/business-app/host";
+
 /** Canonical production origin for SEO URLs. */
 export const PRODUCTION_APP_ORIGIN = "https://audiolad.ru";
 
@@ -148,6 +150,10 @@ function originFromHostAndProto(
  * Arbitrary forwarded hosts are rejected (no open redirect).
  */
 export function getPublicRequestOrigin(request: Request): string {
+  // Coffee is deliberately outside the forwarded-host allowlist: only its real
+  // request host (and the build flag) can select this fixed production origin.
+  if (isCoffeeHostRequest(request.headers)) return COFFEE_ORIGIN;
+
   const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
   const forwardedProto = normalizeForwardedProto(
     request.headers.get("x-forwarded-proto"),
