@@ -101,5 +101,5 @@ export function businessAuthHref(hostname: string, route: "sign-in" | "sign-up",
     return `${PRODUCTION_APP_ORIGIN}/auth/${route}`;
   }
   const next = businessReturnPath(gift || route === "sign-up" ? BUSINESS_TRIAL_RETURN_PATH : BUSINESS_CABINET_RETURN_PATH, "coffee");
-  return `${PRODUCTION_APP_ORIGIN}/auth/${route}?next=${encodeURIComponent(next)}`;
+  return `${COFFEE_ORIGIN}/auth/${route}?next=${encodeURIComponent(next)}`;
 }

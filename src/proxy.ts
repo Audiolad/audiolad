@@ -1,3 +1,4 @@
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { MAX_SITE_PATH } from "@/lib/max/host";
@@ -29,6 +30,11 @@ export function setProxyUpdateSessionForTests(fn: UpdateSessionFn | null) {
 function getRequestHostname(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-host");
   const host = request.headers.get("host");
+  // Coffee admission must agree with checkout/auth: a real Host beats forwarded input.
+  // Keep the established routing of all other hosts unchanged.
+  if (normalizeHostname(host) === COFFEE_HOSTNAME || normalizeHostname(forwarded) === COFFEE_HOSTNAME) {
+    return hostnameFromHeaders(request.headers);
+  }
   return normalizeHostname(forwarded ?? host);
 }
 
