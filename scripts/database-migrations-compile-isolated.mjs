@@ -14,7 +14,14 @@ import {
 } from "../deploy/scripts/lib/database-migrations-plan.mjs";
 
 const adminUrl = process.env.AUDIOLAD_MIGRATION_COMPILE_ADMIN_URL ?? "";
-const expectedDatabase = "audiolad_migration_compile_isolated";
+// Guest Auth stand only: replay into an already created disposable database
+// where real GoTrue has run its own Auth migrations first, then stop before the
+// compile-only smokes (they target the minimal Auth fixture).
+const standDatabase = process.env.AUDIOLAD_MIGRATION_COMPILE_STAND_DATABASE ?? "";
+if (standDatabase && !/^audiolad_[a-z0-9_]+_stand$/.test(standDatabase)) {
+  throw new Error("AUDIOLAD_MIGRATION_COMPILE_STAND_DATABASE must match audiolad_*_stand");
+}
+const expectedDatabase = standDatabase || "audiolad_migration_compile_isolated";
 const preMigrationFixtures = new Map([
   [
     "20260714180000",
@@ -88,7 +95,7 @@ function applyFile(label, file) {
 
 const validatedAdminUrl = isolatedUrl(adminUrl, "postgres");
 const databaseUrl = isolatedUrl(adminUrl, expectedDatabase);
-runPsql(validatedAdminUrl, ["-c", `CREATE DATABASE ${expectedDatabase};`]);
+if (!standDatabase) runPsql(validatedAdminUrl, ["-c", `CREATE DATABASE ${expectedDatabase};`]);
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const migrationDirectory = resolve(root, "supabase/migrations");
@@ -148,6 +155,10 @@ if (
   !pending.has("20261006120400")
 ) {
   throw new Error("analytics migrations were not included in the disposable replay");
+}
+if (standDatabase) {
+  process.stdout.write(`Stand replay complete: ${standDatabase}\n`);
+  process.exit(0);
 }
 applyFile("post-apply analytics smoke", resolve(root, "supabase/tests/database_migrations_compile_analytics_smoke.sql"));
 if (!pending.has("20261007140000")) {
@@ -267,6 +278,8 @@ applyFile(
   "post-apply business subscription payment smoke",
   resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
 );
+applyFile("post-apply business guest Auth stage 1 smoke", resolve(root, "supabase/tests/business_guest_auth_stage1_smoke.sql"));
+
 if (!pending.has("20270210180000")) {
   throw new Error("JWT claims trigger guard migration was not included in the disposable replay");
 }
