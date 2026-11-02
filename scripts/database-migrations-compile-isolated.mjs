@@ -280,6 +280,13 @@ applyFile(
 );
 applyFile("post-apply business guest Auth stage 1 smoke", resolve(root, "supabase/tests/business_guest_auth_stage1_smoke.sql"));
 
+if (!pending.has("20270210180000")) {
+  throw new Error("JWT claims trigger guard migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply JWT claims trigger guard smoke",
+  resolve(root, "supabase/tests/jwt_claims_trigger_guards_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);

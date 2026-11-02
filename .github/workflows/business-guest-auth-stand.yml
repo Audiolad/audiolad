@@ -14,6 +14,7 @@ on:
       - "src/lib/auth/business-guest/**"
       - "src/lib/auth/hooks/**"
       - "src/app/api/auth/hooks/before-user-created/**"
+      - "supabase/migrations/20270210180000_jwt_claims_trigger_guards.sql"
       - "supabase/migrations/20270211120000_business_guest_auth_stage1.sql"
 
 permissions:
