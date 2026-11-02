@@ -19,6 +19,7 @@ import AdminBusinessTrials, {
 import {
   BUSINESS_TRIAL_NO_DATA,
   buildBusinessTrialFunnel,
+  businessTrialFunnelFrom,
   buildBusinessTrialStats,
   businessTrialConversion,
   type BusinessTrialFacts,
@@ -73,12 +74,20 @@ async function main() {
   assert.equal(businessEntryChannel("vk"), null);
   assert.equal(businessEntryChannel(1), null);
   assert.equal(businessUtmValue(" bot "), "bot");
-  assert.equal(businessUtmValue("x".repeat(101)), null);
+  assert.equal(businessUtmValue("x".repeat(65)), null);
+  assert.equal(businessUtmValue("Autumn_2026-promo.v2"), "autumn_2026-promo.v2");
+  assert.equal(businessUtmValue("осень"), "осень");
+  for (const pii of ["ivan@mail.ru", "+79161234567", "89161234567", "79161234567", "192.168.0.1", "10-0-0-1", "Иван Петров", "id 1234567"]) {
+    assert.equal(businessUtmValue(pii), null, `utm must drop ${pii}`);
+  }
   assert.equal(businessUtmValue("a\nb"), null);
   assert.equal(businessReferrerDomain("https://www.Yandex.ru/search/?text=кофе&lr=213"), "yandex.ru");
   assert.equal(businessReferrerDomain("https://audiolad.ru/b/atlas-kofeen?ch=max"), "audiolad.ru");
   assert.equal(businessReferrerDomain("https://coffee.audiolad.ru/start"), null, "own host is not a source");
-  assert.equal(businessReferrerDomain("http://192.168.0.1:8080/"), "192.168.0.1");
+  assert.equal(businessReferrerDomain("http://192.168.0.1:8080/"), null, "IP is never stored");
+  assert.equal(businessReferrerDomain("http://[2001:db8::1]/"), null, "IPv6 is never stored");
+  assert.equal(businessReferrerDomain("10.0.0.1"), null);
+  assert.equal(businessReferrerDomain("https://user:pw@vk.com/x"), "vk.com");
   assert.equal(businessReferrerDomain("localhost"), null);
   assert.equal(businessReferrerDomain("javascript:alert(1)"), null);
   assert.equal(businessReferrerDomain(""), null);
@@ -193,21 +202,26 @@ async function main() {
     channel, referrerDomain: null, utmSource: null, utmMedium: null, utmCampaign: null,
     country: "RU", region: null, city: "Kazan", deviceClass: "phone", osFamily: "ios", browserFamily: "safari",
   });
+  const inWindow = "2026-11-03T09:00:00.000Z";
+  const funnelFromIso = "2026-10-07T12:00:00.000Z";
   const funnelRows = [
-    { origin: origin("max"), everPaid: true },
-    { origin: origin("max"), everPaid: false },
-    { origin: origin("tg"), everPaid: false },
-    { origin: origin(null), everPaid: true },
-    { origin: null, everPaid: true },
+    { origin: origin("max"), everPaid: true, startsAt: inWindow },
+    { origin: origin("max"), everPaid: false, startsAt: inWindow },
+    { origin: origin("tg"), everPaid: false, startsAt: inWindow },
+    { origin: origin(null), everPaid: true, startsAt: inWindow },
+    { origin: null, everPaid: true, startsAt: inWindow },
+    { origin: origin("max"), everPaid: true, startsAt: "2026-09-01T09:00:00.000Z" },
   ];
-  const funnel = buildBusinessTrialFunnel(funnelRows, true, { max: { botStarts: 20, giftClicks: 8 } });
+  assert.equal(businessTrialFunnelFrom(new Date("2026-11-06T12:00:00.000Z")), funnelFromIso);
+  const funnel = buildBusinessTrialFunnel(funnelRows, true, { max: { botStarts: 20, giftClicks: 8 } }, funnelFromIso);
+  assert.equal(funnel.from, funnelFromIso);
   assert.equal(funnel.maxPotok, true);
   assert.deepEqual(funnel.columns, [
     { channel: "max", botStarts: 20, giftClicks: 8, started: 2, paid: 1 },
     { channel: "tg", botStarts: null, giftClicks: null, started: 1, paid: 0 },
     { channel: "none", botStarts: null, giftClicks: null, started: 1, paid: 1 },
   ]);
-  const funnelOff = buildBusinessTrialFunnel(funnelRows, false, null);
+  const funnelOff = buildBusinessTrialFunnel(funnelRows, false, null, funnelFromIso);
   assert.equal(funnelOff.maxPotok, false);
   assert.ok(funnelOff.columns.every((c) => c.started === 0 && c.paid === 0 && c.botStarts === null));
   assert.equal(businessTrialConversion(8, 2), 25);
@@ -254,7 +268,7 @@ async function main() {
   ]);
   const htmlOn = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: statsOn }));
   assert.ok(!htmlOn.includes("data-trial-attribution-off"));
-  for (const text of ["бот МАКС", "бот Телеграм", "Kazan", "телефон", "Подписались на бота", "Нажали ссылку на подарок", "Начали 7 дней в подарок", "Оплатили", "(40%)", "(25%)", "(100%)"]) {
+  for (const text of ["бот МАКС", "бот Телеграм", "Kazan", "телефон", "Подписались на бота", "Нажали ссылку на подарок", "Начали 7 дней в подарок", "Оплатили", "За последние 30 дней", "(40%)", "(25%)", "(100%)"]) {
     assert.ok(htmlOn.includes(text), text);
   }
   assert.ok(htmlOn.includes('data-trial-funnel-cell="bot-max"'));
@@ -294,6 +308,10 @@ async function main() {
   const funnelServer = read("src/lib/admin/max-potok-funnel.server.ts");
   assert.ok(funnelServer.includes('redirect: "error"') && funnelServer.includes("AbortSignal.timeout("));
   assert.ok(funnelServer.includes("if (!config.enabled || !config.maxPotokFunnelUrl || !config.maxPotokFunnelToken) return null;"));
+  const queriesSrc = read("src/lib/admin/business-trials-queries.ts");
+  assert.ok(queriesSrc.includes("const maxPotokOnly = attributionEnabled ? await loadMaxPotokFunnel(funnelFrom) : null;"), "bot counts load before any start");
+  assert.equal(count(queriesSrc, "loadMaxPotokFunnel(funnelFrom)"), 2, "one shared window for both paths");
+  assert.ok(!queriesSrc.includes("earliestStart"));
   const queries = read("src/lib/admin/business-trials-queries.ts");
   assert.ok(/attributionEnabled \? loadMaxPotokFunnel\(/.test(queries), "MAX Поток only with the flag");
   assert.ok(queries.includes("attributionEnabled ? `, ${ATTRIBUTION_COLUMNS}` : \"\""), "new columns only with the flag");
@@ -306,7 +324,9 @@ async function main() {
     assert.ok(text.includes("sessionStorage"));
     assert.ok(!/document\.cookie|localStorage|fetch\(|navigator\.(userAgent|platform)/.test(text), rel);
   }
-  assert.ok(read("src/app/business-app/layout.tsx").includes("<BusinessAttributionCapture />"));
+  assert.ok(read("src/app/business-app/layout.tsx").includes("{attributionEnabled ? <BusinessAttributionCapture /> : null}"), "capture only with the flag on");
+  assert.ok(read("src/app/business-app/layout.tsx").includes("attributionEnabled={attributionEnabled}"));
+  assert.ok(read("src/components/business-app/BusinessGuestStartCta.tsx").includes("...(attributionEnabled ? storedAttribution() : {})"), "CTA sends nothing with the flag off");
   assert.ok(read("src/app/(platform)/b/atlas-kofeen/layout.tsx").includes("<AttributionLinkCarrier />"));
 
   // Migration and rollback shape.
@@ -330,6 +350,9 @@ async function main() {
   assert.ok(refresh.includes("https://download.db-ip.com/free/dbip-city-lite-"));
   assert.ok(refresh.includes("mv -f"));
   assert.ok(refresh.includes("DBIP-City-Lite"));
+  for (const guard of ['--max-filesize "$MAX_GZ_BYTES"', 'head -c "$((MAX_BYTES + 1))"', "flock -n 9", "gunzip -t"]) {
+    assert.ok(refresh.includes(guard), guard);
+  }
   assert.ok(read("package.json").includes('"mmdb-lib": "3.0.4"'));
 
   for (const text of [migration, rollback, record, refresh, read("docs/business/TRIAL_ATTRIBUTION_GEO_DEVICE_RU.md")]) assert.ok(!text.includes("\u2014"));

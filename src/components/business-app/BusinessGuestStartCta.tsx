@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { useGuestStartEnabled } from "./BusinessDomainProvider";
+import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
 import { BUSINESS_OFFER_HREF } from "@/lib/business/offer";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
@@ -21,6 +21,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
   href: string; className?: string; children: ReactNode; testId: string; enabledLabel?: string;
 }) {
   const enabled = useGuestStartEnabled();
+  const attributionEnabled = useAttributionEnabled();
   const [open, setOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,7 +43,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
       }
       const response = await fetch("/api/business/guest-start", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ accepted: true, idempotencyKey: key.current, ...storedAttribution() }),
+        body: JSON.stringify({ accepted: true, idempotencyKey: key.current, ...(attributionEnabled ? storedAttribution() : {}) }),
       });
       const result = await response.json();
       if (response.ok && result.ok === true && result.redirect === "/") {

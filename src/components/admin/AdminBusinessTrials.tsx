@@ -4,6 +4,7 @@ import {
   BUSINESS_TRIAL_DEVICE_LABELS,
   businessTrialConversion,
   BUSINESS_TRIAL_FIRST_PLAY_LABELS,
+  BUSINESS_TRIAL_FUNNEL_DAYS,
   BUSINESS_TRIAL_NO_DATA,
   BUSINESS_TRIAL_START_HOST_LABELS,
   BUSINESS_TRIAL_STATUS_LABELS,
@@ -126,7 +127,7 @@ export function BusinessTrialFunnelBlock({ funnel }: { funnel: BusinessTrialFunn
       <div className="px-4 pt-4">
         <h3 className="text-base font-semibold text-[#2b2140]">Воронка по каналам</h3>
         <p className="mt-1 text-xs text-[#9a8fb8]">
-          Бот: данные MAX Поток{funnel.maxPotok ? "" : ` – ${BUSINESS_TRIAL_NO_DATA}`}. Старты и оплаты: гостевые старты с меткой канала. В скобках – доля от предыдущего шага.
+          За последние {BUSINESS_TRIAL_FUNNEL_DAYS} дней, все шаги за один период. Бот: данные MAX Поток{funnel.maxPotok ? "" : ` – ${BUSINESS_TRIAL_NO_DATA}`}. Старты и оплаты: гостевые старты с меткой канала. В скобках – доля от предыдущего шага.
         </p>
       </div>
       <div className="overflow-x-auto">

@@ -120,8 +120,17 @@ export type BusinessTrialFunnel = {
   enabled: boolean;
   /** false when MAX Поток counts could not be loaded. */
   maxPotok: boolean;
+  /** Start of the shared window (ISO): all four steps count only from here. */
+  from: string;
   columns: BusinessTrialFunnelColumn[];
 };
+
+/** «Воронка по каналам» window: the same last N days for the bot steps and our starts. */
+export const BUSINESS_TRIAL_FUNNEL_DAYS = 30;
+
+export function businessTrialFunnelFrom(now: Date): string {
+  return new Date(now.getTime() - BUSINESS_TRIAL_FUNNEL_DAYS * 86_400_000).toISOString();
+}
 
 export type BusinessTrialActivityDay = {
   /** Moscow calendar day, YYYY-MM-DD. */
@@ -364,7 +373,7 @@ export function buildBusinessTrialStats(input: {
   }
 
   rows.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt) || a.userId.localeCompare(b.userId));
-  const funnel = buildBusinessTrialFunnel(rows, attributionEnabled, input.maxPotok ?? null);
+  const funnel = buildBusinessTrialFunnel(rows, attributionEnabled, input.maxPotok ?? null, businessTrialFunnelFrom(input.now));
   return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows, hiddenTests, attributionEnabled, funnel };
 }
 
@@ -375,13 +384,17 @@ function count(value: unknown): number | null {
 /**
  * «Воронка по каналам»: bot start → gift button → 7-day start → payment, МАКС and Телеграм
  * side by side. The first two steps come from MAX Поток, the last two from our starts with
- * ch=max|tg. «Без метки» = starts without a channel (site, ads, direct).
+ * ch=max|tg. «Без метки» = starts without a channel (site, ads, direct). All steps share one
+ * window (last BUSINESS_TRIAL_FUNNEL_DAYS days), so a subscription and click before the first
+ * start are not lost and the conversions compare like with like.
  */
 export function buildBusinessTrialFunnel(
-  rows: readonly Pick<BusinessTrialRow, "origin" | "everPaid">[],
+  rows: readonly Pick<BusinessTrialRow, "origin" | "everPaid" | "startsAt">[],
   enabled: boolean,
   maxPotok: Partial<Record<"max" | "tg", MaxPotokChannelCounts>> | null,
+  from: string,
 ): BusinessTrialFunnel {
+  const fromMs = Date.parse(from);
   const columns: BusinessTrialFunnelColumn[] = (["max", "tg", "none"] as const).map((channel) => {
     const external = channel === "none" ? undefined : maxPotok?.[channel];
     return {
@@ -395,13 +408,15 @@ export function buildBusinessTrialFunnel(
   if (enabled) {
     for (const row of rows) {
       if (!row.origin) continue;
+      const startMs = Date.parse(row.startsAt);
+      if (!Number.isFinite(startMs) || !(startMs >= fromMs)) continue;
       const column = columns.find((c) => c.channel === (row.origin?.channel ?? "none"));
       if (!column) continue;
       column.started += 1;
       if (row.everPaid) column.paid += 1;
     }
   }
-  return { enabled, maxPotok: maxPotok !== null, columns };
+  return { enabled, maxPotok: maxPotok !== null, from, columns };
 }
 
 /** «12 → 3 (25%)» style conversion; null when either side is unknown or the base is zero. */

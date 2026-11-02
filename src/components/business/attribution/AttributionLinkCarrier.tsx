@@ -16,6 +16,9 @@ import {
  * Links from these pages to coffee/business are another host, so sessionStorage does
  * not follow: on click, ch/utm_* of this tab's first landing are added to the link.
  * Only those parameters, only for coffee/business links; no cookie, nothing is sent.
+ * Not behind the attribution flag on purpose: the atlas overview is a static page, and this
+ * only repeats parameters already in the address bar. Storing and sending them happens on the
+ * coffee/business host, which is behind AUDIOLAD_BUSINESS_TRIAL_ATTRIBUTION_ENABLED.
  */
 function carried(): BusinessAttributionPayload {
   try {

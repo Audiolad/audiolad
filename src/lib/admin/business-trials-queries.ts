@@ -3,6 +3,7 @@ import "server-only";
 import {
   buildBusinessTrialStats,
   earliestBusinessTrialDay,
+  businessTrialFunnelFrom,
   latestIso,
   type BusinessTrialActivityDay,
   type BusinessTrialFacts,
@@ -105,7 +106,12 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     return value;
   };
   const userIds = [...new Set(grants.map((grant) => grant.userId))];
-  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds, attributionEnabled, maxPotok: null });
+  // Bot counts use the funnel window, not the first start, and load even before any start.
+  const funnelFrom = businessTrialFunnelFrom(now);
+  if (userIds.length === 0) {
+    const maxPotokOnly = attributionEnabled ? await loadMaxPotokFunnel(funnelFrom) : null;
+    return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds, attributionEnabled, maxPotok: maxPotokOnly });
+  }
 
   const kindFilter = { kind: BUSINESS_NEW_CLIENT_GRANT_KIND };
   const guestStartColumns = [
@@ -113,12 +119,6 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     config.enabled ? ", start_host" : "",
     attributionEnabled ? `, ${ATTRIBUTION_COLUMNS}` : "",
   ].join("");
-  // MAX Поток counts start from the earliest gift start, so both halves of the funnel cover one period.
-  const earliestMs = grants.reduce((best, grant) => {
-    const ms = Date.parse(grant.startsAt);
-    return Number.isFinite(ms) && ms < best ? ms : best;
-  }, Number.POSITIVE_INFINITY);
-  const earliestStart = Number.isFinite(earliestMs) ? new Date(earliestMs).toISOString() : null;
   const [paidByUser, paidByHash, events, guestStarts, members, playback, maxPotok] = await Promise.all([
     selectIn(db, "access_paid_periods", "user_id, paid_until", "user_id", userIds, { eq: kindFilter, order: ["email_hash"] }),
     selectIn(db, "access_paid_periods", "email_hash, paid_until", "email_hash", [...userByHash.keys()], { eq: kindFilter, order: ["email_hash"] }),
@@ -136,7 +136,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     ),
     selectIn(db, "business_organization_members", "user_id, organization_id, created_at", "user_id", userIds, { eq: { role: "owner" }, order: ["id"] }),
     selectIn(db, "business_workspace_playback", "user_id, updated_at", "user_id", userIds, { order: ["user_id", "space_id"] }),
-    attributionEnabled ? loadMaxPotokFunnel(earliestStart) : Promise.resolve(null),
+    attributionEnabled ? loadMaxPotokFunnel(funnelFrom) : Promise.resolve(null),
   ]);
 
   for (const row of paidByUser) {

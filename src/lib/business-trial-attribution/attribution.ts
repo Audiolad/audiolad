@@ -23,7 +23,7 @@ export const AUDIOLAD_CARRY_STORAGE_KEY = "audiolad.attribution.carry.v1";
 export const BUSINESS_CARRY_PARAMS = ["ch", "utm_source", "utm_medium", "utm_campaign"] as const;
 export const BUSINESS_CARRY_HOSTS = ["coffee.audiolad.ru", "business.audiolad.ru"] as const;
 
-const UTM_MAX = 100;
+const UTM_MAX = 64;
 const OWN_HOSTS = new Set<string>(BUSINESS_CARRY_HOSTS);
 
 export function businessEntryChannel(value: unknown): BusinessEntryChannel | null {
@@ -34,11 +34,16 @@ export function businessEntryChannel(value: unknown): BusinessEntryChannel | nul
   return null;
 }
 
-/** utm_* value: trimmed, at most 100 characters, no control characters. */
+/**
+ * utm_* value: a short campaign label only. Lower-case letters (Latin or Cyrillic), digits,
+ * «.», «_», «-», at most 64 characters. Anything that could be personal data (an email,
+ * a phone or id-like run of 6+ digits, an IP address, spaces, «+», «@») is dropped.
+ */
 export function businessUtmValue(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const v = value.trim();
-  if (!v || v.length > UTM_MAX || /[\u0000-\u001f\u007f]/.test(v)) return null;
+  const v = value.trim().toLowerCase();
+  if (!v || v.length > UTM_MAX || !/^[a-z0-9\u0430-\u044f\u0451][a-z0-9\u0430-\u044f\u0451._-]*$/.test(v)) return null;
+  if (/\d{6,}/.test(v) || /^\d{1,3}([.-]\d{1,3}){3}$/.test(v)) return null;
   return v;
 }
 
@@ -57,7 +62,8 @@ export function businessReferrerDomain(value: unknown): string | null {
     }
   }
   host = host.replace(/\.$/, "").replace(/^www\./, "");
-  if (host.length > 253 || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) return null;
+  // Names only: the last label must start with a letter, so IP addresses never pass.
+  if (host.length > 253 || !/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z][a-z0-9-]*$/.test(host)) return null;
   if (OWN_HOSTS.has(host)) return null;
   return host;
 }
