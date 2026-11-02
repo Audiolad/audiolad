@@ -305,3 +305,11 @@ NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 NODE_OPTIONS='--require ./scripts/cjs
 - `src/lib/business-app/shared-coffee-storage.ts`
 - `src/lib/business/coffee-atlas/constants.ts`
 - `src/proxy.ts`
+
+## Incident 02.11.2026 and production smoke
+
+After 39ccd7e1 (PR #1111) was deployed, every coffee page that the proxy rewrites to `/business-app/*` (`/`, `/help`, `/documents`, `/cabinet`, `/guest/coffee`) returned an empty 404. Production was rolled back with `rollback.sh`, and the change was reverted in PR #1114.
+
+Cause: Next.js runs `NextResponse.rewrite(http://localhost:<PORT>/business-app/...)` as a second HTTP request with `Host: localhost:<PORT>` and keeps `X-Forwarded-Host`. The "Host beats X-Forwarded-Host" rule for coffee therefore resolved that internal request as `localhost`, and `/business-app/*` became 404. Fix: for a loopback Host the proxy routes by `X-Forwarded-Host` (`src/lib/business-app/proxy-hostname.ts`).
+
+Guard: `npm run test:coffee-host-production-smoke` starts `next start` on an already built `.next` and sends real requests with nginx headers (`Host` = `X-Forwarded-Host` = `$host`) to coffee, business and audiolad.ru. In CI it is the `coffee-host-production-smoke` job in `.github/workflows/business-pr-validation.yml`.
