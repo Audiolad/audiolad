@@ -70,14 +70,14 @@ function atMoscow(isoDate: string, hour = 12): Date {
 const start = atMoscow("2026-03-01", 10);
 
 async function main() {
-// ---------------------------------------------------------------- one gift, exact 30*24h
+// ---------------------------------------------------------------- one gift, exact 7*24h (task 39ef47c4, was 30*24h)
 {
   const ends = addGiftPeriod(start);
   assert.equal(ends.getTime() - start.getTime(), BUSINESS_GIFT_MS);
-  assert.equal(BUSINESS_GIFT_MS, 30 * DAY);
+  assert.equal(BUSINESS_GIFT_MS, 7 * DAY);
   assert.equal(isPeriodActive(ends.toISOString(), new Date(ends.getTime() - 1)), true);
   assert.equal(isPeriodActive(ends.toISOString(), ends), false);
-  assert.equal(trialDaysLeft(ends, start), 30);
+  assert.equal(trialDaysLeft(ends, start), 7);
   assert.equal(trialDaysLeft(ends, new Date(ends.getTime() - 1)), 1);
   assert.equal(trialDaysLeft(ends, ends), 0);
   const hash = hashAccessEmail("  Cafe-Trial@Example.test ");
@@ -99,7 +99,7 @@ async function main() {
   assert.equal(first.decision, "issued");
   assert.equal(first.access.mode, "trial");
   assert.equal(first.access.player, true);
-  assert.equal(first.access.daysLeft, 30);
+  assert.equal(first.access.daysLeft, 7);
   assert.equal(store.events.filter((row) => row.name === "trial_started").length, 1);
 
   const again = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: new Date(start.getTime() + DAY) });
@@ -149,7 +149,7 @@ async function main() {
     updatedAt: start.toISOString(),
   });
   const paidUntil = new Date(start.getTime() + 40 * DAY);
-  const during = await recordPaidRenewal(store, { userId: USER_A, email: EMAIL, paidUntil, now: new Date(start.getTime() + 10 * DAY) });
+  const during = await recordPaidRenewal(store, { userId: USER_A, email: EMAIL, paidUntil, now: new Date(start.getTime() + 3 * DAY) });
   assert.equal(during.mode, "paid");
   assert.equal(during.player, true);
   assert.equal(store.grants[0]?.endsAt, originalEnd, "payment during the trial keeps the original gift end");
@@ -169,24 +169,13 @@ async function main() {
   const store = createMemoryAccessGrantStore();
   const issued = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
   const day7 = atMoscow("2026-03-07");
-  const day14 = atMoscow("2026-03-14");
-  const day30 = atMoscow("2026-03-30");
   assert.equal(moscowCalendarDayIndex(start, day7), 6);
-  assert.equal(moscowCalendarDayIndex(start, day14), 13);
-  assert.equal(moscowCalendarDayIndex(start, day30), 29);
   const played = await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: start, action: "play" });
   assert.deepEqual(played, ["first_useful_action"]);
   const playedAgain = await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: start, action: "play" });
   assert.deepEqual(playedAgain, []);
   assert.deepEqual(await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day7, action: "visit" }), ["activity_day_7"]);
-  assert.deepEqual(
-    await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day14, action: "visit" }),
-    ["activity_day_14"],
-  );
-  assert.deepEqual(
-    await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day30, action: "visit" }),
-    ["activity_day_30"],
-  );
+  assert.deepEqual(await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day7, action: "visit" }), [], "day 7 once");
   const graceAt = new Date(Date.parse(issued.grant!.endsAt) + 1000);
   const duringGrace = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: graceAt });
   assert.equal(duringGrace.access.mode, "grace");
@@ -237,7 +226,7 @@ async function main() {
 for (const reverse of [false, true]) {
   const store = createMemoryAccessGrantStore();
   const original = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
-  const other = await activateBusinessTrial(store, { userId: USER_B, email: "second@example.test", now: new Date(start.getTime() + 20 * DAY) });
+  const other = await activateBusinessTrial(store, { userId: USER_B, email: "second@example.test", now: new Date(start.getTime() + 30 * DAY) });
   const collided = await activateBusinessTrial(store, {
     userId: reverse ? USER_A : USER_B,
     email: reverse ? "second@example.test" : EMAIL,
@@ -281,7 +270,8 @@ for (const reverse of [false, true]) {
   assert.equal(workspaceDeadlineDelay(end, deadline - 1), 1);
   assert.equal(workspaceDeadlineDelay(end, deadline), 0);
   assert.equal(workspaceDeadlineDelay(end, deadline + 1), 0);
-  assert.equal(workspaceDeadlineDelay(end, start.getTime()), 2 ** 31 - 1);
+  assert.equal(workspaceDeadlineDelay(end, start.getTime()), BUSINESS_GIFT_MS, "7-day gift fits the timer without the cap");
+  assert.equal(workspaceDeadlineDelay(end, deadline - 30 * DAY), 2 ** 31 - 1);
   for (const pauseFirst of [false, true]) {
     let now = deadline - 1000;
     let playCount = 0;
@@ -557,10 +547,10 @@ const playlists: GuestCoffeePlaylist[] = [{
 }];
 {
   const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="ok"><main>page</main></BusinessAppShell>);
-  assert.match(html, /Получить 30 дней бесплатно/, "gift CTA before the meter runs out");
+  assert.match(html, /Получить 7 дней бесплатно/, "gift CTA before the meter runs out");
   assert.doesNotMatch(html, /data-testid="biz-connect"/, "guest banner: one action, no «Подключить»");
   assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-trial-cta"/, "gift CTA is green (pine)");
-  assert.match(html, /30 дней в подарок – полный доступ ко всем функциям/);
+  assert.match(html, /7 дней в подарок – полный доступ ко всем функциям/);
   assert.doesNotMatch(html, /30 минут/, "top banner does not mention the 30 minutes yet");
 }
 {
@@ -713,7 +703,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx"), /writeLocal/);
   assert.doesNotMatch(html, /\u2014/);
   assert.doesNotMatch(html, /Кафе, рестораны и отели/);
-  assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|30 дней в подарок/);
+  assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|7 дней в подарок/);
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
@@ -911,7 +901,7 @@ for (const file of [
   assert.doesNotMatch(visible, /\u2014/, `${file}: en dash only`);
 }
 
-assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
 assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
 assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
 assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
@@ -921,7 +911,7 @@ for (const [name, text] of [
   ["licence note", BUSINESS_GIFT_LICENSE_NOTE],
   ["price note", businessGiftPriceNote()],
 ] as const) {
-  assertNoForbiddenGiftText(text, name, [["gift title", /30 дней в подарок/]]);
+  assertNoForbiddenGiftText(text, name, [["gift title", /7 дней в подарок/]]);
 }
 const giftCopy = read("src/lib/access-grants/copy.ts");
 assert.doesNotMatch(giftCopy, /не становится безлимитной|Пределы Студии|Гостевой проект Студии|один раз на подтверждённый адрес|businessGiftRulesText/);
@@ -938,7 +928,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assertNoForbiddenGiftText(stripComments(giftCopy), "copy.ts");
   assertNoForbiddenGiftText(stripComments(pending), "business-return page");
   const card = stripComments(read("src/components/business-app/BusinessHomeAccessCard.tsx"));
-  assertNoForbiddenGiftText(card, "BusinessHomeAccessCard", [["gift title", /BUSINESS_GIFT_TITLE|30 дней в подарок/]]);
+  assertNoForbiddenGiftText(card, "BusinessHomeAccessCard", [["gift title", /BUSINESS_GIFT_TITLE|7 дней в подарок/]]);
 }
 
 // ---------------------------------------------------------------- cafe cabinet: curated authors, rights gate, venue link

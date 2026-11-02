@@ -29,7 +29,7 @@ import type { BusinessEntry } from "@/lib/business-app/live-refresh";
  * visible but locked, and a guest sees the guest status strip.
  *
  * ba344b7f (Sergey 23.10.2026): «guest» here only means «no Business organization yet». A
- * signed-in visitor with a live 30-day gift or paid period is NOT a guest for the strip: the
+ * signed-in visitor with a live gift or paid period is NOT a guest for the strip: the
  * gift offer and price are hidden and a quiet «Бесплатный доступ до …» line is shown instead.
  */
 export default function BusinessAppShell({

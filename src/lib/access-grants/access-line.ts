@@ -1,6 +1,6 @@
 /**
  * Calm access line for the Business cabinet chrome (feedback 23.10.2026, task ba344b7f).
- * Browser-safe and pure. The guest strip («Гостевой режим … Получить 30 дней бесплатно»)
+ * Browser-safe and pure. The guest strip («Гостевой режим … BUSINESS_GIFT_CTA»)
  * is only for real guests: a signed-in visitor with a live gift or paid period sees one quiet
  * line with the end date instead.
  */

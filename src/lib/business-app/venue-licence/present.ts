@@ -8,7 +8,7 @@ import {
 /**
  * Public licence card for one location.
  * The clock is the owner account's gift / paid / grace from resolveCustomerAccess:
- * the 30-day gift starts when that account's email is confirmed (registration),
+ * the gift (BUSINESS_GIFT_DAYS) starts when that account's email is confirmed (registration),
  * not when a payment arrives. This view never carries an email, a user id or a hash.
  */
 

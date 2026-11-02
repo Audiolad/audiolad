@@ -389,7 +389,8 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   assert.match(cabinet, /GUEST_COFFEE_ATLAS_URL/, "way back to the atlas");
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
   assert.match(copy, /BUSINESS_GIFT_TITLE/);
-  assert.match(copy, /30 дней в подарок начинаются после подтверждения почты/);
+  assert.match(copy, /\$\{BUSINESS_GIFT_TITLE\} начинаются после подтверждения почты/);
+  assert.match(copy, /получите \$\{BUSINESS_GIFT_TITLE\} с полным доступом/);
 // Typography (as in the atlas, #900): visible texts use the en dash, never the em dash.
 for (const file of [
   "src/lib/business-app/guest-coffee/copy.ts",
