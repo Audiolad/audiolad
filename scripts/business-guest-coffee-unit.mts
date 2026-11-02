@@ -72,7 +72,10 @@ assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sideba
 assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
 assert.match(page, /<BusinessMusicSection/, "guest entry keeps the demo studio");
-assert.doesNotMatch(page, /BusinessWorkspace/, "guest demo is not the member catalog");
+// Stage 3: only a flag-gated, server-verified ready guest start sees its own workspace; the demo stays for everyone else.
+const pageWithoutGuestStart = page.replace(/if \(process\.env\.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1"\) \{[\s\S]*?\.eq\("status", "ready"\)[\s\S]*?\n  \}\n/, "");
+assert.notEqual(pageWithoutGuestStart, page, "ready-guest branch is gated by the flag and a ready start row");
+assert.doesNotMatch(pageWithoutGuestStart.replace(/^import BusinessWorkspace .*$/m, ""), /BusinessWorkspace/, "guest demo is not the member catalog");
 assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land straight in the cabinet");
 const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
 assert.match(musicSection, /loadGuestCoffeeShelf/);
