@@ -21,7 +21,7 @@ One module for tasks **ba344b7f** and **1e008ee8**. Do not add a second registra
 
 ## Return after email confirmation
 
-GoTrue allow-list URLs stay exact, without a query string. Sign-up does not set `emailRedirectTo`. The relative `next=/auth/business-return` is stored on the form, and `user_metadata.business_trial = "1"` is set only for that next path. The callback uses an explicit `next` when it is present, and otherwise the metadata flag.
+On `audiolad.ru` and `business.audiolad.ru`, GoTrue allow-list URLs stay exact, without a query string, and sign-up does not set `emailRedirectTo`. Exception – `coffee.audiolad.ru` with `NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1`: sign-up on the coffee host sets `emailRedirectTo` to `https://coffee.audiolad.ru/auth/callback?next=...`, and the GoTrue allow-list has the wildcard entry `https://coffee.audiolad.ru/**`. See `docs/runbooks/coffee-audiolad-rollout.md`. The relative `next=/auth/business-return` is stored on the form, and `user_metadata.business_trial = "1"` is set only for that next path. The callback uses an explicit `next` when it is present, and otherwise the metadata flag.
 
 ## Migration
 

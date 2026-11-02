@@ -29,14 +29,15 @@ import {
   clearPartnerAttributionCookie,
   shouldClearPartnerAttributionCookie,
 } from "@/lib/author-partner/cookie";
-import { cookies } from "next/headers";
+import { COFFEE_ORIGIN, isCoffeeHostRequest } from "@/lib/business-app/host";
+import { cookies, headers } from "next/headers";
 
 type SignUpAuthClient = {
   auth: {
     signUp: (args: {
       email: string;
       password: string;
-      options?: { data?: Record<string, string> };
+      options?: { data?: Record<string, string>; emailRedirectTo?: string };
     }) => Promise<{
       data: {
         user: { id?: string | null; email?: string | null } | null;
@@ -53,6 +54,7 @@ type SignUpAuthClient = {
 
 export type SignUpActionDeps = {
   createClient?: () => Promise<SignUpAuthClient>;
+  requestHeaders?: () => Promise<{ get(name: string): string | null }>;
   onNewListenerCreated?: (
     input: {
       userId: string;
@@ -192,12 +194,14 @@ export async function signUpAction(
   const supabase = deps.createClient
     ? await deps.createClient()
     : await (await import("@/lib/supabase/server")).createClient();
-  const destination = getSafeNextPath(input.next, SIGN_UP_DEFAULT_REDIRECT);
+  const coffee = isCoffeeHostRequest(await (deps.requestHeaders ?? headers)());
+  const destination = getSafeNextPath(input.next, coffee ? "/cabinet" : SIGN_UP_DEFAULT_REDIRECT);
 
   const { data, error } = await supabase.auth.signUp({
     email: emailValidation.normalizedEmail,
     password,
     options: {
+      ...(coffee ? { emailRedirectTo: `${COFFEE_ORIGIN}/auth/callback?${new URLSearchParams({ next: destination })}` } : {}),
       data: {
         first_name: firstName,
         last_name: lastName,
