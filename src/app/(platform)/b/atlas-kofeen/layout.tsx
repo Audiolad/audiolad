@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Playfair_Display } from "next/font/google";
 
+import AttributionLinkCarrier from "@/components/business/attribution/AttributionLinkCarrier";
 import "@/components/business/coffee-atlas/coffee-atlas.css";
 
 const atlasSerif = Playfair_Display({
@@ -15,5 +16,10 @@ export default function CoffeeAtlasLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  return <div className={atlasSerif.variable}>{children}</div>;
+  return (
+    <div className={atlasSerif.variable}>
+      <AttributionLinkCarrier />
+      {children}
+    </div>
+  );
 }

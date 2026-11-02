@@ -65,6 +65,62 @@ export type BusinessTrialFacts = {
   activityDays?: readonly BusinessTrialActivityDay[];
   /** business_guest_starts.start_host (PR 2, only while recording is on). */
   startHost?: "coffee" | "business" | null;
+  /** business_guest_starts attribution columns (PR 3, only while attribution is on). */
+  origin?: BusinessTrialOrigin | null;
+};
+
+/** Where a guest start came from. Coarse labels only: no IP, user agent or full URL. */
+export type BusinessTrialOrigin = {
+  channel: "max" | "tg" | null;
+  referrerDomain: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  deviceClass: "phone" | "tablet" | "computer" | null;
+  osFamily: string | null;
+  browserFamily: string | null;
+};
+
+export const BUSINESS_TRIAL_CHANNEL_LABELS: Record<"max" | "tg" | "none", string> = {
+  max: "МАКС",
+  tg: "Телеграм",
+  none: "Без метки",
+};
+
+export const BUSINESS_TRIAL_DEVICE_LABELS: Record<"phone" | "tablet" | "computer", string> = {
+  phone: "телефон",
+  tablet: "планшет",
+  computer: "компьютер",
+};
+
+/** Per-channel counts from MAX Поток (read-only endpoint, unique contacts, test contacts excluded). */
+export type MaxPotokChannelCounts = {
+  /** Contacts who started the bot from a source link. */
+  botStarts: number;
+  /** Contacts who tapped a bot button leading to audiolad gift pages. */
+  giftClicks: number;
+};
+
+export type BusinessTrialFunnelChannel = "max" | "tg" | "none";
+
+export type BusinessTrialFunnelColumn = {
+  channel: BusinessTrialFunnelChannel;
+  /** null = no data (MAX Поток not configured or unavailable, or «без метки»). */
+  botStarts: number | null;
+  giftClicks: number | null;
+  started: number;
+  paid: number;
+};
+
+export type BusinessTrialFunnel = {
+  /** false while AUDIOLAD_BUSINESS_TRIAL_ATTRIBUTION_ENABLED is off: block shows «нет данных». */
+  enabled: boolean;
+  /** false when MAX Поток counts could not be loaded. */
+  maxPotok: boolean;
+  columns: BusinessTrialFunnelColumn[];
 };
 
 export type BusinessTrialActivityDay = {
@@ -104,6 +160,10 @@ export type BusinessTrialRow = {
   lastActivityAt: string | null;
   activity: BusinessTrialActivity | null;
   startHost: "coffee" | "business" | null;
+  /** null while attribution is off or for starts without a guest-start row. */
+  origin: BusinessTrialOrigin | null;
+  /** Has any paid period (paid now, or paid before and ended). */
+  everPaid: boolean;
 };
 
 export type BusinessTrialTotals = {
@@ -127,6 +187,8 @@ export type BusinessTrialStats = {
   rows: BusinessTrialRow[];
   /** Accounts skipped because their venue is in AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS. */
   hiddenTests: number;
+  attributionEnabled: boolean;
+  funnel: BusinessTrialFunnel;
 };
 
 export function businessTrialStatusFromMode(mode: CustomerAccessMode): BusinessTrialStatus {
@@ -215,8 +277,13 @@ export function buildBusinessTrialStats(input: {
   activity?: { enabled: boolean; activeMinutes: number };
   /** Our test venues: not counted, not listed, only «Скрыто тестовых: N». */
   excludedOrgIds?: ReadonlySet<string>;
+  /** PR 3 attribution flag. Off by default. */
+  attributionEnabled?: boolean;
+  /** MAX Поток counts per channel; null = not configured or unavailable. */
+  maxPotok?: Partial<Record<"max" | "tg", MaxPotokChannelCounts>> | null;
 }): BusinessTrialStats {
   const activityEnabled = input.activity?.enabled === true;
+  const attributionEnabled = input.attributionEnabled === true;
   const activeMinutes = Math.max(1, Math.floor(input.activity?.activeMinutes ?? 60));
   const totals: BusinessTrialTotals = {
     started: 0,
@@ -281,6 +348,8 @@ export function buildBusinessTrialStats(input: {
       lastActivityAt: latestIso(facts.workspacePlaybackAt, facts.pointSeenAt, facts.deviceSeenAt),
       activity: activityEnabled ? summarizeBusinessTrialActivity(facts.activityDays, grant.startsAt) : null,
       startHost: activityEnabled ? facts.startHost ?? null : null,
+      origin: attributionEnabled ? facts.origin ?? null : null,
+      everPaid: validIso(facts.paidUntil) !== null,
     });
     const last = rows[rows.length - 1];
     if (totals.activeEnough !== null && last.activity && last.activity.listenedMinutes >= activeMinutes) {
@@ -295,5 +364,48 @@ export function buildBusinessTrialStats(input: {
   }
 
   rows.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt) || a.userId.localeCompare(b.userId));
-  return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows, hiddenTests };
+  const funnel = buildBusinessTrialFunnel(rows, attributionEnabled, input.maxPotok ?? null);
+  return { generatedAt: input.now.toISOString(), activityEnabled, activeMinutes, totals, rows, hiddenTests, attributionEnabled, funnel };
+}
+
+function count(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/**
+ * «Воронка по каналам»: bot start → gift button → 7-day start → payment, МАКС and Телеграм
+ * side by side. The first two steps come from MAX Поток, the last two from our starts with
+ * ch=max|tg. «Без метки» = starts without a channel (site, ads, direct).
+ */
+export function buildBusinessTrialFunnel(
+  rows: readonly Pick<BusinessTrialRow, "origin" | "everPaid">[],
+  enabled: boolean,
+  maxPotok: Partial<Record<"max" | "tg", MaxPotokChannelCounts>> | null,
+): BusinessTrialFunnel {
+  const columns: BusinessTrialFunnelColumn[] = (["max", "tg", "none"] as const).map((channel) => {
+    const external = channel === "none" ? undefined : maxPotok?.[channel];
+    return {
+      channel,
+      botStarts: external ? count(external.botStarts) : null,
+      giftClicks: external ? count(external.giftClicks) : null,
+      started: 0,
+      paid: 0,
+    };
+  });
+  if (enabled) {
+    for (const row of rows) {
+      if (!row.origin) continue;
+      const column = columns.find((c) => c.channel === (row.origin?.channel ?? "none"));
+      if (!column) continue;
+      column.started += 1;
+      if (row.everPaid) column.paid += 1;
+    }
+  }
+  return { enabled, maxPotok: maxPotok !== null, columns };
+}
+
+/** «12 → 3 (25%)» style conversion; null when either side is unknown or the base is zero. */
+export function businessTrialConversion(from: number | null, to: number | null): number | null {
+  if (from === null || to === null || from <= 0) return null;
+  return Math.round((to / from) * 100);
 }

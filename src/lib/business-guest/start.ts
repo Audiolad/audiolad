@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { BUSINESS_GIFT_MS } from "../business/plan";
 import type { GuestStartConfig } from "./start-config";
+import { sanitizeBusinessTrialAttribution, type BusinessTrialAttribution } from "../business-trial-attribution/attribution";
 
 export type GuestStartUser = { id: string; is_anonymous?: boolean };
 export type GuestStartDeps = {
@@ -11,7 +12,9 @@ export type GuestStartDeps = {
   reserve: (hash: string, limit: number, windowSeconds: number) => Promise<boolean>;
   ticket: () => Promise<string>;
   signIn: (ticket: string) => Promise<GuestStartUser>;
-  bootstrap: (input: { userId: string; idempotencyHash: string; networkHash: string; giftSeconds: number; venueName: string | null }) => Promise<void>;
+  bootstrap: (input: { userId: string; idempotencyHash: string; networkHash: string; giftSeconds: number; venueName: string | null;
+    /** Optional, best-effort source of the start (ch, utm_*, referrer domain). Invalid values become null, never a 400. */
+    attribution?: BusinessTrialAttribution | null }) => Promise<void>;
   clearTicket: (userId: string) => Promise<void>;
   log: (code: string) => void;
 };
@@ -55,7 +58,8 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
       if (user.is_anonymous !== true) throw new Error("guest_start_failed");
     }
     await deps.bootstrap({ userId: user.id, idempotencyHash, networkHash, giftSeconds: BUSINESS_GIFT_MS / 1000,
-      venueName: typeof body.venueName === "string" ? body.venueName.trim() : null });
+      venueName: typeof body.venueName === "string" ? body.venueName.trim() : null,
+      attribution: sanitizeBusinessTrialAttribution(body.attribution) });
     try { await deps.clearTicket(user.id); } catch { deps.log("guest_start_ticket_clear_failed"); }
     return response(200);
   } catch {

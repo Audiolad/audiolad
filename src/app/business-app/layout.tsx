@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import BusinessAppShell from "@/components/business-app/BusinessAppShell";
+import BusinessAttributionCapture from "@/components/business-app/BusinessAttributionCapture";
 import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
 import "@/components/business-app/theme/business-theme.css";
 import "@/components/business-app/business-app.css";
@@ -62,6 +63,7 @@ export default async function BusinessAppLayout({
   return (
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available}>
+        <BusinessAttributionCapture />
         <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>

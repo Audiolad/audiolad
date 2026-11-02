@@ -8,6 +8,7 @@ import { guestNetworkKey } from "@/lib/business-guest/network-key";
 import { handleBusinessGuestStart } from "@/lib/business-guest/start";
 import { businessStartHost } from "@/lib/business-trial-activity/config";
 import { recordBusinessGuestStartHost } from "@/lib/business-trial-activity/record.server";
+import { recordBusinessGuestStartAttribution } from "@/lib/business-trial-attribution/record.server";
 import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,13 @@ async function handle(request: Request) {
       if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
       // Gift-week stats (flag OFF by default): coffee or business host only, never the raw Host.
       await recordBusinessGuestStartHost(input.userId, businessStartHost(hostnameFromHeaders(request.headers)));
+      // Gift-week source (flag OFF by default): city from the IP in memory, device family from the
+      // User-Agent, ch/utm_*/referrer domain from the body. Neither the IP nor the raw UA is stored.
+      await recordBusinessGuestStartAttribution(input.userId, {
+        attribution: input.attribution ?? null,
+        ip: getTrustedClientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      });
     },
     clearTicket: async (userId) => {
       const { error } = await createServiceRoleClient().auth.admin.updateUserById(userId, { user_metadata: { business_guest_ticket: null } });

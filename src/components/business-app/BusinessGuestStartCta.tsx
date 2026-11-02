@@ -4,8 +4,17 @@ import { useRef, useState, type ReactNode } from "react";
 import { useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
 import { BUSINESS_OFFER_HREF } from "@/lib/business/offer";
+import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
 
 const STORAGE_KEY = "audiolad.business.guest-start.v1";
+
+/** ch, utm_* and referrer domain of this tab's first landing (BusinessAttributionCapture). */
+function storedAttribution(): { attribution?: Record<string, string> } {
+  try {
+    const value = parseStoredBusinessAttribution(sessionStorage.getItem(BUSINESS_ATTRIBUTION_STORAGE_KEY));
+    return value && Object.keys(value).length > 0 ? { attribution: value as Record<string, string> } : {};
+  } catch { return {}; }
+}
 
 /** Disabled flag preserves the original anchor, including its classes and test id. */
 export default function BusinessGuestStartCta({ href, className, children, testId, enabledLabel }: {
@@ -33,7 +42,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
       }
       const response = await fetch("/api/business/guest-start", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ accepted: true, idempotencyKey: key.current }),
+        body: JSON.stringify({ accepted: true, idempotencyKey: key.current, ...storedAttribution() }),
       });
       const result = await response.json();
       if (response.ok && result.ok === true && result.redirect === "/") {
