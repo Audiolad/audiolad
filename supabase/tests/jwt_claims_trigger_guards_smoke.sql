@@ -68,4 +68,46 @@ BEGIN
 END;
 $$;
 
+-- Every re-created guard (profiles and playlists) must read the sub only via
+-- request_jwt_sub_text(); a revert to the legacy GUC is caught here without
+-- playlist fixtures.
+DO $$
+DECLARE
+  v_fn text;
+  v_src text;
+BEGIN
+  FOREACH v_fn IN ARRAY ARRAY[
+    'protect_profiles_role_column',
+    'protect_profiles_author_project_limit_columns',
+    'protect_playlist_ownership_columns',
+    'protect_playlist_direction_id'
+  ] LOOP
+    SELECT p.prosrc INTO v_src
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = v_fn AND p.pronargs = 0;
+    IF v_src IS NULL THEN
+      RAISE EXCEPTION 'jwt guard smoke: % is missing', v_fn;
+    END IF;
+    IF position('request_jwt_sub_text()' in v_src) = 0
+      OR position('request.jwt.claim.sub' in v_src) > 0 THEN
+      RAISE EXCEPTION 'jwt guard smoke: % does not use request_jwt_sub_text()', v_fn;
+    END IF;
+  END LOOP;
+END;
+$$;
+
+-- Malformed claims JSON without a legacy sub fails closed (error, no write).
+DO $$
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claims', '{not json', true);
+  BEGIN
+    PERFORM public.request_jwt_sub_text();
+    RAISE EXCEPTION 'jwt guard smoke: malformed claims accepted';
+  EXCEPTION WHEN invalid_text_representation THEN NULL;
+  END;
+  PERFORM set_config('request.jwt.claims', '', true);
+END;
+$$;
+
 ROLLBACK;
