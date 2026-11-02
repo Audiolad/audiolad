@@ -469,7 +469,8 @@ assert.equal(slideSource.includes("http://"), false);
 assert.equal(slideSource.split("https://").length - 1, 1);
 assert.equal(FOUR_CUPS_MAX_HREF, "https://max-potok.ru/r/gqwvf");
 assert.equal(FOUR_CUPS_TG_HREF, "https://max-potok.ru/r/gqwvf?ch=tg");
-assert.equal(FOUR_CUPS_TG_LABEL, "Открыть в Телеграм");
+assert.equal(FOUR_CUPS_TG_LABEL, "Выбрать чашку и узнать характер кофейни в Телеграме");
+assert.equal(FOUR_CUPS_TG_LABEL, FOUR_CUPS_MAX_LABEL.replace("в Максе", "в Телеграме"));
 assert.equal(FOUR_CUPS_SLIDES.length, 7);
 for (const slide of [...FOUR_CUPS_SLIDES, FOUR_CUPS_FINAL_IMAGE]) {
   assert.equal(slide.alt.includes(EM_DASH), false, slide.src);
