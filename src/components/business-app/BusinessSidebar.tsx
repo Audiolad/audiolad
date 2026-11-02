@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
 import { usePointMode } from "@/components/business-app/BusinessPointMode";
@@ -32,7 +35,6 @@ import {
   type BusinessNavIconKey,
   type BusinessNavItem,
 } from "@/lib/business-app/nav";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
   BUSINESS_CONNECT_HREF,
@@ -42,7 +44,6 @@ import {
   resolveBusinessAccess,
   type BusinessAccess,
 } from "@/lib/business-app/access";
-import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 type IconComp = ComponentType<{ active?: boolean; className?: string }>;
 
@@ -69,6 +70,7 @@ function NavLink({
   collapsed: boolean;
   access: BusinessAccess;
 }) {
+  const hostname = useBusinessHostname();
   const pathname = normalizeBusinessAppPathname(usePathname() || "/");
   const active = isBusinessNavItemCurrent(pathname, item);
   const Icon = ICONS[item.icon];
@@ -117,7 +119,7 @@ function NavLink({
 
   return (
     <Link
-      href={businessNavHref(item, access)}
+      href={item.href === "/" ? businessCabinetHomePath(hostname) : businessNavHref(item, access)}
       data-nav-id={item.id}
       className={`business-app-focus-ring group relative flex items-center gap-3 rounded-xl px-3 text-[0.95rem] transition-colors ${
         collapsed ? "justify-center py-3" : "py-2.5"

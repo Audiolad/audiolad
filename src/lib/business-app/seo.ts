@@ -1,6 +1,6 @@
 import type { Metadata, MetadataRoute } from "next";
 
-import { BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "./host";
+import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "./host";
 
 export const BUSINESS_APP_SEO_TITLE = "Аудиолад Бизнес";
 
@@ -43,5 +43,41 @@ export function buildBusinessAppRobotsRoute(): MetadataRoute.Robots {
       userAgent: "*",
       disallow: "/",
     },
+  };
+}
+
+/** Coffee exposes only these public information pages to crawlers. */
+export function coffeePublicPaths(): string[] {
+  return ["/", "/help", ...Object.keys(BUSINESS_PUBLIC_PATH_REWRITES).filter(
+    (path) => path === "/documents" || path.startsWith("/documents/"),
+  )];
+}
+
+export function buildCoffeeSitemap(): MetadataRoute.Sitemap {
+  return coffeePublicPaths().map((path) => ({ url: `${COFFEE_ORIGIN}${path}` }));
+}
+
+export function buildCoffeeRobotsRoute(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: "*",
+      allow: ["/$", "/help$", "/documents$", "/documents/"],
+      disallow: "/",
+    },
+    sitemap: `${COFFEE_ORIGIN}/sitemap.xml`,
+    host: COFFEE_ORIGIN,
+  };
+}
+
+/** Page-level opt-in: private pages inherit the noindex layout. */
+export function buildCoffeePublicPageMetadata(hostname: string, path: string, title: string, description: string): Metadata {
+  if (!coffeeHostEnabled() || hostname !== COFFEE_HOSTNAME || !coffeePublicPaths().includes(path)) return {};
+  const url = `${COFFEE_ORIGIN}${path}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+    openGraph: { type: "website", url, siteName: "АудиоЛад Кофе", locale: "ru_RU", title, description },
   };
 }

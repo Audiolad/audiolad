@@ -7,7 +7,7 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
-import { coffeeHandoffRedirect, migrateCoffeeGuestCookie } from "@/lib/business-app/coffee-host-proxy";
+import { migrateCoffeeGuestCookie } from "@/lib/business-app/coffee-host-proxy";
 import { COFFEE_HOSTNAME, coffeeHostEnabled } from "@/lib/business-app/host";
 import { resolveBusinessProxyAction } from "@/lib/business-app/proxy-policy";
 import {
@@ -66,8 +66,6 @@ export async function proxy(request: NextRequest) {
   }
 
   if (businessAction.action === "rewrite_business_app") {
-    const handoff = coffeeHandoffRedirect(request);
-    if (handoff) return handoff;
     return migrateCoffeeGuestCookie(request, await updateSession(request, {
       rewritePathname: businessAction.pathname,
     }));

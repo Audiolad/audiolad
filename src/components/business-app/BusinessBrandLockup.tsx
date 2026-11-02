@@ -1,5 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+
+import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { businessCabinetHomePath } from "@/lib/business-app/host";
 
 import {
   BUSINESS_BRAND_MARK_SRC,
@@ -18,9 +23,10 @@ export default function BusinessBrandLockup({
   compact?: boolean;
   testId?: string;
 }) {
+  const hostname = useBusinessHostname();
   return (
     <Link
-      href="/"
+      href={businessCabinetHomePath(hostname)}
       className={`business-app-brand business-app-focus-ring${compact ? " is-compact" : ""}`}
       aria-label={compact ? BUSINESS_BRAND_NAME : undefined}
       data-testid={testId}

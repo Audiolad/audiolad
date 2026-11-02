@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
+import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
 import { BUSINESS_GIFT_CTA, BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
-import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { businessLockedNotice } from "@/lib/business-app/access";
 import { GUEST_COFFEE_COPY, GUEST_COFFEE_TERMS } from "@/lib/business-app/guest-coffee/copy";
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
@@ -57,6 +58,7 @@ export function useBusinessGuestStatus(): GuestStatus {
  * Sergey 28.10.2026: one green action only – no secondary «Подключить» on the guest banner.
  */
 export function BusinessGuestStatusBar() {
+  const hostname = useBusinessHostname();
   const { limit, notice } = useBusinessGuestStatus();
   const exhausted = limit === "exhausted";
   return (
@@ -82,7 +84,7 @@ export function BusinessGuestStatusBar() {
       <div className="business-app-guest-bar__actions">
         {exhausted ? (
           <a
-            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+            href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
             data-testid="biz-guest-register"
           >
@@ -90,7 +92,7 @@ export function BusinessGuestStatusBar() {
           </a>
         ) : (
           <a
-            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+            href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
             data-testid="biz-trial-cta"
           >

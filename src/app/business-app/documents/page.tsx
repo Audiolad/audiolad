@@ -1,4 +1,9 @@
+import { headers } from "next/headers";
 import Link from "next/link";
+
+import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
 
@@ -35,6 +40,7 @@ async function loadDocumentsSticker() {
 }
 
 export default async function BusinessAppDocumentsPage({ searchParams }: PageProps) {
+  const hostname = getHostnameFromHeaders(await headers());
   const sp = await searchParams;
   const at = first(sp.at);
   const windowMinutes = first(sp.window);
@@ -104,7 +110,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           и длительность сообщает плеер. Время – по часовому поясу кофейни.
         </p>
         {result.kind === "anonymous" ? (
-          <p className="mt-3 text-sm"><a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите</a>, чтобы построить отчёт.</p>
+          <p className="mt-3 text-sm"><a href={businessAuthHref(hostname, "sign-in")} className="underline">Войдите</a>, чтобы построить отчёт.</p>
         ) : result.kind === "no_location" ? (
           <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте кофейню</Link>.</p>
         ) : (
@@ -197,4 +203,8 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
       </section>
     </div>
   );
+}
+
+export async function generateMetadata() {
+  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/documents", "Документы – АудиоЛад Кофе", "Действующие документы и условия использования музыки в кофейне.");
 }
