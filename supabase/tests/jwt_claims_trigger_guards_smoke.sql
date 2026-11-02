@@ -6,6 +6,9 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+-- Compile stub auth.users lacks GoTrue columns that profile triggers read.
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
+
 DO $$
 DECLARE
   v_user uuid := gen_random_uuid();
