@@ -1,6 +1,6 @@
 /**
  * a8240527 – honest copy of the guest coffee cabinet. Terms come from the same source as
- * the atlas offer (plan price, 30 дней в подарок) so they can never drift apart.
+ * the atlas offer (plan price, BUSINESS_GIFT_TITLE) so they can never drift apart.
  */
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { COFFEE_ATLAS_CANONICAL, COFFEE_ATLAS_OFFER } from "@/lib/business/coffee-atlas/constants";
@@ -27,7 +27,7 @@ export const GUEST_COFFEE_COPY = {
   exhaustedTitle: "Гостевое прослушивание завершено",
   /** Shown only after the guest meter hits zero. The top banner does not mention the 30 minutes before that. */
   exhaustedBanner:
-    "Гостевые 30 минут закончились. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом.",
+    `Гостевые 30 минут закончились. Зарегистрируйтесь – и получите ${BUSINESS_GIFT_TITLE} с полным доступом.`,
   exhaustedRegister: "Зарегистрироваться",
   exhaustedTrialTitle: "Знакомство с подборками завершено",
   exhaustedTrialText:
@@ -40,7 +40,7 @@ export const GUEST_COFFEE_COPY = {
   settingsSaved: "Настройки сохраняются на этом устройстве и останутся в кабинете после подключения кофейни.",
   /** Gift starts after email confirmation. Payment is not charged from this cabinet. */
   connectNote:
-    "Подключение кофейни – в этом же кабинете. 30 дней в подарок начинаются после подтверждения почты. Оплата и автосписания пока не подключены – ничего не списывается.",
+    `Подключение кофейни – в этом же кабинете. ${BUSINESS_GIFT_TITLE} начинаются после подтверждения почты. Оплата и автосписания пока не подключены – ничего не списывается.`,
   connectContact: "Вопросы о подключении – напишите нам:",
 } as const;
 

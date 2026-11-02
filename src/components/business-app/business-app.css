@@ -371,7 +371,7 @@
   background: var(--biz-accent-hover);
 }
 
-/* Sergey 28.10.2026: the guest's main action («Получить 30 дней…») – the pine of the round play control. */
+/* Sergey 28.10.2026: the guest's main action («Получить N дней…», BUSINESS_GIFT_CTA) – the pine of the round play control. */
 .business-app-btn-cta {
   background: var(--biz-play);
   color: var(--biz-on-play);

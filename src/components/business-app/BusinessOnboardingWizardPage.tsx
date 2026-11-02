@@ -39,7 +39,7 @@ export default function BusinessOnboardingWizardPage({
   returnHref?: string | null;
 } = {}) {
   const domain = useBusinessDomain();
-  // Gift already live: show its end date instead of re-offering «30 дней в подарок, затем 799 ₽».
+  // Gift already live: show its end date instead of re-offering «N дней в подарок, затем 799 ₽» (BUSINESS_GIFT_TITLE).
   const accessLine = businessAccessLine(useBusinessChromeAccess());
   const router = useRouter();
   const [step, setStep] = useState<BusinessOnboardingStep>("type");
