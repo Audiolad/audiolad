@@ -37,6 +37,9 @@ export default function BusinessGuestStartCta({ href, className, children, testI
       });
       const result = await response.json();
       if (response.ok && result.ok === true && result.redirect === "/") {
+        // A finished start must not pin a later start in this tab to the old guest's key.
+        try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
+        key.current = null;
         window.location.assign(result.redirect);
         return;
       }
