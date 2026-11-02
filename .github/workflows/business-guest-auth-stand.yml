@@ -16,6 +16,9 @@ on:
       - "src/app/api/auth/hooks/before-user-created/**"
       - "supabase/migrations/20270210180000_jwt_claims_trigger_guards.sql"
       - "supabase/migrations/20270211120000_business_guest_auth_stage1.sql"
+      - "supabase/migrations/20270212120000_business_guest_start_stage3.sql"
+      - "src/lib/business-guest/**"
+      - "src/app/api/business/guest-start/**"
 
 permissions:
   contents: read
