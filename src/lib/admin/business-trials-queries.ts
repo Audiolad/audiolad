@@ -17,7 +17,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
  * the page gets names, short ids, dates and statuses, no email, IP or hashes.
  */
 
-const CHUNK = 200;
+// 50 sha256 hex values keep the PostgREST GET URL well under common 8 KB proxy limits.
+const CHUNK = 50;
 
 type Db = ReturnType<typeof createServiceRoleClient>;
 type Row = Record<string, unknown>;
