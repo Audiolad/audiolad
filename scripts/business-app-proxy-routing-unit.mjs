@@ -28,6 +28,10 @@ import {
   resolveBusinessProxyAction,
 } from "../src/lib/business-app/proxy-policy.ts";
 import {
+  isLoopbackHostHeader,
+  resolveProxyRequestHostname,
+} from "../src/lib/business-app/proxy-hostname.ts";
+import {
   BUSINESS_POINT_STATES,
   isBusinessPointState,
   parseBusinessPointState,
@@ -277,4 +281,50 @@ try {
 } finally {
   if (coffeeFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
   else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlag;
+}
+
+// Incident 02.11.2026: Next.js re-requests a proxy rewrite with Host: localhost:<PORT> and keeps
+// X-Forwarded-Host. That internal request must still route as the public host, not 404.
+{
+  const h = (host, forwarded) => ({
+    get(name) {
+      if (name === "host") return host ?? null;
+      if (name === "x-forwarded-host") return forwarded ?? null;
+      return null;
+    },
+  });
+  for (const loopback of ["localhost", "localhost:3001", "127.0.0.1:3000", "[::1]:3000", "::1", "LOCALHOST:3999"]) {
+    assert.equal(isLoopbackHostHeader(loopback), true, loopback);
+  }
+  for (const external of ["coffee.audiolad.ru", "business.audiolad.ru", "audiolad.ru:443", "localhost.evil.ru", "127.0.0.2", "", null]) {
+    assert.equal(isLoopbackHostHeader(external), false, String(external));
+  }
+  const coffeeFlagBefore = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  try {
+    process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
+    for (const internalHost of ["localhost:3001", "127.0.0.1:3000", "[::1]:3000"]) {
+      const hostname = resolveProxyRequestHostname(h(internalHost, "coffee.audiolad.ru"));
+      assert.equal(hostname, "coffee.audiolad.ru", `internal ${internalHost}`);
+      for (const path of ["/business-app", "/business-app/documents", "/business-app/guest/coffee", "/business-app/help", "/business-app/cabinet"]) {
+        assert.notEqual(resolveBusinessProxyAction(hostname, path).action, "not_found", `internal ${internalHost}${path}`);
+      }
+      assert.equal(resolveProxyRequestHostname(h(internalHost, BUSINESS_HOSTNAME)), BUSINESS_HOSTNAME);
+      assert.equal(resolveProxyRequestHostname(h(internalHost, "audiolad.ru")), "audiolad.ru");
+    }
+    // Direct nginx requests (Host = X-Forwarded-Host = $host).
+    for (const host of ["coffee.audiolad.ru", BUSINESS_HOSTNAME, "audiolad.ru"]) {
+      assert.equal(resolveProxyRequestHostname(h(host, host)), host);
+      assert.equal(resolveProxyRequestHostname(h(host, null)), host);
+    }
+    // A real public Host beats a forged forwarded coffee host, and vice versa.
+    assert.equal(resolveProxyRequestHostname(h(BUSINESS_HOSTNAME, "coffee.audiolad.ru")), BUSINESS_HOSTNAME);
+    assert.equal(resolveProxyRequestHostname(h("coffee.audiolad.ru", BUSINESS_HOSTNAME)), "coffee.audiolad.ru");
+    // Other hosts keep X-Forwarded-Host ?? Host.
+    assert.equal(resolveProxyRequestHostname(h("audiolad.ru", BUSINESS_HOSTNAME)), BUSINESS_HOSTNAME);
+  } finally {
+    if (coffeeFlagBefore === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = coffeeFlagBefore;
+  }
+  assert.match(proxySource, /resolveProxyRequestHostname\(request\.headers\)/);
+  console.log("business-app-proxy-routing-unit: internal rewrite hostname ok");
 }
