@@ -7,6 +7,7 @@ import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
  * (1000 by default) can never silently truncate the result.
  */
 
+// 50 sha256 hex values keep the PostgREST GET URL well under common 8 KB proxy limits.
 export const BUSINESS_TRIALS_IN_CHUNK = 50;
 export const BUSINESS_TRIALS_PAGE_SIZE = 1000;
 
