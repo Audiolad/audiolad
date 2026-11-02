@@ -1,5 +1,3 @@
-import { headers } from "next/headers";
-import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -33,7 +31,6 @@ const HELP_HREF = helpArticlePath(emailNotReceivedArticle);
 export default async function BusinessTrialReturnPage({ searchParams }: {
   searchParams: Promise<{ site?: string | string[] }>;
 }) {
-  const coffee = isCoffeeHostRequest(await headers());
   const { site: requestedSite } = await searchParams;
   const site = typeof requestedSite === "string" ? requestedSite : undefined;
   const returnPath = businessReturnPath(BUSINESS_TRIAL_RETURN_PATH, site);
@@ -48,7 +45,7 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
   }
 
   if (!isEmailConfirmed(user) || !user.email) {
-    return <BusinessTrialReturnPending signInHref={signInHref} helpHref={coffee ? `https://audiolad.ru${HELP_HREF}` : HELP_HREF} />;
+    return <BusinessTrialReturnPending signInHref={signInHref} />;
   }
 
   try {
@@ -82,7 +79,7 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
 }
 
 /** Unconfirmed address: the same short gift lines as the cabinet home card. The period has not started. */
-export function BusinessTrialReturnPending({ signInHref = businessAuthHref("", "sign-in", true), helpHref = HELP_HREF }: { signInHref?: string; helpHref?: string } = {}) {
+export function BusinessTrialReturnPending({ signInHref = businessAuthHref("", "sign-in", true) }: { signInHref?: string } = {}) {
   return (
     <main className="mx-auto min-h-screen max-w-[430px] bg-platform-surface px-5 py-10 text-[#25135c]" data-testid="biz-return-access">
       <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
@@ -95,7 +92,7 @@ export function BusinessTrialReturnPending({ signInHref = businessAuthHref("", "
         <Link className="font-semibold text-[#7042c5] underline" href={signInHref}>
           Перейти и войти после подтверждения
         </Link>
-        <Link className="font-semibold text-[#7042c5] underline" href={helpHref}>
+        <Link className="font-semibold text-[#7042c5] underline" href={HELP_HREF}>
           Перейти и найти письмо
         </Link>
       </p>

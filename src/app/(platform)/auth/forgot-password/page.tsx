@@ -1,6 +1,6 @@
 "use client";
 
-import BottomNav from "@/components/auth/AuthHostNavigation";
+import BottomNav from "@/components/BottomNav";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   AUTH_NETWORK_ERROR_MESSAGE,

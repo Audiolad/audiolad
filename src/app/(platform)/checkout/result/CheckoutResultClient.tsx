@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildAuthorProjectCapacityPaidHref,
@@ -13,8 +13,6 @@ import {
   isAuthorProjectCapacityCheckout,
   isBusinessSubscriptionCheckout,
   isStudioMusicLicenseCheckout,
-  readCheckoutReturnSiteCookie,
-  resolveCheckoutReturnSite,
   type BusinessCheckoutResultView,
 } from "@/lib/payments/checkout-result-cta";
 import {
@@ -77,22 +75,10 @@ function resolveViewState(
   return pollingTimedOut ? "processing" : "checking";
 }
 
-function subscribeNoop(): () => void {
-  return () => {};
-}
-
 export default function CheckoutResultClient() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
   const checkoutToken = searchParams.get("token");
-  const siteParam = searchParams.get("site");
-  // Cookie of the latest checkout start (server render: none, URL marker only).
-  const returnSiteCookie = useSyncExternalStore(
-    subscribeNoop,
-    () => readCheckoutReturnSiteCookie(document.cookie),
-    () => null,
-  );
-  const returnSite = resolveCheckoutReturnSite(returnSiteCookie, siteParam);
   const hasCheckoutParams = Boolean(orderId && checkoutToken);
 
   const [status, setStatus] = useState<CheckoutStatusResponseBody | null>(null);
@@ -314,7 +300,7 @@ export default function CheckoutResultClient() {
   }
 
   if (businessSubscription && isBusinessCheckoutResultView(viewState)) {
-    const card = businessCheckoutResultCard(viewState, status?.authenticated === true, returnSite);
+    const card = businessCheckoutResultCard(viewState, status?.authenticated === true);
     return (
       <ResultCard
         title={card.title}
