@@ -170,7 +170,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   // 253821e0, guest start on: same no-registration text as the Music block, one green CTA, no «Зарегистрируйтесь» on the page.
   const onPage = wrap(anonymous, "/guest/coffee", <BusinessAppShell initialGuestLimit="exhausted"><BusinessSoundStudio playlists={[]} initialLimit="exhausted" /></BusinessAppShell>, true);
   const onBar = onPage.slice(onPage.indexOf('data-testid="biz-guest-status"'), onPage.indexOf("</section>", onPage.indexOf('data-testid="biz-guest-status"')));
-  has(onBar, /data-testid="biz-guest-exhausted">Бесплатные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\.</, "flag on: top banner text");
+  has(onBar, /data-testid="biz-guest-exhausted">Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\.</, "flag on: top banner text");
   assert.equal((onBar.match(/<a |<button /g) ?? []).length, 1, "flag on: top banner has exactly one CTA");
   has(onBar, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: top banner CTA is green guest start");
   hasNot(onPage, /Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording anywhere on the exhausted page");
@@ -233,7 +233,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   hasNot(gBlock, /Подключить|href="\/onboarding/, "no «Подключить» in the exhausted block");
   const on = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, true);
   const onBlock = on.slice(on.indexOf('data-testid="biz-sound-exhausted"'), on.indexOf("business-atmosphere-anchor"));
-  has(onBlock, /Бесплатные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./, "flag on: no-registration copy");
+  has(onBlock, /Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./, "flag on: no-registration copy");
   assert.equal((onBlock.match(/<a |<button /g) ?? []).length, 1, "flag on: exactly one CTA");
   has(onBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: green guest-start CTA");
   hasNot(onBlock, /Подключить|Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording, no «Подключить»");

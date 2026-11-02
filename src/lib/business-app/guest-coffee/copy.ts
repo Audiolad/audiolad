@@ -34,7 +34,7 @@ export const GUEST_COFFEE_COPY = {
    * is on. The guest start signs in anonymously and asks for no card (see BUSINESS_GUEST_START_COPY.terms).
    */
   exhaustedBannerGuestStart:
-    `Бесплатные 30 минут закончились. Получите ${BUSINESS_GIFT_DAYS} дней бесплатно – без регистрации и карты.`,
+    `Пробные 30 минут закончились. Получите ${BUSINESS_GIFT_DAYS} дней бесплатно – без регистрации и карты.`,
   exhaustedRegister: "Зарегистрироваться",
   exhaustedTrialTitle: "Знакомство с подборками завершено",
   exhaustedTrialText:

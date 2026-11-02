@@ -1,8 +1,8 @@
-import { BUSINESS_GIFT_DAYS, BUSINESS_GRACE_DAYS } from "../business/plan";
+import { BUSINESS_GIFT_DAYS } from "../business/plan";
 import { GUEST_COFFEE_PRICE } from "../business-app/guest-coffee/copy";
 
 export const BUSINESS_GUEST_START_COPY = {
-  terms: `${BUSINESS_GIFT_DAYS} дней бесплатно со всеми функциями, затем ${BUSINESS_GRACE_DAYS} дня льготного периода. Дальше ${GUEST_COFFEE_PRICE} в месяц за одну точку, если решите продолжить. Без карты и автосписаний. Без регистрации – вход можно привязать позже.`,
+  terms: `${BUSINESS_GIFT_DAYS} дней бесплатно со всеми функциями. Дальше ${GUEST_COFFEE_PRICE} в месяц за одну точку, если решите продолжить. Без карты и автосписаний. Без регистрации – вход можно привязать позже.`,
   acceptance: "Принимаю условия и политику обработки персональных данных",
   start: "Начать бесплатно",
   loading: "Запускаем кабинет…",
