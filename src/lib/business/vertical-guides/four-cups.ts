@@ -1,10 +1,15 @@
 /**
  * Owner slides for the coffee pilot carousel, in carousel order.
- * The only external URL allowed on the pilot page.
+ * The only external URLs allowed on a guide page: the «Четыре чашки» site link of MAX Поток,
+ * opened in the MAX bot (default) or in the Telegram bot (`?ch=tg`). Both buttons are nofollow.
  */
 export const FOUR_CUPS_MAX_HREF = "https://max-potok.ru/r/gqwvf";
 
+export const FOUR_CUPS_TG_HREF = `${FOUR_CUPS_MAX_HREF}?ch=tg`;
+
 export const FOUR_CUPS_MAX_LABEL = "Выбрать чашку и узнать характер кофейни в Максе";
+
+export const FOUR_CUPS_TG_LABEL = "Открыть в Телеграм";
 
 export const FOUR_CUPS_SLIDES = [
   {
