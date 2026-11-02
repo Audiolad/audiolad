@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { handleCafeQueue } from "../src/lib/business-app/cafe-queue/handle";
-import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex, cafeUniqueAhead, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
+import { cafeAheadIndices, cafeQueueBuildKey, cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex, cafeUniqueAhead, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
 import { currentCabinetAdmission, restrictCafePool } from "../src/lib/business-app/cafe-queue/pool";
 import {
   cafeDaypartAtMinute,
@@ -25,6 +25,7 @@ import {
   takeAtmosphereRestart,
 } from "../src/lib/business-app/cafe-queue/atmosphere-restart";
 import { feedbackHoldMs } from "../src/lib/business-app/cafe-queue/feedback-phase";
+import { weightedAlbumOrder } from "../src/lib/business-app/cafe-queue/shuffle";
 import { cafeEnergyTarget, passportSimilarity, rankCafeQueue, type CafeQueueRanking, type CafeQueueTrack } from "../src/lib/business-app/cafe-queue/rank";
 import { parseCafeQueueRequest } from "../src/lib/business-app/cafe-queue/request";
 import { cafeSignalsFromPassport, type CafeTrackSignals } from "../src/lib/business-app/cafe-queue/signals";
@@ -620,6 +621,81 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   assert.deepEqual(before, ["Тихий зал", "Ночной драйв", "Полдень"], "before a vote the closer energy leads, then the distant track");
   assert.deepEqual(afterMore, ["Тихий зал", "Полдень", "Ночной драйв"], "Больше lifts the closest track above the distant one");
   assert.deepEqual(afterLess, ["Ночной драйв", "Полдень", "Тихий зал"], "Меньше sends the closest track to the bottom");
+}
+
+// 253821e0 (Sergey 02.11 19:27): the live refresh (router.refresh every 3 s) must not reshuffle
+// «Дальше в очереди». Each refresh hands the page a new model object with equal tracks; the queue
+// is asked for again only when the build key changes, so rows and «и ещё N» stay the same.
+{
+  const catalog = Array.from({ length: 420 }, (_, index) => ({
+    audioItemId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    albumKey: `album-${index % 17}`,
+    score: (index * 37) % 50,
+  }));
+  const settings = { character: "cozy", direction: "jazz", daypart: "evening", feedback: [] as { audioItemId: string; kind: string }[] };
+  // The server mixes with a new random seed on every request (route.ts), like production.
+  let requests = 0;
+  let seed = 11;
+  const serverOrder = (tracks: readonly { audioItemId: string; albumKey: string; score: number }[]) => {
+    requests += 1;
+    seed = (seed * 48271) % 0x7fffffff;
+    return weightedAlbumOrder(tracks, seed).map((track) => track.audioItemId);
+  };
+  // What the player screen does: refetch only on a new key, otherwise keep the queue it has.
+  let lastKey: string | null = null;
+  let order: number[] = [];
+  const screen = (tracks: typeof catalog, current: { daypart: string; feedback: typeof settings.feedback }, playingId: string) => {
+    const key = cafeQueueBuildKey({ spaceId: "cafe", tracks, ...settings, ...current });
+    if (key !== lastKey) {
+      lastKey = key;
+      order = cafeQueueIndices(tracks, serverOrder(tracks));
+    }
+    const currentIndex = tracks.findIndex((track) => track.audioItemId === playingId);
+    const ahead = cafeUniqueAhead(tracks, order, currentIndex);
+    return {
+      rows: ahead.slice(0, 3).map((index) => tracks[index]!.audioItemId),
+      more: cafeUpcomingMoreLabel(cafeUpcomingMoreCount(ahead.length)),
+    };
+  };
+  const playing = catalog[200]!.audioItemId;
+  const first = screen(catalog, settings, playing);
+  for (let refresh = 0; refresh < 10; refresh += 1) {
+    const fresh = catalog.map((track) => ({ ...track })); // new objects, same data
+    assert.deepEqual(screen(fresh, { daypart: "evening", feedback: [] }, playing), first, "a background refresh keeps the same next tracks and count");
+  }
+  assert.equal(requests, 1, "unchanged inputs ask the server for the queue once");
+  assert.ok(first.rows.length === 3 && first.more !== null);
+
+  // Before the fix every refresh re-asked the server: a new seed moves the playing track, so the
+  // rows and «и ещё N» jumped (38 / 389 / 414 on Sergey's phone).
+  const counts = new Set<number>();
+  for (let refresh = 0; refresh < 10; refresh += 1) {
+    const reshuffled = cafeQueueIndices(catalog, serverOrder(catalog));
+    counts.add(cafeUniqueAhead(catalog, reshuffled, 200).length);
+  }
+  assert.ok(counts.size > 1, "a new random mix per refresh changes the count – the old bug");
+
+  // Real changes still rebuild: daypart, more/less, catalog.
+  const before = requests;
+  screen(catalog, { daypart: "day", feedback: [] }, playing);
+  screen(catalog, { daypart: "day", feedback: [{ audioItemId: playing, kind: "more" }] }, playing);
+  screen(catalog.slice(1), { daypart: "day", feedback: [{ audioItemId: playing, kind: "more" }] }, playing);
+  assert.equal(requests, before + 3, "settings and catalog changes rebuild the queue");
+
+  const key = (extra: Partial<Parameters<typeof cafeQueueBuildKey>[0]> = {}) =>
+    cafeQueueBuildKey({ spaceId: "cafe", tracks: catalog, ...settings, ...extra });
+  assert.equal(key(), key({ tracks: catalog.map((track) => ({ ...track })) }));
+  assert.notEqual(key(), key({ character: "city" }));
+  assert.notEqual(key(), key({ direction: "calm" }));
+  assert.notEqual(key(), key({ spaceId: "spa" }));
+  assert.notEqual(key(), key({ tracks: [...catalog].reverse() }));
+
+  // The screen wires the effect to the key, not to the model object identity.
+  const workspace = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
+  const effect = workspace.slice(workspace.indexOf("/api/business/workspace/queue"));
+  const deps = effect.slice(effect.indexOf("}, ["), effect.indexOf("]);") + 3);
+  assert.match(deps, /queueBuildKey/);
+  assert.doesNotMatch(deps, /model\.tracks|queue\.feedback|model\b,/, "no object identities in the queue effect deps");
 }
 
 console.log("business-cafe-queue-unit: ok");

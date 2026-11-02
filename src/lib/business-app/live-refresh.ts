@@ -29,6 +29,25 @@ export function businessLiveRefreshPath(pathname: string): boolean {
   return (BUSINESS_LIVE_REFRESH_ROUTES as readonly string[]).includes(pathname);
 }
 
+/** Same value as COFFEE_HOSTNAME in host.ts (kept literal so this module stays import-free). */
+const BUSINESS_LIVE_COFFEE_HOSTNAME = "coffee.audiolad.ru";
+
+/**
+ * The refresh decision for the address in the browser bar. On coffee.audiolad.ru the root `/`
+ * is the guest player (the proxy rewrites it to /guest/coffee; a guest with a started trial gets
+ * the full player and «Дальше в очереди» there), not the owner home, so it is left alone like
+ * /music. The owner home on that host is `/cabinet`. `normalizedPathname` is the public path
+ * after normalizeBusinessAppPathname.
+ */
+export function businessLiveRefreshActive(input: {
+  hostname: string;
+  pathname: string;
+  normalizedPathname: string;
+}): boolean {
+  if (input.hostname === BUSINESS_LIVE_COFFEE_HOSTNAME && (input.pathname === "/" || input.pathname === "")) return false;
+  return businessLiveRefreshPath(input.normalizedPathname);
+}
+
 /** Text fields, open modal dialogs and anything that opts out explicitly pause the refresh. */
 export const BUSINESS_LIVE_REFRESH_PAUSE_SELECTOR =
   '[aria-modal="true"], dialog[open], [data-biz-live-refresh="pause"]';

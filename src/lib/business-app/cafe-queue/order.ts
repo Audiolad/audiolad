@@ -67,6 +67,30 @@ export function cafeQueueIndices(
   return order;
 }
 
+/**
+ * Everything that can change the built queue: the space, the catalog ids in order, the sound
+ * profile, the daypart and the more/less votes. A background router.refresh() (live refresh)
+ * hands the page a new model object with the same tracks; this key stays the same, so the
+ * player does not ask for a new seeded mix and «Дальше в очереди» keeps its rows and count.
+ */
+export function cafeQueueBuildKey(input: {
+  spaceId: string;
+  tracks: readonly { audioItemId: string }[];
+  character: string;
+  direction: string;
+  daypart: string | null;
+  feedback: readonly { audioItemId: string; kind: string }[];
+}): string {
+  return JSON.stringify([
+    input.spaceId,
+    input.tracks.map((track) => track.audioItemId),
+    input.character,
+    input.direction,
+    input.daypart,
+    input.feedback.map((item) => `${item.audioItemId}:${item.kind}`),
+  ]);
+}
+
 /** How many upcoming rows the venue player lists before «и ещё N». */
 export const CAFE_QUEUE_PREVIEW = 3;
 

@@ -5,11 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 
 import {
   BUSINESS_LIVE_REFRESH_PAUSE_SELECTOR,
-  businessLiveRefreshPath,
+  businessLiveRefreshActive,
   isTypingTarget,
   startBusinessLiveRefresh,
   type BusinessLiveRefreshEnv,
 } from "@/lib/business-app/live-refresh";
+import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 import { restoreWindowScrollY } from "@/lib/public-content/live-sync";
 
@@ -45,13 +46,19 @@ function browserEnv(isBusy: () => boolean): BusinessLiveRefreshEnv {
 
 /**
  * Soft-refreshes the cabinet screen every few seconds (see live-refresh.ts). Mounted once in
- * the shell; it runs only on the screens listed in BUSINESS_LIVE_REFRESH_ROUTES and only for
- * a signed-in owner or the paired venue device.
+ * the shell; it runs only on the screens listed in BUSINESS_LIVE_REFRESH_ROUTES (never on the
+ * coffee.audiolad.ru root, which is the guest player) and only for a signed-in owner or the
+ * paired venue device.
  */
 export default function BusinessLiveRefresh({ enabled }: { enabled: boolean }) {
   const router = useRouter();
-  const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
-  const active = enabled && businessLiveRefreshPath(pathname);
+  const hostname = useBusinessHostname();
+  const rawPathname = usePathname() ?? "";
+  const active = enabled && businessLiveRefreshActive({
+    hostname,
+    pathname: rawPathname,
+    normalizedPathname: normalizeBusinessAppPathname(rawPathname),
+  });
   const [pending, startTransition] = useTransition();
   const pendingRef = useRef(pending);
   useEffect(() => {
