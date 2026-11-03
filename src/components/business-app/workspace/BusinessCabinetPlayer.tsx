@@ -19,6 +19,7 @@ import { postPointReport } from "@/lib/business-app/cabinet-player-client";
 import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
+import { FadingAudio } from "@/lib/business-app/player-fade";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { peekAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
@@ -152,6 +153,8 @@ export function BusinessCabinetPlayerProvider({
   const lastPostRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
+  /** Fade-in on play, fade-out on pause (player-fade.ts). Owns `audio.volume`. */
+  const fadeRef = useRef<FadingAudio | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
   const nextRef = useRef<() => Promise<void>>(async () => {});
   const refreshPointSoundRef = useRef<() => void>(() => {});
@@ -222,7 +225,7 @@ export function BusinessCabinetPlayerProvider({
 
   const release = useCallback(() => {
     void ctlRef.current?.applyManifest(null);
-    audioRef.current?.pause();
+    (fadeRef.current ?? audioRef.current)?.pause();
     setModel(null);
     restoredKey.current = null;
   }, []);
@@ -292,9 +295,12 @@ export function BusinessCabinetPlayerProvider({
     const audio = audioRef.current;
     const current = modelRef.current;
     if (!audio || !open || !current || !catalogKey) return;
+    const fader = new FadingAudio(audio);
+    fader.setVolume(playbackRef.current.volume);
+    fadeRef.current = fader;
     const ctl = new Controller(
       {
-        audio,
+        audio: fader,
         sign: async (audioItemId) => {
           try {
             const params = new URLSearchParams({ space: modelRef.current?.spaceId ?? "cafe" });
@@ -357,14 +363,17 @@ export function BusinessCabinetPlayerProvider({
       audio.removeEventListener("error", onError);
       ctl.dispose();
       ctlRef.current = null;
+      fader.dispose();
+      if (fadeRef.current === fader) fadeRef.current = null;
     };
   }, [catalogKey, open, remember]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !open) return;
-    audio.volume = playback.volume;
-  }, [open, playback.volume]);
+    if (fadeRef.current) fadeRef.current.setVolume(playback.volume);
+    else audio.volume = playback.volume;
+  }, [open, playback.volume, catalogKey]);
 
   useEffect(() => {
     if (!model || !workspacePlayerOpen(model)) return;
@@ -379,7 +388,7 @@ export function BusinessCabinetPlayerProvider({
       }
       expired = true;
       void ctlRef.current?.applyManifest(null);
-      audioRef.current?.pause();
+      (fadeRef.current ?? audioRef.current)?.pause();
     };
     timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
     window.addEventListener("focus", check);
@@ -581,7 +590,7 @@ export function BusinessCabinetPlayerProvider({
       ctl.index = start;
       const audio = audioRef.current;
       if (audio && audio.src) {
-        audio.pause();
+        (fadeRef.current ?? audio).pause();
         audio.removeAttribute("src");
         audio.load();
       }
@@ -726,15 +735,20 @@ export function BusinessCabinetPlayerProvider({
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;
     const audio = audioRef.current;
+    const fader = fadeRef.current;
+    setBarDismissed(true);
     if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
       await ctl.toggle();
     }
-    audio?.pause();
+    // Let the fade-out finish; a play pressed meanwhile keeps the music.
+    if (fader && fader.fadingOut && !(await fader.fadeOut())) return;
+    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) return;
+    if (fader) fader.pause();
+    else audio?.pause();
     if (audio) {
       audio.removeAttribute("src");
       audio.load();
     }
-    setBarDismissed(true);
   }, []);
 
   const revealNowPlaying = useCallback(() => {

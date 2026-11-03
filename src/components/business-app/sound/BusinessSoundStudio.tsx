@@ -42,6 +42,7 @@ import {
 } from "@/lib/business-app/guest-coffee/catalog";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
+import { FadingAudio } from "@/lib/business-app/player-fade";
 import {
   GUEST_COFFEE_ATLAS_URL,
   GUEST_COFFEE_ATMOSPHERE_COPY,
@@ -125,6 +126,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
+  /** Fade-in on play, fade-out on pause (player-fade.ts). Owns `audio.volume`. */
+  const fadeRef = useRef<FadingAudio | null>(null);
   const meterRef = useRef(new GuestCoffeePlaybackMeter());
   const resultRef = useRef<HTMLDivElement | null>(null);
   const timersRef = useRef<number[]>([]);
@@ -189,9 +192,11 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     const audio = audioRef.current;
     if (!audio) return;
     const meter = meterRef.current;
+    const fader = new FadingAudio(audio);
+    fadeRef.current = fader;
     const ctl = new Controller(
       {
-        audio,
+        audio: fader,
         now: () => Date.now(),
         setTimer: (fn, ms) => window.setTimeout(fn, ms),
         clearTimer: (t) => window.clearTimeout(t as number),
@@ -259,6 +264,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
       void flush(true);
       ctl.dispose();
       ctlRef.current = null;
+      fader.dispose();
+      if (fadeRef.current === fader) fadeRef.current = null;
     };
   }, [applyLimit, flush]);
 
@@ -378,7 +385,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const setGuestVolume = (value: number) => {
     setVolume(value);
     const audio = audioRef.current;
-    if (audio) audio.volume = value;
+    if (fadeRef.current) fadeRef.current.setVolume(value);
+    else if (audio) audio.volume = value;
   };
 
   const seekGuest = (ratio: number) => {
@@ -390,15 +398,20 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const dismissGuestBar = async () => {
     const ctl = ctlRef.current;
     const audio = audioRef.current;
+    const fader = fadeRef.current;
+    setBarDismissed(true);
     if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
       await ctl.toggle();
     }
-    audio?.pause();
+    // Let the fade-out finish; a play pressed meanwhile keeps the music.
+    if (fader && fader.fadingOut && !(await fader.fadeOut())) return;
+    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) return;
+    if (fader) fader.pause();
+    else audio?.pause();
     if (audio) {
       audio.removeAttribute("src");
       audio.load();
     }
-    setBarDismissed(true);
     setClock({ current: 0, duration: 0 });
   };
 
