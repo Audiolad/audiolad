@@ -345,15 +345,44 @@ console.log("business-app-client-documents-unit OK");
     "Ничего не подписывайте и не оплачивайте до разговора с Сергеем.",
   ]);
   for (const text of [INSPECTOR_CARD_TITLE, ...INSPECTOR_CARD_LINES, card]) assert.doesNotMatch(text, /\u2014/);
-  assert.match(card, /business-app-btn-cta[^"]*"\s+data-testid="biz-inspector-call"/, "«Позвонить» is the green main button");
-  assert.match(card, /Написать в МАКС/);
-  assert.match(card, /Написать на почту/);
+  // v2 (Sergey 03.11.2026 14:43): buttons in this order, email only as a button.
+  const { INSPECTOR_BUTTONS } = await import("../src/lib/business-app/inspector-contact");
+  assert.equal(INSPECTOR_CONTACT.maxHref, "https://max.ru/u/f9LHodD0cOI9Z0TpTY6vON-AsaLO2UKjrEHxKZb8SoKf46sX5Bvih-n5QjQ");
+  assert.equal(INSPECTOR_CONTACT.telegramHref, "https://t.me/p_e_t_r_o_v");
+  assert.deepEqual({ ...INSPECTOR_BUTTONS }, {
+    call: "Позвонить",
+    max: "Написать в МАКС",
+    telegram: "Написать в Телеграм",
+    email: "Написать на почту 1@audiolad.ru",
+    qr: "Показать QR-код с подтверждением прав на музыку",
+  });
+  const shared = readFileSync("src/components/business-app/SergeyContactActions.tsx", "utf8");
+  const { INSPECTOR_CONTACT_ORDER, PROFILE_HELP_CONTACT_ORDER, PROFILE_HELP_CONTACT_TITLE, SERGEY_CONTACT } = await import("../src/lib/business-app/sergey-contact");
+  assert.equal(INSPECTOR_CONTACT, SERGEY_CONTACT, "one contacts config");
+  assert.deepEqual([...INSPECTOR_CONTACT_ORDER], ["phone", "call", "max", "telegram", "email"]);
+  assert.match(card, /<SergeyContactActions order=\{INSPECTOR_CONTACT_ORDER\} testIdPrefix="biz-inspector">/);
+  const order = ["{INSPECTOR_CONTACT.name}", "<SergeyContactActions ", 'testId="biz-inspector-qr-show"', "INSPECTOR_CARD_LINES.map"].map((m) => card.indexOf(m));
+  assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `card order: name, contacts, QR, lines (${order})`);
+  assert.doesNotMatch(card + shared, /\{c\.email\}/, "no plain email line – only the button");
+  for (const id of ["max", "telegram"]) assert.match(shared, new RegExp(`target="_blank"\\s+rel="noopener noreferrer"[^>]*data-testid=\\{\`\\$\\{testIdPrefix\\}-${id}\``), `${id} opens in a new tab safely`);
+  for (const id of ["call", "email", "phone"]) assert.doesNotMatch(shared.slice(shared.indexOf(`case "${id}"`), shared.indexOf("return", shared.indexOf(`case "${id}"`)) + 400), /target="_blank"/);
+  assert.match(shared, /business-app-btn-cta[^"]*"\s+data-testid=\{`\$\{testIdPrefix\}-call`\}/, "«Позвонить» is green");
+  assert.doesNotMatch(shared, /\u2014|<Link|router\.|location\.href|window\.open/, "no navigation away from the cabinet");
+  // «Профиль» → «Помощь»: the same block first, messengers first (Sergey 14:45).
+  const profile = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+  const help = readFileSync("src/components/business-app/ProfileHelpContact.tsx", "utf8");
+  assert.equal(PROFILE_HELP_CONTACT_TITLE, "По любым вопросам пишите напрямую Сергею Петрову");
+  assert.deepEqual([...PROFILE_HELP_CONTACT_ORDER], ["max", "telegram", "email", "phone", "call"]);
+  assert.match(help, /<SergeyContactActions order=\{PROFILE_HELP_CONTACT_ORDER\} testIdPrefix="biz-profile-contact" \/>/);
+  const helpSection = profile.slice(profile.indexOf('data-testid="biz-profile-help-section"'));
+  assert.ok(helpSection.indexOf("<ProfileHelpContact />") > 0 && helpSection.indexOf("<ProfileHelpContact />") < helpSection.indexOf('data-testid="biz-profile-help"'), "contacts come first in «Помощь»");
+  assert.doesNotMatch(card, /target="_blank"[^>]*data-testid="biz-inspector-(call|email)"/);
   assert.ok(docs.indexOf("<InspectorContactCard ") > 0 && docs.indexOf("<InspectorContactCard ") < docs.indexOf('data-testid="client-documents"'), "card is at the very top");
   assert.match(docs, />Посмотреть<\/span>/, "documents open with «Посмотреть», as the card says");
 }
 {
   const card = readFileSync("src/components/business-app/InspectorContactCard.tsx", "utf8");
   const docs = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
-  assert.match(card, /<VenueQrShowButton url=\{qrUrl\} variant="secondary" testId="biz-inspector-qr-show" \/>/, "inspector card opens the QR too");
+  assert.match(card, /<VenueQrShowButton\s+url=\{qrUrl\}\s+variant="secondary"\s+testId="biz-inspector-qr-show"\s+label=\{INSPECTOR_BUTTONS\.qr\}/, "inspector card opens the QR too, with the explicit label");
   assert.match(docs, /<InspectorContactCard qrUrl=\{sticker \? venueLicencePublicUrl\(sticker\.publicId\) : null\} \/>/);
 }

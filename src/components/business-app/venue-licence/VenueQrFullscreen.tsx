@@ -46,22 +46,26 @@ export default function VenueQrShowButton({
   url,
   variant = "cta",
   testId = "biz-venue-qr-show",
+  label = VENUE_QR_SHOW_LABEL,
+  className = "",
 }: {
   url: string;
   variant?: "cta" | "secondary";
   testId?: string;
+  label?: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
         type="button"
-        className={`business-app-btn ${variant === "cta" ? "business-app-btn-cta business-venue-qr-show" : "business-app-btn-secondary"} business-app-focus-ring`}
+        className={`business-app-btn ${variant === "cta" ? "business-app-btn-cta business-venue-qr-show" : "business-app-btn-secondary"} business-app-focus-ring${className ? ` ${className}` : ""}`}
         aria-haspopup="dialog"
         data-testid={testId}
         onClick={() => setOpen(true)}
       >
-        {VENUE_QR_SHOW_LABEL}
+        {label}
       </button>
       {open ? <VenueQrFullscreen url={url} onClose={() => setOpen(false)} /> : null}
     </>

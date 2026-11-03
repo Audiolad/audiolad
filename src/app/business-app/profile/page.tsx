@@ -7,6 +7,7 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import SignOutForm from "@/components/auth/SignOutForm";
+import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import { createClient } from "@/lib/supabase/server";
@@ -106,7 +107,8 @@ export default async function BusinessProfilePage() {
         </section>
       )}
 
-      <section className="business-app-card space-y-2">
+      <section className="business-app-card space-y-3" data-testid="biz-profile-help-section">
+        <ProfileHelpContact />
         <p>
           <Link className="underline" href="/help" data-testid="biz-profile-help">
             Помощь
