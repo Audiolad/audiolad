@@ -500,11 +500,6 @@
   box-shadow: 0 8px 20px rgba(42, 26, 16, 0.08);
 }
 
-/* Template v2: text-only atlas card (no photo). */
-.guide-atlas-card.guide-atlas-card--text {
-  grid-template-rows: 1fr;
-}
-
 .guide-atlas-card__media {
   position: relative;
   display: block;
@@ -1013,10 +1008,6 @@
   .b2b-guide a.guide-atlas-hero {
     grid-template-columns: 1fr 220px;
   }
-
-  .b2b-guide a.guide-atlas-hero.guide-atlas-hero--text {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (min-width: 900px) {
@@ -1284,70 +1275,4 @@
     left: -21px;
     transform: translateY(-50%);
   }
-}
-
-/* ---------- Template v2: blank for the reader's coffee shop (GuideWorksheet) ---------- */
-.guide-worksheet__card {
-  padding: 16px;
-  background: var(--guide-cream);
-  border: 1px solid var(--guide-cream-border);
-  border-radius: 16px;
-}
-
-.guide-worksheet__progress {
-  margin: 0 0 10px;
-  font-size: 0.9rem;
-  color: var(--guide-muted);
-}
-
-.guide-worksheet__field {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.guide-worksheet__label {
-  font-weight: 600;
-  color: var(--guide-deep);
-}
-
-.guide-worksheet__field textarea {
-  width: 100%;
-  min-height: 52px;
-  padding: 8px 10px;
-  font: inherit;
-  font-size: 1rem;
-  color: var(--guide-ink);
-  background: var(--guide-card-warm);
-  border: 1px solid var(--guide-border);
-  border-radius: 10px;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.guide-worksheet__field textarea:focus-visible {
-  outline: 2px solid var(--guide-accent);
-  outline-offset: 1px;
-}
-
-.guide-worksheet__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.guide-worksheet__clear {
-  padding: 8px 14px;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--guide-accent);
-  background: transparent;
-  border: 1px solid var(--guide-accent);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.guide-worksheet__note {
-  margin: 10px 0 0;
-  font-size: 0.85rem;
-  color: var(--guide-muted);
 }
