@@ -106,7 +106,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
         <GuideSections sections={[article.partTwo[0]]} />
         <GuideExpertCard slot={article.expertOne} />
         <GuideSections sections={[article.partTwo[1]]} />
-        <GuideAtlasCardsBanner />
+        <GuideAtlasCardsBanner neutral={Boolean(article.infographic)} />
         <GuideSections sections={[article.partTwo[2]]} />
         <GuideExpertCard slot={article.expertTwo} />
         <GuideSteps steps={article.steps} />

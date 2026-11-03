@@ -14,8 +14,10 @@ import {
 /**
  * «10 кофеен – 10 характеров звучания»: one internal link to the atlas that wraps
  * the city chips and ten shop cards. No nested links inside.
+ * `neutral` (template v2, set 11 pilot): no brand names and no music tags in visible text or alt –
+ * cards show only the place; the single internal atlas link stays.
  */
-export default function GuideAtlasCardsBanner() {
+export default function GuideAtlasCardsBanner({ neutral = false }: { neutral?: boolean }) {
   const cities = COFFEE_ATLAS_SHOPS.map((shop) => shop.city);
   return (
     <div className="guide-wrap guide-block">
@@ -27,9 +29,13 @@ export default function GuideAtlasCardsBanner() {
         rel="noopener"
       >
         <span className="guide-atlas-cards__head">
-          <span className="guide-atlas-cards__title guide-display">10 кофеен – 10 характеров звучания</span>
+          <span className="guide-atlas-cards__title guide-display">
+            {neutral ? "10 кофеен – 10 городов мира" : "10 кофеен – 10 характеров звучания"}
+          </span>
           <span className="guide-atlas-cards__subtitle">
-            Десять городов на пяти континентах: история каждой кофейни, детали, которые можно взять себе, и идея её звучания.
+            {neutral
+              ? "Десять городов на пяти континентах: история каждой кофейни и детали, которые можно взять себе."
+              : "Десять городов на пяти континентах: история каждой кофейни, детали, которые можно взять себе, и идея её звучания."}
           </span>
           <span className="guide-atlas-cards__chips" aria-hidden="true">
             {cities.map((city) => (
@@ -49,12 +55,13 @@ export default function GuideAtlasCardsBanner() {
               "--card-accent": theme.accent,
               "--card-accent-ink": theme.accentInk,
             } as CSSProperties;
+            const name = neutral ? `Кофейня №${shop.number}` : (ATLAS_CARD_NAMES_RU[shop.slug] ?? shop.name);
             return (
               <span key={shop.slug} className="guide-atlas-card" style={style} data-atlas-card={shop.slug}>
                 <span className="guide-atlas-card__media">
                   <Image
                     src={coffeeAtlasAsset(`${shop.slug}-hero.webp`)}
-                    alt={`${ATLAS_CARD_NAMES_RU[shop.slug] ?? shop.name}, ${shop.city} – обложка карточки атласа`}
+                    alt={`${name}, ${shop.city} – обложка карточки атласа`}
                     width={756}
                     height={807}
                     sizes="(min-width: 960px) 190px, (min-width: 600px) 30vw, 45vw"
@@ -67,8 +74,10 @@ export default function GuideAtlasCardsBanner() {
                   <span className="guide-atlas-card__place">
                     {shop.city}, {shop.country}
                   </span>
-                  <span className="guide-atlas-card__name">{ATLAS_CARD_NAMES_RU[shop.slug] ?? shop.name}</span>
-                  <span className="guide-atlas-card__tags">{shop.soundTags.map(atlasSoundTagRu).join(" · ")}</span>
+                  <span className="guide-atlas-card__name">{name}</span>
+                  {neutral ? null : (
+                    <span className="guide-atlas-card__tags">{shop.soundTags.map(atlasSoundTagRu).join(" · ")}</span>
+                  )}
                 </span>
               </span>
             );

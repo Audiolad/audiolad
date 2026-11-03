@@ -500,6 +500,11 @@ const cardsBanner = read(`${guideDir}/GuideAtlasCardsBanner.tsx`);
 assert.equal((cardsBanner.match(/<Link\b/g) ?? []).length, 1, "one link around the whole banner");
 assert.match(cardsBanner, /10 кофеен – 10 характеров звучания/);
 assert.match(cardsBanner, /-hero\.webp/);
+// Template v2: neutral banner variant without brand names and music tags.
+assert.match(view, /<GuideAtlasCardsBanner neutral=\{Boolean\(article\.infographic\)\} \/>/);
+assert.match(cardsBanner, /10 кофеен – 10 городов мира/);
+assert.match(cardsBanner, /neutral \? `Кофейня №\$\{shop\.number\}`/);
+assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__tags">/);
 for (const shop of COFFEE_ATLAS_SHOPS) {
   assert.ok(ATLAS_CARD_THEMES[shop.slug], shop.slug);
   assert.ok(existsSync(join(root, "public/business/atlas-kofeen", `${shop.slug}-hero.webp`)), shop.slug);
