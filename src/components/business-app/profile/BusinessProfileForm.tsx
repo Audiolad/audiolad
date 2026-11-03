@@ -1,32 +1,52 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { saveBusinessProfile } from "@/app/business-app/profile/actions";
-import { DEFAULT_BUSINESS_ORGANIZATION, validateBusinessProfile } from "@/lib/business-app/profile";
+import {
+  BUSINESS_OWNER_NAME_FIELD_ID,
+  BUSINESS_OWNER_NAME_PLACEHOLDER,
+  BUSINESS_PROFILE_LIMITS_TEXT,
+  focusBusinessOwnerNameField,
+  validateBusinessProfile,
+} from "@/lib/business-app/profile";
 import "./profile.css";
 
-export default function BusinessProfileForm({ ownerName, organizationName, canEditOrganization }: {
-  ownerName: string; organizationName: string | null; canEditOrganization: boolean;
+/**
+ * Owner name and the name of the venue shown in the header switcher. `venueName: null` – no
+ * venue yet. Only the organization owner may rename the venue.
+ */
+export default function BusinessProfileForm({ ownerName, venueName, canEditVenue }: {
+  ownerName: string; venueName: string | null; canEditVenue: boolean;
 }) {
   const [name, setName] = useState(ownerName);
-  const [org, setOrg] = useState(organizationName === DEFAULT_BUSINESS_ORGANIZATION ? "" : organizationName ?? "");
+  const [venue, setVenue] = useState(venueName ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+  const focusedFromLink = useRef(false);
+
+  // «Ваше имя» in the header switcher opens /profile?edit=name: put the cursor in the name field.
+  useEffect(() => {
+    if (focusedFromLink.current) return;
+    if (new URLSearchParams(window.location.search).get("edit") !== "name") return;
+    focusedFromLink.current = true;
+    focusBusinessOwnerNameField();
+  }, []);
+
   const edit = () => { setMessage(""); setError(""); };
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(""); setError("");
-    const parsed = validateBusinessProfile({ ownerName: name, organizationName: org });
+    const parsed = validateBusinessProfile({ ownerName: name, venueName: venueName === null ? null : venue });
     if (!parsed.ok) { setError(parsed.error); return; }
     setBusy(true);
     try {
-      const result = await saveBusinessProfile(parsed);
+      const result = await saveBusinessProfile({ ownerName: parsed.ownerName, venueName: parsed.venueName });
       if (!result.ok) { setError(result.error); router.refresh(); return; }
       setName(result.ownerName);
-      setOrg(result.organizationName === DEFAULT_BUSINESS_ORGANIZATION ? "" : result.organizationName);
+      if (result.venueName !== null) setVenue(result.venueName);
       setMessage("Сохранено");
       router.refresh();
     } catch { setError("Не удалось сохранить профиль. Попробуйте ещё раз."); }
@@ -34,15 +54,18 @@ export default function BusinessProfileForm({ ownerName, organizationName, canEd
   };
   return (
     <form onSubmit={save} className="business-profile-form space-y-3" aria-label="Редактирование профиля">
-      <label htmlFor="business-owner-name">Имя владельца / хозяйки</label>
-      <input id="business-owner-name" name="ownerName" value={name} placeholder="Например, Анна"
-        disabled={busy} onChange={(e) => { setName(e.target.value); edit(); }} aria-describedby="business-profile-limits" />
-      {organizationName !== null ? <>
-        <label htmlFor="business-organization-name">Организация</label>
-        <input id="business-organization-name" name="organizationName" value={org} placeholder="Моя кофейня"
-          disabled={busy || !canEditOrganization} onChange={(e) => { setOrg(e.target.value); edit(); }} aria-describedby="business-profile-limits" />
+      <label htmlFor={BUSINESS_OWNER_NAME_FIELD_ID}>Имя владельца / хозяйки</label>
+      <input id={BUSINESS_OWNER_NAME_FIELD_ID} name="ownerName" value={name} placeholder={BUSINESS_OWNER_NAME_PLACEHOLDER}
+        autoComplete="given-name" disabled={busy} onChange={(e) => { setName(e.target.value); edit(); }}
+        aria-describedby="business-profile-limits" data-testid="biz-profile-owner-name" />
+      {venueName !== null ? <>
+        <label htmlFor="business-venue-name">Название кофейни</label>
+        <input id="business-venue-name" name="venueName" value={venue} placeholder="Моя кофейня" maxLength={120}
+          disabled={busy || !canEditVenue} onChange={(e) => { setVenue(e.target.value); edit(); }}
+          aria-describedby="business-profile-limits" data-testid="biz-profile-venue-name" />
+        {canEditVenue ? null : <p className="text-sm text-[var(--biz-text-muted)]">Название кофейни меняет владелец.</p>}
       </> : null}
-      <p id="business-profile-limits" className="text-sm text-[var(--biz-text-muted)]">Имя – до 80 символов, организация – до 120 символов.</p>
+      <p id="business-profile-limits" className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_PROFILE_LIMITS_TEXT}</p>
       <button type="submit" disabled={busy} className="business-app-btn business-app-btn-cta business-app-focus-ring">
         {busy ? "Сохраняем…" : "Сохранить"}
       </button>

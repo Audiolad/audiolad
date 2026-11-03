@@ -33,14 +33,13 @@ export default async function BusinessAppSettingsPage({
       <header>
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{locationId && !pointDevice ? "Управление кофейней" : "Настройка"}</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
-          {locationId && !pointDevice ? "Музыка в зале, название кофейни и устройство у колонки." : "Звучание плеера в этом кабинете."}
+          {locationId && !pointDevice ? "Музыка в зале и устройство у колонки." : "Звучание плеера в этом кабинете."}
         </p>
       </header>
       {locationId && !pointDevice ? (
         // Owner phone: the picker opens right under «Изменить звучание», not further down the page.
         <VenueControlPanel
           locationId={locationId}
-          locationName={domain.status === "authenticated" ? domain.location?.name ?? "Кофейня" : "Кофейня"}
           pointCanEdit={pointCanEdit}
           soundInitiallyOpen={query.sound === "open"}
           soundSlot={<BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={false} pointCanEdit={pointCanEdit} />}

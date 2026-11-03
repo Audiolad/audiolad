@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { businessCalendarDaysLeft, businessProfileSubscription } from "../src/lib/business-app/profile-subscription";
-import { validateBusinessProfile, businessKindLabel, businessTimezoneLabel } from "../src/lib/business-app/profile";
+import {
+  BUSINESS_OWNER_NAME_PLACEHOLDER, BUSINESS_PROFILE_NAME_HREF, validateBusinessProfile, businessKindLabel, businessTimezoneLabel,
+} from "../src/lib/business-app/profile";
 import { extractBusinessFirstName } from "../src/lib/business-app/domain-identity";
 import { buildBusinessGreeting } from "../src/lib/business-app/greeting";
 
@@ -29,18 +31,22 @@ assert.equal(businessCalendarDaysLeft(new Date("2026-11-03T22:00:00Z"), new Date
 assert.equal(businessCalendarDaysLeft(new Date("2026-11-03T22:00:00Z"), new Date("2026-11-03T20:59:00Z"), "Asia/Vladivostok"), 0);
 assert.equal(businessCalendarDaysLeft(new Date("2026-03-30T10:00:00Z"), new Date("2026-03-28T11:00:00Z"), "Europe/Berlin"), 2, "DST: 47 hours spans two calendar days");
 assert.equal(businessCalendarDaysLeft(new Date("2027-01-01T10:00:00Z"), new Date("2026-12-31T10:00:00Z"), "Europe/Moscow"), 1);
-assert.deepEqual(validateBusinessProfile({ ownerName: "  Анна  ", organizationName: "  Кофейня  " }), { ok: true, ownerName: "Анна", organizationName: "Кофейня" });
-assert.equal(validateBusinessProfile({ ownerName: "", organizationName: "" }).ok, true);
+assert.deepEqual(validateBusinessProfile({ ownerName: "  Анна  ", venueName: "  Долина Кофе  " }), { ok: true, ownerName: "Анна", venueName: "Долина Кофе" });
+assert.deepEqual(validateBusinessProfile({ ownerName: "", venueName: null }), { ok: true, ownerName: "", venueName: null }, "no venue yet: only the name");
+assert.equal(validateBusinessProfile({ ownerName: "Анна", venueName: "   " }).ok, false, "the cafe name cannot be emptied");
 for (const bad of ["<b>Анна</b>", "Анна>", "\u0000", "\nАнна", "Анна\t", "\u007f", "\u202e"]) {
-  assert.equal(validateBusinessProfile({ ownerName: bad, organizationName: "" }).ok, false);
-  assert.equal(validateBusinessProfile({ ownerName: "", organizationName: bad }).ok, false);
+  assert.equal(validateBusinessProfile({ ownerName: bad, venueName: "Кофе" }).ok, false);
+  assert.equal(validateBusinessProfile({ ownerName: "", venueName: bad }).ok, false);
 }
-for (const [ownerName, organizationName, ok] of [["А".repeat(80), "Я".repeat(120), true], ["А".repeat(81), "", false], ["", "Я".repeat(121), false]] as const) {
-  assert.equal(validateBusinessProfile({ ownerName, organizationName }).ok, ok);
+for (const [ownerName, venueName, ok] of [["А".repeat(80), "Я".repeat(120), true], ["А".repeat(81), "Кофе", false], ["", "Я".repeat(121), false]] as const) {
+  assert.equal(validateBusinessProfile({ ownerName, venueName }).ok, ok);
 }
-assert.equal(validateBusinessProfile({ ownerName: null, organizationName: 123 }).ok, false);
+assert.equal(validateBusinessProfile({ ownerName: null, venueName: 123 }).ok, false);
+assert.equal(validateBusinessProfile({ ownerName: "", organizationName: "Кофе" }).ok, false, "old shape is rejected");
 assert.equal(validateBusinessProfile(null).ok, false);
 assert.equal(validateBusinessProfile({}).ok, false);
+assert.equal(BUSINESS_OWNER_NAME_PLACEHOLDER, "Ваше имя");
+assert.equal(BUSINESS_PROFILE_NAME_HREF, "/profile?edit=name");
 assert.equal(extractBusinessFirstName({ metadataFirstName: "", fullName: "Старое имя", email: "fixture@example.invalid" }), "");
 assert.match(buildBusinessGreeting(extractBusinessFirstName({ metadataFirstName: "Новое имя" }), now), /Новое имя/);
 assert.equal(businessKindLabel("cafe"), "Кофейня");
@@ -51,7 +57,32 @@ assert.equal(businessTimezoneLabel("unknown"), "unknown");
 assert.equal(businessTimezoneLabel("__proto__"), "__proto__");
 const form = readFileSync("src/components/business-app/profile/BusinessProfileForm.tsx", "utf8");
 assert.match(form, /router\.refresh\(\)/);
-assert.doesNotMatch(form, /window\.location/);
+assert.doesNotMatch(form, /window\.location\.(href|assign|replace|reload)/);
+assert.match(form, /placeholder=\{BUSINESS_OWNER_NAME_PLACEHOLDER\}/);
+assert.doesNotMatch(form, /Например, Анна|Организация/);
+assert.match(form, />Название кофейни</);
+assert.match(form, /get\("edit"\) !== "name"/);
+assert.match(form, /focusBusinessOwnerNameField\(\)/);
+assert.doesNotMatch(form, /\u2014/);
+const page = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+assert.doesNotMatch(page, /Изменить в управлении кофейней/, "no duplicate cafe row in the profile");
+assert.match(page, /venueName=\{domain\.location\?\.name \?\? null\}/);
+const action = readFileSync("src/app/business-app/profile/actions.ts", "utf8");
+assert.match(action, /rpc\("rename_business_location"/, "the header venue name is renamed through the existing owner-only RPC");
+assert.match(action, /p_location_id: location\.id/, "venue resolved on the server");
+assert.match(action, /count !== 1\) return/, "organization sync only for a single-venue account");
+const panel = readFileSync("src/components/business-app/VenueControlPanel.tsx", "utf8");
+assert.doesNotMatch(panel, /Название кофейни|biz-venue-name|biz-venue-rename|action: "rename"/, "settings do not edit the cafe name");
+const pointRoute = readFileSync("src/app/api/business/point/route.ts", "utf8");
+assert.doesNotMatch(pointRoute, /rename_business_location/, "one rename path: the profile");
+const switcher = readFileSync("src/components/business-app/BusinessEntrySwitcher.tsx", "utf8");
+assert.match(switcher, /label: person \|\| BUSINESS_OWNER_NAME_PLACEHOLDER/);
+assert.doesNotMatch(switcher, /label: person \|\| "–"/);
+assert.match(switcher, /router\.push\(BUSINESS_PROFILE_NAME_HREF\)/);
+assert.match(switcher, /if \(!person\) return openNameField\(\);/);
+// On /profile the name field keeps the focus: the menu must not hand it back to the trigger.
+assert.match(switcher, /const focusMoved = option\.onSelect\(\) === true;\s*close\(!focusMoved\);/);
+assert.match(switcher, /focusBusinessOwnerNameField\(\)\) return true;/);
 const subscription = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.match(subscription, /useBusinessHomePay\(\)/);
 assert.match(subscription, /BusinessPayControls/);

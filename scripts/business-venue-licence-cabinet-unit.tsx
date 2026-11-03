@@ -174,7 +174,7 @@ async function main() {
   function panel() {
     return renderToStaticMarkup(
       <AppRouterContext.Provider value={router}>
-        <VenueControlPanel locationId={LOC_A} locationName="Образец кофейни" pointCanEdit />
+        <VenueControlPanel locationId={LOC_A} pointCanEdit />
       </AppRouterContext.Provider>,
     );
 }
