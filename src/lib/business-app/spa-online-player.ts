@@ -71,6 +71,11 @@ export class SpaOnlinePlayer {
   /** Source still sounding, which may differ from the immediately selected UI row. */
   private soundingId: string | null = null;
   private switching = false;
+  /**
+   * The loaded source is on its way out (manual switch fade, kept through a pause pressed
+   * meanwhile) and must never be resumed – even when the chosen track is the same one.
+   */
+  private leaving = false;
   /** Track under the soft-fade rights guard (armFadeGuard); null when none is armed. */
   private fadeGuardId: string | null = null;
 
@@ -90,7 +95,7 @@ export class SpaOnlinePlayer {
    * the chosen one. Its time updates belong to the previous track (no evidence / position).
    */
   get fadingOutPrevious(): boolean {
-    return this.soundingId !== null && this.soundingId !== (this.current?.audioItemId ?? null);
+    return this.leaving && this.soundingId !== null;
   }
 
   /** Track the element is actually producing (the previous one during a skip fade-out). */
@@ -192,6 +197,7 @@ export class SpaOnlinePlayer {
   private stopAudio() {
     this.clearDeadline();
     this.switching = false;
+    this.leaving = false;
     this.soundingId = null;
     this.d.audio.pause();
     this.d.audio.removeAttribute("src");
@@ -223,6 +229,7 @@ export class SpaOnlinePlayer {
     this.set("loading");
     if (!instant && this.d.audio.fadeOutForSwitch) {
       this.switching = true;
+      this.leaving = true;
       const fade = this.d.audio.fadeOutForSwitch();
       // A deadline hard-stops the old source, settling the fade; the user choice continues.
       if (this.soundingId) this.armFadeGuard(this.soundingId, op);
@@ -289,6 +296,7 @@ export class SpaOnlinePlayer {
       this.status === "paused" &&
       this.d.audio.src &&
       this.current &&
+      !this.leaving &&
       this.soundingId === this.current.audioItemId &&
       !this.expired(this.current)
     ) {

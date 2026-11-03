@@ -800,6 +800,55 @@ for (const select of [(p: SpaOnlinePlayer) => p.previous(), (p: SpaOnlinePlayer)
   for (const e of m.events) if (e.kind !== "src") assert.equal(e.volume, 0, `${e.kind} only at zero gain`);
 }
 
+// 40. Back to the sounding track inside the skip (next → previous → pause → play): the
+// leaving source is never resumed at its old position; a fresh source starts from silence.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  m.currentTime = 120;
+  const oldSrc = m.src;
+  const next = p.next();
+  c.advance(100);
+  const prev = p.previous();
+  assert.equal(p.current?.title, "T1");
+  assert.equal(p.fadingOutPrevious, true, "same track id, but the source is leaving");
+  c.advance(100);
+  await p.toggle(); // pause
+  await Promise.all([next, prev]);
+  assert.equal(p.fadingOutPrevious, true);
+  m.events.length = 0;
+  const resume = p.toggle(); // play
+  assert.equal(p.status, "loading", "no direct resume of the leaving source");
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await resume;
+  assert.equal(p.status, "playing");
+  assert.equal(p.current?.title, "T1");
+  assert.ok(m.events.some((e) => e.kind === "load"), "source replaced");
+  for (const e of m.events) if (e.kind !== "src") assert.equal(e.volume, 0, `${e.kind} only at zero gain`);
+  assert.equal(m.src, oldSrc.replace(/\?.*/, "") + "?token=x");
+  assert.equal(p.fadingOutPrevious, false);
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1, 1e-9);
+}
+
+// 41. Rapid next wrapping back to the sounding track: still a fresh source after the fade.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  m.events.length = 0;
+  const presses = [p.next(), p.next(), p.next(), p.next()];
+  assert.equal(p.current?.title, "T1");
+  assert.equal(p.fadingOutPrevious, true);
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await Promise.all(presses);
+  assert.equal(p.status, "playing");
+  assert.equal(m.events.filter((e) => e.kind === "load").length, 1, "one replacement");
+  for (const e of m.events) if (e.kind !== "src") assert.equal(e.volume, 0);
+  assert.equal(p.fadingOutPrevious, false);
+}
+
 // 19. Wiring: both Business players route the element through FadingAudio and set the
 // volume through it (cabinet / hall device, guest /guest/coffee).
 for (const file of [
