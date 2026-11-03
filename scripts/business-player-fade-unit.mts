@@ -871,6 +871,11 @@ for (const file of [
   assert.match(src, /const audible = ctl\.audibleItemId;/);
   assert.equal((src.match(/positionSec: (?:audio|audioRef)/g) ?? []).length, 1, "only the guarded timeupdate write reads the element time");
 }
+{
+  const src = readFileSync(new URL("../src/components/business-app/sound/BusinessSoundStudio.tsx", import.meta.url), "utf8");
+  assert.match(src, /if \(ctl\.fadingOutPrevious\) return;\n\s*setClock\(/);
+  assert.match(src, /if \(ctlRef\.current\?\.fadingOutPrevious\) return;\n\s*audio\.currentTime = /);
+}
 // 39. Controller: next → pause → play → pause inside the skip keeps the previous track
 // marked as fading (the toggle wrapper stores position 0 for the chosen one).
 {
