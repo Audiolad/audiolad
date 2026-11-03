@@ -6394,6 +6394,11 @@
       "file": "supabase/migrations/20270215120000_business_player_history_retention.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.cleanup_business_player_listening_history(boolean, boolean, integer, integer, integer) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270216120000_business_profile_organization.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.rename_business_organization(uuid, text) TO authenticated;"
     }
   ]
 }
