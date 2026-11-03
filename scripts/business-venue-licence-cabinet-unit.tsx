@@ -24,6 +24,7 @@ import {
 } from "../src/lib/business-app/venue-licence/sticker-access";
 import { venueStickerHref, VENUE_STICKER_API_PATH } from "../src/lib/business-app/venue-licence/sticker-links";
 import { VENUE_STICKER_ITEMS, VENUE_STICKER_PREVIEW_LABEL } from "../src/components/business-app/venue-licence/VenueStickerItem";
+import { closeModal, openModal, type ModalDocument, type ModalEntry } from "../src/components/business-app/venue-licence/useModalDialog";
 
 // Fictional ids only.
 const OWNER = "11111111-1111-4111-8111-111111111111";
@@ -162,11 +163,7 @@ async function main() {
   assert.match(item, /<img\s+src=\{href\}/, "the preview shows the same SVG the download returns");
   assert.match(item, /createPortal\(/);
   assert.match(item, /useModalDialog\(overlayRef, cardRef, closeRef, onClose\)/);
-  const modal = read("src/components/business-app/venue-licence/useModalDialog.ts");
-  assert.match(modal, /event\.key === "Escape"/);
-  assert.match(modal, /event\.key !== "Tab"/, "dialogs trap Tab inside");
-  assert.match(modal, /el\.inert = true/, "background is inert while a dialog is open");
-  assert.match(modal, /el\.inert = false/, "background inert is restored on close");
+  modalStackBehaviour();
   assert.doesNotMatch(item, /window\.open|target="_blank"|router\.push|location\.href/, "no new tab and no navigation: the player keeps playing");
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "square80").replaceAll("&", "&amp;")}"`));
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "a6").replaceAll("&", "&amp;")}"`));
@@ -223,3 +220,87 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
+// Shared modal stack behaviour on a minimal fake DOM: Tab / Shift+Tab wrap,
+// Escape only closes the top dialog, inert + scroll lock + focus restore,
+// overlapping dialogs closed in any order, StrictMode open/close/open.
+function modalStackBehaviour() {
+  type Key = { key: string; shiftKey: boolean; preventDefault(): void };
+  const listeners = new Set<(e: Key) => void>();
+  const doc = {
+    activeElement: null as unknown,
+    body: { style: { overflow: "auto" } },
+    addEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.add(l),
+    removeEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.delete(l),
+  } satisfies ModalDocument;
+  const focusable = (name: string) => ({ name, focus() { doc.activeElement = this; } });
+  const host = { children: [] as Array<{ name: string; inert: boolean }> };
+  const node = (name: string) => {
+    const el = { name, inert: false, parentElement: host };
+    host.children.push(el);
+    return el;
+  };
+  const app = node("app");
+  const press = (key: string, shiftKey = false) => {
+    let prevented = false;
+    for (const l of [...listeners]) l({ key, shiftKey, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  const dialog = (name: string, closed: string[]) => {
+    const overlay = node(name);
+    const a = focusable(`${name}-a`);
+    const b = focusable(`${name}-b`);
+    const card = { contains: (n: unknown) => n === a || n === b, querySelectorAll: () => [a, b] };
+    const entry: ModalEntry = { overlay: () => overlay, card: () => card, close: () => closed.push(name), previous: doc.activeElement as { focus(): void } | null };
+    return { overlay, a, b, entry };
+  };
+  const opener = focusable("opener");
+  opener.focus();
+  const closed: string[] = [];
+  const A = dialog("A", closed);
+  openModal(doc, A.entry);
+  A.a.focus();
+  assert.equal(doc.body.style.overflow, "hidden");
+  assert.equal(app.inert, true, "background inert while open");
+  assert.equal(A.overlay.inert, false);
+  assert.equal(press("Tab", true), true);
+  assert.equal(doc.activeElement, A.b, "Shift+Tab from first wraps to last");
+  assert.equal(press("Tab"), true);
+  assert.equal(doc.activeElement, A.a, "Tab from last wraps to first");
+  // Overlapping: B on top of A.
+  const B = dialog("B", closed);
+  openModal(doc, B.entry);
+  B.a.focus();
+  assert.equal(A.overlay.inert, true, "lower dialog inert under the top one");
+  assert.equal(listeners.size, 1, "one shared key listener");
+  press("Escape");
+  assert.deepEqual(closed, ["B"], "Escape closes only the top dialog");
+  // Close the lower one first: state must stay locked while B is open.
+  closeModal(doc, A.entry);
+  assert.equal(doc.body.style.overflow, "hidden");
+  assert.equal(app.inert, true);
+  assert.equal(doc.activeElement, B.a, "closing a lower dialog does not steal focus");
+  closeModal(doc, B.entry);
+  assert.equal(doc.body.style.overflow, "auto", "scroll restored after the last dialog");
+  assert.equal(app.inert, false, "background restored after the last dialog");
+  assert.equal(listeners.size, 0);
+  assert.equal(doc.activeElement, A.a, "focus returns to B's opener");
+  // StrictMode: open, cleanup, open again, close.
+  opener.focus();
+  const C = dialog("C", closed);
+  openModal(doc, C.entry);
+  closeModal(doc, C.entry);
+  openModal(doc, C.entry);
+  assert.equal(doc.body.style.overflow, "hidden");
+  closeModal(doc, C.entry);
+  assert.equal(doc.body.style.overflow, "auto");
+  assert.equal(app.inert, false);
+  assert.equal(doc.activeElement, opener, "focus restored to the opener");
+  // A pre-existing inert sibling is left alone.
+  const pre = node("pre");
+  pre.inert = true;
+  const D = dialog("D", closed);
+  openModal(doc, D.entry);
+  closeModal(doc, D.entry);
+  assert.equal(pre.inert, true, "foreign inert untouched");
+}
