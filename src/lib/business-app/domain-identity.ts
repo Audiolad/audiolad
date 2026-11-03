@@ -7,7 +7,8 @@ export function extractBusinessFirstName(input: {
     typeof input.metadataFirstName === "string"
       ? input.metadataFirstName.trim()
       : "";
-  if (fromMeta) return fromMeta;
+  // An explicitly saved empty name clears the greeting; do not fall back to email.
+  if (typeof input.metadataFirstName === "string") return fromMeta;
 
   const full =
     typeof input.fullName === "string" ? input.fullName.trim() : "";
