@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -15,9 +15,12 @@ import {
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
-import type { BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
 
 export type PayError = { code: BusinessPayErrorCode; href: string | null };
+
+/** Shown before any request when the account has no email and the field is empty or invalid. */
+const RECEIPT_EMAIL_REQUIRED_ERROR = { code: "receipt_email_required" as const, href: null };
 
 function unavailablePayError(): PayError {
   return { code: "internal_error", href: null };
@@ -41,6 +44,14 @@ export function useBusinessHomePay() {
   const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
+  const [askReceiptEmail, setAskReceiptEmail] = useState(
+    domain.status === "authenticated" && Boolean(domain.needsReceiptEmail),
+  );
+  const [receiptEmail, setReceiptEmailState] = useState("");
+  const setReceiptEmail = (value: string) => {
+    setReceiptEmailState(value);
+    if (error?.code === "receipt_email_required") setError(null);
+  };
 
   const accept = async () => {
     setBusy(true);
@@ -65,6 +76,11 @@ export function useBusinessHomePay() {
   };
 
   const pay = async () => {
+    const typedEmail = askReceiptEmail ? normalizeBusinessReceiptEmail(receiptEmail) : null;
+    if (askReceiptEmail && !typedEmail) {
+      setError(RECEIPT_EMAIL_REQUIRED_ERROR);
+      return;
+    }
     setBusy(true);
     setError(null);
     const params = new URLSearchParams({ space: "cafe" });
@@ -82,7 +98,8 @@ export function useBusinessHomePay() {
         method: "POST",
         credentials: "same-origin",
         cache: "no-store",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Idempotency-Key": crypto.randomUUID(), "Content-Type": "application/json" },
+        body: JSON.stringify(typedEmail ? { receipt_email: typedEmail } : {}),
       });
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
@@ -90,7 +107,9 @@ export function useBusinessHomePay() {
         payment_url?: string;
       } | null;
       if (!response.ok || typeof payload?.payment_url !== "string") {
-        setError(payErrorFromPayload(payload));
+        const next = payErrorFromPayload(payload);
+        if (next.code === "receipt_email_required") setAskReceiptEmail(true);
+        setError(next);
         setBusy(false);
         return;
       }
@@ -105,12 +124,25 @@ export function useBusinessHomePay() {
     (access.mode === "trial" || access.mode === "paid" || access.mode === "grace" || access.mode === "offer") &&
     Boolean(access.endsAt);
 
-  return { access, hasTerm, canPay, accepted, busy, error, accept, pay };
+  return {
+    access,
+    hasTerm,
+    canPay,
+    accepted,
+    busy,
+    error,
+    accept,
+    pay,
+    askReceiptEmail,
+    receiptEmail,
+    setReceiptEmail,
+  };
 }
 
 /** Owner payment before the first venue. A manager and a venue device do not see the button. */
 export default function BusinessHomeAccessCard() {
-  const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay } = useBusinessHomePay();
+  const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay, askReceiptEmail, receiptEmail, setReceiptEmail } =
+    useBusinessHomePay();
 
   if (!hasTerm || !access.endsAt) {
     return null;
@@ -125,6 +157,7 @@ export default function BusinessHomeAccessCard() {
       error={error}
       onAccept={accept}
       onPay={startPay}
+      receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null}
     />
   );
 
@@ -174,6 +207,69 @@ export default function BusinessHomeAccessCard() {
   );
 }
 
+export type ReceiptEmailControl = { value: string; onChange: (value: string) => void } | null;
+
+/** The one document the «Принять условия» button records, as a link that opens in a new tab. */
+export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { testId?: string }) {
+  return (
+    <a
+      href={BUSINESS_OFFER_HREF}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring"
+      data-testid={testId}
+    >
+      «{BUSINESS_OFFER_TITLE}»
+    </a>
+  );
+}
+
+/** Clear text above every «Принять условия»: what is accepted, once per account, with the document link. */
+export function BusinessOfferAcceptNote() {
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
+      Перед первой оплатой примите условия сервиса – один раз для всего аккаунта. Нажимая «Принять условия», вы
+      соглашаетесь с документом <BusinessOfferTermsLink /> (откроется в новой вкладке).
+    </p>
+  );
+}
+
+export function BusinessOfferAcceptedNote() {
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-terms-accepted">
+      Условия приняты для всего аккаунта: <BusinessOfferTermsLink />.
+    </p>
+  );
+}
+
+/** Guest-start accounts have no email; the receipt still needs one. Not saved to the account. */
+export function BusinessReceiptEmailField({ control, busy }: { control: NonNullable<ReceiptEmailControl>; busy: boolean }) {
+  const id = useId();
+  return (
+    <div className="space-y-1" data-testid="biz-home-receipt-email">
+      <label htmlFor={id} className="block text-sm font-semibold text-[var(--biz-text)]">
+        Почта для чека
+      </label>
+      <input
+        id={id}
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        className="business-app-input"
+        placeholder="Ваша почта"
+        value={control.value}
+        disabled={busy}
+        onChange={(event) => control.onChange(event.target.value)}
+        aria-describedby={`${id}-hint`}
+        data-testid="biz-home-receipt-email-input"
+      />
+      <p id={`${id}-hint`} className="text-sm leading-6 text-[var(--biz-text-muted)]">
+        В аккаунте нет почты. Укажите, куда прислать чек об оплате.
+      </p>
+    </div>
+  );
+}
+
 export function BusinessPayControls({
   canPay,
   accepted,
@@ -183,6 +279,8 @@ export function BusinessPayControls({
   onPay,
   payLabel = "Оплатить",
   buttonVariant = "primary",
+  receiptEmail = null,
+  showAcceptedNote = false,
 }: {
   canPay: boolean;
   accepted: boolean;
@@ -192,6 +290,8 @@ export function BusinessPayControls({
   onPay: () => void;
   payLabel?: string;
   buttonVariant?: "primary" | "cta";
+  receiptEmail?: ReceiptEmailControl;
+  showAcceptedNote?: boolean;
 }) {
   if (!canPay) return null;
   return (
@@ -200,22 +300,22 @@ export function BusinessPayControls({
         {businessGiftPriceNote()}
       </p>
       {accepted ? (
-        <button
-          type="button"
-          className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
-          onClick={onPay}
-          disabled={busy}
-          data-testid="biz-home-pay-button"
-        >
-          {payLabel}
-        </button>
+        <>
+          {showAcceptedNote ? <BusinessOfferAcceptedNote /> : null}
+          {receiptEmail ? <BusinessReceiptEmailField control={receiptEmail} busy={busy} /> : null}
+          <button
+            type="button"
+            className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
+            onClick={onPay}
+            disabled={busy}
+            data-testid="biz-home-pay-button"
+          >
+            {payLabel}
+          </button>
+        </>
       ) : (
         <>
-          <p>
-            <Link href={BUSINESS_OFFER_HREF} data-testid="biz-home-offer-link">
-              {BUSINESS_OFFER_TITLE}
-            </Link>
-          </p>
+          <BusinessOfferAcceptNote />
           <button
             type="button"
             className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
@@ -236,8 +336,7 @@ export function BusinessPayError({ error }: { error: PayError }) {
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
-        Сначала примите{" "}
-        <Link href={error.href || BUSINESS_OFFER_HREF}>{BUSINESS_OFFER_TITLE}</Link>.
+        Сначала примите условия: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.
       </p>
     );
   }
@@ -254,6 +353,13 @@ export function BusinessPayError({ error }: { error: PayError }) {
   }
   if (error.code === "support_mode_consent_forbidden") {
     return <p role="alert" data-testid="biz-home-pay-error">В режиме сопровождения оплату оформить нельзя.</p>;
+  }
+  if (error.code === "receipt_email_required") {
+    return (
+      <p role="alert" data-testid="biz-home-pay-error">
+        Укажите почту для чека и нажмите кнопку оплаты ещё раз.
+      </p>
+    );
   }
   if (error.code === "payments_not_configured") {
     return <p role="alert" data-testid="biz-home-pay-error">Оплата временно недоступна. Попробуйте ещё раз позже.</p>;

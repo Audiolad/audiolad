@@ -37,6 +37,8 @@ export type BusinessOwnerHomeContext =
       canPay: boolean;
       /** Account-level B2B offer. One acceptance covers every point. */
       offerAccepted: boolean;
+      /** Owner account without email (guest start): payment asks for an email for the receipt. */
+      needsReceiptEmail?: boolean;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
       signals: BusinessOwnerHomeSignals | null;
     };
@@ -87,6 +89,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     const { data: acceptance } = await supabase.rpc("business_offer_acceptance_for_caller");
     offerAccepted = Array.isArray(acceptance) && acceptance.length > 0;
   }
+  const needsReceiptEmail = canPay && !(user.email?.trim() ?? "");
 
   if (!membership?.organization_id) {
     return {
@@ -97,6 +100,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId: null,
       canPay,
       offerAccepted,
+      needsReceiptEmail,
       signals: null,
     };
   }
@@ -144,6 +148,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId,
       canPay,
       offerAccepted,
+      needsReceiptEmail,
       signals,
     };
   }
@@ -175,6 +180,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     organizationId,
     canPay,
     offerAccepted,
+    needsReceiptEmail,
     location: {
       id: location.id,
       organizationId: location.organization_id,

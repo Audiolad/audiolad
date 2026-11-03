@@ -9,7 +9,7 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-grants/policy";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { BUSINESS_GRACE_MS } from "../src/lib/business/plan";
-import { mapBusinessSubscriptionRpcError, ownerCanPayFromThisBrowser } from "../src/lib/business/subscription-checkout";
+import { mapBusinessSubscriptionRpcError, normalizeBusinessReceiptEmail, ownerCanPayFromThisBrowser, resolveBusinessReceiptEmail } from "../src/lib/business/subscription-checkout";
 import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/copy";
 import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
 import { resolveSignInIntroCopy } from "../src/lib/auth/buy-sign-in";
@@ -98,7 +98,38 @@ assert.match(graceHtml, /data-testid="biz-home-accept"/);
 assert.doesNotMatch(graceHtml, /data-testid="biz-home-pay-button"/);
 assert.doesNotMatch(graceHtml, /—/);
 
+// Every «Принять условия» says what is accepted, once per account, and links the document in a new tab.
+assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
+assert.match(graceHtml, /один раз для всего аккаунта/);
+assert.match(graceHtml, /<a href="\/documents\/b2b-terms" target="_blank" rel="noopener noreferrer"[^>]*>«Условия лицензирования музыки для бизнеса»<\/a>/);
+assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
+
 const accepted = card({ ...ownerDomain, offerAccepted: true }, grace);
+assert.doesNotMatch(accepted, /biz-home-receipt-email/, "account with email: no receipt field");
+const guestStart = card({ ...ownerDomain, offerAccepted: true, needsReceiptEmail: true }, grace);
+assert.match(guestStart, /data-testid="biz-home-receipt-email-input"/);
+assert.match(guestStart, /type="email"/);
+assert.match(guestStart, /Почта для чека/);
+assert.match(guestStart, /В аккаунте нет почты\. Укажите, куда прислать чек об оплате\./);
+assert.ok(guestStart.indexOf("biz-home-receipt-email") < guestStart.indexOf("biz-home-pay-button"), "email before pay");
+assert.doesNotMatch(guestStart, /—/);
+const guestNotAccepted = card({ ...ownerDomain, needsReceiptEmail: true }, grace);
+assert.doesNotMatch(guestNotAccepted, /biz-home-receipt-email/, "email only after the terms");
+
+// Receipt email: account email wins; a guest-start account (no email) can type one.
+assert.equal(resolveBusinessReceiptEmail("owner@example.test", "other@example.test"), "owner@example.test");
+assert.equal(resolveBusinessReceiptEmail(null, " Guest@Example.Test "), "guest@example.test");
+assert.equal(resolveBusinessReceiptEmail("", undefined), null);
+assert.equal(resolveBusinessReceiptEmail(undefined, "not-an-email"), null);
+assert.equal(normalizeBusinessReceiptEmail(123), null);
+assert.equal(normalizeBusinessReceiptEmail("a@b"), null);
+assert.equal(normalizeBusinessReceiptEmail("a b@c.ru"), null);
+assert.equal(normalizeBusinessReceiptEmail(`${"x".repeat(250)}@c.ru`), null);
+assert.equal(normalizeBusinessReceiptEmail("a@c.ru\n"), "a@c.ru");
+const checkoutSource = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
+assert.match(checkoutSource, /resolveBusinessReceiptEmail\(user\.email, body\?\.receipt_email\)/);
+assert.match(checkoutSource, /error: "receipt_email_required" \}, \{ status: 400 \}/);
+assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /needsReceiptEmail = canPay && !\(user\.email\?\.trim\(\) \?\? ""\)/);
 assert.match(accepted, /data-testid="biz-home-pay-button"/);
 assert.match(accepted, /Оплатить/);
 assert.match(accepted, /Автосписания нет/);

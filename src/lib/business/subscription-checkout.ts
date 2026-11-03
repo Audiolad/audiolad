@@ -10,7 +10,28 @@ export type BusinessPayErrorCode =
   | "support_mode_consent_forbidden"
   | "payments_not_configured"
   | "invalid_request"
+  | "receipt_email_required"
   | "internal_error";
+
+const RECEIPT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A guest-start account has no email. The receipt (чек) still needs one, typed at payment time. */
+export function normalizeBusinessReceiptEmail(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const email = raw.trim().toLowerCase();
+  if (email.length < 3 || email.length > 254 || /[\u0000-\u001f\u007f]/.test(email)) return null;
+  return RECEIPT_EMAIL_PATTERN.test(email) ? email : null;
+}
+
+/**
+ * The account email wins. Without it the email typed for the receipt is used.
+ * Nothing is stored: the address only goes to the payment provider for the receipt.
+ */
+export function resolveBusinessReceiptEmail(accountEmail: string | null | undefined, typed: unknown): string | null {
+  const account = accountEmail?.trim() ?? "";
+  if (account) return account;
+  return normalizeBusinessReceiptEmail(typed);
+}
 
 /** The payer is the owner account, and only from a browser that is not the hall device. */
 export function ownerCanPayFromThisBrowser(ownerRole: boolean, venueDevice: boolean): boolean {

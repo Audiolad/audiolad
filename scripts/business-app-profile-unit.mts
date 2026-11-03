@@ -123,4 +123,19 @@ assert.match(unaccepted, /Принять условия/);
 assert.match(unaccepted, /href="\/documents\/b2b-terms"/);
 assert.equal(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, canPay: false })), "");
 assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, busy: true })), /disabled=""/);
+// Profile: after acceptance the accepted document stays visible and clickable.
+const profileAccepted = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", showAcceptedNote: true }));
+assert.match(profileAccepted, /Условия приняты для всего аккаунта/);
+assert.match(profileAccepted, /href="\/documents\/b2b-terms" target="_blank"/);
+assert.equal((profileAccepted.match(/<button/g) ?? []).length, 1);
+// Before acceptance: clear text + document link right above «Принять условия».
+assert.match(unaccepted, /Нажимая «Принять условия», вы соглашаетесь с документом/);
+assert.match(unaccepted, /target="_blank" rel="noopener noreferrer"/);
+// Guest-start account without email: the receipt email field sits before the pay button.
+const withEmail = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", receiptEmail: { value: "", onChange() {} } }));
+assert.match(withEmail, /Почта для чека/);
+assert.ok(withEmail.indexOf("biz-home-receipt-email-input") < withEmail.indexOf("biz-home-pay-button"));
+const receiptError = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, error: { code: "receipt_email_required", href: null } }));
+assert.match(receiptError, /Укажите почту для чека/);
+assert.doesNotMatch(receiptError, /Не удалось перейти к оплате/);
 console.log("business-app-profile shared controls: OK");
