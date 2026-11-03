@@ -1,64 +1,46 @@
 import { venueLicencePublicUrl } from "@/lib/business-app/host";
-import { venueStickerHref, venueStickerFilename } from "@/lib/business-app/venue-licence/sticker-links";
+import VenueQrShowButton from "@/components/business-app/venue-licence/VenueQrFullscreen";
+import VenueStickerItem from "@/components/business-app/venue-licence/VenueStickerItem";
 
 export const VENUE_STICKER_CARD_TITLE = "QR-наклейка с подтверждением прав на музыку";
+export const VENUE_QR_PHONE_TEXT =
+  "Пришёл проверяющий – откройте QR-код на телефоне и дайте отсканировать: по нему откроется подтверждение прав на музыку.";
+export const VENUE_QR_PRINT_TEXT = "Можно один раз распечатать и держать в папке с документами или у кассы.";
 
 /**
  * Cabinet block with the venue's own sticker (task 90d24628).
- * Shown in «Управление кофейней» and in «Документы». The pages render it only
- * when the licence flag is on and the caller manages this venue.
- * No hooks: it renders inside client and server components alike.
+ * Lives only in «Документы»: it is printed once, so it does not take space in
+ * «Управление кофейней» (Sergey, 03.11.2026). The page renders it only when the
+ * licence flag is on and the caller manages this venue.
  */
 export default function VenueLicenceStickerCard({
   locationId,
   publicId,
-  placement,
 }: {
   locationId: string;
   publicId: string;
-  placement: "venue" | "documents";
 }) {
-  const titleId = `venue-sticker-title-${placement}`;
+  const titleId = "venue-sticker-title";
+  const publicUrl = venueLicencePublicUrl(publicId);
   return (
     <section
       className="business-app-card space-y-3"
       data-testid="biz-venue-sticker"
-      data-placement={placement}
       aria-labelledby={titleId}
     >
       <h2 id={titleId} className="text-[1.15rem] font-bold text-[var(--biz-text)]">
         {VENUE_STICKER_CARD_TITLE}
       </h2>
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Наклейте QR-код у кассы или поставьте тент на стол. Гость наводит камеру телефона и видит, что у кофейни
-        есть лицензия на музыку и до какого числа она действует.
+      <p className="text-[0.98rem] leading-6 text-[var(--biz-text)]" data-testid="biz-venue-qr-text">
+        {VENUE_QR_PHONE_TEXT}
       </p>
-      <a
-        href={venueLicencePublicUrl(publicId)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block text-sm font-semibold text-[var(--biz-accent)] underline underline-offset-2 business-app-focus-ring"
-        data-testid="biz-venue-sticker-page"
-      >
-        Открыть страницу проверки
-      </a>
-      <div className="flex flex-wrap gap-2">
-        <a
-          href={venueStickerHref(locationId, "square80")}
-          download={venueStickerFilename("square80")}
-          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          data-testid="biz-venue-sticker-square80"
-        >
-          Скачать наклейку 80×80 мм
-        </a>
-        <a
-          href={venueStickerHref(locationId, "a6")}
-          download={venueStickerFilename("a6")}
-          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          data-testid="biz-venue-sticker-a6"
-        >
-          Скачать тент А6
-        </a>
+      <VenueQrShowButton url={publicUrl} />
+      <p className="pt-2 text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-venue-print-text">
+        {VENUE_QR_PRINT_TEXT}
+      </p>
+      <div className="business-venue-sticker__actions">
+        <VenueStickerItem locationId={locationId} format="square80" />
+        <VenueStickerItem locationId={locationId} format="a6" />
       </div>
       <p className="text-xs leading-5 text-[var(--biz-text-muted)]">
         Векторные файлы с полями под обрез: их можно распечатать из браузера или отдать в типографию.
