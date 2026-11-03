@@ -1,7 +1,8 @@
 /**
  * Cabinet entry point of the venue QR sticker (task 90d24628).
  * Owners and managers download their own venue's sticker; anyone else gets 404.
- * The block is in «Управление кофейней» and in «Документы», only with the licence flag on.
+ * The block lives only in «Документы» (moved out of «Управление кофейней», 03.11.2026), only with the licence flag on.
+ * Each file has «Скачать …» and «Посмотреть» (an in-page preview of the same SVG).
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,7 +10,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 import VenueControlPanel from "../src/components/business-app/VenueControlPanel";
-import VenueLicenceStickerCard, { VENUE_STICKER_CARD_TITLE } from "../src/components/business-app/venue-licence/VenueLicenceStickerCard";
+import VenueLicenceStickerCard, { VENUE_QR_PHONE_TEXT, VENUE_QR_PRINT_TEXT, VENUE_STICKER_CARD_TITLE } from "../src/components/business-app/venue-licence/VenueLicenceStickerCard";
+import { VENUE_QR_SHOW_LABEL, VenueQrSvg } from "../src/components/business-app/venue-licence/VenueQrFullscreen";
 import { venueLicencePublicUrl } from "../src/lib/business-app/host";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag";
@@ -21,6 +23,8 @@ import {
   type VenueStickerReader,
 } from "../src/lib/business-app/venue-licence/sticker-access";
 import { venueStickerHref, VENUE_STICKER_API_PATH } from "../src/lib/business-app/venue-licence/sticker-links";
+import { VENUE_STICKER_ITEMS, VENUE_STICKER_PREVIEW_LABEL } from "../src/components/business-app/venue-licence/VenueStickerItem";
+import { closeModal, openModal, type ModalDocument, type ModalEntry } from "../src/components/business-app/venue-licence/useModalDialog";
 
 // Fictional ids only.
 const OWNER = "11111111-1111-4111-8111-111111111111";
@@ -121,57 +125,77 @@ async function main() {
     }
 }
 
-  const card = renderToStaticMarkup(<VenueLicenceStickerCard locationId={LOC_A} publicId={PUBLIC_A} placement="documents" />);
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  const card = renderToStaticMarkup(<VenueLicenceStickerCard locationId={LOC_A} publicId={PUBLIC_A} />);
   checkCopy(card, "card");
   assert.ok(card.includes(`>${VENUE_STICKER_CARD_TITLE}</h2>`));
   assert.equal(VENUE_STICKER_CARD_TITLE, "QR-наклейка с подтверждением прав на музыку");
-  assert.match(card, /Гость наводит камеру телефона и видит, что у кофейни\s+есть лицензия на музыку и до какого числа она действует/);
-  assert.ok(card.includes(`href="${venueLicencePublicUrl(PUBLIC_A)}" target="_blank" rel="noopener noreferrer"`));
-  assert.match(card, />Открыть страницу проверки</);
+  // Phone first (Sergey 03.11 13:32): show the QR on the phone, printing is optional.
+  assert.ok(card.includes(`>${VENUE_QR_PHONE_TEXT}</p>`));
+  assert.equal(VENUE_QR_PHONE_TEXT, "Пришёл проверяющий – откройте QR-код на телефоне и дайте отсканировать: по нему откроется подтверждение прав на музыку.");
+  assert.ok(card.includes(`>${VENUE_QR_PRINT_TEXT}</p>`));
+  assert.equal(VENUE_QR_PRINT_TEXT, "Можно один раз распечатать и держать в папке с документами или у кассы.");
+  assert.match(card, new RegExp(`<button type="button" class="business-app-btn business-app-btn-cta business-venue-qr-show[^"]*" aria-haspopup="dialog" data-testid="biz-venue-qr-show">${VENUE_QR_SHOW_LABEL}</button>`));
+  assert.ok(card.indexOf('data-testid="biz-venue-qr-show"') < card.indexOf('data-testid="biz-venue-print-text"'), "«Показать QR-код» comes before the print options");
+  assert.equal(card.includes("target=\"_blank\""), false, "no new tab from the block");
+  const qrMarkup = renderToStaticMarkup(<VenueQrSvg url={venueLicencePublicUrl(PUBLIC_A)} label="qr" />);
+  assert.match(qrMarkup, /fill="black"/);
+  assert.ok(qrMarkup.length > 2000, "the fullscreen QR encodes the licence page");
+  const full = read("src/components/business-app/venue-licence/VenueQrFullscreen.tsx");
+  assert.match(full, /qrMatrix\(url\)/, "the fullscreen QR uses the same encoder as the sticker");
+  assert.match(full, /useModalDialog\(/);
+  assert.doesNotMatch(full, /window\.open|target="_blank"|router\.push|location\.href/);
   assert.match(card, />Скачать наклейку 80×80 мм</);
-  assert.match(card, />Скачать тент А6</);
+  assert.match(card, />Скачать настольную табличку А6</);
+  assert.equal(/тент/i.test(card), false, "«тент» is gone from the visible copy");
+  assert.equal(VENUE_STICKER_ITEMS.a6.download, "Скачать настольную табличку А6");
+  assert.equal(VENUE_STICKER_ITEMS.square80.download, "Скачать наклейку 80×80 мм");
+  // «Посмотреть» next to each download: a button (no navigation, no new tab), the download stays the main green action.
+  for (const format of ["square80", "a6"] as const) {
+    const row = card.slice(card.indexOf(`data-testid="biz-venue-sticker-row-${format}"`));
+    const rowHtml = row.slice(0, row.indexOf("</button>") + 9);
+    assert.match(rowHtml, new RegExp(`<a href="[^"]+" download="[^"]+" class="business-app-btn business-app-btn-cta[^"]*" data-testid="biz-venue-sticker-${format}"`));
+    assert.match(rowHtml, new RegExp(`<button type="button" class="business-app-btn business-app-btn-secondary[^"]*" aria-haspopup="dialog"[^>]*data-testid="biz-venue-sticker-preview-${format}"[^>]*>${VENUE_STICKER_PREVIEW_LABEL}</button>`));
+  }
+  assert.equal(card.match(new RegExp(`>${VENUE_STICKER_PREVIEW_LABEL}<`, "g"))?.length, 2);
+  assert.equal(card.includes('role="dialog"'), false, "the preview opens only after a tap");
+  const item = read("src/components/business-app/venue-licence/VenueStickerItem.tsx");
+  assert.match(item, /<img\s+src=\{href\}/, "the preview shows the same SVG the download returns");
+  assert.match(item, /createPortal\(/);
+  assert.match(item, /useModalDialog\(overlayRef, cardRef, closeRef, onClose\)/);
+  modalStackBehaviour();
+  assert.doesNotMatch(item, /window\.open|target="_blank"|router\.push|location\.href/, "no new tab and no navigation: the player keeps playing");
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "square80").replaceAll("&", "&amp;")}"`));
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "a6").replaceAll("&", "&amp;")}"`));
-  assert.match(card, /data-placement="documents"/);
 
   const router = {
     back() {}, forward() {}, refresh() {}, push() {}, replace() {}, prefetch() {},
   } as unknown as React.ContextType<typeof AppRouterContext>;
-  function panel(licenceSticker: { publicId: string } | null) {
+  function panel() {
     return renderToStaticMarkup(
       <AppRouterContext.Provider value={router}>
-        <VenueControlPanel locationId={LOC_A} locationName="Образец кофейни" pointCanEdit licenceSticker={licenceSticker} />
+        <VenueControlPanel locationId={LOC_A} locationName="Образец кофейни" pointCanEdit />
       </AppRouterContext.Provider>,
     );
 }
-  const withSticker = panel({ publicId: PUBLIC_A });
-  const stickerInPanel = withSticker.slice(withSticker.lastIndexOf("<section", withSticker.indexOf('data-testid="biz-venue-sticker"')));
-  assert.match(stickerInPanel.slice(0, 120), /^<section class="business-app-card[^"]*" data-testid="biz-venue-sticker"/);
-  checkCopy(stickerInPanel.slice(0, stickerInPanel.indexOf("</section>")), "panel");
-  assert.match(withSticker, /Музыка в зале/);
-  assert.ok(withSticker.includes(VENUE_STICKER_CARD_TITLE));
-  assert.match(withSticker, /data-placement="venue"/);
-  assert.ok(
-    withSticker.indexOf('data-testid="biz-venue-control"') < withSticker.indexOf('data-testid="biz-venue-sticker"'),
-    "the sticker sits inside «Управление кофейней»",
-  );
-  const withoutSticker = panel(null);
-  assert.equal(withoutSticker.includes(VENUE_STICKER_CARD_TITLE), false, "flag off: no block in «Управление кофейней»");
-  assert.equal(withoutSticker.includes(VENUE_STICKER_API_PATH), false);
+  const panelHtml = panel();
+  assert.match(panelHtml, /Музыка в зале/);
+  assert.equal(panelHtml.includes(VENUE_STICKER_CARD_TITLE), false, "no QR block in «Управление кофейней»");
+  assert.equal(panelHtml.includes(VENUE_STICKER_API_PATH), false);
+  assert.equal(panelHtml.includes('data-testid="biz-venue-sticker"'), false);
 
-  // Pages: both places render the same component only with data from loadOwnVenueSticker,
+  // Pages: only «Документы» renders the block, with data from loadOwnVenueSticker,
   // and that loader checks the flag before it opens a session.
-  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const loader = read("src/lib/business-app/venue-licence/sticker-access.server.ts");
   assert.match(loader, /if \(!locationId \|\| !isVenueLicencePublicEnabled\(\)\) return null;/);
   assert.ok(loader.indexOf("isVenueLicencePublicEnabled()") < loader.indexOf("createClient()"));
   assert.doesNotMatch(loader, /createServiceRoleClient/, "the cabinet reads with the caller's session, not the service role");
   const settings = read("src/app/business-app/settings/page.tsx");
-  assert.match(settings, /loadOwnVenueSticker\(locationId\)/);
-  assert.match(settings, /licenceSticker=\{sticker \? \{ publicId: sticker\.publicId \} : null\}/);
+  assert.doesNotMatch(settings, /loadOwnVenueSticker|VenueLicenceStickerCard|licenceSticker/, "settings no longer loads or shows the sticker");
+  assert.doesNotMatch(read("src/components/business-app/VenueControlPanel.tsx"), /VenueLicenceStickerCard|licenceSticker/);
   const documents = read("src/app/business-app/documents/page.tsx");
   assert.match(documents, /loadOwnVenueSticker\(locationId\)/);
-  assert.match(documents, /\{sticker \? \(\s*<VenueLicenceStickerCard locationId=\{sticker\.locationId\} publicId=\{sticker\.publicId\} placement="documents" \/>/);
+  assert.match(documents, /\{sticker \? \(\s*<VenueLicenceStickerCard locationId=\{sticker\.locationId\} publicId=\{sticker\.publicId\} \/>/);
   const route = read("src/app/api/business/venue-licence/sticker/route.ts");
   assert.match(route, /if \(!enabled\) return new NextResponse\(null, \{ status: 404/);
   assert.match(route, /Content-Disposition/);
@@ -196,3 +220,92 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
+// Shared modal stack behaviour on a minimal fake DOM: Tab / Shift+Tab wrap,
+// Escape only closes the top dialog, inert + scroll lock + focus restore,
+// overlapping dialogs closed in any order, StrictMode open/close/open.
+function modalStackBehaviour() {
+  type Key = { key: string; shiftKey: boolean; preventDefault(): void };
+  const listeners = new Set<(e: Key) => void>();
+  const doc = {
+    activeElement: null as unknown,
+    body: { style: { overflow: "auto" } },
+    addEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.add(l),
+    removeEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.delete(l),
+  } satisfies ModalDocument;
+  // Fake focusable: focusing a removed (disconnected) node does nothing, as in a real DOM.
+  const focusable = (name: string) => ({ name, isConnected: true, focus() { if (this.isConnected) doc.activeElement = this; } });
+  const host = { children: [] as Array<{ name: string; inert: boolean }> };
+  const node = (name: string) => {
+    const el = { name, inert: false, parentElement: host };
+    host.children.push(el);
+    return el;
+  };
+  const app = node("app");
+  const press = (key: string, shiftKey = false) => {
+    let prevented = false;
+    for (const l of [...listeners]) l({ key, shiftKey, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  const dialog = (name: string, closed: string[]) => {
+    const a = focusable(`${name}-a`);
+    const b = focusable(`${name}-b`);
+    const overlay = { ...node(name), contains: (n: unknown) => n === a || n === b };
+    host.children[host.children.length - 1] = overlay;
+    const card = { contains: (n: unknown) => n === a || n === b, querySelectorAll: () => [a, b] };
+    const entry: ModalEntry = { overlay, card, close: () => closed.push(name), previous: doc.activeElement as { focus(): void } | null };
+    return { overlay, a, b, entry };
+  };
+  const opener = focusable("opener");
+  opener.focus();
+  const closed: string[] = [];
+  const A = dialog("A", closed);
+  openModal(doc, A.entry);
+  A.a.focus();
+  assert.equal(doc.body.style.overflow, "hidden");
+  assert.equal(app.inert, true, "background inert while open");
+  assert.equal(A.overlay.inert, false);
+  assert.equal(press("Tab", true), true);
+  assert.equal(doc.activeElement, A.b, "Shift+Tab from first wraps to last");
+  assert.equal(press("Tab"), true);
+  assert.equal(doc.activeElement, A.a, "Tab from last wraps to first");
+  // Overlapping: B opened from inside A (A's button has focus).
+  const B = dialog("B", closed);
+  openModal(doc, B.entry);
+  B.a.focus();
+  assert.equal(A.overlay.inert, true, "lower dialog inert under the top one");
+  assert.equal(listeners.size, 1, "one shared key listener");
+  press("Escape");
+  assert.deepEqual(closed, ["B"], "Escape closes only the top dialog");
+  // Close the lower one first: state must stay locked while B is open.
+  // As in React: A's nodes are removed (and its refs cleared) before the effect cleanup runs.
+  A.a.isConnected = false;
+  A.b.isConnected = false;
+  closeModal(doc, A.entry);
+  assert.equal(doc.body.style.overflow, "hidden");
+  assert.equal(app.inert, true);
+  assert.equal(doc.activeElement, B.a, "closing a lower dialog does not steal focus");
+  closeModal(doc, B.entry);
+  assert.equal(doc.body.style.overflow, "auto", "scroll restored after the last dialog");
+  assert.equal(app.inert, false, "background restored after the last dialog");
+  assert.equal(listeners.size, 0);
+  assert.equal(doc.activeElement, opener, "A is gone, so focus returns to the original page opener");
+  // StrictMode: open, cleanup, open again, close.
+  opener.focus();
+  const C = dialog("C", closed);
+  openModal(doc, C.entry);
+  closeModal(doc, C.entry);
+  openModal(doc, C.entry);
+  assert.equal(doc.body.style.overflow, "hidden");
+  closeModal(doc, C.entry);
+  assert.equal(doc.body.style.overflow, "auto");
+  assert.equal(app.inert, false);
+  assert.equal(doc.activeElement, opener, "focus restored to the opener");
+  // A pre-existing inert sibling is left alone.
+  const pre = node("pre");
+  pre.inert = true;
+  const D = dialog("D", closed);
+  openModal(doc, D.entry);
+  closeModal(doc, D.entry);
+  assert.equal(pre.inert, true, "foreign inert untouched");
+}
