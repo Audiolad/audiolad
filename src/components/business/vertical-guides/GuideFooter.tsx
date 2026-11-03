@@ -13,12 +13,16 @@ export const GUIDE_FOOTER_LINKS = [
   { href: "/help", label: "Справочный центр" },
 ] as const;
 
-export default function GuideFooter() {
+/** Footer items about music, hidden in template v2 articles (owner rule for the pilot set 11: no music in visible text). */
+export const GUIDE_FOOTER_MUSIC_HREFS: readonly string[] = ["/b", "/b/prava"];
+
+export default function GuideFooter({ withoutMusic = false }: { withoutMusic?: boolean }) {
+  const links = withoutMusic ? GUIDE_FOOTER_LINKS.filter((link) => !GUIDE_FOOTER_MUSIC_HREFS.includes(link.href)) : GUIDE_FOOTER_LINKS;
   return (
     <footer className="guide-footer">
       <div className="guide-wrap">
         <nav className="guide-footer__nav" aria-label="О разделе и платформе">
-          {GUIDE_FOOTER_LINKS.map((link) => (
+          {links.map((link) => (
             <Link key={link.href} href={link.href} target="_blank" rel="noopener">
               {link.label}
             </Link>
