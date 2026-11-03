@@ -1,9 +1,18 @@
-# Business player history retention — PROPOSAL, awaiting Sergey's confirmation
+# Business player history retention (task f381f92b)
 
-**Proposed history retention: 400 days (400 × 24 hours). Sergey has not approved
-this period or deletion. Deletion must remain disabled until he confirms.**
-No production access, data cleanup, scheduling or migration application is part of
-this change. Existing applied migrations remain unchanged.
+**Decision (Sergey, 2026-11-03 07:56 MSK, clarification
+`owner-retention-policy-20261103-f381f92b-v1`):**
+
+- keep **400 days** (400 × 24 hours) of `business_player_listening_history`;
+- delete **only** rows with `last_confirmed_at < cutoff`, in bounded batches;
+- **no archive** / export of removed rows;
+- **do not touch** `business_player_device_heartbeat` or `business_player_playback_state`.
+
+This decision fixes the policy that the code implements. It is **not** approval to
+merge, deploy, apply the migration, register a schedule or enable deletion: both
+deletion flags stay off by default and each of those steps needs Sergey's separate
+explicit OK. No production access, data cleanup, scheduling or migration application
+is part of this change. Existing applied migrations remain unchanged.
 
 ## Reporting and data requirements
 
@@ -23,24 +32,19 @@ Repository audit for f381f92b:
 
 400 days preserves a complete annual comparison window plus 35 days for delayed
 operational reviews. It bounds raw interval growth without losing recent session
-merging. This is a product proposal, not an assertion of a legal minimum. There
-is no historical aggregate/archive added here. Future reports needing more than
-400 days must establish an aggregate/export policy before deletion is enabled.
-Removing intervals is irreversible and would limit future raw-history reports.
+merging. It is the owner's product decision, not an assertion of a legal minimum.
+By decision there is **no archive**: removed intervals are gone. Removal is
+irreversible; the rollback below restores the schema, not deleted rows. Any future
+report needing raw history older than 400 days would need a new owner decision.
 
 ## Three independent lifecycles
 
 - History: delete **only** `last_confirmed_at < cutoff`, where cutoff is server
   statement time minus `p_retention_days × 24` hours (default 400 days). Equality
   survives; `first_confirmed_at` is never a deletion criterion. A long session with a recent last confirmation survives.
-- Heartbeat: proposal for a future separately approved cleanup is **stale only**,
-  `last_seen_at < server time - 30 days`; never infer age from `claimed_at`.
-  Active claims use a five-minute freshness window. Heartbeats are one upserted
-  row per player, not an append-only stream; they do not grow with each ping.
-  This implementation deletes **no heartbeats**, including stale ones. Keeping
-  stale values preserves the owner's last-seen diagnostics until Sergey approves
-  their removal. Any future deletion must lock and recheck last_seen_at against
-  concurrent claim refreshes.
+- Heartbeat: **not touched** (owner decision). Heartbeats are one upserted row per
+  player, not an append-only stream; they do not grow with each ping and keep the
+  owner's last-seen diagnostics. No heartbeat cleanup exists or is planned here.
 - Current playback state: **never cleaned up by retention**. One upserted row per
   player represents its last reported state, including long pauses and stopped
   devices. Age does not make that state a historical event. Neither this function
@@ -53,9 +57,9 @@ Removing intervals is irreversible and would limit future raw-history reports.
 `cleanup_business_player_listening_history`. No data is deleted when it is applied.
 Public, anonymous and authenticated execution are revoked. RPC defaults are
 `p_enabled=false`, `p_delete_enabled=false`, batch size 500, maximum batches 20.
-The optional `p_retention_days` integer defaults to 400; SQL rejects NULL or values
-outside 30–3650 days. These bounds are configuration safeguards, not an approved
-retention policy. Duration is exact hours, independent of timezone/DST.
+The optional `p_retention_days` integer defaults to the decided 400; SQL rejects
+NULL or values outside 30–3650 days. These bounds are configuration safeguards;
+running with any value other than 400 would contradict the decision. Duration is exact hours, independent of timezone/DST.
 SQL also validates batch hard limits (1–500 and 1–20). Disabled RPC calls do not
 count or mutate history. Dry-run counts all candidates without row locks or deletes.
 
@@ -68,15 +72,15 @@ Flags accept only literal `true`:
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
-| `BUSINESS_PLAYER_RETENTION_DAYS` | 400 | Integer 30–3650; overrides the proposed period |
+| `BUSINESS_PLAYER_RETENTION_DAYS` | 400 | Integer 30–3650; leave unset (decision: 400) |
 | `BUSINESS_PLAYER_RETENTION_ENABLED` | off | Enables counting/RPC connection |
 | `BUSINESS_PLAYER_RETENTION_DELETE_ENABLED` | off | Allows deletion when also enabled; requires Sergey's confirmation |
 
 `BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS = 400` is the named library default.
 Invalid values (including empty strings, fractions or out-of-range values) fail
 closed before any RPC, even when disabled. The runner logs the fixed validation
-error without echoing the supplied value. Changing the period still needs owner
-approval; configuration does not approve deletion or the proposed 400 days.
+error without echoing the supplied value. Changing the period needs a new owner
+decision; configuration never approves deletion.
 
 With both flags absent the runner logs zero counts and does not even create a
 client. It needs no credentials in this mode:
@@ -95,8 +99,8 @@ BUSINESS_PLAYER_RETENTION_DELETE_ENABLED=false \
 node --import tsx scripts/run-business-player-retention.mts
 ```
 
-Only after Sergey's decision, deletion is enabled by setting **both** flags to
-`true`. To stop deletion while retaining monitoring, set DELETE_ENABLED=false.
+Only after Sergey's separate explicit OK (the retention decision is not that OK),
+deletion is enabled by setting **both** flags to `true`. To stop deletion while retaining monitoring, set DELETE_ENABLED=false.
 To switch the job off entirely, set ENABLED=false or unset it and stop any future
 external schedule. The kill switch applies to the next invocation; changing env
 cannot cancel a transaction already running. A service-role holder can explicitly
@@ -112,6 +116,56 @@ Errors fail the process with a generic structured error, without leaking secrets
 The client request timeout is 60 seconds; it is not a guaranteed DB cancellation.
 A DB error rolls the entire RPC back; operators should recount after an ambiguous
 network failure rather than assuming a particular deletion count.
+
+## Batch size
+
+Deletion runs at most `p_max_batches` (default and hard cap 20) statements of at
+most `p_batch_size` (default and hard cap 500) rows: **≤ 10000 rows per call**.
+SQL rejects values outside 1–500 / 1–20 even from the service role. Each batch
+selects the oldest expired rows by `(last_confirmed_at, id)` with
+`FOR UPDATE SKIP LOCKED`, then deletes them with the predicate re-checked. The call
+is one transaction (one RPC); a 500-row batch keeps each statement's lock set and
+WAL burst small, and the 20-batch cap bounds the whole transaction. A backlog is
+drained by repeated bounded runs, never by raising the caps.
+
+## Read-only dry-run count (manual, authorized environment only)
+
+[`player-retention-dry-run.sql`](player-retention-dry-run.sql) runs inside
+`BEGIN TRANSACTION READ ONLY … ROLLBACK` with a 30-second statement timeout. It
+returns `cutoff`, `candidates`, `oldest_last_confirmed_at` and
+`max_deleted_by_one_run = least(candidates, 10000)`, plus a plain `EXPLAIN`
+(never `EXPLAIN ANALYZE`) of the count. Its predicate is exactly the RPC's:
+`last_confirmed_at < statement_timestamp() - 400 × 24 h`. The isolated test checks
+that its `candidates` equals the RPC dry-run (`p_enabled=true`,
+`p_delete_enabled=false`) and that no row changes. The RPC dry-run via the runner
+(ENABLED=true, DELETE_ENABLED=false) gives the same number. Neither has been run
+against any real database; running either on production needs Sergey's OK.
+
+## Index use check
+
+Before any enabled run, on the authorized target confirm the index is valid (query
+below) and that the dry-run file's `EXPLAIN` shows an `Index Only Scan` / `Index Scan`
+on `business_player_listening_history_retention_idx` with
+`Index Cond: (last_confirmed_at < …)`. With a large expired fraction PostgreSQL may
+legitimately choose a sequential scan for the one-off count; the batched `LIMIT 500`
+selection still prefers the ordered index. The isolated test requires the index in
+the batch, count and dry-run plans on a selective fixture.
+
+## Rollback
+
+[`supabase/rollbacks/20270215120000_business_player_history_retention.rollback.sql`](../../supabase/rollbacks/20270215120000_business_player_history_retention.rollback.sql)
+is not a migration and is never run by deploy. With both flags off and no external
+schedule, and only with Sergey's OK, feed it to psql **without**
+`--single-transaction`: a short transaction (`lock_timeout` 3 s) drops the RPC and
+its `schema_migrations` row, then `DROP INDEX CONCURRENTLY IF EXISTS` removes the
+index without blocking writes. It touches no history, heartbeat or playback rows.
+The migration can be re-applied afterwards (idempotent). Rows deleted by an
+enabled run cannot be restored: by decision there is no archive. Stopping deletion
+without rollback is just DELETE_ENABLED=false (or ENABLED unset).
+
+The isolated test applies the rollback, checks that only the RPC, index and
+migration row disappear (row counts unchanged), then re-applies the migration and
+re-checks privileges and index validity.
 
 ## Verification and index evidence
 
@@ -170,10 +224,11 @@ proof of a successful build. There is no automatic destructive repair here.
 
 ## Decisions and continuation
 
-Sergey: confirm 400 days, whether future annual/custom reports need an archive,
-and whether 30-day stale heartbeat removal is desirable. Then review a dry-run
-on an authorized environment and approve deletion/scheduling separately. Continue
-from that review; nothing in this task enables production deletion.
+Decided (2026-11-03): 400 days, `last_confirmed_at < cutoff` only, batched, no
+archive, heartbeats and playback state untouched. Still requires Sergey's separate
+explicit OK, each on its own: merging this PR, applying the migration (concurrent
+index build on the live table), running the read-only dry-run on production,
+registering any schedule, and enabling deletion (`DELETE_ENABLED=true`).
 
 ## Task validation record
 
@@ -222,3 +277,13 @@ changes, scheduling, commit, push or deploy. Owner decisions remain pending:
 400 days, archive yes/no, and removal of heartbeats older than 30 days.
 Continue with coordinator diff review, then separately authorized isolated SQL
 validation and the owner's policy decisions before any migration application.
+
+## Decision alignment validation (2026-11-03)
+
+Migration renumbered to `20270215120000` (main took `20270211120000`); planner
+expectations and the anonymous-RLS snapshot (one new `GRANT EXECUTE … TO
+service_role`) updated. Added the read-only dry-run file, the rollback file and
+their unit/isolated checks. Locally: retention unit, migration planner unit,
+duplicate-version unit and anonymous-RLS audit PASS. The isolated PostgreSQL
+harness (private temporary cluster, synthetic rows) now also runs in the Business
+validation CI job. No real database was accessed.

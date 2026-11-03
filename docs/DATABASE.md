@@ -2377,7 +2377,7 @@ The migration plan expectation lists and normalize SQL contract checks cover
 this forward migration. Application requires the migration and updated workers
 before accepting these uploads. No production operation was performed.
 
-## Business player listening history retention (f381f92b, proposal)
+## Business player listening history retention (f381f92b)
 
 New forward-only migration `20270215120000_business_player_history_retention.sql`
 builds `business_player_listening_history_retention_idx (last_confirmed_at, id)`
@@ -2397,9 +2397,11 @@ dry-run counts candidates; explicitly enabled deletion is limited to 500 rows
 per batch and 20 batches per call, strictly older than the configured period
 (exact days × 24 hours) by last confirmation. Both flags must explicitly be true.
 No heartbeat or playback-state writes, scheduling or deletion on migration apply.
-**400 days is a PROPOSAL awaiting Sergey's confirmation; deletion stays disabled.**
+**Owner decision 2026-11-03: 400 days, only `last_confirmed_at < cutoff`, batched,
+no archive, heartbeats/playback state untouched. Deletion stays disabled; enabling
+it, applying the migration and scheduling need Sergey's separate OK.**
+Rollback (manual, not a migration):
+`supabase/rollbacks/20270215120000_business_player_history_retention.rollback.sql`.
+Read-only dry-run count: `docs/business/player-retention-dry-run.sql`.
 See [policy, controls and local EXPLAIN evidence](business/player-retention.md).
-The initial draft applied the migration only to an isolated synthetic local test
-cluster. Review fixes were not applied to any database; SQL parameter/reapply smoke
-coverage is prepared but not executed in this session. Owner decisions on archive
-yes/no and heartbeats older than 30 days also remain pending.
+Applied only to isolated synthetic test clusters (local/CI), never to a real database.

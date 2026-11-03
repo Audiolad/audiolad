@@ -69,4 +69,36 @@ assert.match(sql, /REVOKE ALL ON FUNCTION[^;]+FROM PUBLIC, anon, authenticated/)
 assert.match(sql, /GRANT EXECUTE ON FUNCTION[^;]+TO service_role/);
 assert.doesNotMatch(sql, /(?:DELETE FROM|UPDATE|TRUNCATE) public\.business_player_(?:playback_state|device_heartbeat)/i);
 assert.match(sql, /LIMIT p_batch_size FOR UPDATE SKIP LOCKED/);
-console.log("business player retention runner, flags, logging, migration index: PASS");
+// Owner decision 2026-11-03: 400 days, last_confirmed_at only, batches, no archive,
+// heartbeats/playback_state untouched. Recorded in SQL; deletion remains opt-in.
+assert.doesNotMatch(sql, /PROPOSAL/);
+const code = sql.replace(/--.*$/gm, "").replace(/COMMENT ON FUNCTION[\s\S]*?';/, "");
+assert.match(sql, /NO archive/);
+assert.doesNotMatch(code, /\b(?:INSERT INTO|CREATE TABLE|COPY)\b/i, "no archive table or copy of history rows");
+assert.doesNotMatch(code, /first_confirmed_at/, "first_confirmed_at is never a deletion criterion");
+assert.doesNotMatch(code, /business_player_(?:playback_state|device_heartbeat)/i, "heartbeats and playback state untouched");
+assert.match(sql, /p_enabled boolean DEFAULT false/);
+assert.match(sql, /p_delete_enabled boolean DEFAULT false/);
+assert.match(sql, /p_batch_size integer DEFAULT 500/);
+assert.match(sql, /p_max_batches integer DEFAULT 20/);
+assert.match(sql, /p_batch_size NOT BETWEEN 1 AND 500/);
+assert.match(sql, /p_max_batches NOT BETWEEN 1 AND 20/);
+assert.equal((code.match(/last_confirmed_at < cutoff/g) ?? []).length, 3, "count, selection and delete recheck share one predicate");
+assert.doesNotMatch(code, /cron|pg_cron|schedule\(/i, "no schedule registered by the migration");
+
+const rollback = readFileSync(new URL("../supabase/rollbacks/20270215120000_business_player_history_retention.rollback.sql", import.meta.url), "utf8");
+assert.match(rollback, /DROP FUNCTION IF EXISTS public\.cleanup_business_player_listening_history\(boolean, boolean, integer, integer, integer\);/);
+assert.match(rollback, /DELETE FROM supabase_migrations\.schema_migrations WHERE version = '20270215120000';/);
+assert.match(rollback, /DROP INDEX CONCURRENTLY IF EXISTS public\.business_player_listening_history_retention_idx;/);
+assert.ok(rollback.indexOf("COMMIT;") < rollback.indexOf("DROP INDEX CONCURRENTLY"), "concurrent drop runs after the transaction");
+assert.doesNotMatch(rollback.replace(/DELETE FROM supabase_migrations\.schema_migrations[^;]+;/, ""), /\b(?:DELETE|UPDATE|TRUNCATE|INSERT)\b/i, "rollback never touches data");
+
+const dryRun = readFileSync(new URL("../docs/business/player-retention-dry-run.sql", import.meta.url), "utf8");
+assert.match(dryRun, /BEGIN TRANSACTION READ ONLY;/);
+assert.match(dryRun, /ROLLBACK;\s*$/);
+assert.doesNotMatch(dryRun.replace(/^--.*$/gm, ""), /\b(?:DELETE|UPDATE|INSERT|TRUNCATE|FOR UPDATE|ANALYZE\))\b/i, "dry-run is read-only, EXPLAIN without ANALYZE");
+assert.equal((dryRun.match(/h\.last_confirmed_at < statement_timestamp\(\) - 400 \* 24 \* interval '1 hour'/g) ?? []).length, 2);
+assert.match(dryRun, /least\(count\(\*\), 500 \* 20\)/);
+// The isolated PostgreSQL harness (temporary private cluster, synthetic rows) runs in CI.
+assert.match(readFileSync(new URL("../.github/workflows/business-pr-validation.yml", import.meta.url), "utf8"), /npm run test:business-player-retention\n/);
+console.log("business player retention runner, flags, logging, migration index, decision, rollback, dry-run: PASS");

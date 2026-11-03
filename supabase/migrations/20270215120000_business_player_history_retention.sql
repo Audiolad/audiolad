@@ -1,5 +1,10 @@
--- PROPOSAL: 400 days, awaiting Sergey's confirmation. No scheduling or data deletion
--- on apply. Only the service role may opt in to a bounded cleanup run.
+-- Task f381f92b. Retention policy decided by Sergey (2026-11-03): keep 400 days of
+-- business_player_listening_history; delete only rows with last_confirmed_at < cutoff,
+-- in bounded batches; NO archive; heartbeats and playback_state are never touched.
+-- Applying this migration schedules nothing and deletes nothing: the RPC is disabled
+-- and dry-run by default, and only the service role may opt in to a bounded run.
+-- Enabling deletion is a separate operation that still needs Sergey's explicit OK.
+-- Rollback: supabase/rollbacks/20270215120000_business_player_history_retention.rollback.sql
 -- The official psql file runner does not wrap files in a transaction.
 -- Keep this statement outside BEGIN/COMMIT; see docs/business/player-retention.md
 -- for the manual invalid-index check before retrying a failed concurrent build.
@@ -61,6 +66,6 @@ REVOKE ALL ON FUNCTION public.cleanup_business_player_listening_history(boolean,
 GRANT EXECUTE ON FUNCTION public.cleanup_business_player_listening_history(boolean, boolean, integer, integer, integer)
   TO service_role;
 COMMENT ON FUNCTION public.cleanup_business_player_listening_history(boolean, boolean, integer, integer, integer) IS
-  'PROPOSAL awaiting Sergey: configurable history retention (default 400 days), disabled by default, dry-run unless explicitly opted in. Never touches heartbeat or playback state.';
+  'Task f381f92b: listening history retention, 400 days by decision (no archive). Deletes only last_confirmed_at < cutoff in bounded batches; disabled and dry-run by default. Never touches heartbeat or playback state.';
 
 COMMIT;
