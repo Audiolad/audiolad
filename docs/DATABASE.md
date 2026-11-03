@@ -2405,3 +2405,38 @@ Rollback (manual, not a migration):
 Read-only dry-run count: `docs/business/player-retention-dry-run.sql`.
 See [policy, controls and local EXPLAIN evidence](business/player-retention.md).
 Applied only to isolated synthetic test clusters (local/CI), never to a real database.
+
+### Business profile personalization (biz-profile-edit)
+
+NEEDS MIGRATION/RLS: `20270216120000_business_profile_organization.sql` is prepared,
+not applied by this task. It adds only `rename_business_organization(uuid, text)`:
+SECURITY DEFINER with fixed search_path, auth.uid(), existing
+`is_business_organization_owner`, support-mode guard, explicit authenticated EXECUTE.
+Existing SELECT policy `Business members can read own organizations` and absence of
+an authenticated table UPDATE grant remain unchanged. Managers cannot rename an org.
+No new tables or columns, no change to auth policies.
+
+`src/app/business-app/profile/actions.ts:saveBusinessProfile` uses the existing
+Supabase Auth updateUser API for `auth.users.raw_user_meta_data.first_name` and the
+new RPC for `public.business_organizations.name`. Both client and server trim and
+validate: owner name up to 80 Unicode code points, organization up to 120; angle
+brackets and Unicode control/format characters are rejected. Empty owner name is
+stored as an explicit empty string, suppressing full-name/email fallback in greetings.
+Empty organization is stored as `Моя кофейня` to preserve the NOT NULL/nonempty
+contract; that default is only a placeholder in the profile input. No display changes
+elsewhere. Organization and Auth writes are separate transactions: organization is
+saved first; an Auth failure reports the possible partial save and allows retry.
+The client calls router.refresh() to update the layout domain provider and greetings
+without remounting the persistent player. Venue name editing stays at `/preferences`.
+
+The profile subscription block reuses useBusinessHomePay, businessGiftPriceNote and
+existing checkout/return URL. Its counter compares calendar dates in the venue zone
+(ceil, with Moscow fallback for invalid legacy zones), never elapsed 24-hour periods.
+An expired instant is ended, even on the same calendar date. Future end dates on today's
+calendar date show the last-day copy. Existing activation in
+`20270205130000_business_subscription_payment.sql`, lines 670–688, uses the latest
+of payment confirmation, gift end and paid_until, then adds 30 days. No payment,
+price, gift duration or webhook behavior is changed.
+
+Continuation: review/apply the new migration separately, then verify saving, greetings,
+terms gating and uninterrupted audio with an authorized test account in a browser.

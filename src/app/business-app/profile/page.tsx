@@ -10,6 +10,10 @@ import SignOutForm from "@/components/auth/SignOutForm";
 import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
+import BusinessProfileSubscription from "@/components/business-app/profile/BusinessProfileSubscription";
+import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
+import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +32,13 @@ export default async function BusinessProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
   const email = user?.email?.trim() || null;
+
+  const meta = user?.user_metadata ?? {};
+  const ownerName = extractBusinessFirstName({ metadataFirstName: meta.first_name, fullName: meta.full_name });
+  const { data: membership } = domain.status === "authenticated" && domain.organizationId && user
+    ? await supabase.from("business_organization_members").select("role")
+      .eq("organization_id", domain.organizationId).eq("user_id", user.id).maybeSingle()
+    : { data: null };
 
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-profile">
@@ -49,21 +60,12 @@ export default async function BusinessProfilePage() {
         </section>
       ) : (
         <section className="business-app-card space-y-3">
+          <BusinessProfileForm ownerName={ownerName} organizationName={domain.organizationName} canEditOrganization={membership?.role === "owner"} />
           <dl className="space-y-2 text-sm">
-            <div>
-              <dt className="text-[var(--biz-text-muted)]">Имя</dt>
-              <dd className="font-semibold text-[var(--biz-text)]">{domain.owner.firstName}</dd>
-            </div>
             {email ? (
               <div>
                 <dt className="text-[var(--biz-text-muted)]">Почта</dt>
                 <dd className="font-semibold text-[var(--biz-text)]">{email}</dd>
-              </div>
-            ) : null}
-            {domain.organizationName ? (
-              <div>
-                <dt className="text-[var(--biz-text-muted)]">Организация</dt>
-                <dd className="font-semibold text-[var(--biz-text)]">{domain.organizationName}</dd>
               </div>
             ) : null}
             {domain.location ? (
@@ -71,17 +73,18 @@ export default async function BusinessProfilePage() {
                 <div>
                   <dt className="text-[var(--biz-text-muted)]">Кофейня</dt>
                   <dd className="font-semibold text-[var(--biz-text)]">{domain.location.name}</dd>
+                  <dd><Link className="underline" href="/preferences">Изменить в управлении кофейней</Link></dd>
                 </div>
                 {domain.location.businessCategory ? (
                   <div>
                     <dt className="text-[var(--biz-text-muted)]">Направление</dt>
-                    <dd className="font-semibold text-[var(--biz-text)]">{domain.location.businessCategory}</dd>
+                    <dd className="font-semibold text-[var(--biz-text)]">{businessKindLabel(domain.location.businessCategory)}</dd>
                   </div>
                 ) : null}
                 {domain.location.timezone ? (
                   <div>
                     <dt className="text-[var(--biz-text-muted)]">Часовой пояс</dt>
-                    <dd className="font-semibold text-[var(--biz-text)]">{domain.location.timezone}</dd>
+                    <dd className="font-semibold text-[var(--biz-text)]">{businessTimezoneLabel(domain.location.timezone)}</dd>
                   </div>
                 ) : null}
               </>
@@ -99,6 +102,7 @@ export default async function BusinessProfilePage() {
               </Link>
             </p>
           )}
+          <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()} />
           <SignOutForm action={signOut}>
             <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
               Выйти
