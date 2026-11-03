@@ -152,6 +152,7 @@ assert.match(banner, /await runHallAuthExclusive\(async \(\) => \{/);
 assert.match(banner, /cabinet\.hallDeviceRevoked \? \([\s\S]*?action: "forget-revoked"[\s\S]*?Забыть устройство/, "permanent forget only by an explicit button");
 assert.match(server, /const \{ error \} = await createServiceRoleClient\(\)\.auth\.admin\.signOut\(jwt, "local"\);\n\s*if \(error\)/);
 assert.match(read("src/app/business-app/layout.tsx"), /businessPointReports\(cabinet\) && cabinet\.deviceStatus === "alive"/, "only a live device reports");
+assert.match(read("src/lib/business-app/hall-auth-lock.ts"), /locks\.request\(LOCK_NAME, \{ mode: "exclusive" \}/, "cleanup and sign-in serialized across tabs");
 const workspaceLoad = read("src/lib/business-workspace/load.server.ts");
 assert.equal((workspaceLoad.match(/if \(await businessHallDeviceLocked\(\)\) return/g) ?? []).length, 2, "workspace page and actor: no account fallback on the hall device");
 assert.match(read("src/app/api/business/guest-start/route.ts"), /async function handle\(request: Request\) \{\n[\s\S]{0,200}if \(await businessHallDeviceLocked\(\)\)/, "no new venue from the hall device, before any sign-in");
