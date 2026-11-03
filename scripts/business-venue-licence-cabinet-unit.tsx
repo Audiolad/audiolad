@@ -253,7 +253,7 @@ function modalStackBehaviour() {
     const overlay = { ...node(name), contains: (n: unknown) => n === a || n === b };
     host.children[host.children.length - 1] = overlay;
     const card = { contains: (n: unknown) => n === a || n === b, querySelectorAll: () => [a, b] };
-    const entry: ModalEntry = { overlay: () => overlay, card: () => card, close: () => closed.push(name), previous: doc.activeElement as { focus(): void } | null };
+    const entry: ModalEntry = { overlay, card, close: () => closed.push(name), previous: doc.activeElement as { focus(): void } | null };
     return { overlay, a, b, entry };
   };
   const opener = focusable("opener");
@@ -278,9 +278,10 @@ function modalStackBehaviour() {
   press("Escape");
   assert.deepEqual(closed, ["B"], "Escape closes only the top dialog");
   // Close the lower one first: state must stay locked while B is open.
-  closeModal(doc, A.entry);
+  // As in React: A's nodes are removed (and its refs cleared) before the effect cleanup runs.
   A.a.isConnected = false;
   A.b.isConnected = false;
+  closeModal(doc, A.entry);
   assert.equal(doc.body.style.overflow, "hidden");
   assert.equal(app.inert, true);
   assert.equal(doc.activeElement, B.a, "closing a lower dialog does not steal focus");

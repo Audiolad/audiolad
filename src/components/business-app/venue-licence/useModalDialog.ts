@@ -29,8 +29,9 @@ export type ModalDocument = {
 };
 
 export type ModalEntry = {
-  overlay: () => OverlayNode | null;
-  card: () => CardNode | null;
+  /** Captured on open: React clears refs before passive effect cleanup runs. */
+  overlay: OverlayNode | null;
+  card: CardNode | null;
   close: () => void;
   previous: FocusTarget | null;
 };
@@ -52,7 +53,7 @@ function isInertNode(node: unknown): node is InertNode {
 function applyInert(stack: ModalStack): void {
   for (const el of stack.inerted) el.inert = false;
   stack.inerted = [];
-  const overlay = stack.entries.at(-1)?.overlay();
+  const overlay = stack.entries.at(-1)?.overlay;
   const parent = overlay?.parentElement;
   if (!parent) return;
   for (const el of Array.from(parent.children)) {
@@ -77,7 +78,7 @@ function getStack(doc: ModalDocument): ModalStack {
           top.close();
           return;
         }
-        const card = top.card();
+        const card = top.card;
         if (event.key !== "Tab" || !card) return;
         const focusable = Array.from(card.querySelectorAll("button:not([disabled]), a[href]"));
         if (focusable.length === 0) return;
@@ -121,7 +122,7 @@ export function closeModal(doc: ModalDocument, entry: ModalEntry): void {
   // A dialog opened from inside this one must not restore focus into it once
   // it is gone: hand over this dialog's own opener instead.
   const above = stack.entries[index + 1];
-  const removedOverlay = entry.overlay();
+  const removedOverlay = entry.overlay;
   if (above && above.previous && removedOverlay?.contains?.(above.previous)) above.previous = entry.previous;
   stack.entries.splice(index, 1);
   applyInert(stack);
@@ -145,8 +146,8 @@ export function useModalDialog(
 
   useEffect(() => {
     const entry: ModalEntry = {
-      overlay: () => overlayRef.current,
-      card: () => cardRef.current,
+      overlay: overlayRef.current,
+      card: cardRef.current,
       close: () => onCloseRef.current(),
       previous: document.activeElement as HTMLElement | null,
     };
