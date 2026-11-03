@@ -52,7 +52,10 @@ function testLibraryContract() {
     "counter id from env var",
   );
   assert(!library.includes("110799004"), "counter id is not hardcoded");
-  assert(library.includes("webvisor: true"), "webvisor enabled");
+  assert(
+    library.includes("webvisor: !isBusinessAnalyticsHost(window.location.hostname)"),
+    "webvisor on audiolad.ru, off in the Business cabinet",
+  );
   assert(library.includes("clickmap: true"), "clickmap enabled");
   assert(library.includes("trackLinks: true"), "trackLinks enabled");
   assert(library.includes("accurateTrackBounce: true"), "accurateTrackBounce enabled");
