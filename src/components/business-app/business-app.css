@@ -734,81 +734,48 @@
   min-height: 48px;
 }
 
-.business-app-owner-signals {
+/* Главная «С чего начать» (03.11.2026): numbered steps, a green mark when a step is done. */
+.business-app-steps {
   display: grid;
   gap: 0.75rem;
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
-.business-app-owner-signals li {
-  border-radius: 12px;
-  background: var(--biz-bg);
-  padding: 0.75rem;
-  color: var(--biz-text);
+.business-app-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--biz-border);
+  background: var(--biz-surface);
+  padding: 0.9rem;
 }
 
-.business-app-owner-signals li[data-tone="ok"] {
+.business-app-step[data-done="true"] {
   background: var(--biz-green-bg);
+  border-color: transparent;
 }
 
-.business-app-owner-signals li[data-tone="error"] {
-  background: var(--biz-red-bg);
-  color: var(--biz-red-ink);
-}
-
-.business-app-owner-signals p {
-  margin-top: 0.25rem;
+.business-app-step-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 2px solid var(--biz-border);
   color: var(--biz-text-muted);
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
-.business-app-owner-disabled {
-  color: var(--biz-text-muted);
-  box-shadow: none;
-}
-
-.business-app-owner-disabled :disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.business-app-owner-compact-status {
-  border-radius: 12px;
-  background: var(--biz-bg);
-  padding: 0.75rem;
-  color: var(--biz-text);
-}
-
-.business-app-owner-compact-status[data-tone="ok"] {
-  background: var(--biz-green-bg);
-}
-
-.business-app-owner-compact-status[data-tone="error"] {
-  background: var(--biz-red-bg);
-  color: var(--biz-red-ink);
-}
-
-.business-app-owner-signal-details summary {
-  display: list-item;
-  min-height: 48px;
-  align-content: center;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.business-app-owner-desktop-signals {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .business-app-owner-compact-status {
-    display: none;
-  }
-
-  .business-app-owner-desktop-signals {
-    display: grid;
-  }
+.business-app-step-mark[data-done="true"] {
+  background: var(--biz-play);
+  border-color: var(--biz-play);
+  color: var(--biz-on-play);
 }
 
 /* Thin cabinet bar: one row above the mobile nav, beside the desktop sidebar. */

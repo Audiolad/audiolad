@@ -34,7 +34,9 @@ export default async function BusinessAppSettingsPage({
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-player-settings">
       <header>
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{locationId && !pointDevice ? "Управление кофейней" : "Настройка"}</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">Звучание плеера в этом кабинете.</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
+          {locationId && !pointDevice ? "Музыка в зале, название кофейни и устройство у колонки." : "Звучание плеера в этом кабинете."}
+        </p>
       </header>
       {locationId && !pointDevice ? (
         // Owner phone: the picker opens right under «Изменить звучание», not further down the page.

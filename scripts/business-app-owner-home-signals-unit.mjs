@@ -112,8 +112,9 @@ assert.doesNotMatch(home, /BUSINESS_HOME_MOCK|mock-data/);
 assert.doesNotMatch(home, /Всё работает|Лицензия активна|Документы в порядке|Всё под контролем/);
 assert.doesNotMatch(home, /Интернет работает|Соединение стабильно|Музыка остановилась/);
 assert.doesNotMatch(home, /Сейчас играет|progressbar|Пропустить/);
-assert.match(home, /Лицензия: нет подтверждённых данных/);
-assert.match(home, /buildBusinessHomeStatusCopy/);
+// Главная «С чего начать» (03.11.2026): the music step is marked from real signals only.
+assert.match(home, /businessHomeMusicDone\(\{ playback, lastPlayMinutesAgo: signals\?\.lastPlayMinutesAgo \}\)/);
+assert.doesNotMatch(home, /Лицензия: нет подтверждённых данных|buildBusinessHomeStatusCopy/);
 assert.doesNotMatch(home, /useState/);
 assert.doesNotMatch(home, /initialState/);
 assert.doesNotMatch(home, /BUSINESS_HOME_MOCK\.stoppedMinutes/);

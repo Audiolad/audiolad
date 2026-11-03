@@ -7,10 +7,9 @@ import { useBusinessHostname, useBusinessDomain } from "@/components/business-ap
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
+import BusinessHomeChecklist from "@/components/business-app/BusinessHomeChecklist";
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
-import { POINT_PAIRING_ANCHOR_ID } from "@/components/business-app/PointPairingCard";
-import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
@@ -18,10 +17,9 @@ import {
   buildBusinessGreeting,
   buildBusinessGreetingSubtitle,
 } from "@/lib/business-app/greeting";
+import { buildBusinessHomeSteps, businessHomeMusicDone } from "@/lib/business-app/home-checklist";
 import {
-  deriveOwnerOverallStatus,
   deriveOwnerPlaybackSignal,
-  type OwnerPlaybackSignal,
   type OwnerPlaybackSignalInput,
   type BusinessOwnerHomeSignals,
 } from "@/lib/business-app/owner-home-signals";
@@ -29,90 +27,6 @@ import {
 import {
   ageOwnerHomeSignals,
 } from "@/lib/business-app/owner-home-live-refresh";
-import {
-  buildBusinessHomeStatusCopy,
-  formatBusinessAge,
-} from "@/lib/business-app/owner-home-status-copy";
-
-function StatusBanner({
-  locationName,
-  signals,
-  playback,
-}: {
-  locationName: string;
-  signals: BusinessOwnerHomeSignals | null;
-  playback: OwnerPlaybackSignal;
-}) {
-  const hb = buildBusinessHomeStatusCopy(signals);
-  const overall = deriveOwnerOverallStatus(hb, playback);
-  const signalItems = (
-    <>
-      <li data-tone={hb.tone}>
-        <strong>{hb.title}</strong>
-        <p>{hb.detail}</p>
-      </li>
-      <li data-tone={playback.tone}>
-        <strong>{playback.title}</strong>
-        {playback.kind === "error" ? (
-          <p>
-            <Link href="/player" data-testid="biz-point-player-link">Откройте плеер кофейни</Link>
-            {" или "}
-            <Link href="/help" data-testid="biz-point-support-link">обратитесь в поддержку</Link>.
-          </p>
-        ) : (
-          <p>{playback.detail}</p>
-        )}
-      </li>
-    </>
-  );
-  const checkedAge = hb.kind !== "no_data"
-    ? formatBusinessAge((signals?.secondsSinceHeartbeat ?? 0) / 60)
-    : null;
-  return (
-    <section
-      className="business-app-card"
-      aria-live="polite"
-      data-testid="owner-home-status"
-    >
-      <h2 className="text-[1.35rem] font-bold leading-tight text-[var(--biz-text)]">
-        {locationName}
-      </h2>
-      <p className="mt-1 text-sm text-[var(--biz-text-muted)]">
-        {checkedAge ? `Последний сигнал от плеера: ${checkedAge}` : "Последний сигнал от плеера: нет данных"}
-      </p>
-      <div className="business-app-owner-compact-status mt-4" data-tone={overall.tone}>
-        <strong data-testid="owner-home-overall-status">{overall.title}</strong>
-        <details className="business-app-owner-signal-details">
-          <summary className="business-app-focus-ring">Подробнее</summary>
-          <ul className="business-app-owner-signals" aria-label="Сигналы кофейни">
-            {signalItems}
-          </ul>
-        </details>
-      </div>
-      <ul className="business-app-owner-signals business-app-owner-desktop-signals mt-4" aria-label="Сигналы кофейни">
-        {signalItems}
-      </ul>
-      <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
-        Лицензия: нет подтверждённых данных
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <a
-          href="/music"
-          className="business-app-btn business-app-btn-primary business-app-focus-ring"
-        >
-          Открыть музыку
-        </a>
-        <Link
-          href="/help"
-          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-        >
-          Проверить работу музыки
-        </Link>
-      </div>
-    </section>
-  );
-}
-
 /**
  * The /spa player reports live state (part B). Its last-seen time is a connectivity
  * heartbeat too; use whichever heartbeat is fresher. Never implies sound.
@@ -146,14 +60,17 @@ export function livePlaybackInput(signals: BusinessOwnerHomeSignals | null): Own
 }
 
 export type BusinessHomePageProps = {
-  currentTrack?: { title: string; coverUrl?: string } | null;
   /** Part B only: no live server confirmation source is connected in Part A. */
   playbackConfirmation?: OwnerPlaybackSignalInput;
-  /** Owner permission for the venue device. Missing row stays allowed. */
-  pointCanEdit?: boolean;
+  /** A device in the hall is paired with the venue (server read); null when unknown. */
+  pointLinked?: boolean | null;
 };
 
-export default function BusinessHomePage({ currentTrack, playbackConfirmation, pointCanEdit = true }: BusinessHomePageProps = {}) {
+/**
+ * Главная (Sergey, 03.11.2026): a short «С чего начать» checklist. Each step sends the owner to
+ * the tab that does it. Venue controls live only on «Настройка».
+ */
+export default function BusinessHomePage({ playbackConfirmation, pointLinked = null }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
   const hostname = useBusinessHostname();
   const pointMode = usePointMode();
@@ -184,9 +101,11 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
   const playback = deriveOwnerPlaybackSignal(
     playbackConfirmation ?? livePlaybackInput(signals),
   );
-  const shownTrack: { title: string; coverUrl?: string } | null =
-    currentTrack ?? signals?.currentTrack ?? null;
-  const lastPlayAge = formatBusinessAge(signals?.lastPlayMinutesAgo ?? null);
+  const steps = buildBusinessHomeSteps({
+    musicDone: businessHomeMusicDone({ playback, lastPlayMinutesAgo: signals?.lastPlayMinutesAgo }),
+    deviceLinked: pointLinked,
+    pointMode,
+  });
 
   if (domain.status === "anonymous") {
     return (
@@ -263,10 +182,10 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
   // at the top of the page and not only far below.
   const venueSide = pointMode || entry === "venue";
   const title = venueSide ? locationName || "Кофейня" : greeting;
-  const lead = venueSide ? "Что звучит в зале, управление музыкой и устройство у колонки." : subtitle;
+  const lead = venueSide ? "Что сделать, чтобы музыка играла в зале." : subtitle;
 
   return (
-    <div className="mx-auto max-w-6xl" data-testid="biz-home" data-entry={venueSide ? "venue" : "person"}>
+    <div className="mx-auto max-w-3xl" data-testid="biz-home" data-entry={venueSide ? "venue" : "person"}>
       <header className="mb-5">
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]" data-testid="biz-home-title">
           {title}
@@ -275,72 +194,9 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
           {lead}
         </p>
       </header>
-
-      {pointMode || entry === "venue" ? null : <BusinessHomeAccessCard />}
-      <div className="business-app-home-grid business-app-owner-home">
-        <div className="business-app-home-stack">
-          <StatusBanner locationName={locationName || "Кофейня"} signals={signals} playback={playback} />
-          {!pointMode && domain.location ? (
-            <section className="business-app-card space-y-3" data-testid="biz-home-device-cta">
-              <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Устройство у колонки</h2>
-              <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-                Планшет, компьютер или телефон в кофейне. Получите код и отправьте ссылку на устройство – в мессенджер, по почте или через код для камеры.
-              </p>
-              <a
-                href={`#${POINT_PAIRING_ANCHOR_ID}`}
-                className="business-app-btn business-app-btn-primary business-app-focus-ring"
-                data-testid="biz-home-device-connect"
-              >
-                Подключить устройство в зале
-              </a>
-            </section>
-          ) : null}
-          <section className="business-app-card" aria-labelledby="playback-data-title">
-            <h2 id="playback-data-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
-              Сейчас звучит
-            </h2>
-            {playback.kind === "confirmed" && shownTrack ? (
-              <div className="mt-4 flex items-center gap-4">
-                {shownTrack.coverUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element -- optional real player artwork
-                  <img src={shownTrack.coverUrl} alt={`Обложка «${shownTrack.title}»`} width={72} height={72} className="rounded-xl object-cover" />
-                )}
-                <p className="font-semibold text-[var(--biz-text)]">{shownTrack.title}</p>
-              </div>
-            ) : (
-              <p className="mt-3 text-[var(--biz-text-muted)]">
-                Название трека появится, когда плеер сообщит, что музыка играет.
-              </p>
-            )}
-            {lastPlayAge && (
-              <p className="mt-3 text-sm text-[var(--biz-text-muted)]">
-                Последнее воспроизведение: {lastPlayAge}.
-              </p>
-            )}
-          </section>
-          {pointMode ? <PointDeviceControls /> : null}
-          {!pointMode && entry === "person" && domain.location ? (
-            <>
-              <section className="business-app-card space-y-3" data-testid="biz-listen-local">
-                <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Слушать у себя</h2>
-                <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-                  Звучит только на этом телефоне и не меняет зал.
-                </p>
-                <a href="/music" className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-listen-local-open">
-                  Слушать у себя
-                </a>
-              </section>
-              <VenueControlPanel
-                locationId={domain.location.id}
-                locationName={locationName || "Кофейня"}
-                pointCanEdit={pointCanEdit}
-              />
-            </>
-          ) : null}
-          {!pointMode && entry === "venue" && domain.location ? (
-            <VenueControlPanel locationId={domain.location.id} locationName={locationName || "Кофейня"} pointCanEdit={pointCanEdit} />
-          ) : null}
-        </div>
+      <div className="business-app-owner-home space-y-4">
+        <BusinessHomeChecklist steps={steps} showAccess={!venueSide} />
+        {pointMode ? <PointDeviceControls /> : null}
       </div>
     </div>
   );

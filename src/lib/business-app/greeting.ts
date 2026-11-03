@@ -27,5 +27,5 @@ export function buildBusinessGreeting(
 }
 
 export function buildBusinessGreetingSubtitle(): string {
-  return "Состояние вашей кофейни и последние данные.";
+  return "Кофейня подключена. Дальше – несколько шагов.";
 }

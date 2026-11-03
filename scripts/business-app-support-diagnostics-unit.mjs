@@ -147,7 +147,7 @@ const home = readFileSync(
   join(repoRoot, "src/components/business-app/BusinessHomePage.tsx"),
   "utf8",
 );
-assert.match(home, /href="\/help"/);
+// Главная «С чего начать» (03.11.2026): diagnostics stay on the profile, not on the checklist.
 assert.doesNotMatch(home, /Диагностика расширится в P1-07/);
 
 console.log("business-app-support-diagnostics-unit: ok");
