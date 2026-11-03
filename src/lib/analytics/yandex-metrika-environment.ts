@@ -1,3 +1,4 @@
+import { isBusinessHostname } from "@/lib/business-app/host";
 import { isMaxHostname } from "@/lib/max/host";
 import { isAccessTokenAnalyticsRoute } from "@/lib/products/access-links";
 
@@ -21,6 +22,25 @@ export function isAdminAnalyticsRoute(pathname: string | null | undefined): bool
     normalized === ADMIN_ROUTE_PREFIX ||
     normalized.startsWith(`${ADMIN_ROUTE_PREFIX}/`)
   );
+}
+
+/**
+ * Business cabinet screens that never load Metrika: client documents (legal entity
+ * details), the paired venue device and the one-time sign-in handoff.
+ */
+const BUSINESS_NO_ANALYTICS_PREFIXES = ["/documents", "/point", "/player", "/coffee-handoff"];
+
+export function isBusinessNoAnalyticsRoute(pathname: string | null | undefined): boolean {
+  const normalized = (pathname?.trim() || "/").replace(/^\/business-app(?=\/|$)/, "") || "/";
+  return BUSINESS_NO_ANALYTICS_PREFIXES.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+  );
+}
+
+/** Business hosts (business./coffee.audiolad.ru): no Webvisor session recording. */
+export function isBusinessAnalyticsHost(hostname?: string | null): boolean {
+  const normalized = resolveAnalyticsHostname(hostname);
+  return normalized.length > 0 && isBusinessHostname(normalized);
 }
 
 export function isNonProductionAnalyticsHost(hostname: string | null | undefined): boolean {
@@ -82,6 +102,10 @@ export function shouldEnableYandexMetrika(input?: {
 
   // MAX Mini App WebView: do not load Yandex Metrika. Host-based, not pathname.
   if (isMaxYandexAnalyticsHost(hostname)) {
+    return false;
+  }
+
+  if (isBusinessHostname(hostname) && isBusinessNoAnalyticsRoute(input?.pathname)) {
     return false;
   }
 
