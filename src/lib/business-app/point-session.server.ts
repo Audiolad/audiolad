@@ -1,23 +1,45 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { BUSINESS_POINT_COOKIE, isPointToken } from "@/lib/business-app/point-session";
 import { createClient } from "@/lib/supabase/server";
 
-/** True only when this browser holds a live venue-device cookie. */
-export async function businessPointSessionAlive(): Promise<boolean> {
+/**
+ * The venue-device cookie of this browser: none, alive, revoked (or expired), or unknown when the
+ * check itself failed. One RPC per request.
+ */
+export type BusinessPointDeviceStatus = "none" | "alive" | "revoked" | "unknown";
+
+export const businessPointDeviceStatus = cache(async function businessPointDeviceStatus(): Promise<BusinessPointDeviceStatus> {
   const jar = await cookies();
   const token = jar.get(BUSINESS_POINT_COOKIE)?.value;
-  if (!isPointToken(token)) return false;
+  if (!isPointToken(token)) return "none";
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("business_point_session_alive", { p_token: token });
-    if (error) return false;
-    return data === true;
+    if (error || typeof data !== "boolean") return "unknown";
+    return data ? "alive" : "revoked";
   } catch {
-    return false;
+    return "unknown";
   }
+});
+
+/** True only when this browser holds a live venue-device cookie (player reports, device screens). */
+export async function businessPointSessionAlive(): Promise<boolean> {
+  return (await businessPointDeviceStatus()) === "alive";
+}
+
+/**
+ * Guards fail closed: any device cookie on this browser counts as the hall device – alive, revoked
+ * from the owner's phone, or not checked because the lookup failed. Only the owner's fresh password
+ * (and then «forget-revoked» in the point route) or «Отключить это устройство» removes it, so neither
+ * a failed lookup nor a remote revoke turns a hall browser with an old account session into the
+ * owner cabinet.
+ */
+export async function businessHallDeviceCookie(): Promise<boolean> {
+  return (await businessPointDeviceStatus()) !== "none";
 }
 
 /** Atmosphere permission for this device. Missing row stays allowed. */

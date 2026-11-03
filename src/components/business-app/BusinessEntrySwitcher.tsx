@@ -4,10 +4,12 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import { usePathname, useRouter } from "next/navigation";
 
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
-import { businessAuthHref } from "@/lib/access-grants/paths";
 import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
-import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
+import Link from "next/link";
+
+import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
+import { BUSINESS_OWNER_UNLOCK_PATH } from "@/lib/business-app/cabinet-mode";
 import { businessEntrySwitchAction, type BusinessEntry } from "@/lib/business-app/live-refresh";
 import {
   BUSINESS_OWNER_NAME_PLACEHOLDER,
@@ -35,7 +37,9 @@ type EntryOption = {
 export default function BusinessEntrySwitcher() {
   const domain = useBusinessDomain();
   const hostname = useBusinessHostname();
-  const point = usePointMode();
+  const cabinet = useBusinessCabinetMode();
+  // The hall device (also while the owner unlock lasts): no preview switch on it.
+  const point = cabinet.pointReports;
   const { entry, setEntry } = useBusinessEntry();
   const router = useRouter();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
@@ -66,6 +70,23 @@ export default function BusinessEntrySwitcher() {
     if (open) listRef.current?.focus();
   }, [open]);
 
+  if (cabinet.mode === "point") {
+    // Hall device: the venue name and the way into the owner cabinet (password again, cabinet-mode.ts).
+    const next = pathname && pathname !== "/" ? `?next=${encodeURIComponent(pathname)}` : "";
+    return (
+      <div className="business-entry-switcher business-entry-switcher--point" data-testid="biz-entry-switcher" data-mode="point">
+        <span className="business-entry-switcher__value" data-testid="biz-point-venue">{cabinet.pointVenueName || "Кофейня"}</span>
+        <Link
+          href={`${BUSINESS_OWNER_UNLOCK_PATH}${next}`}
+          className="business-entry-switcher__owner-link business-app-focus-ring"
+          data-testid="biz-owner-unlock-link"
+        >
+          Кабинет владельца
+        </Link>
+      </div>
+    );
+  }
+
   if (domain.status !== "authenticated" || !domain.location) return null;
 
   /**
@@ -86,8 +107,8 @@ export default function BusinessEntrySwitcher() {
 
   const person = domain.owner.firstName.trim();
   const venue = domain.location.name.trim() || "Кофейня";
-  const personOn = !point && entry === "person";
-  const venueOn = point || entry === "venue";
+  const personOn = point || entry === "person";
+  const venueOn = !point && entry === "venue";
 
   /**
    * No name yet: the row reads «Ваше имя» and opens «Профиль» with the name field focused,
@@ -109,10 +130,6 @@ export default function BusinessEntrySwitcher() {
       testId: "biz-entry-person",
       selected: personOn,
       onSelect: () => {
-        if (point) {
-          setHint("Войдите со своего телефона. Это устройство только играет музыку в зале.");
-          return;
-        }
         setHint(null);
         if (!person) return openNameField();
         switchTo("person");
@@ -121,11 +138,17 @@ export default function BusinessEntrySwitcher() {
     {
       id: "venue",
       label: venue,
+      // Owner phone: the venue side is a preview of the hall device menu (same table, no reports).
+      ariaLabel: `${venue} – как видит точка`,
       testId: "biz-entry-venue",
       selected: venueOn,
       onSelect: () => {
+        if (point) {
+          setHint("Это устройство в зале. Чтобы вернуть его в режим точки, нажмите «Вернуть режим точки».");
+          return;
+        }
         setHint(null);
-        if (!point) switchTo("venue");
+        switchTo("venue");
       },
     },
   ];
@@ -262,8 +285,7 @@ export default function BusinessEntrySwitcher() {
       ) : null}
       {hint ? (
         <p className="business-entry-switcher__hint" role="status" data-testid="biz-entry-hint">
-          {hint}{" "}
-          <a href={businessAuthHref(hostname, "sign-in")}>Войти</a>
+          {hint}
         </p>
       ) : null}
     </div>

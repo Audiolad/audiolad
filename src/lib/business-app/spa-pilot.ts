@@ -1,5 +1,6 @@
 import "server-only";
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { parseBusinessEligibilityPayload } from "@/lib/business-app/eligibility";
 
 import { resolveMusicListenSource } from "@/lib/listen/music-delivery";
@@ -42,6 +43,8 @@ export function isUuid(value: unknown): value is string {
 
 /** null = not logged in or not on the pilot allowlist (page must look absent). */
 export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
+  // The hall device plays its own venue through the device session, never an account's pilot page.
+  if (await businessHallDeviceLocked()) return null;
   const supabase = await createClient();
   const {
     data: { user },

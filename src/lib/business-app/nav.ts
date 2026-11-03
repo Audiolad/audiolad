@@ -87,6 +87,28 @@ export const BUSINESS_MOBILE_NAV_ITEMS: readonly BusinessNavItem[] = [
   ...BUSINESS_SECONDARY_NAV_ITEMS,
 ] as const;
 
+/** «Помощь» is a section of the hall device menu (cabinet-mode.ts); the owner reaches it from «Профиль». */
+export const BUSINESS_HELP_NAV_ITEM: BusinessNavItem = {
+  id: "help",
+  title: "Помощь",
+  href: "/help",
+  icon: "help",
+  available: true,
+  requires: "everyone",
+};
+
+const BUSINESS_NAV_ITEMS_BY_ID: Readonly<Record<string, BusinessNavItem>> = Object.fromEntries(
+  [...BUSINESS_MOBILE_NAV_ITEMS, BUSINESS_HELP_NAV_ITEM].map((item) => [item.id, item]),
+);
+
+/**
+ * The menu for one cabinet mode: the section ids come from the shared permission table
+ * (businessCabinetSections in cabinet-mode.ts), in that order. Nav, sidebar and pages read the same table.
+ */
+export function businessNavItemsForSections(sectionIds: readonly string[]): BusinessNavItem[] {
+  return sectionIds.map((id) => BUSINESS_NAV_ITEMS_BY_ID[id]).filter((item): item is BusinessNavItem => Boolean(item));
+}
+
 export const BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX = 232;
 export const BUSINESS_SIDEBAR_COLLAPSED_WIDTH_PX = 72;
 export const BUSINESS_SIDEBAR_STORAGE_KEY = "audiolad-business-sidebar";

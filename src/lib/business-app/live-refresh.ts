@@ -152,16 +152,21 @@ export function startBusinessLiveRefresh(
 /** Header switcher: the person (listen on this phone) or the venue (the hall). */
 export type BusinessEntry = "person" | "venue";
 
-/** UI choice only. Access is still checked on the server for every request. */
-export const BUSINESS_ENTRY_COOKIE = "al-biz-entry";
-const BUSINESS_ENTRY_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+/**
+ * UI choice only. Access is still checked on the server for every request.
+ * "venue" = the owner's preview «как видит точка». A session cookie (no Max-Age), so the next
+ * visit opens the owner's own side again. The old year-long `al-biz-entry` cookie is ignored.
+ */
+export const BUSINESS_VIEW_COOKIE = "al-biz-view";
 
 export function parseBusinessEntry(value: string | null | undefined): BusinessEntry {
   return value === "venue" ? "venue" : "person";
 }
 
 export function businessEntryCookieValue(entry: BusinessEntry, secure: boolean): string {
-  return `${BUSINESS_ENTRY_COOKIE}=${entry}; Path=/; Max-Age=${BUSINESS_ENTRY_MAX_AGE_SECONDS}; SameSite=Lax${secure ? "; Secure" : ""}`;
+  return entry === "venue"
+    ? `${BUSINESS_VIEW_COOKIE}=venue; Path=/; SameSite=Lax${secure ? "; Secure" : ""}`
+    : `${BUSINESS_VIEW_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure ? "; Secure" : ""}`;
 }
 
 /**

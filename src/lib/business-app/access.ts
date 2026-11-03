@@ -30,6 +30,8 @@ export function resolveBusinessAccess(domain: BusinessOwnerHomeContext, pointDev
 }
 
 export function isBusinessNavItemLocked(item: Pick<BusinessNavItem, "requires">, access: BusinessAccess): boolean {
+  // The hall device belongs to a venue: its menu (cabinet-mode.ts) is never locked behind connecting.
+  if (access.pointDevice) return false;
   return item.requires === "member" && access.level !== "member";
 }
 

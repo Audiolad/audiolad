@@ -11,7 +11,6 @@ import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import {
   POINT_DEVICE_PLAYER_PATH,
   businessMusicRoute,
-  pointDeviceHomeRedirect,
   pointDeviceWorkspaceAccess,
 } from "../src/lib/business-app/point-device";
 
@@ -24,13 +23,7 @@ assert.equal(businessMusicRoute({ signedIn: true, pointDevice: true }), "player"
 assert.equal(businessMusicRoute({ signedIn: true, pointDevice: false }), "player");
 assert.equal(businessMusicRoute({ signedIn: false, pointDevice: false }), "guest");
 
-// Home: the device opens its player unless the signed-in account manages this same venue.
-const venue = { locationId: "loc-a" };
-assert.equal(pointDeviceHomeRedirect(null, null), null);
-assert.equal(pointDeviceHomeRedirect(null, "loc-b"), null);
-assert.equal(pointDeviceHomeRedirect(venue, null), "/music", "no account / non-member account");
-assert.equal(pointDeviceHomeRedirect(venue, "loc-b"), "/music", "member of another venue");
-assert.equal(pointDeviceHomeRedirect(venue, "loc-a"), null, "owner of the same venue keeps Home");
+// Home on the device is the hall home (cabinet-mode.ts), whatever account is signed in; see the home check below.
 
 // Venue owner's access drives the device player; nothing ever maps to the guest «anonymous».
 assert.deepEqual(pointDeviceWorkspaceAccess({ mode: "trial", endsAt: "2026-11-28T00:00:00.000Z" }), {
@@ -63,7 +56,8 @@ assert.match(music, /businessMusicRoute\(\{ signedIn: Boolean\(user\), pointDevi
 assert.doesNotMatch(music, /if \(!user\) redirect/, "no account alone must not send a device to the guest page");
 
 const home = read("src/app/business-app/page.tsx");
-assert.match(home, /pointDeviceHomeRedirect\(await loadPointDeviceVenue\(\), locationId\)/);
+assert.match(home, /if \(cabinet\.mode === "point"\) return <BusinessHomePage pointLinked=\{null\} \/>;/);
+assert.doesNotMatch(home, /redirect\(/, "the device stays on Home, it does not jump to the player");
 
 const loader = read("src/lib/business-workspace/load.server.ts");
 const page = loader.slice(loader.indexOf("export async function loadWorkspacePage"));
@@ -103,8 +97,8 @@ assert.doesNotMatch(point, /guest\/coffee/);
 const shell = read("src/components/business-app/BusinessAppShell.tsx");
 assert.match(shell, /resolveBusinessAccess\(useBusinessDomain\(\), pointReports\)/);
 assert.match(shell, /!access\.pointDevice/);
-assert.match(read("src/components/business-app/BusinessBottomNav.tsx"), /resolveBusinessAccess\(useBusinessDomain\(\), pointMode\)/);
-assert.match(read("src/components/business-app/BusinessSidebar.tsx"), /resolveBusinessAccess\(domain, pointMode\)/);
+assert.match(read("src/components/business-app/BusinessBottomNav.tsx"), /resolveBusinessAccess\(useBusinessDomain\(\), cabinet\.side === "venue"\)/);
+assert.match(read("src/components/business-app/BusinessSidebar.tsx"), /resolveBusinessAccess\(domain, cabinet\.side === "venue"\)/);
 
 for (const source of [music, home, point, deviceServer]) assert.doesNotMatch(source, /\u2014/, "en dash only");
 

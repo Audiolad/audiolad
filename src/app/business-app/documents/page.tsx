@@ -1,11 +1,13 @@
 import { headers } from "next/headers";
+import Form from "next/form";
 import Link from "next/link";
 
 import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
-import { getHostnameFromHeaders, venueLicencePublicUrl } from "@/lib/business-app/host";
+import { getHostnameFromHeaders, isVenueLicencePublicId, venueLicencePublicUrl } from "@/lib/business-app/host";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import InspectorContactCard from "@/components/business-app/InspectorContactCard";
+import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
 
 import {
@@ -18,8 +20,11 @@ import {
   formatVenueZoneRu,
 } from "@/lib/business-app/client-documents";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
-import { loadPlaybackReport } from "@/lib/business-app/load-playback-report";
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { businessCabinetCan, type BusinessCabinetMode } from "@/lib/business-app/cabinet-mode";
+import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
+import { loadPlaybackReport, type PlaybackReportVenue } from "@/lib/business-app/load-playback-report";
+import { loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
+import { isVenueLicencePublicEnabled } from "@/lib/business-app/venue-licence/flag";
 import { loadOwnVenueSticker } from "@/lib/business-app/venue-licence/sticker-access.server";
 
 export const dynamic = "force-dynamic";
@@ -32,12 +37,25 @@ function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** The venue's own QR sticker. It lives only here, not in «Управление кофейней». Not on a device in the hall. */
-async function loadDocumentsSticker() {
-  if (await businessPointSessionAlive()) return null;
+/**
+ * The venue's QR for the inspector card, and whether this page may offer the sticker download.
+ * Owner and preview: the owner's own venue, checked with the owner's session.
+ * Hall device: the paired venue, read on the server from the device cookie (point-device.server.ts),
+ * so the QR shows with no account on the device. The sticker download stays with the owner.
+ */
+async function loadDocumentsQr(mode: BusinessCabinetMode, pointVenue: Awaited<ReturnType<typeof loadPointDeviceVenue>>) {
+  if (mode === "point") {
+    const publicId = pointVenue?.licencePublicId ?? null;
+    const qrUrl = publicId && isVenueLicencePublicEnabled() && isVenueLicencePublicId(publicId) ? venueLicencePublicUrl(publicId) : null;
+    return { qrUrl, sticker: null };
+  }
   const domain = await loadBusinessOwnerHomeContext();
   const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
-  return loadOwnVenueSticker(locationId);
+  const own = await loadOwnVenueSticker(locationId);
+  return {
+    qrUrl: own ? venueLicencePublicUrl(own.publicId) : null,
+    sticker: own && businessCabinetCan({ mode }, "stickerDownload") ? own : null,
+  };
 }
 
 export default async function BusinessAppDocumentsPage({ searchParams }: PageProps) {
@@ -45,12 +63,31 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
   const sp = await searchParams;
   const at = first(sp.at);
   const windowMinutes = first(sp.window);
-  const result = await loadPlaybackReport({ at, windowMinutes });
-  const sticker = await loadDocumentsSticker();
+  const cabinet = await loadBusinessCabinetMode();
+  const pointVenue = cabinet.mode === "point" ? await loadPointDeviceVenue() : null;
+  const reportVenue: PlaybackReportVenue | null = pointVenue
+    ? {
+        organizationId: pointVenue.organizationId,
+        locationId: pointVenue.locationId,
+        locationName: pointVenue.locationName,
+        timezone: pointVenue.timezone ?? null,
+      }
+    : null;
+  const result =
+    cabinet.mode === "point" && !reportVenue
+      ? ({ kind: "no_location" } as const)
+      : await loadPlaybackReport({ at, windowMinutes, venue: reportVenue });
+  const { qrUrl, sticker } = await loadDocumentsQr(cabinet.mode, pointVenue);
+  const venueSide = cabinet.mode !== "owner";
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <InspectorContactCard qrUrl={sticker ? venueLicencePublicUrl(sticker.publicId) : null} />
+      <InspectorContactCard qrUrl={qrUrl} />
+      {venueSide ? (
+        <section className="business-app-card" data-testid="biz-documents-hall-contact">
+          <ProfileHelpContact />
+        </section>
+      ) : null}
 
       <section className="business-app-card" data-testid="client-documents">
         <h1 className="text-[1.45rem] font-bold tracking-tight text-[var(--biz-text)]">
@@ -115,10 +152,15 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm"><a href={businessAuthHref(hostname, "sign-in")} className="underline">Войдите</a>, чтобы построить отчёт.</p>
         ) : result.kind === "no_location" ? (
-          <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте кофейню</Link>.</p>
+          venueSide ? (
+            <p className="mt-3 text-sm">Отчёт появится, когда устройство будет связано с кофейней.</p>
+          ) : (
+            <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте кофейню</Link>.</p>
+          )
         ) : (
           <>
-            <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
+            {/* next/form: a soft navigation, so the hall player in the layout keeps playing. */}
+            <Form action="/documents" scroll={false} className="mt-3 flex flex-wrap items-end gap-3" data-testid="playback-report-form">
               <label className="flex flex-col text-sm">
                 Дата и время
                 <input
@@ -143,7 +185,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring">
                 Показать
               </button>
-            </form>
+            </Form>
             {result.kind === "invalid_time" ? (
               <p className="mt-3 text-sm">Не удалось разобрать дату и время.</p>
             ) : null}

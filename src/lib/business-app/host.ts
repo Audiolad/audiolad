@@ -73,6 +73,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/help": `${BUSINESS_SITE_PATH}/help`,
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
   "/point": `${BUSINESS_SITE_PATH}/point`,
+  // Owner password check on the hall device (cabinet-mode.ts).
+  "/owner": `${BUSINESS_SITE_PATH}/owner`,
   "/player": `${BUSINESS_SITE_PATH}/player`,
   "/spa": `${BUSINESS_SITE_PATH}/spa`,
   // ba344b7f: one workspace for every business_space. Cafe is the enabled direction.

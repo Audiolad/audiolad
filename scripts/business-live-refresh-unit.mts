@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  BUSINESS_ENTRY_COOKIE,
   BUSINESS_LIVE_IDLE_AFTER_MS,
   BUSINESS_LIVE_IDLE_REFRESH_MS,
   BUSINESS_LIVE_REFRESH_MS,
@@ -11,6 +10,7 @@ import {
   businessLiveRefreshActive,
   businessLiveRefreshPath,
   isTypingTarget,
+  BUSINESS_VIEW_COOKIE,
   parseBusinessEntry,
   startBusinessLiveRefresh,
 } from "../src/lib/business-app/live-refresh";
@@ -117,14 +117,15 @@ assert.equal(isTypingTarget({ tagName: "INPUT", type: "checkbox" }), false);
 assert.equal(isTypingTarget({ tagName: "BUTTON" }), false);
 assert.equal(isTypingTarget(null), false);
 
-// Header switcher side survives a reload via a UI cookie.
+// Header switcher: «как видит точка» is a preview for this browser session only (session cookie).
 assert.equal(parseBusinessEntry("venue"), "venue");
 assert.equal(parseBusinessEntry("person"), "person");
 assert.equal(parseBusinessEntry(undefined), "person");
 assert.equal(parseBusinessEntry("admin"), "person");
-const cookie = businessEntryCookieValue("venue", true);
-assert.match(cookie, new RegExp(`^${BUSINESS_ENTRY_COOKIE}=venue; Path=/; Max-Age=\\d+; SameSite=Lax; Secure$`));
-assert.doesNotMatch(businessEntryCookieValue("person", false), /Secure/);
+assert.equal(BUSINESS_VIEW_COOKIE, "al-biz-view");
+assert.equal(businessEntryCookieValue("venue", true), "al-biz-view=venue; Path=/; SameSite=Lax; Secure");
+assert.doesNotMatch(businessEntryCookieValue("venue", true), /Max-Age/, "preview never outlives the browser session");
+assert.equal(businessEntryCookieValue("person", false), "al-biz-view=; Path=/; Max-Age=0; SameSite=Lax");
 
 // A switch opens home or re-reads it.
 assert.deepEqual(businessEntrySwitchAction("/"), { kind: "refresh" });
@@ -141,7 +142,7 @@ const provider = readFileSync("src/components/business-app/BusinessPointMode.tsx
 assert.match(provider, /document\.cookie = businessEntryCookieValue/);
 assert.match(provider, /useState<Entry>\(initialEntry\)/);
 const layout = readFileSync("src/app/business-app/layout.tsx", "utf8");
-assert.match(layout, /cookies\(\)\)\.get\(BUSINESS_ENTRY_COOKIE\)/);
+assert.match(layout, /cookies\(\)\)\.get\(BUSINESS_VIEW_COOKIE\)/);
 assert.match(layout, /initialEntry=\{initialEntry\}/);
 const shell = readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8");
 assert.match(shell, /<BusinessEntryProvider initialEntry=\{initialEntry\}>/);
@@ -151,8 +152,10 @@ assert.match(live, /startTransition\(\(\) => router\.refresh\(\)\)/);
 assert.match(live, /restoreWindowScrollY\(scrollY\)/);
 assert.match(live, /visibilityState === "hidden"/);
 const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8");
-assert.match(home, /data-entry=\{venueSide \? "venue" : "person"\}/);
-assert.match(home, /venueSide \? locationName \|\| "Кофейня" : greeting/);
+assert.match(home, /if \(cabinet\.side === "venue"\) return <BusinessHallHome \/>;/);
+assert.match(home, /data-entry="person"/);
+const hall = readFileSync("src/components/business-app/BusinessHallHome.tsx", "utf8");
+assert.match(hall, /data-entry="venue"/);
 
 // 253821e0: the coffee.audiolad.ru root is the guest player, not the owner home – no refresh there.
 {

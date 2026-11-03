@@ -1,5 +1,6 @@
 import "server-only";
 
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
@@ -39,6 +40,8 @@ type PreviewSource = OnboardingPreviewTrack & {
  */
 export async function loadOnboardingPreviewGate(): Promise<"allow" | "no_access"> {
   try {
+    // New venues are added from the owner's phone, not from the hall device (cabinet-mode.ts).
+    if (await businessHallDeviceLocked()) return "no_access";
     const supabase = await createClient();
     const {
       data: { user },

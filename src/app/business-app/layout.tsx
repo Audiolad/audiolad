@@ -14,8 +14,11 @@ import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
-import { BUSINESS_ENTRY_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
+import { businessPointReports } from "@/lib/business-app/cabinet-mode";
+import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
+import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
+import { BUSINESS_VIEW_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
+import { loadPointDeviceAccess, loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
 import { guestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import {
@@ -49,17 +52,46 @@ export default async function BusinessAppLayout({
   }
 
   const domain = await loadBusinessOwnerHomeContext();
-  const pointReports = await businessPointSessionAlive();
+  // owner | preview | point from one table (cabinet-mode.ts): the hall device is the venue side
+  // until the owner re-enters the password on it; the owner's preview never reports as a point.
+  const cabinet = await loadBusinessCabinetMode();
+  // A revoked or unchecked device cookie keeps the hall menu but sends no player reports.
+  const pointReports = businessPointReports(cabinet) && cabinet.deviceStatus === "alive";
+  const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;
   // ba344b7f: live gift / paid state (read-only) – such a visitor never sees the guest strip.
-  const customerAccess = domain.status === "authenticated" ? await peekBusinessChromeAccess() : null;
+  // The hall device shows the venue's period, not the account that may be signed in on it.
+  const customerAccess =
+    cabinet.mode === "point"
+      ? pointVenue
+        ? await loadPointDeviceAccess(pointVenue)
+        : null
+      : domain.status === "authenticated"
+        ? await peekBusinessChromeAccess()
+        : null;
+  // Preview «как видит точка» follows the owner's own «Разрешить менять настройку на точке» switch.
+  const previewSound =
+    cabinet.mode === "preview" && domain.status === "authenticated" && domain.location
+      ? await loadLocationSoundSettings(domain.location.id)
+      : null;
+  const cabinetMode = {
+    mode: cabinet.mode,
+    pointReports,
+    pointCanEdit: cabinet.mode === "preview" ? previewSound?.pointCanEditSettings !== false : pointVenue?.pointCanEdit ?? false,
+    pointVenueName: pointVenue?.locationName ?? null,
+    ownerUnlockUntil: cabinet.ownerUnlockUntil,
+    staleOwnerSession: cabinet.staleOwnerSession,
+    hallSessionId: cabinet.hallSessionId,
+    hallDeviceRevoked: cabinet.deviceStatus === "revoked",
+    canPreview: domain.status === "authenticated",
+  };
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).
   const initialGuestLimit =
     !pointReports && resolveBusinessAccess(domain).level === "guest" && !hasLiveBusinessAccess(customerAccess)
       ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
       : null;
 
-  // Header switcher side (UI only) so a reload opens the same side without a flash.
-  const initialEntry = parseBusinessEntry((await cookies()).get(BUSINESS_ENTRY_COOKIE)?.value);
+  // Header switcher side (owner or preview «как видит точка») so a reload opens the same side without a flash.
+  const initialEntry = parseBusinessEntry((await cookies()).get(BUSINESS_VIEW_COOKIE)?.value);
 
   const attributionEnabled = businessTrialAttributionConfig(process.env).enabled;
 
@@ -67,7 +99,7 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

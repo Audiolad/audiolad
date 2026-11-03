@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
 
@@ -82,7 +82,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   const membership = memberships[0] ?? null;
   const canPay = ownerCanPayFromThisBrowser(
     memberships.some((row) => row.role === "owner"),
-    await businessPointSessionAlive(),
+    await businessHallDeviceLocked(),
   );
   let offerAccepted = false;
   if (canPay) {

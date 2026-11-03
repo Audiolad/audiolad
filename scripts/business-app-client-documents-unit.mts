@@ -384,7 +384,10 @@ console.log("business-app-client-documents-unit OK");
   const card = readFileSync("src/components/business-app/InspectorContactCard.tsx", "utf8");
   const docs = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
   assert.match(card, /<VenueQrShowButton\s+url=\{qrUrl\}\s+variant="secondary"\s+testId="biz-inspector-qr-show"\s+label=\{INSPECTOR_BUTTONS\.qr\}/, "inspector card opens the QR too, with the explicit label");
-  assert.match(docs, /<InspectorContactCard qrUrl=\{sticker \? venueLicencePublicUrl\(sticker\.publicId\) : null\} \/>/);
+  // QR: the owner's own venue, or on the hall device the venue of its device session (cookie, server side).
+  assert.match(docs, /<InspectorContactCard qrUrl=\{qrUrl\} \/>/);
+  assert.match(docs, /qrUrl: own \? venueLicencePublicUrl\(own\.publicId\) : null/);
+  assert.match(docs, /isVenueLicencePublicEnabled\(\) && isVenueLicencePublicId\(publicId\) \? venueLicencePublicUrl\(publicId\) : null/);
 }
 
 // Rendered markup (not only source patterns): order, labels, links, targets, classes in both placements.

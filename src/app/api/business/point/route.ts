@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+
 import { after, NextResponse } from "next/server";
 
 import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS } from "@/lib/business-app/cafe-queue/prefs";
 import { GUEST_COFFEE_DEFAULT_PROFILE } from "@/lib/business-app/guest-coffee/catalog";
 import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
-import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, soundDraftFromBody } from "@/lib/business-app/point-sound";
+import { businessHallDeviceLocked, loadBusinessOwnerUnlockUntil } from "@/lib/business-app/cabinet-mode.server";
+import { businessPointDeviceStatus } from "@/lib/business-app/point-session.server";
+import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, pointSoundUpdate, soundDraftFromBody } from "@/lib/business-app/point-sound";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
 import { pointClientIpCollapsed, pointJoinResult } from "@/lib/business-app/point-join";
@@ -22,6 +26,14 @@ let warnedCollapsedIp = false;
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+
+/** Owner actions. The hall device without a fresh owner password gets 403 (cabinet-mode.ts). */
+const OWNER_ACTIONS = new Set(["create", "revoke", "link", "permission", "enqueue"]);
+
+/** Same hash as the database stores: sha256 of the token text (business_point_sessions.token_hash). */
+function pointTokenHashHex(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
+}
 
 function json(body: unknown, status = 200, extra?: { token?: string; secure?: boolean }) {
   const response = NextResponse.json(body, { status, headers: NO_STORE });
@@ -51,6 +63,51 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const secure = new URL(request.url).protocol === "https:";
+
+  if (typeof body.action === "string" && OWNER_ACTIONS.has(body.action) && (await businessHallDeviceLocked())) {
+    return json({ ok: false, reason: "venue_device", error: "На устройстве в зале это делает владелец после ввода пароля." }, 403);
+  }
+
+  if (body.action === "disconnect-self") {
+    // «Отключить это устройство»: closes only this browser's own device session, by its own cookie.
+    // No account needed; the token never leaves the server and no other session is touched.
+    // First the account session on this browser (this browser only, checked): if it stayed, the
+    // browser would turn into the owner cabinet once the device cookie is gone.
+    try {
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+    } catch {
+      return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+    }
+    const token = readCookie(request.headers.get("cookie") ?? "", BUSINESS_POINT_COOKIE);
+    if (isPointToken(token)) {
+      try {
+        const admin = createServiceRoleClient();
+        const { error } = await admin
+          .from("business_point_sessions")
+          .update({ revoked_at: new Date().toISOString() })
+          .eq("token_hash", `\\x${pointTokenHashHex(token)}`)
+          .is("revoked_at", null);
+        if (error) return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+      } catch {
+        return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+      }
+    }
+    const response = json({ ok: true });
+    response.cookies.set(BUSINESS_POINT_COOKIE, "", { ...pointCookieOptions(secure), maxAge: 0 });
+    return response;
+  }
+
+  if (body.action === "forget-revoked") {
+    // After the owner's fresh password on a browser whose device was revoked (for example their own
+    // phone): drop the dead device cookie, so this browser is the owner cabinet again. Only a
+    // definitely revoked cookie and only with a fresh password; an alive or unchecked one stays.
+    if ((await loadBusinessOwnerUnlockUntil()) === null) return json({ ok: false, reason: "unauthorized" }, 401);
+    if ((await businessPointDeviceStatus()) !== "revoked") return json({ ok: true, cleared: false });
+    const response = json({ ok: true, cleared: true });
+    response.cookies.set(BUSINESS_POINT_COOKIE, "", { ...pointCookieOptions(secure), maxAge: 0 });
+    return response;
+  }
 
   if (body.action === "create") {
     const locationId = typeof body.locationId === "string" ? body.locationId : "";
@@ -198,6 +255,12 @@ export async function POST(request: Request) {
       if (settings.point_can_edit_settings === false) {
         return json({ ok: false, reason: "forbidden", error: POINT_MUSIC_FORBIDDEN }, 403);
       }
+      // Day-time settings belong to the owner (cabinet-mode.ts «daypartSettings»): the hall device
+      // keeps the saved daypart mode and hours whatever the request says.
+      const current = pointSoundUpdate(sound);
+      if (!current) return json({ ok: false, reason: "no_access" }, 403);
+      draft.daypartMode = current.daypartMode;
+      draft.hours = current.hours;
       const { data, error } = await supabase.rpc("save_business_point_sound_settings", {
         p_token: token,
         p_location_id: locationId,

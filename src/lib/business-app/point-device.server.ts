@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import type { BusinessChromeAccess } from "@/lib/access-grants/access-line";
 import { BUSINESS_NO_ACCESS } from "@/lib/access-grants/access-line";
@@ -16,33 +17,43 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
  * The signed-in account (if any) plays no part. Revoked session, inactive venue or any
  * read failure gives null.
  */
-export async function loadPointDeviceVenue(): Promise<PointDeviceVenue | null> {
+export const loadPointDeviceVenue = cache(async function loadPointDeviceVenue(): Promise<PointDeviceVenue | null> {
   const jar = await cookies();
   const token = jar.get(BUSINESS_POINT_COOKIE)?.value;
   if (!isPointToken(token)) return null;
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
-    const row = data as { ok?: boolean; location_id?: unknown } | null;
+    const row = data as { ok?: boolean; location_id?: unknown; point_can_edit_settings?: unknown } | null;
     if (error || !row || row.ok !== true || typeof row.location_id !== "string") return null;
     const db = createServiceRoleClient();
     const { data: location, error: locationError } = await db
       .from("business_locations")
-      .select("id, organization_id, name, status")
+      .select("id, organization_id, name, status, timezone, licence_public_id")
       .eq("id", row.location_id)
       .maybeSingle();
-    const loc = location as { id?: unknown; organization_id?: unknown; name?: unknown; status?: unknown } | null;
+    const loc = location as {
+      id?: unknown;
+      organization_id?: unknown;
+      name?: unknown;
+      status?: unknown;
+      timezone?: unknown;
+      licence_public_id?: unknown;
+    } | null;
     if (locationError || !loc || loc.status !== "active") return null;
     if (typeof loc.id !== "string" || typeof loc.organization_id !== "string") return null;
     return {
       locationId: loc.id,
       organizationId: loc.organization_id,
       locationName: typeof loc.name === "string" && loc.name.trim() ? loc.name.trim() : "Кофейня",
+      timezone: typeof loc.timezone === "string" ? loc.timezone : null,
+      licencePublicId: typeof loc.licence_public_id === "string" ? loc.licence_public_id : null,
+      pointCanEdit: row.point_can_edit_settings !== false,
     };
   } catch {
     return null;
   }
-}
+});
 
 /**
  * The venue owner's gift or paid period, read-only (never issues a gift, never writes).

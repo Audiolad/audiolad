@@ -105,8 +105,13 @@ assert.match(switcher, /aria-selected=\{option\.selected\}/);
 assert.match(switcher, /case "Escape"/);
 assert.match(switcher, /addEventListener\("pointerdown"/);
 assert.match(switcher, /switchTo\("person"\)/);
-assert.match(switcher, /if \(!point\) switchTo\("venue"\)/);
-assert.match(switcher, /Войдите со своего телефона/);
+// Owner phone: the venue side is the preview «как видит точка»; an unlocked hall device stays put.
+assert.match(switcher, /setHint\(null\);\n        switchTo\("venue"\);/);
+assert.match(switcher, /if \(point\) \{\n          setHint\("Это устройство в зале/);
+// Hall device: the venue name and the way into the owner cabinet, with the password again.
+assert.match(switcher, /if \(cabinet\.mode === "point"\)/);
+assert.match(switcher, /href=\{`\$\{BUSINESS_OWNER_UNLOCK_PATH\}\$\{next\}`\}/);
+assert.match(switcher, /Кабинет владельца/);
 assert.doesNotMatch(switcher, /business-sound-chip/);
 assert.doesNotMatch(switcher, /\u2014/);
 const bizCss = readFileSync(new URL("../src/components/business-app/business-app.css", import.meta.url), "utf8");

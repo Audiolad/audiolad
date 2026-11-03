@@ -14,6 +14,7 @@ import { useReportBusinessChromeAccess } from "@/components/business-app/Busines
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import {
   BusinessCabinetPlayerProvider,
   useCabinetPlayer,
@@ -59,6 +60,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const hostname = useBusinessHostname();
   const guestStartEnabled = useGuestStartEnabled();
   const player = useCabinetPlayer();
+  // Ratings and day-time choices stay with the owner (cabinet-mode.ts), also in the preview.
+  const cabinet = useBusinessCabinetMode();
   const adopt = player.adopt;
   const release = player.release;
   const playIndex = player.playIndex;
@@ -299,9 +302,13 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               ? `Подарочный период закончился ${model.endsAtLabel}. Полный плеер закрыт.`
               : "Подарочный период закончился. Полный плеер закрыт."}
           </p>
-          <p>
-            <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
-          </p>
+          {cabinet.can("payLink") ? (
+            <p>
+              <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
+            </p>
+          ) : (
+            <p data-testid="biz-workspace-tell-owner">Сообщите владельцу кофейни.</p>
+          )}
         </section>
       ) : null}
 
@@ -415,7 +422,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               appearance="round"
               size="large"
             />
-            {!player.pointDevice ? <CafeTrackFeedback
+            {cabinet.can("trackRatings") ? <CafeTrackFeedback
               phase={feedbackPhase}
               busyKind={feedbackBusyKind}
               onFeedback={(kind) => {
@@ -429,7 +436,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               }}
             /> : null}
           </section>
-          {!player.pointDevice ? <section className="business-app-card">
+          {cabinet.can("daypartSettings") ? <section className="business-app-card">
             <CafeQueueControls
               mode={queue.prefs.daypartMode}
               effectiveDaypart={queue.effectiveDaypart}

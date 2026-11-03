@@ -9,13 +9,14 @@ import { businessCabinetHomePath, businessNavPathname } from "@/lib/business-app
 
 import {
   BizDocumentsIcon,
+  BizHelpIcon,
   BizHomeIcon,
   BizLockIcon,
   BizMusicIcon,
   BizProfileIcon,
   BizSettingsIcon,
 } from "@/components/business-app/BusinessIcons";
-import { usePointMode } from "@/components/business-app/BusinessPointMode";
+import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
   BUSINESS_LOCKED_LABEL,
@@ -24,19 +25,20 @@ import {
   resolveBusinessAccess,
 } from "@/lib/business-app/access";
 import {
-  BUSINESS_MOBILE_NAV_ITEMS,
   businessActiveNavItemId,
+  businessNavItemsForSections,
   type BusinessNavIconKey,
 } from "@/lib/business-app/nav";
 
 const ICONS: Record<
-  Extract<BusinessNavIconKey, "home" | "music" | "settings" | "documents" | "profile">,
+  Extract<BusinessNavIconKey, "home" | "music" | "settings" | "documents" | "help" | "profile">,
   ComponentType<{ active?: boolean; className?: string }>
 > = {
   home: BizHomeIcon,
   music: BizMusicIcon,
   settings: BizSettingsIcon,
   documents: BizDocumentsIcon,
+  help: BizHelpIcon,
   profile: BizProfileIcon,
 };
 
@@ -47,11 +49,10 @@ const ICONS: Record<
 export default function BusinessBottomNav() {
   const hostname = useBusinessHostname();
   const pathname = businessNavPathname(usePathname() || "/", hostname);
-  const pointMode = usePointMode();
-  const items = pointMode
-    ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music" || item.id === "settings")
-    : BUSINESS_MOBILE_NAV_ITEMS;
-  const access = resolveBusinessAccess(useBusinessDomain(), pointMode);
+  // One table for every menu (cabinet-mode.ts): owner, preview «как видит точка», hall device.
+  const cabinet = useBusinessCabinetMode();
+  const items = businessNavItemsForSections(cabinet.sections);
+  const access = resolveBusinessAccess(useBusinessDomain(), cabinet.side === "venue");
   const { showLocked } = useBusinessGuestStatus();
   const activeId = businessActiveNavItemId(pathname, items);
 

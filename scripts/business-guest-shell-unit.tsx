@@ -182,8 +182,9 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   hasNot(at("ok", "/"), /30 минут/);
   const layout = read("src/app/business-app/layout.tsx");
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
-  has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\} initialEntry=\{initialEntry\}>/);
+  has(layout, /: domain\.status === "authenticated"\s*\? await peekBusinessChromeAccess\(\)\s*: null;/, "layout reads the gift state (read-only) for signed-in visitors");
+  has(layout, /cabinet\.mode === "point"\s*\? pointVenue\s*\? await loadPointDeviceAccess\(pointVenue\)/, "the hall device shows the venue's period, not the signed-in account's");
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\} initialEntry=\{initialEntry\} cabinetMode=\{cabinetMode\}>/);
   const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-reader.server.ts") + read("src/lib/access-grants/peek-closure.ts");
   hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }

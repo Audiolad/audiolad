@@ -1,11 +1,13 @@
 import BusinessOnboardingWizardPage from "@/components/business-app/BusinessOnboardingWizardPage";
 import { safeBusinessWorkspaceReturn } from "@/lib/access-grants/paths";
+import { requireBusinessCabinetPermission } from "@/lib/business-app/cabinet-mode.server";
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function BusinessAppOnboardingPage({ searchParams }: PageProps) {
+  await requireBusinessCabinetPermission("sectionOnboarding");
   const query = await searchParams;
   const type = query.type;
   const next = query.next;

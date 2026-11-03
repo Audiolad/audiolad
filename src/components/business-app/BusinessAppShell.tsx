@@ -14,7 +14,13 @@ import BusinessAudienceTracker from "./BusinessAudienceTracker";
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
 import BusinessLiveRefresh from "@/components/business-app/BusinessLiveRefresh";
-import { BusinessEntryProvider, BusinessPointModeProvider } from "@/components/business-app/BusinessPointMode";
+import BusinessCabinetModeBanner from "@/components/business-app/BusinessCabinetModeBanner";
+import {
+  BusinessCabinetModeProvider,
+  BusinessEntryProvider,
+  useBusinessCabinetMode,
+  type BusinessCabinetServerMode,
+} from "@/components/business-app/BusinessPointMode";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -40,6 +46,7 @@ export default function BusinessAppShell({
   customerAccess = null,
   pointReports = false,
   initialEntry = "person",
+  cabinetMode,
 }: {
   children: ReactNode;
   /** Read-only gift / paid state from the layout; null for anonymous visitors. */
@@ -50,15 +57,25 @@ export default function BusinessAppShell({
   pointReports?: boolean;
   /** Header switcher side saved in the UI cookie (person or venue). */
   initialEntry?: BusinessEntry;
+  /** owner | preview | point and the hall device facts (layout, cabinet-mode.server.ts). */
+  cabinetMode?: BusinessCabinetServerMode;
 }) {
+  const modeValue: BusinessCabinetServerMode = cabinetMode ?? {
+    mode: pointReports ? "point" : "owner",
+    pointReports,
+    pointCanEdit: false,
+    pointVenueName: null,
+    ownerUnlockUntil: null,
+    canPreview: false,
+  };
   return (
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
-        <BusinessPointModeProvider value={pointReports}>
+        <BusinessCabinetModeProvider value={modeValue}>
           <BusinessEntryProvider initialEntry={initialEntry}>
             <BusinessShellFrame pointReports={pointReports}>{children}</BusinessShellFrame>
           </BusinessEntryProvider>
-        </BusinessPointModeProvider>
+        </BusinessCabinetModeProvider>
       </BusinessGuestStatusProvider>
     </BusinessChromeAccessProvider>
   );
@@ -73,8 +90,10 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  const showGuestBar = access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess;
-  const showAccessLine = liveAccess && !cabinetMusic;
+  // The period line and the guest offer are the owner's (cabinet-mode.ts «accessLine»), not the hall's.
+  const cabinet = useBusinessCabinetMode();
+  const showGuestBar = access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
+  const showAccessLine = liveAccess && !cabinetMusic && cabinet.can("accessLine");
 
   return (
     <div className="business-app-shell" data-access={access.level}>
@@ -87,6 +106,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
             <BusinessBrandLockup testId="biz-brand-topbar" />
             <BusinessEntrySwitcher />
           </header>
+          <BusinessCabinetModeBanner />
           {showGuestBar ? <BusinessGuestStatusBar /> : null}
           {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
           {children}

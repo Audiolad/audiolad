@@ -10,6 +10,7 @@ import { businessStartHost } from "@/lib/business-trial-activity/config";
 import { recordBusinessGuestStartHost } from "@/lib/business-trial-activity/record.server";
 import { recordBusinessGuestStartAttribution } from "@/lib/business-trial-attribution/record.server";
 import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +37,11 @@ async function boundedText(request: Request): Promise<string> {
 }
 
 async function handle(request: Request) {
+  // A new venue starts from a phone, never from the hall device (cabinet-mode.ts): no sign-in,
+  // no bootstrap side effects there.
+  if (await businessHallDeviceLocked()) {
+    return NextResponse.json({ ok: false, reason: "venue_device" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const config = businessGuestStartConfig(process.env);
   // Lazy clients keep the disabled path independent of Auth and service credentials.
   const session = () => createClient();

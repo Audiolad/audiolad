@@ -1,7 +1,7 @@
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { NextResponse } from "next/server";
 
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { mapBusinessSubscriptionRpcError, resolveBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (await businessPointSessionAlive()) {
+  if (await businessHallDeviceLocked()) {
     return NextResponse.json({ error: "venue_device" }, { status: 403 });
   }
   if (authError) {

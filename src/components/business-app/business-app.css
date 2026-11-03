@@ -2102,3 +2102,49 @@
   color: var(--biz-accent);
   font-weight: 600;
 }
+
+/* Cabinet mode strip: the owner's preview «Так видит точка» or the owner unlock on the hall device. */
+.business-app-mode-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--biz-green-border);
+  border-radius: 14px;
+  background: var(--biz-green-bg);
+  color: var(--biz-green-ink);
+}
+
+.business-app-mode-banner__text {
+  margin: 0;
+  flex: 1 1 14rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+/* Hall device header: the venue name and the way into the owner cabinet (password again). */
+.business-entry-switcher--point {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  max-width: min(13rem, 56vw);
+  font-weight: 600;
+  color: var(--biz-text);
+}
+
+.business-entry-switcher__owner-link {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--biz-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  border-radius: 6px;
+}
+
+.business-app-hall-notice {
+  border-color: var(--biz-accent-border);
+}
