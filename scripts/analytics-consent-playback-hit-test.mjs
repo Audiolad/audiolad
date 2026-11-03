@@ -108,19 +108,21 @@ async function waitForActualPlayback(page) {
 async function clearConsentAndReload(page) {
   await page.evaluate(() => {
     localStorage.removeItem("audiolad_analytics_cookies");
+    localStorage.removeItem("audiolad_advertising_cookies");
   });
   await page.reload({ waitUntil: "networkidle" });
 }
 
 async function assertConsentControls(page) {
   const dialog = page.getByRole("dialog", {
-    name: "Аналитические cookies",
+    name: "Cookies на сайте",
   });
-  const accept = dialog.getByRole("button", { name: "Разрешить" });
+  const accept = dialog.getByRole("button", { name: "Разрешить все", exact: true });
   const reject = dialog.getByRole("button", { name: "Отклонить" });
   const policy = dialog.getByRole("link", { name: "Подробнее в политике" });
 
-  for (const control of [accept, reject, policy]) {
+  const analyticsOnly = dialog.getByRole("button", { name: "Только аналитика", exact: true });
+  for (const control of [accept, analyticsOnly, reject, policy]) {
     const point = center(await control.boundingBox());
     const hit = await page.evaluate(({ x, y }) => {
       const element = document.elementFromPoint(x, y);
@@ -186,7 +188,7 @@ async function expectConsent(page, expected) {
     expected,
   );
   await assert.rejects(
-    page.getByRole("dialog", { name: "Аналитические cookies" }).waitFor({
+    page.getByRole("dialog", { name: "Cookies на сайте" }).waitFor({
       state: "visible",
       timeout: 500,
     }),

@@ -6,9 +6,19 @@ import {
 } from "@/lib/analytics/use-analytics-consent";
 import { writeAnalyticsConsent } from "@/lib/analytics/analytics-consent";
 
+import { useAdvertisingConsent } from "@/lib/analytics/use-advertising-consent";
+import { writeAdvertisingConsent } from "@/lib/analytics/advertising-consent.mjs";
+
 export default function AnalyticsPrivacySection() {
   const consent = useAnalyticsConsent();
   const granted = useAnalyticsConsentGranted();
+  const advertising = useAdvertisingConsent();
+  const advertisingGranted = advertising === "granted";
+  const advertisingDescription = advertising === "unknown"
+    ? "Пиксель VK Реклама не загружается, пока вы не дадите согласие на сайте или здесь."
+    : advertisingGranted
+      ? "Пиксель VK Реклама включён. Имя, email и телефон не передаются."
+      : "Пиксель VK Реклама отключён.";
 
   const description =
     consent === "unknown"
@@ -50,6 +60,22 @@ export default function AnalyticsPrivacySection() {
               }`}
               aria-hidden
             />
+          </button>
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t border-[#eadff8] px-5 py-4">
+          <span className="min-w-0">
+            <span className="block font-medium">Рекламные cookies</span>
+            <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">{advertisingDescription}</span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={advertisingGranted}
+            aria-label="Рекламные cookies"
+            onClick={() => writeAdvertisingConsent(advertisingGranted ? "denied" : "granted")}
+            className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition ${advertisingGranted ? "bg-[#7042c5]" : "bg-[#d8c9ef]"}`}
+          >
+            <span className={`h-6 w-6 rounded-full bg-white transition ${advertisingGranted ? "translate-x-5" : "translate-x-0"}`} aria-hidden />
           </button>
         </div>
       </div>

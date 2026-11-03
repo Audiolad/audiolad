@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
@@ -27,6 +27,12 @@ export function BusinessChromeAccessProvider({ value, children }: { value: Busin
   // Signed out (the layout sends null): forget a period reported for the previous session.
   if (value == null && reported !== null) setReported(null);
   const access = effectiveChromeAccess(value, reported);
+  useEffect(() => {
+    const reportAccess = () => window.dispatchEvent(new CustomEvent("audiolad:vk-business-access", { detail: access.mode }));
+    reportAccess();
+    window.addEventListener("audiolad:vk-business-access-request", reportAccess);
+    return () => window.removeEventListener("audiolad:vk-business-access-request", reportAccess);
+  }, [access.mode]);
   const state = useMemo(() => ({ access, report }), [access, report]);
   return <ChromeAccessContext.Provider value={state}>{children}</ChromeAccessContext.Provider>;
 }
