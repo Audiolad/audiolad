@@ -9,11 +9,30 @@ export function vkPixelId(value) {
   return value && /^[1-9][0-9]{0,15}$/.test(value) ? value : null;
 }
 
+const VK_EXCLUDED_ROUTE = /^\/(?:documents|point|player|coffee-handoff)(?:\/|$)/;
+const VK_BUSINESS_HOSTS = new Set(['coffee.audiolad.ru', 'business.audiolad.ru']);
+
+/** @param {string} pathname */
+function vkPublicPath(pathname) {
+  const path = pathname.replace(/\/$/, '') || '/';
+  return path.replace(/^\/business-app(?=\/|$)/, '') || '/';
+}
+
+/**
+ * Business screens that must never run with the VK SDK in the document. The SDK has no unload
+ * API, so entering one by SPA navigation after it loaded requires a full reload (see VkAdsPixel).
+ * @param {string} hostname @param {string} pathname
+ */
+export function vkBusinessReloadRoute(hostname, pathname) {
+  const isBusiness = VK_BUSINESS_HOSTS.has(hostname) || /^\/business-app(?:\/|$)/.test(pathname);
+  return isBusiness && VK_EXCLUDED_ROUTE.test(vkPublicPath(pathname));
+}
+
 /** @param {string} hostname @param {string} pathname */
 export function vkRoute(hostname, pathname) {
   const path = pathname.replace(/\/$/, '') || '/';
-  const publicPath = path.replace(/^\/business-app(?=\/|$)/, '') || '/';
-  if (/^\/(?:documents|point|player|coffee-handoff)(?:\/|$)/.test(publicPath)) return null;
+  const publicPath = vkPublicPath(pathname);
+  if (VK_EXCLUDED_ROUTE.test(publicPath)) return null;
   if (hostname === 'audiolad.ru' || hostname === 'www.audiolad.ru') {
     if (path === '/') return { group: 'home', path };
     if (path === '/b/atlas-kofeen') return { group: 'atlas_home', path };
@@ -91,4 +110,9 @@ export function createVkAdsTracker({ pixelId, allowed, win, doc }) {
       if (event && !observed.has(event) && goal(event)) observed.add(event);
     },
   };
+}
+
+/** @param {Document} doc */
+export function vkSdkInDocument(doc) {
+  return Boolean(doc.getElementById('audiolad-vk-ads') || doc.querySelector('script[src="https://top-fwz1.mail.ru/js/code.js"]'));
 }

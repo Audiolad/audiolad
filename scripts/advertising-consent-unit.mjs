@@ -6,7 +6,7 @@ import {
   readAdvertisingConsent, writeAdvertisingConsent, subscribeAdvertisingConsent,
 } from '../src/lib/analytics/advertising-consent.mjs';
 import { consentBannerVariant, applyConsentBannerChoice } from '../src/lib/analytics/consent-banner-choice.mjs';
-import { createVkAdsTracker, vkDestinationGoal, vkPixelId } from '../src/lib/analytics/vk-ads.mjs';
+import { createVkAdsTracker, vkBusinessReloadRoute, vkDestinationGoal, vkPixelId, vkSdkInDocument } from '../src/lib/analytics/vk-ads.mjs';
 
 assert.equal(readAdvertisingConsent(), 'unknown', 'SSR');
 globalThis.CustomEvent = class extends Event {
@@ -68,9 +68,9 @@ doc.getElementById = () => scripts[0]; doc.querySelector = () => null;
 doc.createElement = () => ({}); doc.head = { appendChild: script => scripts.push(script) };
 globalThis.document = doc;
 process.env.NEXT_PUBLIC_VK_PIXEL_ID = '3811226';
-const component = new Function('usePathname', 'useEffect', 'useRef', 'useAdvertisingConsent', 'readAdvertisingConsent', 'createVkAdsTracker', 'vkDestinationGoal', 'vkPixelId', `${source}\nreturn VkAdsPixel;`)(
+const component = new Function('usePathname', 'useEffect', 'useRef', 'useAdvertisingConsent', 'readAdvertisingConsent', 'createVkAdsTracker', 'vkDestinationGoal', 'vkPixelId', 'vkBusinessReloadRoute', 'vkSdkInDocument', `${source}\nreturn VkAdsPixel;`)(
   () => '/music', fn => effects.push(fn), value => ({ current: value }), readAdvertisingConsent,
-  readAdvertisingConsent, createVkAdsTracker, vkDestinationGoal, vkPixelId,
+  readAdvertisingConsent, createVkAdsTracker, vkDestinationGoal, vkPixelId, vkBusinessReloadRoute, vkSdkInDocument,
 );
 win.addEventListener('audiolad:vk-business-access-request', () => win.dispatchEvent(new CustomEvent('audiolad:vk-business-access', { detail: 'trial' })));
 for (const state of ['unknown', 'denied']) {
@@ -90,11 +90,20 @@ assert.equal(win._tmr.filter(e => e.goal === 'subscription_active').length, 1, '
 const count = win._tmr.length;
 writeAdvertisingConsent('denied');
 win.dispatchEvent(new CustomEvent('audiolad:vk-business-access', { detail: 'trial' }));
-effects[1](); assert.equal(win._tmr.length, count, 'revocation blocks dispatch');
+effects[2](); assert.equal(win._tmr.length, count, 'revocation blocks dispatch');
 replayCleanups.forEach(fn => fn?.());
 delete win._tmr; scripts.length = 0;
 effects.length = 0; component(); effects.map(fn => fn()).forEach(fn => fn?.());
 assert.equal(win._tmr, undefined); assert.equal(scripts.length, 0, 'next visit denied');
+// Allowed -> excluded SPA navigation on a business host: SDK in document -> full reload,
+// independent of the analytics choice; without the SDK no reload.
+let reloads = 0;
+win.location = Object.assign(new URL('https://business.audiolad.ru/documents'), { reload: () => { reloads += 1; } });
+storage.set(ANALYTICS_KEY, 'denied'); writeAdvertisingConsent('granted');
+scripts.length = 0; effects.length = 0; component(); effects[1]();
+assert.equal(reloads, 0, 'no SDK in document – no reload');
+scripts.push({ id: 'audiolad-vk-ads' }); effects.length = 0; component(); effects[1]();
+assert.equal(reloads, 1, 'SDK loaded before entering /documents – reload');
 const privacy = readFileSync(new URL('../src/app/(platform)/privacy/page.tsx', import.meta.url), 'utf8');
 assert(privacy.includes('Последнее обновление: [дата публикации]'));
 assert(privacy.includes('{/* Дата ставится в день выкладки. */}'));

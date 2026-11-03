@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createVkAdsTracker, vkRoute, vkPixelId, vkDestinationGoal } from '../src/lib/analytics/vk-ads.mjs';
+import { createVkAdsTracker, vkRoute, vkPixelId, vkDestinationGoal, vkBusinessReloadRoute, vkSdkInDocument } from '../src/lib/analytics/vk-ads.mjs';
 
 let consent = false;
 const scripts = [];
@@ -90,4 +90,19 @@ for (const state of ['unknown', 'denied', 'granted']) {
   choice = 'denied'; fresh.page(); fresh.goal('gift_interest'); fresh.access('paid');
   assert.equal(freshWin._tmr?.length, before);
 }
+// Allowed -> excluded SPA navigation on business hosts must reload a document that has the SDK.
+for (const host of ['coffee.audiolad.ru', 'business.audiolad.ru']) {
+  for (const route of ['/documents', '/point/x', '/player', '/coffee-handoff', '/business-app/documents']) {
+    assert.equal(vkBusinessReloadRoute(host, route), true, `${host}${route} reload boundary`);
+  }
+  for (const route of ['/', '/music', '/cabinet', '/workspace']) assert.equal(vkBusinessReloadRoute(host, route), false);
+}
+assert.equal(vkBusinessReloadRoute('127.0.0.1', '/business-app/point'), true);
+// Platform player keeps playback: no reload there (vkRoute already sends nothing on /player).
+assert.equal(vkBusinessReloadRoute('audiolad.ru', '/player'), false);
+assert.equal(vkRoute('audiolad.ru', '/player'), null);
+assert.equal(vkSdkInDocument({ getElementById: () => null, querySelector: () => null }), false);
+assert.equal(vkSdkInDocument({ getElementById: (id) => (id === 'audiolad-vk-ads' ? {} : null), querySelector: () => null }), true);
+const boundary = readFileSync(new URL('../src/components/analytics/VkAdsPixel.tsx', import.meta.url), 'utf8');
+assert.match(boundary, /vkBusinessReloadRoute\([\s\S]*vkSdkInDocument\(document\)\) window\.location\.reload\(\)/, 'VkAdsPixel reloads on business excluded routes');
 console.log('VK Ads: all sensitive route prefixes and explicit consent states – passed');
