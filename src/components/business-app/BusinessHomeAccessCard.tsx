@@ -19,7 +19,7 @@ import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/
 
 export type PayError = { code: BusinessPayErrorCode; href: string | null };
 
-/** Remembered on this device only, so a guest-start owner does not retype it next month. */
+/** Shown before any request when the account has no email and the field is empty or invalid. */
 const RECEIPT_EMAIL_REQUIRED_ERROR = { code: "receipt_email_required" as const, href: null };
 
 function unavailablePayError(): PayError {
