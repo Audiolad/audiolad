@@ -8,13 +8,16 @@ import {
   coffeeAtlasAsset,
 } from "@/lib/business/coffee-atlas/constants";
 
-/** Dark atlas cover banner. The whole card is one internal link to the atlas. */
-export default function GuideAtlasHeroBanner() {
+/**
+ * Dark atlas cover banner. The whole card is one internal link to the atlas.
+ * `textOnly` (template v2, set 11 pilot): no cover photo – the cover carries Latin lettering and a brand.
+ */
+export default function GuideAtlasHeroBanner({ textOnly = false }: { textOnly?: boolean }) {
   return (
     <div className="guide-wrap guide-block">
       <Link
         href={COFFEE_ATLAS_PATH}
-        className="guide-atlas-hero"
+        className={textOnly ? "guide-atlas-hero guide-atlas-hero--text" : "guide-atlas-hero"}
         data-guide-banner="atlas-hero"
         target="_blank"
         rel="noopener"
@@ -26,15 +29,17 @@ export default function GuideAtlasHeroBanner() {
           <span className="guide-atlas-hero__question">Почему сюда возвращаются?</span>
           <span className="guide-atlas-hero__button">Открыть атлас</span>
         </span>
-        <span className="guide-atlas-hero__cover">
-          <Image
-            src={coffeeAtlasAsset("cover.webp")}
-            alt="Обложка «Атлас кофеен мира»: карта мира, полароиды из Парижа, Нью-Йорка, Сиднея, Кейптауна и чашка капучино."
-            width={756}
-            height={1344}
-            sizes="(min-width: 800px) 220px, 40vw"
-          />
-        </span>
+        {textOnly ? null : (
+          <span className="guide-atlas-hero__cover">
+            <Image
+              src={coffeeAtlasAsset("cover.webp")}
+              alt="Обложка «Атлас кофеен мира»: карта мира, полароиды из Парижа, Нью-Йорка, Сиднея, Кейптауна и чашка капучино."
+              width={756}
+              height={1344}
+              sizes="(min-width: 800px) 220px, 40vw"
+            />
+          </span>
+        )}
       </Link>
     </div>
   );

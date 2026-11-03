@@ -104,5 +104,5 @@ assert.equal(vkRoute('audiolad.ru', '/player'), null);
 assert.equal(vkSdkInDocument({ getElementById: () => null, querySelector: () => null }), false);
 assert.equal(vkSdkInDocument({ getElementById: (id) => (id === 'audiolad-vk-ads' ? {} : null), querySelector: () => null }), true);
 const boundary = readFileSync(new URL('../src/components/analytics/VkAdsPixel.tsx', import.meta.url), 'utf8');
-assert.match(boundary, /vkBusinessReloadRoute\([\s\S]*vkSdkInDocument\(document\)\) window\.location\.reload\(\)/, 'VkAdsPixel reloads on business excluded routes');
+assert.doesNotMatch(boundary, /location\.reload/, 'VkAdsPixel never reloads: cabinet music keeps playing');
 console.log('VK Ads: all sensitive route prefixes and explicit consent states – passed');

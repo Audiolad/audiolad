@@ -102,8 +102,13 @@ const SET_10_SLUGS = [
   "slogan-dlya-kofeyni", "pitcher-dlya-kofeyni", "kassir-v-kofeynyu",
   "prodvizhenie-kofeyni", "firmennyy-stil-kofeyni",
 ];
-const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS, ...SET_03_SLUGS, ...SET_04_SLUGS, ...SET_05_SLUGS, ...SET_06_SLUGS, ...SET_07_SLUGS, ...SET_08_SLUGS, ...SET_09_SLUGS, ...SET_10_SLUGS];
-// Sets 02–10 use Sergey's supplied packs, rather than the earlier discovery CSV.
+// Set 11 is the pilot of article template v2 (infographic + worksheet + atlas transition).
+const SET_11_SLUGS = [
+  "afisha-kofeyni", "kakie-dokumenty-nuzhny-dlya-kofeyni", "stulya-dlya-kofeyni",
+  "kofeynya-samoobsluzhivaniya-pod-klyuch", "oborudovanie-dlya-kofeyni-kupit",
+];
+const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS, ...SET_03_SLUGS, ...SET_04_SLUGS, ...SET_05_SLUGS, ...SET_06_SLUGS, ...SET_07_SLUGS, ...SET_08_SLUGS, ...SET_09_SLUGS, ...SET_10_SLUGS, ...SET_11_SLUGS];
+// Sets 02–11 use Sergey's supplied packs, rather than the earlier discovery CSV.
 const set02Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-02-9be20bf8.json")) as {
   articles: Array<{
     slug: string; title: string; primaryQuery: string;
@@ -128,6 +133,8 @@ const set09Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-09-22d2
 assert.deepEqual(set09Pack.articles.map((brief) => brief.slug), SET_09_SLUGS);
 const set10Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-10-bc99b0c2.json")) as typeof set02Pack;
 assert.deepEqual(set10Pack.articles.map((brief) => brief.slug), SET_10_SLUGS);
+const set11Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-11-4cdabf2b.json")) as typeof set02Pack;
+assert.deepEqual(set11Pack.articles.map((brief) => brief.slug), SET_11_SLUGS);
 
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
@@ -154,7 +161,7 @@ assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portr
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
-assert.equal(listVerticalArticles().length, 51, "reference and five articles each of sets 01–10");
+assert.equal(listVerticalArticles().length, 56, "reference and five articles each of sets 01–11");
 assert.equal(listVerticalArticles("restaurants").length, 0);
 assert.deepEqual(getVerticalArticle("coffee", "kofe-v-zernah-dlya-kofeyni"), ARTICLE);
 assert.equal(getVerticalArticle("coffee", "muzyka-dlya-kofeyni"), null, "old slug is only a redirect");
@@ -428,6 +435,9 @@ assert.doesNotMatch(view, /publishedAt|updatedAt|<time\b/);
 const footerSource = read(`${guideDir}/GuideFooter.tsx`);
 assert.doesNotMatch(footerSource, /href: "\/(?:privacy|requisites)"/, "footer carries no page with personal data");
 assert.doesNotMatch(footerSource, /ИНН|ОГРНИП|паспорт/);
+// Template v2 (set 11 pilot): no music items in the footer of articles with an infographic.
+assert.match(view, /<GuideFooter withoutMusic=\{Boolean\(article\.infographic\)\} \/>/, "v2 articles hide footer music links");
+assert.match(footerSource, /GUIDE_FOOTER_MUSIC_HREFS: readonly string\[\] = \["\/b", "\/b\/prava"\]/);
 
 const componentFiles = readdirSync(join(root, guideDir)).filter((file) => file.endsWith(".tsx"));
 for (const file of componentFiles) {
@@ -490,6 +500,13 @@ const cardsBanner = read(`${guideDir}/GuideAtlasCardsBanner.tsx`);
 assert.equal((cardsBanner.match(/<Link\b/g) ?? []).length, 1, "one link around the whole banner");
 assert.match(cardsBanner, /10 кофеен – 10 характеров звучания/);
 assert.match(cardsBanner, /-hero\.webp/);
+// Template v2: neutral banner variant without brand names and music tags.
+assert.match(view, /<GuideAtlasCardsBanner neutral=\{Boolean\(article\.infographic\)\} \/>/);
+assert.match(cardsBanner, /10 кофеен – 10 городов мира/);
+assert.match(cardsBanner, /neutral \? `Кофейня №\$\{shop\.number\}`/);
+assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__tags">/);
+assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__media">/, "v2 cards without shop photos");
+assert.match(view, /<GuideAtlasHeroBanner textOnly=\{Boolean\(article\.infographic\)\} \/>/);
 for (const shop of COFFEE_ATLAS_SHOPS) {
   assert.ok(ATLAS_CARD_THEMES[shop.slug], shop.slug);
   assert.ok(existsSync(join(root, "public/business/atlas-kofeen", `${shop.slug}-hero.webp`)), shop.slug);
@@ -499,6 +516,7 @@ const heroBanner = read(`${guideDir}/GuideAtlasHeroBanner.tsx`);
 assert.equal((heroBanner.match(/<Link\b/g) ?? []).length, 1);
 assert.match(heroBanner, /Кофе · люди · города · вдохновение/);
 assert.match(heroBanner, /Почему сюда возвращаются\?/);
+assert.match(heroBanner, /\{textOnly \? null : \(\s*<span className="guide-atlas-hero__cover">/, "v2 hero banner without cover photo");
 assert.match(heroBanner, /cover\.webp/);
 
 const checklist = read(`${guideDir}/GuideChecklist.tsx`);
@@ -523,7 +541,8 @@ assert.match(seriesPlan, /1 829/);
 assert.match(seriesPlan, /1 729/);
 assert.match(seriesPlan, /838/);
 for (const slug of SET_SLUGS) {
-  if (SET_10_SLUGS.includes(slug)) assert.ok(set10Pack.articles.some((brief) => brief.slug === slug));
+  if (SET_11_SLUGS.includes(slug)) assert.ok(set11Pack.articles.some((brief) => brief.slug === slug));
+  else if (SET_10_SLUGS.includes(slug)) assert.ok(set10Pack.articles.some((brief) => brief.slug === slug));
   else if (SET_09_SLUGS.includes(slug)) assert.ok(set09Pack.articles.some((brief) => brief.slug === slug));
   else if (SET_08_SLUGS.includes(slug)) assert.ok(set08Pack.articles.some((brief) => brief.slug === slug));
   else if (SET_07_SLUGS.includes(slug)) assert.ok(set07Pack.articles.some((brief) => brief.slug === slug));
@@ -633,7 +652,7 @@ assert.deepEqual(allArticles.map((article) => article.slug).sort(), [ARTICLE.slu
 for (const slug of SET_SLUGS) {
   const article = getVerticalArticle("coffee", slug);
   assert.ok(article, `registered: ${slug}`);
-  const brief = [...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles, ...set05Pack.articles, ...set06Pack.articles, ...set07Pack.articles, ...set08Pack.articles, ...set09Pack.articles, ...set10Pack.articles].find((brief) => brief.slug === slug);
+  const brief = [...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles, ...set05Pack.articles, ...set06Pack.articles, ...set07Pack.articles, ...set08Pack.articles, ...set09Pack.articles, ...set10Pack.articles, ...set11Pack.articles].find((brief) => brief.slug === slug);
   if (brief) {
     assert.deepEqual(article.relatedQueries.map(({ phrase, frequency }) => ({ phrase, frequency })), brief.relatedQueries);
     for (const [index, slot] of [article.expertOne, article.expertTwo].entries()) {
@@ -798,7 +817,7 @@ const approvedTopics = [
   ["Описание бизнеса кофейни", "описание бизнеса кофейни"],
   ["Печенье для кофейни: ассортимент и поставки", "печенье для кофейни"],
 ];
-const approvedSetTopics = [...approvedTopics, ...[...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles, ...set05Pack.articles, ...set06Pack.articles, ...set07Pack.articles, ...set08Pack.articles, ...set09Pack.articles, ...set10Pack.articles].map((brief) => [brief.title, brief.primaryQuery])];
+const approvedSetTopics = [...approvedTopics, ...[...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles, ...set05Pack.articles, ...set06Pack.articles, ...set07Pack.articles, ...set08Pack.articles, ...set09Pack.articles, ...set10Pack.articles, ...set11Pack.articles].map((brief) => [brief.title, brief.primaryQuery])];
 for (const [index, slug] of SET_SLUGS.entries()) {
   const article = getVerticalArticle("coffee", slug)!;
   assert.equal(article.title, approvedSetTopics[index]?.[0]);
@@ -887,8 +906,8 @@ const setSlots = SET_SLUGS.flatMap((slug) => {
 // Keep the original person-level restriction for sets 01–03; quote uniqueness below covers every set.
 const earlierSetExpertIds = setSlots.filter(({ slug }) => SET_01_SLUGS.includes(slug) || SET_02_SLUGS.includes(slug) || SET_03_SLUGS.includes(slug)).map(({ slot }) => slot.expertId);
 // Set 03 deliberately reuses people with fresh quotes (approved pack report, «Правки брифа»).
-// Preserve the accepted cross-set 01/02 check and check distinct people within each of sets 03–10.
-for (const slugs of [[...SET_01_SLUGS, ...SET_02_SLUGS], SET_03_SLUGS, SET_04_SLUGS, SET_05_SLUGS, SET_06_SLUGS, SET_07_SLUGS, SET_08_SLUGS, SET_09_SLUGS, SET_10_SLUGS]) {
+// Preserve the accepted cross-set 01/02 check and check distinct people within each of sets 03–11.
+for (const slugs of [[...SET_01_SLUGS, ...SET_02_SLUGS], SET_03_SLUGS, SET_04_SLUGS, SET_05_SLUGS, SET_06_SLUGS, SET_07_SLUGS, SET_08_SLUGS, SET_09_SLUGS, SET_10_SLUGS, SET_11_SLUGS]) {
   const ids = setSlots.filter(({ slug }) => slugs.includes(slug)).map(({ slot }) => slot.expertId);
   assert.equal(new Set(ids).size, ids.length, `expert repeats in the checked group: ${ids.join(", ")}`);
 }
@@ -922,4 +941,50 @@ for (const article of allArticles) {
   assert.ok(m.explanatoryShare >= TONE.explanatoryShareMin, `${article.slug}: explanatory share ${m.explanatoryShare}`);
   assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
 }
-console.log("business-coffee-guide: reference and fifty set-01…set-10 articles passed");
+// ---------- Article template v2 (pilot set 11, Sergey 03.11.2026) ----------
+// Optional slots: a schematic infographic right after the direct answer and a blank for the
+// reader's own coffee shop right after the table. One shared component each; articles give data.
+const infographicSource = read("src/components/business/vertical-guides/GuideInfographic.tsx");
+assert.doesNotMatch(infographicSource, /<img|next\/image/, "infographic is real text, not a picture");
+const worksheetStorageKeys = new Set<string>();
+for (const slug of SET_11_SLUGS) {
+  const article = allArticles.find((item) => item.slug === slug);
+  assert.ok(article?.infographic, `${slug}: template v2 pilot needs an infographic`);
+  assert.ok(article?.worksheet, `${slug}: template v2 pilot needs a worksheet`);
+  assert.ok(JSON.stringify(article.partTwo).includes('"href":"/b/atlas-kofeen"'), `${slug}: soft transition to the atlas «10 удивительных кофеен мира»`);
+}
+for (const article of allArticles.filter((item) => item.infographic || item.worksheet)) {
+  const slug = article.slug;
+  const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
+  if (article.infographic) {
+    const info = article.infographic;
+    assert.ok(["steps", "structure", "comparison"].includes(info.kind), `${slug}: infographic kind`);
+    assert.ok(info.nodes.length >= 3 && info.nodes.length <= 5, `${slug}: infographic has 3–5 nodes`);
+    assert.equal(new Set(info.nodes.map((node) => node.title)).size, info.nodes.length, `${slug}: infographic node titles unique`);
+    if (info.kind === "structure") assert.ok(info.center, `${slug}: structure names the whole`);
+    for (const node of info.nodes) {
+      assert.ok(node.title.length <= 40, `${slug}: short node title for a 360 px phone: ${node.title}`);
+      assert.ok(node.text.length <= 120, `${slug}: short node text: ${node.text}`);
+    }
+    assert.ok(info.description.length >= 60, `${slug}: infographic text equivalent`);
+    for (const value of [info.title, info.center ?? "", info.description, info.caption, ...info.nodes.flatMap((node) => [node.title, node.text])]) {
+      assert.doesNotMatch(value, /[A-Za-z\u2014]|--|(?:^|[^\p{L}])точк[\p{L}]*/iu, `${slug}: infographic text`);
+    }
+    const at = html.indexOf(`data-guide-infographic="${info.kind}"`);
+    assert.ok(at > html.indexOf('class="guide-wrap guide-prose guide-intro"'), `${slug}: infographic after the direct answer`);
+    assert.ok(at < html.indexOf('class="guide-wrap guide-summary"'), `${slug}: infographic before «Коротко»`);
+    assert.ok(html.includes(`aria-describedby="${info.id}-desc"`), `${slug}: infographic text equivalent linked`);
+  }
+  if (article.worksheet) {
+    const sheet = article.worksheet;
+    assert.ok(sheet.fields.length >= 3 && sheet.fields.length <= 8, `${slug}: worksheet has 3–8 fields`);
+    assert.equal(new Set(sheet.fields.map((field) => field.id)).size, sheet.fields.length, `${slug}: worksheet field ids unique`);
+    assert.equal(worksheetStorageKeys.has(sheet.storageKey), false, `${slug}: worksheet storage key unique`);
+    assert.notEqual(sheet.storageKey, article.checklist.storageKey, `${slug}: worksheet key differs from checklist`);
+    worksheetStorageKeys.add(sheet.storageKey);
+    const tableAt = html.indexOf(`id="${article.table.id}"`);
+    const sheetAt = html.indexOf('data-guide-worksheet="true"');
+    assert.ok(tableAt > 0 && sheetAt > tableAt && sheetAt < html.indexOf(`id="${article.partTwo[0].id}"`), `${slug}: worksheet right after the table`);
+  }
+}
+console.log("business-coffee-guide: reference and fifty-five set-01…set-11 articles passed");

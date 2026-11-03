@@ -2,9 +2,10 @@
  * Data model of a B2B vertical guide article (reference: «Кофе в зёрнах для кофейни»).
  *
  * The page renders these slots in a fixed order (docs/business/coffee-guides/TEMPLATE.md):
- * header → H1 + intro → «Четыре чашки» slider → partOne[0] → atlas cover banner →
- * partOne[1] → table → partTwo[0] → expertOne → partTwo[1] → «10 кофеен» banner →
- * partTwo[2] → expertTwo → steps → checklist → FAQ → final cups block → «Читайте также».
+ * header → H1 + intro → [infographic] → «Коротко» → partOne[0] → «Четыре чашки» slider →
+ * partOne[1] → table → [worksheet] → partTwo[0] → expertOne → partTwo[1] → «10 кофеен» banner →
+ * partTwo[2] → expertTwo → steps → atlas cover banner → checklist → FAQ → final cups block →
+ * «Читайте также». Slots in brackets are optional (article template v2, pilot set 11).
  * Text and inserts alternate: never two text sections in a row. A new article only fills
  * this data; it never adds its own markup.
  */
@@ -97,6 +98,52 @@ export type GuideFigure = {
   caption: string;
 };
 
+/** One node of a schematic infographic: a short label and one explaining line. */
+export type GuideInfographicNode = {
+  title: string;
+  text: string;
+};
+
+/**
+ * Simple schematic infographic (template v2): 3–5 nodes explaining the topic, rendered as
+ * real text by `GuideInfographic` right after the direct answer. Only facts from the brief;
+ * no invented numbers.
+ */
+export type GuideInfographic = {
+  id: string;
+  /** steps – ordered sequence; structure – a whole and its parts; comparison – options side by side. */
+  kind: "steps" | "structure" | "comparison";
+  /** Short visible heading of the scheme. */
+  title: string;
+  /** `structure` only: the whole that the nodes make up. */
+  center?: string;
+  /** 3–5 nodes. */
+  nodes: GuideInfographicNode[];
+  /** Text equivalent of the whole scheme for screen readers (aria-describedby). */
+  description: string;
+  /** Visible caption: what the scheme is based on and its limits. */
+  caption: string;
+};
+
+export type GuideWorksheetField = {
+  id: string;
+  label: string;
+  /** Placeholder: what to write in the field. */
+  hint: string;
+};
+
+/** Blank for the reader's own coffee shop (template v2), kept only in the browser. */
+export type GuideWorksheet = {
+  id: string;
+  heading: string;
+  intro: GuideParagraph[];
+  /** localStorage key; unique per article. */
+  storageKey: string;
+  /** 3–8 fields. */
+  fields: GuideWorksheetField[];
+  note: string;
+};
+
 /** Generated text card (own artwork, not a photo) for social previews and JSON-LD. */
 export type GuideOgImage = {
   src: string;
@@ -130,6 +177,8 @@ export type VerticalGuideArticle = {
   ogImage: GuideOgImage;
   /** Paragraphs right under the H1 (may carry internal links). */
   intro: GuideParagraph[];
+  /** Template v2: schematic infographic between the direct answer (intro) and «Коротко». */
+  infographic?: GuideInfographic;
   /** «Коротко» box under the intro: 3–5 one-sentence takeaways. */
   summary: string[];
   /** Lead-in above the «Четыре чашки» slider (shown after partOne[0], not a heading). */
@@ -137,6 +186,8 @@ export type VerticalGuideArticle = {
   /** [0] before the «Четыре чашки» slider, [1] before the table. */
   partOne: [GuideSection, GuideSection];
   table: GuideTable;
+  /** Template v2: blank for the reader's own coffee shop, right after the table. */
+  worksheet?: GuideWorksheet;
   expertOne: GuideExpertSlot;
   /** [0] before expertOne, [1] before the «10 кофеен» banner, [2] before expertTwo. */
   partTwo: [GuideSection, GuideSection, GuideSection];
