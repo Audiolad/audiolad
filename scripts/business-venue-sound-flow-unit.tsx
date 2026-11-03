@@ -46,13 +46,14 @@ const at = (html: string, testid: string) => {
   assert.match(css, /\.business-venue-sound \{[^}]*scroll-margin-top/);
 }
 
-// 2. Panel: renamed copy, «Сохранить название» right under the name, picker right under «Изменить звучание».
+// 2. Panel: renamed copy, no cafe name field (edited in «Профиль»), picker right under «Изменить звучание».
 {
   const closed = inRouter(
-    <VenueControlPanel locationId="loc-1" locationName="Кофе" pointCanEdit soundSlot={<p data-testid="slot">picker</p>} />,
+    <VenueControlPanel locationId="loc-1" pointCanEdit soundSlot={<p data-testid="slot">picker</p>} />,
   );
   assert.match(closed, /Музыка в зале/);
-  assert.match(closed, /Название кофейни/);
+  assert.doesNotMatch(closed, /Название кофейни/, "the cafe name is edited in «Профиль»");
+  assert.doesNotMatch(closed, /biz-venue-name|biz-venue-rename/);
   assert.doesNotMatch(closed, /точк/i);
   assert.match(closed, /Пауза, продолжение, следующий трек и новое звучание уходят в зал после подтверждения\. Вкладка «Музыка» играет только у вас\./);
   assert.equal((closed.match(/подтвержд/g) ?? []).length, 1, "the confirmation is said once in the panel");
@@ -60,15 +61,10 @@ const at = (html: string, testid: string) => {
   assert.doesNotMatch(closed, /—/);
   assert.doesNotMatch(closed, /data-testid="slot"/, "picker stays closed until the owner asks");
   assert.match(closed, /data-testid="biz-venue-atmosphere-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*data-testid="biz-venue-atmosphere-toggle"/);
-  const name = at(closed, "biz-venue-name");
-  const rename = at(closed, "biz-venue-rename");
-  const toggle = at(closed, "biz-venue-atmosphere-toggle");
-  assert.ok(name < rename && rename < toggle, "«Сохранить название» sits directly under the name field");
-  const between = closed.slice(name, rename);
-  assert.equal((between.match(/<button|<a /g) || []).length, 1, "nothing between the name field and its save button");
+  assert.ok(at(closed, "biz-venue-atmosphere-toggle") > 0);
 
   const open = inRouter(
-    <VenueControlPanel locationId="loc-1" locationName="Кофе" pointCanEdit soundInitiallyOpen soundSlot={<p data-testid="slot">picker</p>} />,
+    <VenueControlPanel locationId="loc-1" pointCanEdit soundInitiallyOpen soundSlot={<p data-testid="slot">picker</p>} />,
   );
   const openToggle = at(open, "biz-venue-atmosphere-toggle");
   const panel = at(open, "biz-venue-sound-panel");
@@ -78,7 +74,7 @@ const at = (html: string, testid: string) => {
   assert.doesNotMatch(open.slice(openToggle, panel), /<p[ >]/, "nothing between the button and the picker");
   assert.ok(pairing < 0 || slot < pairing, "picker comes before the device pairing card");
 
-  const home = inRouter(<VenueControlPanel locationId="loc-1" locationName="Кофе" pointCanEdit />);
+  const home = inRouter(<VenueControlPanel locationId="loc-1" pointCanEdit />);
   assert.match(home, /href="\/preferences\?sound=open"[^>]*data-testid="biz-venue-atmosphere-link"/);
 
   const source = read("src/components/business-app/VenueControlPanel.tsx");

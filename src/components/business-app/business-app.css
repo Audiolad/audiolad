@@ -204,6 +204,13 @@
   overflow-wrap: anywhere;
 }
 
+/* «Ваше имя»: no name yet, the row opens the profile name field. */
+.business-entry-switcher__option-label[data-placeholder="true"],
+.business-entry-switcher__value[data-placeholder="true"] {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
 .business-entry-switcher__check {
   flex-shrink: 0;
 }

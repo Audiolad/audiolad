@@ -154,22 +154,6 @@ export async function POST(request: Request) {
     return json({ ok: true });
   }
 
-  if (body.action === "rename") {
-    const locationId = typeof body.locationId === "string" ? body.locationId : "";
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    if (!locationId || name.length < 1 || name.length > 120) {
-      return json({ ok: false, error: "Не удалось сохранить название." }, 400);
-    }
-    const { data, error } = await supabase.rpc("rename_business_location", {
-      p_location_id: locationId,
-      p_name: name,
-    });
-    if (error || !(data as { ok?: boolean } | null)?.ok) {
-      return json({ ok: false, error: "Не удалось сохранить название. Попробуйте ещё раз." });
-    }
-    return json({ ok: true });
-  }
-
   if (body.action === "enqueue") {
     if (!isPointCommandId(body.id) || !isPointCommandType(body.type) || typeof body.locationId !== "string") {
       return json({ ok: false, error: "Не удалось отправить команду." }, 400);

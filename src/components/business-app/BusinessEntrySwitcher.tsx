@@ -9,12 +9,19 @@ import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/bus
 
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
 import { businessEntrySwitchAction, type BusinessEntry } from "@/lib/business-app/live-refresh";
+import {
+  BUSINESS_OWNER_NAME_PLACEHOLDER,
+  BUSINESS_PROFILE_NAME_HREF,
+  focusBusinessOwnerNameField,
+} from "@/lib/business-app/profile";
 
 type EntryOption = {
   id: "person" | "venue";
   label: string;
   /** Screen reader name when the visible label is a placeholder. */
   ariaLabel?: string;
+  /** The label is a hint («Ваше имя»), not a real name. */
+  placeholder?: boolean;
   testId: string;
   selected: boolean;
   onSelect: () => void;
@@ -81,11 +88,22 @@ export default function BusinessEntrySwitcher() {
   const personOn = !point && entry === "person";
   const venueOn = point || entry === "venue";
 
+  /**
+   * No name yet: the row reads «Ваше имя» and opens «Профиль» with the name field focused,
+   * so the owner sees where to set it. The person side is chosen too.
+   */
+  const openNameField = () => {
+    setEntry("person");
+    if (pathname === "/profile" && focusBusinessOwnerNameField()) return;
+    router.push(BUSINESS_PROFILE_NAME_HREF);
+  };
+
   const options: EntryOption[] = [
     {
       id: "person",
-      label: person || "–",
-      ariaLabel: person ? undefined : "Имя не указано",
+      label: person || BUSINESS_OWNER_NAME_PLACEHOLDER,
+      ariaLabel: person ? undefined : "Ваше имя – указать в профиле",
+      placeholder: !person,
       testId: "biz-entry-person",
       selected: personOn,
       onSelect: () => {
@@ -94,6 +112,10 @@ export default function BusinessEntrySwitcher() {
           return;
         }
         setHint(null);
+        if (!person) {
+          openNameField();
+          return;
+        }
         switchTo("person");
       },
     },
@@ -181,7 +203,7 @@ export default function BusinessEntrySwitcher() {
         onClick={() => (open ? close(false) : openList(currentIndex))}
         onKeyDown={onTriggerKeyDown}
       >
-        <span className="business-entry-switcher__value">{current.label}</span>
+        <span className="business-entry-switcher__value" data-placeholder={current.placeholder ? "true" : undefined}>{current.label}</span>
         <svg
           className="business-entry-switcher__chevron"
           viewBox="0 0 20 20"
@@ -219,7 +241,9 @@ export default function BusinessEntrySwitcher() {
               onMouseEnter={() => setActiveIndex(index)}
               onClick={() => choose(index)}
             >
-              <span className="business-entry-switcher__option-label">{option.label}</span>
+              <span className="business-entry-switcher__option-label" data-placeholder={option.placeholder ? "true" : undefined}>
+                {option.label}
+              </span>
               {option.selected ? (
                 <svg
                   className="business-entry-switcher__check"

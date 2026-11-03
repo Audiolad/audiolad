@@ -18,13 +18,11 @@ const QUESTIONS: Record<PointCommandType, string> = {
 
 export default function VenueControlPanel({
   locationId,
-  locationName,
   pointCanEdit,
   soundSlot = null,
   soundInitiallyOpen = false,
 }: {
   locationId: string;
-  locationName: string;
   pointCanEdit: boolean;
   /** Atmosphere picker. It opens right under «Изменить звучание». Without it the button links to the settings page. */
   soundSlot?: ReactNode;
@@ -32,7 +30,6 @@ export default function VenueControlPanel({
 }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(pointCanEdit);
-  const [name, setName] = useState(locationName);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirm, setConfirm] = useState<{ text: string; run: () => void } | null>(null);
@@ -104,28 +101,6 @@ export default function VenueControlPanel({
     ask(next ? "Разрешить устройству в зале менять музыку?" : "Запретить устройству в зале менять музыку?", run);
   };
 
-  const saveName = () => {
-    const next = name.trim();
-    if (!next) return;
-    ask("Сохранить новое название кофейни?", () => {
-      setPending(true);
-      setError(null);
-      void fetch("/api/business/point", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ action: "rename", locationId, name: next }),
-      })
-        .then((res) => res.json())
-        .then((json: { ok?: boolean; error?: string }) => {
-          if (json.ok === true) router.refresh();
-          else setError(json.error ?? "Не удалось сохранить название. Попробуйте ещё раз.");
-        })
-        .catch(() => setError("Не удалось сохранить название. Попробуйте ещё раз."))
-        .finally(() => setPending(false));
-    });
-  };
-
   return (
     <section className="business-app-card space-y-4" data-testid="biz-venue-control" aria-labelledby="venue-control-title">
       <h2 id="venue-control-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
@@ -156,19 +131,6 @@ export default function VenueControlPanel({
         />
         <span>Разрешить менять музыку с устройства в заведении</span>
       </label>
-      <label className="block text-sm text-[var(--biz-text)]">
-        <span className="font-medium">Название кофейни</span>
-        <input
-          className="mt-2 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-3"
-          value={name}
-          maxLength={120}
-          data-testid="biz-venue-name"
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null || name.trim().length === 0} onClick={saveName} data-testid="biz-venue-rename">
-        Сохранить название
-      </button>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         В зале новое звучание начнётся со следующего трека.
       </p>
