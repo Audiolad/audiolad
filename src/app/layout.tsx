@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import VkAdsPixel from "@/components/analytics/VkAdsPixel";
 import { headers } from "next/headers";
 
 import BaseProviders from "@/components/providers/BaseProviders";
@@ -68,6 +70,8 @@ export default async function RootLayout({
   return (
     <html lang="ru" className="bg-platform-surface">
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
+        {/* VK loads only after the separate advertising cookie consent is granted. */}
+        <Suspense fallback={null}><VkAdsPixel /></Suspense>
         {isBusinessHost ? children : <BaseProviders>{children}</BaseProviders>}
       </body>
     </html>

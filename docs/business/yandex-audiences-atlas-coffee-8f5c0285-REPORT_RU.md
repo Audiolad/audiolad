@@ -30,7 +30,6 @@
 | `business_atlas_coffee_cta_clicked` | Атлас кофеен – переход к звучанию | Перешли из Атласа кофеен к подбору звучания или в кабинет | `CoffeeAtlasChrome.tsx` |
 | `business_atlas_coffee_shop_opened` | Атлас кофеен – открыли кофейню | Открыли карточку кофейни в Атласе кофеен | `CoffeeAtlasOverview.tsx`, `CoffeeAtlasShopView.tsx`, `CoffeeAtlasChrome.tsx` |
 | `business_atlas_coffee_pdf_downloaded` | Атлас кофеен – скачали PDF | Скачали PDF Атласа кофеен | `CoffeeAtlasChrome.tsx` |
-| `business_atlas_coffee_pdf_opened` | Атлас кофеен – открыли PDF | В списке разрешённых на будущее; сейчас на странице только кнопка «Скачать», цель не отправляется | – |
 | `business_four_cups_clicked` | Кофейни – клик «4 чашки» | Нажали MAX или Telegram «4 чашки» в SEO-статье | `src/components/business/vertical-guides/GuideMaxButton.tsx` |
 | `business_cabinet_signed_in` | Кабинет кофеен – вошли | Сервер подтвердил вход в кабинет | `BusinessAudienceTracker.tsx` |
 | `business_trial_access_confirmed` | Кабинет кофеен – 7 дней в подарок | Сервер подтвердил действующие 7 дней в подарок | там же |

@@ -68,6 +68,9 @@ jobs:
       - name: Validate Audiolad Business
         run: |
           set -euo pipefail
+          npm run test:advertising-consent
+          npm run test:vk-ads
+          node scripts/yandex-metrika-unit.mjs
           npx tsx scripts/business-landing-unit.mts
           npm run test:business-app-domain-bind
           npm run test:business-coffee-host

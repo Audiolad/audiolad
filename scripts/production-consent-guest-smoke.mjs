@@ -29,11 +29,14 @@ async function consentDenyFlow() {
   const page = await context.newPage();
 
   await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
-  await page.evaluate(() => localStorage.removeItem("audiolad_analytics_cookies"));
+  await page.evaluate(() => {
+    localStorage.removeItem("audiolad_analytics_cookies");
+    localStorage.removeItem("audiolad_advertising_cookies");
+  });
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
 
-  const grant = page.getByRole("button", { name: "Разрешить" });
+  const grant = page.getByRole("button", { name: "Разрешить все", exact: true });
   const deny = page.getByRole("button", { name: "Отклонить" });
 
   if (!(await grant.isVisible())) {
@@ -48,7 +51,7 @@ async function consentDenyFlow() {
     throw new Error("consent banner not portaled to body");
   }
 
-  await assertButtonHitTarget(page, "Разрешить");
+  await assertButtonHitTarget(page, "Разрешить все");
   await assertButtonHitTarget(page, "Отклонить");
 
   await deny.click();
@@ -71,11 +74,14 @@ async function consentGrantFlow() {
   const page = await context.newPage();
 
   await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
-  await page.evaluate(() => localStorage.removeItem("audiolad_analytics_cookies"));
+  await page.evaluate(() => {
+    localStorage.removeItem("audiolad_analytics_cookies");
+    localStorage.removeItem("audiolad_advertising_cookies");
+  });
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
 
-  const grant = page.getByRole("button", { name: "Разрешить" });
+  const grant = page.getByRole("button", { name: "Разрешить все", exact: true });
   await grant.click();
 
   const stored = await page.evaluate(() =>
