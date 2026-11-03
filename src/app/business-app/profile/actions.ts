@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { AUTHOR_SUPPORT_COOKIE_NAME } from "@/lib/author-support/policy";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { DEFAULT_BUSINESS_ORGANIZATION, validateBusinessProfile } from "@/lib/business-app/profile";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
@@ -41,7 +41,7 @@ async function syncSingleVenueOrganizationName(supabase: ServerSupabase, input: 
 export async function saveBusinessProfile(input: { ownerName: string; venueName: string | null }) {
   const parsed = validateBusinessProfile(input);
   if (!parsed.ok) return parsed;
-  if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessPointSessionAlive()) {
+  if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
     return { ok: false, error: "Изменить профиль можно в личном кабинете владельца." } as const;
   }
   const supabase = await createClient();

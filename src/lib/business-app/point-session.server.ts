@@ -1,12 +1,13 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { BUSINESS_POINT_COOKIE, isPointToken } from "@/lib/business-app/point-session";
 import { createClient } from "@/lib/supabase/server";
 
-/** True only when this browser holds a live venue-device cookie. */
-export async function businessPointSessionAlive(): Promise<boolean> {
+/** True only when this browser holds a live venue-device cookie. One RPC per request. */
+export const businessPointSessionAlive = cache(async function businessPointSessionAlive(): Promise<boolean> {
   const jar = await cookies();
   const token = jar.get(BUSINESS_POINT_COOKIE)?.value;
   if (!isPointToken(token)) return false;
@@ -18,7 +19,7 @@ export async function businessPointSessionAlive(): Promise<boolean> {
   } catch {
     return false;
   }
-}
+});
 
 /** Atmosphere permission for this device. Missing row stays allowed. */
 export async function loadPointDevicePermission(): Promise<{ locationId: string; pointCanEdit: boolean } | null> {

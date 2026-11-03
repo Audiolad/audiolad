@@ -8,8 +8,8 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessHomeChecklist from "@/components/business-app/BusinessHomeChecklist";
-import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
-import PointDeviceControls from "@/components/business-app/PointDeviceControls";
+import BusinessHallHome from "@/components/business-app/BusinessHallHome";
+import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
@@ -73,8 +73,8 @@ export type BusinessHomePageProps = {
 export default function BusinessHomePage({ playbackConfirmation, pointLinked = null }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
   const hostname = useBusinessHostname();
-  const pointMode = usePointMode();
-  const { entry } = useBusinessEntry();
+  // owner | preview | point (cabinet-mode.ts): the venue side gets the hall home.
+  const cabinet = useBusinessCabinetMode();
   const rawSignals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
   const elapsedSeconds = useOwnerHomeElapsed(rawSignals);
@@ -82,10 +82,6 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
 
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "гость";
-  const locationName =
-    domain.status === "authenticated" && domain.location
-      ? domain.location.name
-      : "";
 
   const greeting = useMemo(
     () => buildBusinessGreeting(ownerFirstName),
@@ -104,8 +100,10 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
   const steps = buildBusinessHomeSteps({
     musicDone: businessHomeMusicDone({ playback, lastPlayMinutesAgo: signals?.lastPlayMinutesAgo }),
     deviceLinked: pointLinked,
-    pointMode,
+    pointMode: false,
   });
+
+  if (cabinet.side === "venue") return <BusinessHallHome />;
 
   if (domain.status === "anonymous") {
     return (
@@ -178,25 +176,18 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
     );
   }
 
-  // Header switcher side: the venue screen is titled with the venue, so a switch is visible
-  // at the top of the page and not only far below.
-  const venueSide = pointMode || entry === "venue";
-  const title = venueSide ? locationName || "Кофейня" : greeting;
-  const lead = venueSide ? "Что сделать, чтобы музыка играла в зале." : subtitle;
-
   return (
-    <div className="mx-auto max-w-3xl" data-testid="biz-home" data-entry={venueSide ? "venue" : "person"}>
+    <div className="mx-auto max-w-3xl" data-testid="biz-home" data-entry="person">
       <header className="mb-5">
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]" data-testid="biz-home-title">
-          {title}
+          {greeting}
         </h1>
         <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
-          {lead}
+          {subtitle}
         </p>
       </header>
       <div className="business-app-owner-home space-y-4">
-        <BusinessHomeChecklist steps={steps} showAccess={!venueSide} />
-        {pointMode ? <PointDeviceControls /> : null}
+        <BusinessHomeChecklist steps={steps} showAccess />
       </div>
     </div>
   );

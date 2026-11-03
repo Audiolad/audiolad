@@ -8,6 +8,7 @@ import {
   parseBusinessEligibilityPayload,
   type BusinessEligibilityProbeRow,
 } from "@/lib/business-app/eligibility";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { BUSINESS_SITE_PATH } from "@/lib/business-app/host";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -23,6 +24,8 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
   countryCode?: string;
   timezone?: string;
 }): Promise<BootstrapBusinessDomainResult> {
+  // The hall device opens owner actions only after the owner re-enters the password (cabinet-mode.ts).
+  if (await businessHallDeviceLocked()) return { ok: false, error: "На устройстве в зале это делает владелец после ввода пароля." };
   const supabase = await createClient();
   const {
     data: { user },
@@ -97,6 +100,8 @@ export async function provisionVenuePlayer(input: {
   zoneId: string;
   displayName?: string;
 }): Promise<ProvisionVenuePlayerResult> {
+  // The hall device opens owner actions only after the owner re-enters the password (cabinet-mode.ts).
+  if (await businessHallDeviceLocked()) return { ok: false, error: "На устройстве в зале это делает владелец после ввода пароля." };
   const supabase = await createClient();
   const {
     data: { user },

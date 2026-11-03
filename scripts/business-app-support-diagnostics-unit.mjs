@@ -137,8 +137,13 @@ assert.doesNotMatch(pureSrc, /createClient|createServiceRoleClient/);
 assert.doesNotMatch(pureSrc, /ELIGIBLE|music_rights_grants/);
 
 const nav = readFileSync(join(repoRoot, "src/lib/business-app/nav.ts"), "utf8");
-assert.doesNotMatch(nav, /id: "help"/, "help stays off the five-section cabinet nav");
-assert.doesNotMatch(nav, /Документы и оплата|title: "Плеер"|title: "Точки"|title: "Статистика"|title: "Объявления"|title: "Команда"|title: "Помощь"|title: "Настройки"/);
+// The owner's five sections never carry help; «Помощь» is a separate item the hall device menu adds
+// (it has no Profile), see src/lib/business-app/cabinet-mode.ts.
+const ownerNav = nav.slice(nav.indexOf("BUSINESS_MOBILE_NAV_ITEMS"), nav.indexOf("BUSINESS_HELP_NAV_ITEM"));
+assert.ok(ownerNav.length > 0, "owner nav is declared before the hall help item");
+assert.doesNotMatch(ownerNav, /id: "help"/, "help stays off the five-section owner nav");
+assert.match(nav, /export const BUSINESS_HELP_NAV_ITEM: BusinessNavItem = \{\n  id: "help",\n  title: "Помощь",/);
+assert.doesNotMatch(nav, /Документы и оплата|title: "Плеер"|title: "Точки"|title: "Статистика"|title: "Объявления"|title: "Команда"|title: "Настройки"/);
 const profile = readFileSync(join(repoRoot, "src/app/business-app/profile/page.tsx"), "utf8");
 assert.match(profile, /href="\/help"/, "help stays reachable from the profile");
 assert.doesNotMatch(profile, /BusinessEmptySection/);

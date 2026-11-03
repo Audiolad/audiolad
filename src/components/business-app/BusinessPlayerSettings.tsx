@@ -66,6 +66,7 @@ export default function BusinessPlayerSettings({
   saved = null,
   pointDevice = false,
   pointCanEdit = true,
+  venueSide = false,
 }: {
   locationId?: string | null;
   saved?: LocationSoundSettings | null;
@@ -73,6 +74,8 @@ export default function BusinessPlayerSettings({
   pointDevice?: boolean;
   /** Server flag. Missing row stays allowed. */
   pointCanEdit?: boolean;
+  /** Hall device or the owner's preview of it: day-time choices stay with the owner (cabinet-mode.ts «daypartSettings»). */
+  venueSide?: boolean;
 }) {
   const seeded = saved
     ? {
@@ -366,9 +369,15 @@ export default function BusinessPlayerSettings({
         profile={profile}
         onChange={onChange}
         showDaypart={false}
-        hint="Характер заведения и тип звучания учитываются в очереди. Время суток выбирается ниже, по часам этого устройства."
+        hint={
+          venueSide
+            ? "Характер заведения и тип звучания учитываются в очереди. Время суток настраивает владелец."
+            : "Характер заведения и тип звучания учитываются в очереди. Время суток выбирается ниже, по часам этого устройства."
+        }
         action={action}
       />
+      {venueSide ? null : (
+      <>
       <section className="business-app-card space-y-3">
         <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Очередь</h2>
         <CafeQueueControls
@@ -404,6 +413,8 @@ export default function BusinessPlayerSettings({
           }}
         />
       </section>
+      </>
+      )}
     </>
   );
 }

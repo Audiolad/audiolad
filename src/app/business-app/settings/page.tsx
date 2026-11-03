@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import BusinessPlayerSettings from "@/components/business-app/BusinessPlayerSettings";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
-import { businessPointSessionAlive, loadPointDevicePermission } from "@/lib/business-app/point-session.server";
+import { BUSINESS_VENUE_FALLBACK_PATH, businessCabinetCan } from "@/lib/business-app/cabinet-mode";
+import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
+import { loadPointDevicePermission } from "@/lib/business-app/point-session.server";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 
 export const metadata: Metadata = {
@@ -20,23 +23,32 @@ export default async function BusinessAppSettingsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = (await searchParams) ?? {};
+  // owner | preview | point (cabinet-mode.ts). The owner unlock on the hall device opens the owner panel.
+  const cabinet = await loadBusinessCabinetMode();
+  const pointDevice = cabinet.mode === "point";
   const domain = await loadBusinessOwnerHomeContext();
-  const pointDevice = await businessPointSessionAlive();
   const pointPermission = pointDevice ? await loadPointDevicePermission() : null;
-  const locationId =
-    (domain.status === "authenticated" ? domain.location?.id ?? null : null) ?? pointPermission?.locationId ?? null;
+  const locationId = pointDevice
+    ? pointPermission?.locationId ?? null
+    : domain.status === "authenticated"
+      ? domain.location?.id ?? null
+      : null;
   const saved = locationId ? await loadLocationSoundSettings(locationId) : null;
   const pointCanEdit = pointPermission ? pointPermission.pointCanEdit : saved?.pointCanEditSettings !== false;
+  // «Настройка» on the venue side only when the owner allowed it; otherwise the hall opens «Музыка».
+  if (!businessCabinetCan({ mode: cabinet.mode, pointCanEdit }, "sectionSettings")) redirect(BUSINESS_VENUE_FALLBACK_PATH);
+  const venueSide = cabinet.mode !== "owner";
+  const ownerPanel = Boolean(locationId) && !venueSide;
 
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-player-settings">
       <header>
-        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{locationId && !pointDevice ? "Управление кофейней" : "Настройка"}</h1>
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{ownerPanel ? "Управление кофейней" : "Настройка"}</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
-          {locationId && !pointDevice ? "Музыка в зале и устройство у колонки." : "Звучание плеера в этом кабинете."}
+          {ownerPanel ? "Музыка в зале и устройство у колонки." : venueSide ? "Звучание музыки в зале." : "Звучание плеера в этом кабинете."}
         </p>
       </header>
-      {locationId && !pointDevice ? (
+      {ownerPanel && locationId ? (
         // Owner phone: the picker opens right under «Изменить звучание», not further down the page.
         <VenueControlPanel
           locationId={locationId}
@@ -45,7 +57,7 @@ export default async function BusinessAppSettingsPage({
           soundSlot={<BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={false} pointCanEdit={pointCanEdit} />}
         />
       ) : (
-        <BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={pointDevice} pointCanEdit={pointCanEdit} />
+        <BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={pointDevice} pointCanEdit={pointCanEdit} venueSide={venueSide} />
       )}
     </div>
   );

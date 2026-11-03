@@ -15,6 +15,7 @@ import BusinessProfileSubscription from "@/components/business-app/profile/Busin
 import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 import { createClient } from "@/lib/supabase/server";
+import { requireBusinessCabinetPermission } from "@/lib/business-app/cabinet-mode.server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessProfilePage() {
+  // Not on the hall device without a fresh owner password, not in the preview (cabinet-mode.ts).
+  await requireBusinessCabinetPermission("sectionProfile");
   const hostname = getHostnameFromHeaders(await headers());
   const domain = await loadBusinessOwnerHomeContext();
   const supabase = await createClient();

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { isVenueLicencePublicEnabled } from "@/lib/business-app/venue-licence/flag";
 import { handleVenueStickerDownload } from "@/lib/business-app/venue-licence/sticker-access";
 import { createVenueStickerReader } from "@/lib/business-app/venue-licence/sticker-access.server";
@@ -24,6 +25,8 @@ function stickerLogoHref(): Promise<string | null> {
 export async function GET(request: Request) {
   const enabled = isVenueLicencePublicEnabled();
   if (!enabled) return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+  // The sticker download is the owner's (cabinet-mode.ts «stickerDownload»), not the hall device's.
+  if (await businessHallDeviceLocked()) return new NextResponse(null, { status: 403, headers: { "Cache-Control": "no-store" } });
   const supabase = await createClient();
   const {
     data: { user },

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { BUSINESS_SITE_PATH } from "@/lib/business-app/host";
 import {
   locationSoundRpcArgs,
@@ -23,6 +24,8 @@ export async function saveLocationSoundSettings(
   const hoursError = validateCafeDaypartHours(draft.hours);
   if (hoursError) return { ok: false, error: hoursError };
   if (!locationId.trim()) return { ok: false, error: SAVE_ERROR };
+  // The hall device saves through its own device session (/api/business/point «sound-save»).
+  if (await businessHallDeviceLocked()) return { ok: false, error: "На устройстве в зале это делает владелец после ввода пароля." };
 
   try {
     const supabase = await createClient();

@@ -24,15 +24,40 @@ const MAX_FACTS = 2000;
 /** Above this many grant rows the answer may be truncated: treat as unavailable. */
 const MAX_REGISTRY_ROWS = 1000;
 
+/** A venue resolved by the server from the hall device session (point-device.server.ts), never from the request. */
+export type PlaybackReportVenue = {
+  organizationId: string;
+  locationId: string;
+  locationName: string;
+  timezone?: string | null;
+};
+
 /**
  * Read-only. Membership is checked with the user's session (RLS); facts are
  * then read with the service role strictly scoped to that organization and
  * location, usage_kind = 'business'. Same pattern as load-support-diagnostics.
+ * The hall device passes `venue` from its own device session instead (no account on it).
  */
 export async function loadPlaybackReport(params: {
   at?: string;
   windowMinutes?: string;
+  venue?: PlaybackReportVenue | null;
 }): Promise<PlaybackReportResult> {
+  const venue = params.venue
+    ? {
+        organizationId: params.venue.organizationId,
+        locationId: params.venue.locationId,
+        locationName: params.venue.locationName || "Кофейня",
+        timezone: params.venue.timezone ?? null,
+      }
+    : await loadMemberVenue();
+  if (venue.kind === "anonymous" || venue.kind === "no_location") return venue;
+  return buildVenuePlaybackReport(venue, params);
+}
+
+type ReportVenue = { kind?: undefined; organizationId: string; locationId: string; locationName: string; timezone: unknown };
+
+async function loadMemberVenue(): Promise<ReportVenue | { kind: "anonymous" } | { kind: "no_location" }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -58,10 +83,21 @@ export async function loadPlaybackReport(params: {
     .limit(1)
     .maybeSingle();
   if (!location?.id) return { kind: "no_location" };
+  return {
+    organizationId,
+    locationId: location.id as string,
+    locationName: String(location.name ?? "Кофейня"),
+    timezone: location.timezone,
+  };
+}
 
-  const locationName = String(location.name ?? "Кофейня");
-  const timezone = isValidTimeZone(location.timezone)
-    ? (location.timezone as string)
+async function buildVenuePlaybackReport(
+  venue: ReportVenue,
+  params: { at?: string; windowMinutes?: string },
+): Promise<PlaybackReportResult> {
+  const { organizationId, locationName } = venue;
+  const timezone = isValidTimeZone(venue.timezone)
+    ? (venue.timezone as string)
     : "Europe/Moscow";
 
   if (!params.at) return { kind: "idle", locationName, timezone };
@@ -76,7 +112,7 @@ export async function loadPlaybackReport(params: {
     const service = createServiceRoleClient();
     const { data: facts, error } = await queryPlaybackFacts(service, {
       organizationId,
-      locationId: location.id as string,
+      locationId: venue.locationId,
       from,
       to,
       limit: MAX_FACTS,

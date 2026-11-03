@@ -9,7 +9,7 @@ import { businessCabinetHomePath, businessNavPathname } from "@/lib/business-app
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
-import { usePointMode } from "@/components/business-app/BusinessPointMode";
+import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import {
   BizAnnouncementsIcon,
   BizCollapseIcon,
@@ -27,7 +27,7 @@ import {
 } from "@/components/business-app/BusinessIcons";
 import {
   BUSINESS_PRIMARY_NAV_ITEMS,
-  BUSINESS_SECONDARY_NAV_ITEMS,
+  businessNavItemsForSections,
   BUSINESS_SIDEBAR_COLLAPSED_WIDTH_PX,
   BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX,
   BUSINESS_SIDEBAR_STORAGE_KEY,
@@ -185,12 +185,22 @@ export default function BusinessSidebar() {
   }, [collapsed]);
 
   const domain = useBusinessDomain();
-  const pointMode = usePointMode();
-  const access = resolveBusinessAccess(domain, pointMode);
-  const ownerFirstName =
-    domain.status === "authenticated" ? domain.owner.firstName : "Гость";
-  const locationName =
-    domain.status === "authenticated" && domain.location
+  // One table for every menu (cabinet-mode.ts): owner, preview «как видит точка», hall device.
+  const cabinet = useBusinessCabinetMode();
+  const access = resolveBusinessAccess(domain, cabinet.side === "venue");
+  const sectionItems = businessNavItemsForSections(cabinet.sections);
+  const primaryIds = new Set(BUSINESS_PRIMARY_NAV_ITEMS.map((item) => item.id));
+  const primaryItems = sectionItems.filter((item) => primaryIds.has(item.id));
+  const secondaryItems = sectionItems.filter((item) => !primaryIds.has(item.id));
+  const hallDevice = cabinet.mode === "point";
+  const ownerFirstName = hallDevice
+    ? cabinet.pointVenueName || "Кофейня"
+    : domain.status === "authenticated"
+      ? domain.owner.firstName
+      : "Гость";
+  const locationName = hallDevice
+    ? "Устройство в зале"
+    : domain.status === "authenticated" && domain.location
       ? domain.location.name
       : domain.status === "authenticated"
         ? "Кофейня ещё не создана"
@@ -227,17 +237,17 @@ export default function BusinessSidebar() {
       )}
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3" aria-label="Основное">
-        {BUSINESS_PRIMARY_NAV_ITEMS.filter((item) => !pointMode || item.id === "home" || item.id === "music" || item.id === "settings").map((item) => (
+        {primaryItems.map((item) => (
           <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
-        {pointMode ? null : (
+        {secondaryItems.length ? (
         <div
           className="my-2 border-t border-[var(--biz-border)]"
           role="separator"
           aria-hidden
         />
-        )}
-        {BUSINESS_SECONDARY_NAV_ITEMS.filter(() => !pointMode).map((item) => (
+        ) : null}
+        {secondaryItems.map((item) => (
           <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
       </nav>
