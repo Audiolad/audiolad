@@ -723,6 +723,83 @@ for (const select of [(p: SpaOnlinePlayer) => p.previous(), (p: SpaOnlinePlayer)
   assert.equal(c.running, false);
 }
 
+// 34. Pause during a skip, then the old track leaves the manifest: its fade is still
+// audible, so it stops at once (the guard follows the sounding track, not the chosen one).
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const next = p.next();
+  c.advance(300);
+  await p.toggle();
+  await next;
+  assert.equal(m.paused, false);
+  await p.applyManifest([item(2), item(3), item(4)]);
+  assert.equal(m.paused, true, "removed old track stops immediately");
+  await flush();
+  assert.equal(m.src, "");
+  assert.equal(p.status, "paused");
+  assert.equal(p.current?.title, "T2");
+}
+
+// 35. Same, but the manifest shortens the old track's playable_until: hard stop then.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const next = p.next();
+  c.advance(300);
+  await p.toggle();
+  await next;
+  await p.applyManifest([{ ...item(1), playableUntil: new Date(c.now() + 300) }, item(2), item(3), item(4)]);
+  c.advance(280);
+  assert.equal(m.paused, false);
+  c.advance(40);
+  assert.equal(m.paused, true, "old track stops at its new playable_until");
+  await flush();
+  assert.equal(m.src, "");
+  assert.equal(p.current?.title, "T2");
+}
+
+// 36. While the previous track fades out it is the audible one (reports / position), and
+// the chosen track takes over once it starts.
+{
+  const { c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  assert.equal(p.fadingOutPrevious, false);
+  assert.equal(p.audibleItemId, item(1).audioItemId);
+  const next = p.next();
+  assert.equal(p.current?.title, "T2");
+  assert.equal(p.fadingOutPrevious, true);
+  assert.equal(p.audibleItemId, item(1).audioItemId);
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await next;
+  assert.equal(p.fadingOutPrevious, false);
+  assert.equal(p.audibleItemId, item(2).audioItemId);
+}
+
+// 37. The chosen track leaves the manifest during the skip: no hard cut of the previous
+// one; the same fade continues and the first allowed track starts from silence.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const next = p.next();
+  c.advance(300);
+  m.events.length = 0;
+  const low = m.volume;
+  const moved = p.applyManifest([item(1), item(3), item(4)]);
+  assert.equal(m.paused, false, "no cut");
+  c.advance(40);
+  assert.ok(m.volume < low);
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await Promise.all([next, moved]);
+  assert.equal(p.status, "playing");
+  assert.equal(p.current?.title, "T1");
+  for (const e of m.events) if (e.kind !== "src") assert.equal(e.volume, 0, `${e.kind} only at zero gain`);
+}
+
 // 19. Wiring: both Business players route the element through FadingAudio and set the
 // volume through it (cabinet / hall device, guest /guest/coffee).
 for (const file of [

@@ -16,7 +16,7 @@ import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
-import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
+import { runPointCommands } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
@@ -268,8 +268,10 @@ export function BusinessCabinetPlayerProvider({
     const audio = audioRef.current;
     const ctl = ctlRef.current;
     if (!audio || !ctl) return;
-    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(ctl.current));
-    const report = evidenceRef.current.report(state, ctl.current?.audioItemId ?? null, Date.now());
+    // During a skip fade-out the element still sounds the previous track: report that one.
+    const audible = ctl.audibleItemId;
+    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible));
+    const report = evidenceRef.current.report(state, audible, Date.now());
     sendSpaLiveReport(
       (live) => postPointReport({ kind: "playback", report: live }),
       report,
@@ -332,6 +334,8 @@ export function BusinessCabinetPlayerProvider({
     );
     ctlRef.current = ctl;
     const onTime = () => {
+      // Skip fade-out: these updates belong to the previous track, not the chosen one.
+      if (ctl.fadingOutPrevious) return;
       evidenceRef.current.onTimeUpdate(audio.currentTime, Date.now(), audio.paused);
       setView((prev) => ({
         ...prev,
@@ -480,12 +484,12 @@ export function BusinessCabinetPlayerProvider({
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
         if (json.commands.length > 0) refreshPointSoundRef.current();
-        for (const row of json.commands) {
-          if (stop || !isPointCommandType(row.type)) continue;
-          const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
-          if (action === "toggle") await toggleRef.current();
-          if (action === "next") await nextRef.current();
-        }
+        await runPointCommands(json.commands.map((row) => row.type), {
+          status: () => ctlRef.current?.status ?? "idle",
+          toggle: () => toggleRef.current(),
+          next: () => nextRef.current(),
+          stopped: () => stop,
+        });
       } catch {
         /* the next poll retries; a claimed command is not returned again */
       } finally {

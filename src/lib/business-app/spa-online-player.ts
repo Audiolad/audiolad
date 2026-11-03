@@ -71,6 +71,8 @@ export class SpaOnlinePlayer {
   /** Source still sounding, which may differ from the immediately selected UI row. */
   private soundingId: string | null = null;
   private switching = false;
+  /** Track under the soft-fade rights guard (armFadeGuard); null when none is armed. */
+  private fadeGuardId: string | null = null;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -81,6 +83,19 @@ export class SpaOnlinePlayer {
 
   get current(): SpaManifestItem | null {
     return this.index >= 0 ? (this.items[this.index] ?? null) : null;
+  }
+
+  /**
+   * Skip fade-out: the element still sounds the previous track while `current` already is
+   * the chosen one. Its time updates belong to the previous track (no evidence / position).
+   */
+  get fadingOutPrevious(): boolean {
+    return this.soundingId !== null && this.soundingId !== (this.current?.audioItemId ?? null);
+  }
+
+  /** Track the element is actually producing (the previous one during a skip fade-out). */
+  get audibleItemId(): string | null {
+    return this.fadingOutPrevious ? this.soundingId : (this.current?.audioItemId ?? null);
   }
 
   private set(status: OnlineStatus, message: string | null = null) {
@@ -96,6 +111,7 @@ export class SpaOnlinePlayer {
   private clearDeadline() {
     if (this.deadlineTimer !== null) (this.d.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>)))(this.deadlineTimer);
     this.deadlineTimer = null;
+    this.fadeGuardId = null;
   }
 
   /** Track's playable_until has passed (rights window over). */
@@ -138,6 +154,7 @@ export class SpaOnlinePlayer {
    */
   private armFadeGuard(id: string, op: number) {
     this.clearDeadline();
+    this.fadeGuardId = id;
     const item = this.fresh(id);
     if (!item?.playableUntil) return;
     const ms = Math.max(0, item.playableUntil.getTime() - this.now());
@@ -147,6 +164,7 @@ export class SpaOnlinePlayer {
       if (op !== this.op || this.disposed) return;
       const cur = this.fresh(id);
       if (cur && !this.expired(cur)) return this.armFadeGuard(id, op);
+      this.fadeGuardId = null;
       this.d.audio.pause();
     }, Math.min(ms, 2 ** 31 - 1));
   }
@@ -344,10 +362,15 @@ export class SpaOnlinePlayer {
     const currentId = this.current?.audioItemId ?? null;
     const wasActive = this.status === "playing" || this.status === "loading";
     this.items = items;
-    if (this.switching && this.soundingId) {
-      const old = this.fresh(this.soundingId);
-      if (!old || this.expired(old)) this.d.audio.pause();
-      else this.armFadeGuard(this.soundingId, this.op);
+    // A soft fade (pause, or the previous track during a skip) is still audible: guard the
+    // SOUNDING track, which may differ from the selected one. Removed / expired: stop now.
+    const guarded = this.fadeGuardId;
+    if (guarded) {
+      const old = this.fresh(guarded);
+      if (!old || this.expired(old)) {
+        this.clearDeadline();
+        this.d.audio.pause();
+      } else this.armFadeGuard(guarded, this.op);
     }
     const idx = currentId ? items.findIndex((i) => i.audioItemId === currentId) : -1;
     if (idx >= 0) {
@@ -355,13 +378,18 @@ export class SpaOnlinePlayer {
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
       if (this.expired(items[idx])) return this.onDeadline(wasActive);
       if (this.status === "playing") this.armDeadline(currentId as string, this.op);
-      else if (!this.switching && this.status === "paused" && this.deadlineTimer !== null) this.armFadeGuard(currentId as string, this.op);
       this.d.onChange();
       return;
     }
     if (currentId === null) {
       this.d.onChange();
       return;
+    }
+    if (this.switching && items.length > 0) {
+      // The chosen track left the manifest during the skip fade-out: switch to the first
+      // allowed one and keep the same fade (no hard cut of the previous track).
+      this.index = -1;
+      return this.playIndex(0);
     }
     this.op++;
     this.stopAudio();
