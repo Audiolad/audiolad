@@ -24,17 +24,20 @@
 
 Все цели уходят через `sendYandexGoal` – только в production, только после согласия, без параметров.
 
-| Идентификатор цели | Когда отправляется | Файл |
-| --- | --- | --- |
-| `business_atlas_listen_clicked` | Нажали «Слушать» в Атласе | `CoffeeAtlasListen.tsx` |
-| `business_atlas_cta_clicked` | Перешли из Атласа к подбору звучания или в кабинет | `CoffeeAtlasGoalLink.tsx`, `CoffeeAtlasChrome.tsx` |
-| `business_atlas_shop_opened` | Открыли карточку кофейни в Атласе | `CoffeeAtlasGoalLink.tsx` |
-| `business_atlas_pdf_opened` / `business_atlas_pdf_downloaded` | Открыли или скачали PDF Атласа | `CoffeeAtlasGoalLink.tsx` |
-| `business_four_cups_clicked` – новая | Нажали MAX или Telegram «4 чашки» в SEO-статье | `src/components/business/vertical-guides/GuideMaxButton.tsx` |
-| `business_cabinet_signed_in` – новая | Сервер подтвердил вход в кабинет | `BusinessAudienceTracker.tsx` |
-| `business_trial_access_confirmed` – новая | Сервер подтвердил действующие 7 дней в подарок | там же |
-| `business_paid_access_confirmed` – новая | Сервер подтвердил оплаченный период | там же |
-| `business_access_used_confirmed` – новая | У аккаунта есть или был подарочный либо платный период | там же |
+| Идентификатор цели | Название цели в Метрике | Когда отправляется | Файл |
+| --- | --- | --- | --- |
+| `business_atlas_coffee_listen_clicked` | Атлас кофеен – нажали «Слушать» | Нажали «Слушать» в Атласе кофеен | `CoffeeAtlasListen.tsx` |
+| `business_atlas_coffee_cta_clicked` | Атлас кофеен – переход к звучанию | Перешли из Атласа кофеен к подбору звучания или в кабинет | `CoffeeAtlasChrome.tsx` |
+| `business_atlas_coffee_shop_opened` | Атлас кофеен – открыли кофейню | Открыли карточку кофейни в Атласе кофеен | `CoffeeAtlasOverview.tsx`, `CoffeeAtlasShopView.tsx`, `CoffeeAtlasChrome.tsx` |
+| `business_atlas_coffee_pdf_downloaded` | Атлас кофеен – скачали PDF | Скачали PDF Атласа кофеен | `CoffeeAtlasChrome.tsx` |
+| `business_atlas_coffee_pdf_opened` | Атлас кофеен – открыли PDF | В списке разрешённых на будущее; сейчас на странице только кнопка «Скачать», цель не отправляется | – |
+| `business_four_cups_clicked` | Кофейни – клик «4 чашки» | Нажали MAX или Telegram «4 чашки» в SEO-статье | `src/components/business/vertical-guides/GuideMaxButton.tsx` |
+| `business_cabinet_signed_in` | Кабинет кофеен – вошли | Сервер подтвердил вход в кабинет | `BusinessAudienceTracker.tsx` |
+| `business_trial_access_confirmed` | Кабинет кофеен – 7 дней в подарок | Сервер подтвердил действующие 7 дней в подарок | там же |
+| `business_paid_access_confirmed` | Кабинет кофеен – оплаченный доступ | Сервер подтвердил оплаченный период | там же |
+| `business_access_used_confirmed` | Кабинет кофеен – доступ уже получал | У аккаунта есть или был подарочный либо платный период | там же |
+
+Цели Атласа кофеен содержат `coffee` в идентификаторе, чтобы будущие атласы (рестораны, спа) получили свои отдельные цели и не смешивались с кофейнями. Пять целей `business_four_cups_clicked`, `business_cabinet_signed_in`, `business_trial_access_confirmed`, `business_paid_access_confirmed`, `business_access_used_confirmed` не переименовывались – они уже созданы в Метрике. Если цели Атласа ранее создавались со старыми идентификаторами без `coffee`, их нужно изменить на новые – старые больше не отправляются.
 
 Цели кабинета берутся из серверного состояния доступа, а не из нажатий кнопок, поэтому отказ или ошибка оплаты платную цель не дают. Одна и та же цель шлётся один раз за открытую вкладку – повторные рендеры, SPA-переходы и защитная перезагрузка не дублируют. Во вкладке (sessionStorage) хранятся только названия уже отправленных целей, без ID аккаунта и дат, в Метрику это не уходит. Устройство заведения в режиме точки целей не шлёт и Метрику не грузит.
 
@@ -42,7 +45,7 @@
 
 ## Карта адресов
 
-- Атлас: `https://audiolad.ru/b/atlas-kofeen` и 10 страниц `/b/atlas-kofeen/{caffe-florian, cafe-de-flore, coffee-collective, fuglen-tokyo, starbucks-reserve-shanghai, cafe-tortoni, cafe-san-alberto, truth-coffee-roasting, single-o-surry-hills, la-colombe}`.
+- Атлас кофеен: `https://audiolad.ru/b/atlas-kofeen` и 10 страниц `/b/atlas-kofeen/{caffe-florian, cafe-de-flore, coffee-collective, fuglen-tokyo, starbucks-reserve-shanghai, cafe-tortoni, cafe-san-alberto, truth-coffee-roasting, single-o-surry-hills, la-colombe}`.
 - SEO-статьи о кофейнях: `https://audiolad.ru/b/coffee` и `/b/coffee/<статья>`.
 - Воронка «4 чашки»: кнопки в статьях ведут во внешний бот (MAX / Telegram), поэтому измеряется клик – цель `business_four_cups_clicked`.
 - Кабинет кофеен: `https://coffee.audiolad.ru/` (гостевое прослушивание), `/cabinet`, `/music`, `/onboarding`, `/profile`; старый адрес из PDF – `https://business.audiolad.ru/guest/coffee`.
@@ -53,10 +56,10 @@
 
 | Название сегмента | Условие | Зачем |
 | --- | --- | --- |
-| `АЛ Кофейни – Атлас – посетители` | Страница входа или просмотренная страница: URL содержит `audiolad.ru/b/atlas-kofeen` | Все, кто смотрел Атлас и его 10 кофеен |
+| `АЛ Кофейни – Атлас кофеен – посетители` | Страница входа или просмотренная страница: URL содержит `audiolad.ru/b/atlas-kofeen` | Все, кто смотрел Атлас кофеен и его 10 кофеен |
 | `АЛ Кофейни – SEO-статьи – посетители` | URL содержит `audiolad.ru/b/coffee` | Читатели SEO-статей |
 | `АЛ Кофейни – SEO – из поиска` | Источник «Переходы из поисковых систем» И страница входа содержит `audiolad.ru/b/coffee` или `audiolad.ru/b/atlas-kofeen` | Оценка органики |
-| `АЛ Кофейни – интерес` | Достигнута любая из целей `business_atlas_listen_clicked`, `business_atlas_cta_clicked`, `business_four_cups_clicked` ИЛИ просмотр `coffee.audiolad.ru` / `business.audiolad.ru/guest/coffee` | Заинтересованные – слушали, пошли в воронку или в кабинет |
+| `АЛ Кофейни – интерес` | Достигнута любая из целей `business_atlas_coffee_listen_clicked`, `business_atlas_coffee_cta_clicked`, `business_four_cups_clicked` ИЛИ просмотр `coffee.audiolad.ru` / `business.audiolad.ru/guest/coffee` | Заинтересованные – слушали, пошли в воронку или в кабинет |
 | `АЛ Кофейни – кабинет – вошли` | Достигнута цель `business_cabinet_signed_in` | Вошедшие в кабинет |
 | `АЛ Кофейни – исключение – доступ получен` | Достигнута любая из целей `business_trial_access_confirmed`, `business_paid_access_confirmed`, `business_access_used_confirmed` | Исключать из всех продающих аудиторий |
 | `АЛ Кофейни – исключение – платят` | Достигнута цель `business_paid_access_confirmed` | Отдельный контроль платящих |
@@ -67,7 +70,7 @@
 
 | Название условия | «Выполнено хотя бы одно», 30 дней | «Не выполнено ни одного», 90 дней |
 | --- | --- | --- |
-| `АЛ Кофейни – Атлас – 7 дней в подарок` | Сегмент `АЛ Кофейни – Атлас – посетители` | Цели `business_trial_access_confirmed`, `business_paid_access_confirmed`, `business_access_used_confirmed` |
+| `АЛ Кофейни – Атлас кофеен – 7 дней в подарок` | Сегмент `АЛ Кофейни – Атлас кофеен – посетители` | Цели `business_trial_access_confirmed`, `business_paid_access_confirmed`, `business_access_used_confirmed` |
 | `АЛ Кофейни – интерес – 7 дней в подарок` | Сегмент `АЛ Кофейни – интерес` | те же три цели |
 | `АЛ Кофейни – кабинет без подарка – 7 дней` | Цель `business_cabinet_signed_in` | те же три цели |
 
@@ -76,7 +79,7 @@
 ## Что сделать в Яндексе вручную (один раз)
 
 1. Метрика → счётчик `110799004` → «Настройка» → «Счётчик»: проверить, что в дополнительных адресах есть `coffee.audiolad.ru` и `business.audiolad.ru` (или включён учёт поддоменов `audiolad.ru`). Иначе данные кабинета могут отфильтроваться.
-2. «Настройка» → «Цели» → «Добавить цель» → тип «JavaScript-событие» (в новом интерфейсе – «Целевое событие») → «Идентификатор совпадает» → по одной цели на каждый идентификатор из таблицы целей. Цели Атласа, если уже созданы, не дублировать. Без созданной цели в интерфейсе вызов `reachGoal` в отчётах не виден.
+2. «Настройка» → «Цели» → «Добавить цель» → тип «JavaScript-событие» (в новом интерфейсе – «Целевое событие») → «Идентификатор совпадает» → по одной цели на каждый идентификатор из таблицы целей, название – из колонки «Название цели в Метрике». Пять целей кабинета и «4 чашек» уже созданы – их не дублировать; создать 5 целей Атласа кофеен с `coffee` в идентификаторе. Без созданной цели в интерфейсе вызов `reachGoal` в отчётах не виден.
 3. Создать сегменты из таблицы выше.
 4. Директ: зайти под тем Яндекс-логином, у которого есть доступ к счётчику (или в Метрике «Настройка» → «Доступ» выдать доступ логину Директа – пароли никому не передаются).
 5. Создать три условия ретаргетинга из таблицы. Кампании не создавать.
@@ -98,7 +101,7 @@
 
 1. Новое окно в режиме инкогнито, открыть `https://audiolad.ru/b/atlas-kofeen?_ym_debug=2`. До «Разрешить» в DevTools → Network нет запросов к `mc.yandex.ru`.
 2. Нажать «Разрешить». Появляется один `tag.js` и запросы `watch/110799004`. Перейти на 2 кофейни и назад – по одному просмотру на переход.
-3. Нажать «Слушать» и PDF – в консоли `_ym_debug` видны `reachGoal business_atlas_listen_clicked` и `business_atlas_pdf_opened`.
+3. Нажать «Слушать» и PDF – в консоли `_ym_debug` видны `reachGoal business_atlas_coffee_listen_clicked` и `business_atlas_coffee_pdf_downloaded`.
 4. Открыть статью `https://audiolad.ru/b/coffee/...`, нажать кнопку «4 чашки» – `business_four_cups_clicked`.
 5. Перейти на `https://coffee.audiolad.ru/` – появляется тот же баннер, после «Разрешить» загружается тот же счётчик `110799004`.
 6. Войти тестовым аккаунтом без подарка – `business_cabinet_signed_in`. Получить 7 дней в подарок штатно – `business_trial_access_confirmed` и `business_access_used_confirmed`. Реальную оплату ради теста не проводить.

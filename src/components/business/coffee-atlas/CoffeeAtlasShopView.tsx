@@ -179,7 +179,7 @@ export default function CoffeeAtlasShopView({ shop, previous, next, tracks }: Co
           <div className="atlas-wrap atlas-pager__grid">
             <CoffeeAtlasGoalLink
               href={buildCoffeeAtlasShopPath(previous.slug)}
-              goal="business_atlas_shop_opened"
+              goal="business_atlas_coffee_shop_opened"
               className="atlas-pager__link atlas-pager__link--prev"
             >
               <span className="atlas-pager__dir">← Назад</span>
@@ -193,7 +193,7 @@ export default function CoffeeAtlasShopView({ shop, previous, next, tracks }: Co
             </Link>
             <CoffeeAtlasGoalLink
               href={buildCoffeeAtlasShopPath(next.slug)}
-              goal="business_atlas_shop_opened"
+              goal="business_atlas_coffee_shop_opened"
               className="atlas-pager__link atlas-pager__link--next"
             >
               <span className="atlas-pager__dir">Далее →</span>
