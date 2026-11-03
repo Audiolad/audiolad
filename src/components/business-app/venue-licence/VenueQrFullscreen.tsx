@@ -32,8 +32,8 @@ export function VenueQrSvg({ url, label }: { url: string; label: string }) {
       className="business-venue-qr-full__svg"
       data-testid="biz-venue-qr-svg"
     >
-      <rect width={size} height={size} fill="#ffffff" />
-      <path d={d} fill="#000000" />
+      <rect width={size} height={size} fill="white" />
+      <path d={d} fill="black" />
     </svg>
   );
 }

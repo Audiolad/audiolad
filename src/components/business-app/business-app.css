@@ -707,8 +707,9 @@
   justify-content: center;
   gap: 0.75rem;
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
-  background: #ffffff;
-  color: #000000;
+  /* Scanner-friendly: pure black on white regardless of theme. */
+  background: white;
+  color: black;
   text-align: center;
 }
 .business-venue-qr-full__title {
@@ -717,7 +718,8 @@
 }
 .business-venue-qr-full__hint {
   font-size: 1rem;
-  color: #333333;
+  color: black;
+  opacity: 0.8;
 }
 .business-venue-qr-full__code {
   width: min(100%, calc(100dvh - 15rem), 32rem);

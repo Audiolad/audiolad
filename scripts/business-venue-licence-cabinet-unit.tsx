@@ -138,7 +138,7 @@ async function main() {
   assert.ok(card.indexOf('data-testid="biz-venue-qr-show"') < card.indexOf('data-testid="biz-venue-print-text"'), "«Показать QR-код» comes before the print options");
   assert.equal(card.includes("target=\"_blank\""), false, "no new tab from the block");
   const qrMarkup = renderToStaticMarkup(<VenueQrSvg url={venueLicencePublicUrl(PUBLIC_A)} label="qr" />);
-  assert.match(qrMarkup, /fill="#000000"/);
+  assert.match(qrMarkup, /fill="black"/);
   assert.ok(qrMarkup.length > 2000, "the fullscreen QR encodes the licence page");
   const full = read("src/components/business-app/venue-licence/VenueQrFullscreen.tsx");
   assert.match(full, /qrMatrix\(url\)/, "the fullscreen QR uses the same encoder as the sticker");
