@@ -85,3 +85,9 @@ API: [официальная справка Mail.ru JS API](https://top.mail.ru/
 - `npm run lint`, `npm run build` – не запущены: `npm: command not found`. node_modules отсутствует. Новый тест также доступен как `npm run test:vk-ads` в штатном окружении.
 - Браузерный сценарий, TypeScript и реальный SDK/VK cabinet – не проверены. Локальные unit tests не заменяют эти проверки.
 - Следующий шаг: указать существующий источник рекламного согласия аккаунта, подключить его вместо unknown и проверить отзыв; затем ID/привязка в кабинете и стендовый smoke по пунктам выше. Незавершённое: реальный consent binding, payment_success confirmation, vendor revocation, полный lint/build/browser, приём в VK, создание аудиторий. Нельзя считать AC 2–6 полностью выполненными.
+
+## Передача результата
+
+Изменены восемь файлов: `package.json`, `src/app/layout.tsx`, `src/components/analytics/VkAdsPixel.tsx`, `src/lib/analytics/vk-ads.mjs`, `src/components/business-app/BusinessAccessLine.tsx`, `src/components/business-app/BusinessGuestStartCta.tsx`, `scripts/vk-ads-unit.mjs`, этот отчёт.
+
+Исходная рабочая `.git` read-only: git add/commit там запрещены файловой системой. Проверенный коммит создан на той же ветке в локальной копии Git `/tmp/audiolad-task-511c4b4b-review`, работающей с текущими файлами. Shell push не прошёл (DNS github.com); gh отсутствует. GitHub-коннектор прочитал исходный commit и подтвердил отсутствие task branch, но создание ветки вернуло `MCP tool call requires approval, but approval policy is never`. Поэтому удалённая ветка и Draft PR не созданы. Полный diff сохранён в `/tmp/task-511c4b4b.patch`, заготовка PR – `/tmp/task-511c4b4b-pr.md`. Следующая сессия: перенести проверенный diff в доступную для записи рабочую копию требуемой ветки, выполнить проверки, опубликовать только `ai-company/task-511c4b4b` и создать Draft PR; затем устранить перечисленные функциональные блокеры. Никаких изменений production или issues не выполнялось.
