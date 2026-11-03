@@ -500,6 +500,11 @@
   box-shadow: 0 8px 20px rgba(42, 26, 16, 0.08);
 }
 
+/* Template v2: text-only atlas card (no photo). */
+.guide-atlas-card.guide-atlas-card--text {
+  grid-template-rows: 1fr;
+}
+
 .guide-atlas-card__media {
   position: relative;
   display: block;
@@ -1007,6 +1012,10 @@
 
   .b2b-guide a.guide-atlas-hero {
     grid-template-columns: 1fr 220px;
+  }
+
+  .b2b-guide a.guide-atlas-hero.guide-atlas-hero--text {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -505,6 +505,8 @@ assert.match(view, /<GuideAtlasCardsBanner neutral=\{Boolean\(article\.infograph
 assert.match(cardsBanner, /10 кофеен – 10 городов мира/);
 assert.match(cardsBanner, /neutral \? `Кофейня №\$\{shop\.number\}`/);
 assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__tags">/);
+assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__media">/, "v2 cards without shop photos");
+assert.match(view, /<GuideAtlasHeroBanner textOnly=\{Boolean\(article\.infographic\)\} \/>/);
 for (const shop of COFFEE_ATLAS_SHOPS) {
   assert.ok(ATLAS_CARD_THEMES[shop.slug], shop.slug);
   assert.ok(existsSync(join(root, "public/business/atlas-kofeen", `${shop.slug}-hero.webp`)), shop.slug);
@@ -514,6 +516,7 @@ const heroBanner = read(`${guideDir}/GuideAtlasHeroBanner.tsx`);
 assert.equal((heroBanner.match(/<Link\b/g) ?? []).length, 1);
 assert.match(heroBanner, /Кофе · люди · города · вдохновение/);
 assert.match(heroBanner, /Почему сюда возвращаются\?/);
+assert.match(heroBanner, /\{textOnly \? null : \(\s*<span className="guide-atlas-hero__cover">/, "v2 hero banner without cover photo");
 assert.match(heroBanner, /cover\.webp/);
 
 const checklist = read(`${guideDir}/GuideChecklist.tsx`);

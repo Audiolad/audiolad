@@ -110,7 +110,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
         <GuideSections sections={[article.partTwo[2]]} />
         <GuideExpertCard slot={article.expertTwo} />
         <GuideSteps steps={article.steps} />
-        <GuideAtlasHeroBanner />
+        <GuideAtlasHeroBanner textOnly={Boolean(article.infographic)} />
 
         <section className="guide-wrap guide-block">
           <GuideChecklist
