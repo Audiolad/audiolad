@@ -20,7 +20,12 @@ function useClientMounted(): boolean {
   );
 }
 
-export default function AnalyticsConsentBanner() {
+/** Business hosts have no /privacy route: they pass the absolute audiolad.ru policy URL. */
+export default function AnalyticsConsentBanner({
+  privacyHref = "/privacy#section-8",
+}: {
+  privacyHref?: string;
+} = {}) {
   const consent = useAnalyticsConsent();
   const mounted = useClientMounted();
 
@@ -54,9 +59,15 @@ export default function AnalyticsConsentBanner() {
           Для обезличенной статистики посещений мы используем Яндекс Метрику.
           Персональные данные не передаются. Метрика загружается только после
           вашего согласия.{" "}
-          <Link href="/privacy#section-8" className="text-[#7042c5] underline">
-            Подробнее в политике
-          </Link>
+          {/^https?:\/\//i.test(privacyHref) ? (
+            <a href={privacyHref} className="text-[#7042c5] underline">
+              Подробнее в политике
+            </a>
+          ) : (
+            <Link href={privacyHref} className="text-[#7042c5] underline">
+              Подробнее в политике
+            </Link>
+          )}
           .
         </p>
 

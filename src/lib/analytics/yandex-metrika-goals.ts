@@ -25,13 +25,18 @@ export const YANDEX_METRIKA_CORE_GOALS = [
   "author_application_submitted",
 ] as const satisfies readonly PlatformAnalyticsEventName[];
 
-/** Guest «Атлас звучания кофеен мира» (/b/atlas-kofeen): PDF, CTA, switching, listening. */
+/** Coffee atlas, SEO funnel exits and server-confirmed Business access states. */
 export const YANDEX_METRIKA_BUSINESS_ATLAS_GOALS = [
   "business_atlas_pdf_opened",
   "business_atlas_pdf_downloaded",
   "business_atlas_cta_clicked",
   "business_atlas_shop_opened",
   "business_atlas_listen_clicked",
+  "business_four_cups_clicked",
+  "business_cabinet_signed_in",
+  "business_trial_access_confirmed",
+  "business_paid_access_confirmed",
+  "business_access_used_confirmed",
 ] as const;
 
 export type YandexMetrikaBusinessAtlasGoalName =

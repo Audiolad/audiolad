@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { sendYandexGoal } from "@/lib/analytics/yandex-metrika";
 
 import {
   FOUR_CUPS_MAX_HREF,
@@ -21,6 +24,7 @@ export default function GuideMaxButton({ placement }: { placement: "slider" | "f
         rel="nofollow noopener noreferrer"
         data-four-cups-max="true"
         data-max-placement={placement}
+        onClick={() => sendYandexGoal("business_four_cups_clicked")}
       >
         <span className="guide-max__icon" aria-hidden="true">
           <Image src="/school/messengers/max.png" alt="" width={36} height={36} />
@@ -34,6 +38,7 @@ export default function GuideMaxButton({ placement }: { placement: "slider" | "f
         rel="nofollow noopener noreferrer"
         data-four-cups-tg="true"
         data-max-placement={placement}
+        onClick={() => sendYandexGoal("business_four_cups_clicked")}
       >
         <span className="guide-max__icon" aria-hidden="true">
           <Image src="/school/messengers/telegram.png" alt="" width={36} height={36} />
