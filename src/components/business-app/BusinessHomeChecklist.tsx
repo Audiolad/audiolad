@@ -3,12 +3,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { BusinessPayError, useBusinessHomePay } from "@/components/business-app/BusinessHomeAccessCard";
+import {
+  BusinessOfferAcceptNote,
+  BusinessOfferAcceptedNote,
+  BusinessPayError,
+  BusinessReceiptEmailField,
+  useBusinessHomePay,
+} from "@/components/business-app/BusinessHomeAccessCard";
 import { BizDocumentsIcon, BizMusicIcon, BizSettingsIcon } from "@/components/business-app/BusinessIcons";
 import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, BUSINESS_PERIOD_ENDED_PAY_NOTE, BUSINESS_SUBSCRIPTION_NOTE, businessGiftPriceNote } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import type { BusinessHomeStep, BusinessHomeStepIcon } from "@/lib/business-app/home-checklist";
-import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
 
 const STEP_ICONS: Record<BusinessHomeStepIcon, (props: { className?: string }) => ReactNode> = {
   music: BizMusicIcon,
@@ -84,7 +89,8 @@ export default function BusinessHomeChecklist({
   /** Terms and payment steps: the owner's own side only, never the venue side or a hall device. */
   showAccess?: boolean;
 }) {
-  const { access, hasTerm, canPay, accepted, busy, error, accept, pay } = useBusinessHomePay();
+  const { access, hasTerm, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } =
+    useBusinessHomePay();
   const withAccess = showAccess && canPay && hasTerm && access.endsAt != null;
   const label = access.endsAt ? formatMoscowDateTime(new Date(access.endsAt)) : "";
   const paid = access.mode === "paid";
@@ -109,13 +115,7 @@ export default function BusinessHomeChecklist({
         })}
         {withAccess ? (
           <Step id="terms" index={steps.length + 1} done={accepted} title="Примите условия">
-            <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-              {accepted ? "Условия приняты: " : "Прочитайте и примите: "}
-              <Link href={BUSINESS_OFFER_HREF} data-testid="biz-home-offer-link">
-                {BUSINESS_OFFER_TITLE}
-              </Link>
-              .
-            </p>
+            {accepted ? <BusinessOfferAcceptedNote /> : <BusinessOfferAcceptNote />}
             {accepted ? null : (
               <button
                 type="button"
@@ -163,6 +163,9 @@ export default function BusinessHomeChecklist({
             )}
             <div className="space-y-2" data-testid="biz-home-pay">
               <p className="text-sm leading-6 text-[var(--biz-text-muted)]">{businessGiftPriceNote()}</p>
+              {accepted && askReceiptEmail ? (
+                <BusinessReceiptEmailField control={{ value: receiptEmail, onChange: setReceiptEmail }} busy={busy} />
+              ) : null}
               {accepted ? (
                 <button
                   type="button"
