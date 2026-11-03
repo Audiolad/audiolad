@@ -6,6 +6,7 @@ import { type FormEvent, useState } from "react";
 
 import PasswordInput from "@/components/ui/PasswordInput";
 import { safeBusinessNextPath } from "@/lib/business-app/cabinet-mode";
+import { runHallAuthExclusive } from "@/lib/business-app/hall-auth-lock";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -32,20 +33,14 @@ export default function BusinessOwnerUnlockForm({ defaultEmail, next }: { defaul
     setBusy(true);
     setError(null);
     try {
-      const { error: signInError } = await createClient().auth.signInWithPassword({ email: login, password });
+      // Serialized with the hall cleanup (BusinessCabinetModeBanner): it never ends this new session.
+      const { error: signInError } = await runHallAuthExclusive(() => createClient().auth.signInWithPassword({ email: login, password }));
       if (signInError) {
         setError("Неверная почта или пароль.");
         setBusy(false);
         return;
       }
       setPassword("");
-      // A device cookie revoked from the owner's phone (for example on the owner's own phone) is
-      // dropped now, so this browser is the owner cabinet again; an alive one stays (hall device).
-      await fetch("/api/business/point", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "forget-revoked" }),
-      }).catch(() => undefined);
       router.replace(safeBusinessNextPath(next));
       router.refresh();
     } catch {

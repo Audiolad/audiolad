@@ -29,6 +29,8 @@ export type BusinessCabinetServerMode = {
   staleOwnerSession?: boolean;
   /** Account session id on the hall device: the cleanup signs out only this one. */
   hallSessionId?: string | null;
+  /** The device cookie here was revoked from the owner's phone: during an unlock the owner may forget it. */
+  hallDeviceRevoked?: boolean;
   /** A signed-in person may look at the cabinet «как видит точка». */
   canPreview: boolean;
 };

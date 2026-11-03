@@ -14,7 +14,7 @@ import {
   type BusinessCabinetPermission,
 } from "@/lib/business-app/cabinet-mode";
 import { BUSINESS_VIEW_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
-import { businessHallDeviceCookie } from "@/lib/business-app/point-session.server";
+import { businessHallDeviceCookie, businessPointDeviceStatus, type BusinessPointDeviceStatus } from "@/lib/business-app/point-session.server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -51,6 +51,8 @@ export type BusinessCabinetModeState = {
    * exactly that session and never a fresh unlock made in the meantime.
    */
   hallSessionId: string | null;
+  /** The device cookie as checked: only "alive" sends player reports; "revoked" offers «забыть». */
+  deviceStatus: BusinessPointDeviceStatus;
 };
 
 /**
@@ -66,7 +68,8 @@ async function revokeStaleHallSession(): Promise<void> {
     if (!jwt) return;
     after(async () => {
       try {
-        await createServiceRoleClient().auth.admin.signOut(jwt, "local");
+        const { error } = await createServiceRoleClient().auth.admin.signOut(jwt, "local");
+        if (error) console.warn("[business] hall session sign-out failed", error.status ?? error.name);
       } catch {
         // The browser cleanup (BusinessCabinetModeBanner) and the next request try again.
       }
@@ -90,7 +93,7 @@ export const loadBusinessCabinetMode = cache(async (): Promise<BusinessCabinetMo
   const previewChosen = !pointAlive && parseBusinessEntry((await cookies()).get(BUSINESS_VIEW_COOKIE)?.value) === "venue";
   const canPreview = previewChosen && typeof (await loadBusinessClaims())?.sub === "string";
   const mode = resolveBusinessCabinetMode({ pointAlive, ownerUnlocked: ownerUnlockUntil !== null, previewChosen, canPreview });
-  return { mode, pointAlive, ownerUnlockUntil, staleOwnerSession, hallSessionId };
+  return { mode, pointAlive, ownerUnlockUntil, staleOwnerSession, hallSessionId, deviceStatus: await businessPointDeviceStatus() };
 });
 
 /**

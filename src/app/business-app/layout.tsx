@@ -55,7 +55,8 @@ export default async function BusinessAppLayout({
   // owner | preview | point from one table (cabinet-mode.ts): the hall device is the venue side
   // until the owner re-enters the password on it; the owner's preview never reports as a point.
   const cabinet = await loadBusinessCabinetMode();
-  const pointReports = businessPointReports(cabinet);
+  // A revoked or unchecked device cookie keeps the hall menu but sends no player reports.
+  const pointReports = businessPointReports(cabinet) && cabinet.deviceStatus === "alive";
   const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;
   // ba344b7f: live gift / paid state (read-only) – such a visitor never sees the guest strip.
   // The hall device shows the venue's period, not the account that may be signed in on it.
@@ -80,6 +81,7 @@ export default async function BusinessAppLayout({
     ownerUnlockUntil: cabinet.ownerUnlockUntil,
     staleOwnerSession: cabinet.staleOwnerSession,
     hallSessionId: cabinet.hallSessionId,
+    hallDeviceRevoked: cabinet.deviceStatus === "revoked",
     canPreview: domain.status === "authenticated",
   };
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).

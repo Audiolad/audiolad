@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
+import { runHallAuthExclusive } from "@/lib/business-app/hall-auth-lock";
 import { createClient } from "@/lib/supabase/client";
 
 /** session_id of the access token held by this browser (only compared, never trusted for access). */
@@ -24,23 +25,21 @@ function tokenSessionId(accessToken: string | undefined): string | null {
  * that session: a fresh unlock made meanwhile on «Кабинет владельца» stays.
  */
 async function signOutThisBrowser(onlySessionId?: string | null): Promise<void> {
-  const supabase = createClient();
-  const sessionMatches = async () => {
-    if (onlySessionId === undefined) return true;
-    const { data } = await supabase.auth.getSession();
-    const current = tokenSessionId(data.session?.access_token);
-    // No session left: nothing to end. Unknown id on either side: end it (fail closed), unless a
-    // different, known session is there now.
-    if (!data.session) return false;
-    return onlySessionId === null || current === null || current === onlySessionId;
-  };
-  if (!(await sessionMatches())) return;
-  await supabase.rpc("unlink_analytics_identity").then(
-    () => undefined,
-    () => undefined,
-  );
-  if (!(await sessionMatches())) return;
-  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  await runHallAuthExclusive(async () => {
+    const supabase = createClient();
+    if (onlySessionId !== undefined) {
+      const { data } = await supabase.auth.getSession();
+      // No session left: nothing to end. A different, known session (a fresh unlock): keep it.
+      if (!data.session) return;
+      const current = tokenSessionId(data.session.access_token);
+      if (onlySessionId !== null && current !== null && current !== onlySessionId) return;
+    }
+    await supabase.rpc("unlink_analytics_identity").then(
+      () => undefined,
+      () => undefined,
+    );
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  });
 }
 
 /** «до 18:40» in the device's own clock (the owner stands next to it). */
@@ -60,8 +59,10 @@ export default function BusinessCabinetModeBanner() {
   const cabinet = useBusinessCabinetMode();
   const { setEntry } = useBusinessEntry();
   const router = useRouter();
-  const unlockUntil = cabinet.mode === "owner" && cabinet.pointReports ? cabinet.ownerUnlockUntil : null;
+  const unlockUntil = cabinet.mode === "owner" ? cabinet.ownerUnlockUntil : null;
   const [locking, setLocking] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+  const [forgetError, setForgetError] = useState<string | null>(null);
   const staleOwnerSession = cabinet.mode === "point" && cabinet.staleOwnerSession === true;
   const hallSessionId = cabinet.hallSessionId ?? null;
 
@@ -128,6 +129,41 @@ export default function BusinessCabinetModeBanner() {
         >
           Вернуть режим точки
         </button>
+        {cabinet.hallDeviceRevoked ? (
+          // Permanent change only by this explicit choice: the device was revoked from the owner's
+          // phone, and the owner (password just entered) says this is not a hall device.
+          <>
+            <p className="business-app-mode-banner__text" data-testid="biz-forget-device-text">
+              Это устройство отключено от заведения. Если это ваш телефон, а не устройство в зале, его можно забыть – тогда пароль здесь больше не понадобится.
+            </p>
+            {forgetError ? <p className="text-sm text-[var(--biz-danger)]">{forgetError}</p> : null}
+            <button
+              type="button"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+              data-testid="biz-forget-device"
+              disabled={forgetting}
+              onClick={async () => {
+                setForgetting(true);
+                setForgetError(null);
+                const ok = await fetch("/api/business/point", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "forget-revoked" }),
+                })
+                  .then(async (res) => res.ok && ((await res.json()) as { cleared?: unknown }).cleared === true)
+                  .catch(() => false);
+                if (!ok) {
+                  setForgetError("Не получилось. Попробуйте ещё раз.");
+                  setForgetting(false);
+                  return;
+                }
+                router.refresh();
+              }}
+            >
+              Забыть устройство
+            </button>
+          </>
+        ) : null}
       </div>
     );
   }

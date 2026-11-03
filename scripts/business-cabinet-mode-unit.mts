@@ -144,7 +144,14 @@ assert.match(route, /body\.action === "forget-revoked"[\s\S]{0,500}loadBusinessO
 assert.match(server, /if \(staleOwnerSession\) await revokeStaleHallSession\(\);/, "stale hall session ended on the auth server, no JS needed");
 assert.match(server, /auth\.admin\.signOut\(jwt, "local"\)/);
 assert.match(banner, /signOutThisBrowser\(hallSessionId\)/, "cleanup bound to the stale session id");
-assert.match(banner, /current === onlySessionId/);
+assert.match(banner, /current !== onlySessionId\) return;/);
+// Codex review3: no automatic forget; cleanup and password sign-in serialized; admin sign-out checked.
+assert.doesNotMatch(read("src/components/business-app/BusinessOwnerUnlockForm.tsx"), /forget-revoked/, "unlock never makes a hall device permanent owner");
+assert.match(read("src/components/business-app/BusinessOwnerUnlockForm.tsx"), /runHallAuthExclusive\(\(\) => createClient\(\)\.auth\.signInWithPassword/);
+assert.match(banner, /await runHallAuthExclusive\(async \(\) => \{/);
+assert.match(banner, /cabinet\.hallDeviceRevoked \? \([\s\S]*?action: "forget-revoked"[\s\S]*?Забыть устройство/, "permanent forget only by an explicit button");
+assert.match(server, /const \{ error \} = await createServiceRoleClient\(\)\.auth\.admin\.signOut\(jwt, "local"\);\n\s*if \(error\)/);
+assert.match(read("src/app/business-app/layout.tsx"), /businessPointReports\(cabinet\) && cabinet\.deviceStatus === "alive"/, "only a live device reports");
 const workspaceLoad = read("src/lib/business-workspace/load.server.ts");
 assert.equal((workspaceLoad.match(/if \(await businessHallDeviceLocked\(\)\) return/g) ?? []).length, 2, "workspace page and actor: no account fallback on the hall device");
 assert.match(read("src/app/api/business/guest-start/route.ts"), /async function handle\(request: Request\) \{\n[\s\S]{0,200}if \(await businessHallDeviceLocked\(\)\)/, "no new venue from the hall device, before any sign-in");
