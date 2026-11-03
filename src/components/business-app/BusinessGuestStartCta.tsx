@@ -28,7 +28,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
   const key = useRef<string | null>(null);
-  if (!enabled) return <a href={href} className={className} data-testid={testId}>{children}</a>;
+  if (!enabled) return <a href={href} className={className} data-testid={testId} data-vk-gift-interest>{children}</a>;
 
   async function start() {
     if (!accepted || busy.current) return;
@@ -59,7 +59,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
   }
 
   return <div data-testid={`${testId}-guest-start`}>
-    <button type="button" className={className} data-testid={testId} aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
+    <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
     {open ? <div className="space-y-3 py-3" data-testid={`${testId}-confirmation`}>
       <p>{copy.terms}</p>
       <p><a href={BUSINESS_OFFER_HREF} target="_blank" rel="noreferrer">Условия для бизнеса</a>{" · "}<a href="https://audiolad.ru/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p>

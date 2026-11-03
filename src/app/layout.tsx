@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import VkAdsPixel from "@/components/analytics/VkAdsPixel";
 import { headers } from "next/headers";
 
 import BaseProviders from "@/components/providers/BaseProviders";
@@ -68,6 +70,8 @@ export default async function RootLayout({
   return (
     <html lang="ru" className="bg-platform-surface">
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
+        {/* Advertising consent authority is not present in this checkout. Fail closed. */}
+        <Suspense fallback={null}><VkAdsPixel accountAdvertisingConsent="unknown" /></Suspense>
         {isBusinessHost ? children : <BaseProviders>{children}</BaseProviders>}
       </body>
     </html>
