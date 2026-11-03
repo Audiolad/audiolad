@@ -2,9 +2,10 @@ import { headers } from "next/headers";
 import Link from "next/link";
 
 import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
-import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { getHostnameFromHeaders, venueLicencePublicUrl } from "@/lib/business-app/host";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
+import InspectorContactCard from "@/components/business-app/InspectorContactCard";
 import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
 
 import {
@@ -49,6 +50,8 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <InspectorContactCard qrUrl={sticker ? venueLicencePublicUrl(sticker.publicId) : null} />
+
       <section className="business-app-card" data-testid="client-documents">
         <h1 className="text-[1.45rem] font-bold tracking-tight text-[var(--biz-text)]">
           Документы
@@ -75,7 +78,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
                 </div>
                 <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
-                <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть полный текст</span>
+                <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
               </a>
             </li>
           ))}

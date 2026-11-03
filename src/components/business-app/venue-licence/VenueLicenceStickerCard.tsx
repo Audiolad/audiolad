@@ -1,7 +1,11 @@
 import { venueLicencePublicUrl } from "@/lib/business-app/host";
+import VenueQrShowButton from "@/components/business-app/venue-licence/VenueQrFullscreen";
 import VenueStickerItem from "@/components/business-app/venue-licence/VenueStickerItem";
 
 export const VENUE_STICKER_CARD_TITLE = "QR-наклейка с подтверждением прав на музыку";
+export const VENUE_QR_PHONE_TEXT =
+  "Пришёл проверяющий – откройте QR-код на телефоне и дайте отсканировать: по нему откроется подтверждение прав на музыку.";
+export const VENUE_QR_PRINT_TEXT = "Можно один раз распечатать и держать в папке с документами или у кассы.";
 
 /**
  * Cabinet block with the venue's own sticker (task 90d24628).
@@ -17,6 +21,7 @@ export default function VenueLicenceStickerCard({
   publicId: string;
 }) {
   const titleId = "venue-sticker-title";
+  const publicUrl = venueLicencePublicUrl(publicId);
   return (
     <section
       className="business-app-card space-y-3"
@@ -26,19 +31,13 @@ export default function VenueLicenceStickerCard({
       <h2 id={titleId} className="text-[1.15rem] font-bold text-[var(--biz-text)]">
         {VENUE_STICKER_CARD_TITLE}
       </h2>
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Наклейте QR-код у кассы или поставьте табличку на стол. Гость наводит камеру телефона и видит, что у кофейни
-        есть лицензия на музыку и до какого числа она действует.
+      <p className="text-[0.98rem] leading-6 text-[var(--biz-text)]" data-testid="biz-venue-qr-text">
+        {VENUE_QR_PHONE_TEXT}
       </p>
-      <a
-        href={venueLicencePublicUrl(publicId)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block text-sm font-semibold text-[var(--biz-accent)] underline underline-offset-2 business-app-focus-ring"
-        data-testid="biz-venue-sticker-page"
-      >
-        Открыть страницу проверки
-      </a>
+      <VenueQrShowButton url={publicUrl} />
+      <p className="pt-2 text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-venue-print-text">
+        {VENUE_QR_PRINT_TEXT}
+      </p>
       <div className="business-venue-sticker__actions">
         <VenueStickerItem locationId={locationId} format="square80" />
         <VenueStickerItem locationId={locationId} format="a6" />

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import type { StickerFormat } from "@/lib/business-app/venue-licence/sticker";
+import { modalHost, useModalDialog } from "./useModalDialog";
 import { venueStickerFilename, venueStickerHref } from "@/lib/business-app/venue-licence/sticker-links";
 
 /** What the owner sees for each print file. The file name stays technical. */
@@ -59,32 +60,15 @@ export default function VenueStickerItem({ locationId, format }: { locationId: s
 function VenueStickerPreview({ href, format, onClose }: { href: string; format: StickerFormat; onClose: () => void }) {
   const item = VENUE_STICKER_ITEMS[format];
   const closeRef = useRef<HTMLButtonElement>(null);
-  const onCloseRef = useRef(onClose);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const titleId = `venue-sticker-preview-title-${format}`;
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCloseRef.current();
-    };
-    document.addEventListener("keydown", onKey);
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
-      previous?.focus?.();
-    };
-  }, []);
+  useModalDialog(overlayRef, cardRef, closeRef, onClose);
 
   const dialog: ReactNode = (
     <div
+      ref={overlayRef}
       className="business-venue-confirm business-venue-sticker-preview"
       data-testid="biz-venue-sticker-preview-overlay"
       onClick={(event) => {
@@ -92,6 +76,7 @@ function VenueStickerPreview({ href, format, onClose }: { href: string; format: 
       }}
     >
       <div
+        ref={cardRef}
         className="business-app-card business-venue-sticker-preview__card"
         role="dialog"
         aria-modal="true"
@@ -147,6 +132,5 @@ function VenueStickerPreview({ href, format, onClose }: { href: string; format: 
   );
 
   if (typeof document === "undefined") return dialog;
-  const host = document.querySelector<HTMLElement>(".business-app-root") ?? document.body;
-  return createPortal(dialog, host);
+  return createPortal(dialog, modalHost());
 }

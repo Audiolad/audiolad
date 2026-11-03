@@ -327,3 +327,33 @@ console.log("business-app-client-documents-unit OK");
   }
   console.log("business-app-client-documents-unit: r6 liability OK");
 }
+
+// «Документы» opens with one calm step: call Sergey (owner 03.11.2026 13:30).
+{
+  const { INSPECTOR_CONTACT, INSPECTOR_CARD_TITLE, INSPECTOR_CARD_LINES } = await import("../src/lib/business-app/inspector-contact");
+  const card = readFileSync("src/components/business-app/InspectorContactCard.tsx", "utf8");
+  const docs = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+  assert.equal(INSPECTOR_CARD_TITLE, "Пришёл инспектор или предписание? Просто позвоните Сергею");
+  assert.equal(INSPECTOR_CONTACT.name, "Сергей Петров");
+  assert.equal(INSPECTOR_CONTACT.phoneDisplay, "+7 926 411 1381");
+  assert.equal(INSPECTOR_CONTACT.phoneHref, "tel:+79264111381");
+  assert.equal(INSPECTOR_CONTACT.emailHref, "mailto:1@audiolad.ru");
+  assert.match(INSPECTOR_CONTACT.maxHref, /^https:\/\/max\.ru\/u\//);
+  assert.ok(readFileSync("src/components/school/SchoolFaqScreen.tsx", "utf8").includes(INSPECTOR_CONTACT.maxHref), "MAX link is the confirmed one");
+  assert.deepEqual([...INSPECTOR_CARD_LINES], [
+    "Покажите проверяющему документы ниже – кнопка «Посмотреть» откроет их на телефоне.",
+    "Ничего не подписывайте и не оплачивайте до разговора с Сергеем.",
+  ]);
+  for (const text of [INSPECTOR_CARD_TITLE, ...INSPECTOR_CARD_LINES, card]) assert.doesNotMatch(text, /\u2014/);
+  assert.match(card, /business-app-btn-cta[^"]*"\s+data-testid="biz-inspector-call"/, "«Позвонить» is the green main button");
+  assert.match(card, /Написать в МАКС/);
+  assert.match(card, /Написать на почту/);
+  assert.ok(docs.indexOf("<InspectorContactCard ") > 0 && docs.indexOf("<InspectorContactCard ") < docs.indexOf('data-testid="client-documents"'), "card is at the very top");
+  assert.match(docs, />Посмотреть<\/span>/, "documents open with «Посмотреть», as the card says");
+}
+{
+  const card = readFileSync("src/components/business-app/InspectorContactCard.tsx", "utf8");
+  const docs = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+  assert.match(card, /<VenueQrShowButton url=\{qrUrl\} variant="secondary" testId="biz-inspector-qr-show" \/>/, "inspector card opens the QR too");
+  assert.match(docs, /<InspectorContactCard qrUrl=\{sticker \? venueLicencePublicUrl\(sticker\.publicId\) : null\} \/>/);
+}
