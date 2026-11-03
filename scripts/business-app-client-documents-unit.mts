@@ -345,15 +345,104 @@ console.log("business-app-client-documents-unit OK");
     "Ничего не подписывайте и не оплачивайте до разговора с Сергеем.",
   ]);
   for (const text of [INSPECTOR_CARD_TITLE, ...INSPECTOR_CARD_LINES, card]) assert.doesNotMatch(text, /\u2014/);
-  assert.match(card, /business-app-btn-cta[^"]*"\s+data-testid="biz-inspector-call"/, "«Позвонить» is the green main button");
-  assert.match(card, /Написать в МАКС/);
-  assert.match(card, /Написать на почту/);
+  // v2 (Sergey 03.11.2026 14:43): buttons in this order, email only as a button.
+  const { INSPECTOR_BUTTONS } = await import("../src/lib/business-app/inspector-contact");
+  assert.equal(INSPECTOR_CONTACT.maxHref, "https://max.ru/u/f9LHodD0cOI9Z0TpTY6vON-AsaLO2UKjrEHxKZb8SoKf46sX5Bvih-n5QjQ");
+  assert.equal(INSPECTOR_CONTACT.telegramHref, "https://t.me/p_e_t_r_o_v");
+  assert.deepEqual({ ...INSPECTOR_BUTTONS }, {
+    call: "Позвонить",
+    max: "Написать в МАКС",
+    telegram: "Написать в Телеграм",
+    email: "Написать на почту 1@audiolad.ru",
+    qr: "Показать QR-код с подтверждением прав на музыку",
+  });
+  const shared = readFileSync("src/components/business-app/SergeyContactActions.tsx", "utf8");
+  const { INSPECTOR_CONTACT_ORDER, PROFILE_HELP_CONTACT_ORDER, PROFILE_HELP_CONTACT_TITLE, SERGEY_CONTACT } = await import("../src/lib/business-app/sergey-contact");
+  assert.equal(INSPECTOR_CONTACT, SERGEY_CONTACT, "one contacts config");
+  assert.deepEqual([...INSPECTOR_CONTACT_ORDER], ["phone", "call", "max", "telegram", "email"]);
+  assert.match(card, /<SergeyContactActions order=\{INSPECTOR_CONTACT_ORDER\} testIdPrefix="biz-inspector">/);
+  const order = ["{INSPECTOR_CONTACT.name}", "<SergeyContactActions ", 'testId="biz-inspector-qr-show"', "INSPECTOR_CARD_LINES.map"].map((m) => card.indexOf(m));
+  assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `card order: name, contacts, QR, lines (${order})`);
+  assert.doesNotMatch(card + shared, /\{c\.email\}/, "no plain email line – only the button");
+  for (const id of ["max", "telegram"]) assert.match(shared, new RegExp(`target="_blank"\\s+rel="noopener noreferrer"[^>]*data-testid=\\{\`\\$\\{testIdPrefix\\}-${id}\``), `${id} opens in a new tab safely`);
+  for (const id of ["call", "email", "phone"]) assert.doesNotMatch(shared.slice(shared.indexOf(`case "${id}"`), shared.indexOf("return", shared.indexOf(`case "${id}"`)) + 400), /target="_blank"/);
+  assert.match(shared, /business-app-btn-cta[^"]*"\s+data-testid=\{`\$\{testIdPrefix\}-call`\}/, "«Позвонить» is green");
+  assert.doesNotMatch(shared, /\u2014|<Link|router\.|location\.href|window\.open/, "no navigation away from the cabinet");
+  // «Профиль» → «Помощь»: the same block first, messengers first (Sergey 14:45).
+  const profile = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+  const help = readFileSync("src/components/business-app/ProfileHelpContact.tsx", "utf8");
+  assert.equal(PROFILE_HELP_CONTACT_TITLE, "По любым вопросам пишите напрямую Сергею Петрову");
+  assert.deepEqual([...PROFILE_HELP_CONTACT_ORDER], ["max", "telegram", "email", "phone", "call"]);
+  assert.match(help, /<SergeyContactActions order=\{PROFILE_HELP_CONTACT_ORDER\} testIdPrefix="biz-profile-contact" \/>/);
+  const helpSection = profile.slice(profile.indexOf('data-testid="biz-profile-help-section"'));
+  assert.ok(helpSection.indexOf("<ProfileHelpContact />") > 0 && helpSection.indexOf("<ProfileHelpContact />") < helpSection.indexOf('data-testid="biz-profile-help"'), "contacts come first in «Помощь»");
+  assert.doesNotMatch(card, /target="_blank"[^>]*data-testid="biz-inspector-(call|email)"/);
   assert.ok(docs.indexOf("<InspectorContactCard ") > 0 && docs.indexOf("<InspectorContactCard ") < docs.indexOf('data-testid="client-documents"'), "card is at the very top");
   assert.match(docs, />Посмотреть<\/span>/, "documents open with «Посмотреть», as the card says");
 }
 {
   const card = readFileSync("src/components/business-app/InspectorContactCard.tsx", "utf8");
   const docs = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
-  assert.match(card, /<VenueQrShowButton url=\{qrUrl\} variant="secondary" testId="biz-inspector-qr-show" \/>/, "inspector card opens the QR too");
+  assert.match(card, /<VenueQrShowButton\s+url=\{qrUrl\}\s+variant="secondary"\s+testId="biz-inspector-qr-show"\s+label=\{INSPECTOR_BUTTONS\.qr\}/, "inspector card opens the QR too, with the explicit label");
   assert.match(docs, /<InspectorContactCard qrUrl=\{sticker \? venueLicencePublicUrl\(sticker\.publicId\) : null\} \/>/);
+}
+
+// Rendered markup (not only source patterns): order, labels, links, targets, classes in both placements.
+{
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { default: InspectorContactCard } = await import("../src/components/business-app/InspectorContactCard");
+  const { default: ProfileHelpContact } = await import("../src/components/business-app/ProfileHelpContact");
+  const { SERGEY_CONTACT: c, SERGEY_CONTACT_LABELS: l } = await import("../src/lib/business-app/sergey-contact");
+  const { INSPECTOR_BUTTONS } = await import("../src/lib/business-app/inspector-contact");
+  const { VENUE_QR_SHOW_LABEL, default: VenueQrShowButton } = await import("../src/components/business-app/venue-licence/VenueQrFullscreen");
+  type El = { id: string; tag: string; attrs: string; text: string };
+  const els = (html: string): El[] =>
+    [...html.matchAll(/<(a|button|p)\b([^>]*data-testid="([^"]+)"[^>]*)>([^<]*)</g)].map((m) => ({ tag: m[1], attrs: m[2], id: m[3], text: m[4] }));
+  const attr = (e: El, n: string) => e.attrs.match(new RegExp(`\\b${n}="([^"]*)"`))?.[1] ?? null;
+  const expectPart = (e: El, part: string) => {
+    const want: Record<string, [string, string | null, string | null, string]> = {
+      phone: ["p", null, null, c.phoneDisplay],
+      call: ["a", c.phoneHref, null, l.call],
+      max: ["a", c.maxHref, "_blank", l.max],
+      telegram: ["a", c.telegramHref, "_blank", l.telegram],
+      email: ["a", c.emailHref, null, l.email],
+    };
+    const [tag, href, target, text] = want[part];
+    assert.equal(e.tag, tag, `${e.id} tag`);
+    assert.equal(attr(e, "href"), href, `${e.id} href`);
+    assert.equal(attr(e, "target"), target, `${e.id} target`);
+    if (target) assert.equal(attr(e, "rel"), "noopener noreferrer", `${e.id} rel`);
+    assert.equal(e.text, text, `${e.id} text`);
+    if (part === "call") assert.match(attr(e, "class") ?? "", /\bbusiness-app-btn-cta\b/, "«Позвонить» is green");
+    if (tag === "a") assert.match(attr(e, "class") ?? "", /\bbusiness-app-focus-ring\b/);
+  };
+
+  const card = els(renderToStaticMarkup(createElement(InspectorContactCard, { qrUrl: "https://business.audiolad.ru/v/0123456789abcdef0123456789abcdef" })));
+  assert.deepEqual(
+    card.map((e) => e.id),
+    ["biz-inspector-name", "biz-inspector-phone", "biz-inspector-call", "biz-inspector-max", "biz-inspector-telegram", "biz-inspector-email", "biz-inspector-qr-show"],
+    "rendered inspector card order",
+  );
+  for (const e of card.slice(1, 6)) expectPart(e, e.id.replace("biz-inspector-", ""));
+  const qr = card[6];
+  assert.equal(qr.tag, "button");
+  assert.equal(qr.text, INSPECTOR_BUTTONS.qr);
+  assert.match(attr(qr, "class") ?? "", /\bbusiness-app-btn-secondary\b.*\bbusiness-contact__btn\b/);
+  assert.equal(els(renderToStaticMarkup(createElement(InspectorContactCard, { qrUrl: null }))).some((e) => e.id === "biz-inspector-qr-show"), false);
+
+  const help = renderToStaticMarkup(createElement(ProfileHelpContact));
+  assert.ok(help.includes(">По любым вопросам пишите напрямую Сергею Петрову</h2>"), "profile help title");
+  const helpEls = els(help);
+  assert.deepEqual(
+    helpEls.map((e) => e.id),
+    ["biz-profile-contact-max", "biz-profile-contact-telegram", "biz-profile-contact-email", "biz-profile-contact-phone", "biz-profile-contact-call"],
+    "rendered profile help order",
+  );
+  for (const e of helpEls) expectPart(e, e.id.replace("biz-profile-contact-", ""));
+
+  // Other VenueQrShowButton callers keep the default label and classes.
+  const def = els(renderToStaticMarkup(createElement(VenueQrShowButton, { url: "https://business.audiolad.ru/v/x", testId: "q" })))[0];
+  assert.equal(def.text, VENUE_QR_SHOW_LABEL);
+  assert.doesNotMatch(attr(def, "class") ?? "", /business-contact__btn|\s$/);
 }

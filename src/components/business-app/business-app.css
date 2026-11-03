@@ -654,32 +654,34 @@
   position: absolute;
 }
 
-/* «Документы»: who to call when an inspector comes. */
-.business-inspector-card__contact {
+/* Sergey's contacts («Документы» inspector card, «Профиль» → «Помощь»). */
+.business-contact__name {
   margin-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  font-weight: 600;
+  color: var(--biz-text);
 }
-.business-inspector-card__phone {
+.business-contact__phone {
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--biz-text);
 }
-.business-inspector-card__actions {
-  margin-top: 1rem;
+.business-contact__actions {
+  margin-top: 0.75rem;
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.6rem;
 }
-.business-inspector-card__call {
+.business-contact__call {
   min-height: 3.25rem;
   font-size: 1.1rem;
 }
-.business-inspector-card__qr {
-  margin-top: 0.6rem;
-  display: grid;
+/* Long labels («…с подтверждением прав на музыку») wrap readably at 390px. */
+.business-contact__btn {
+  padding: 0.55rem 1.1rem;
+  text-align: center;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 .business-inspector-card__lines {
   margin-top: 1rem;
