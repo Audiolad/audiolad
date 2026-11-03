@@ -74,8 +74,7 @@ export default function PrivacyPage() {
           </p>
 
           <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-            {/* Дата ставится в день выкладки. */}
-            Последнее обновление: [дата публикации]
+            Последнее обновление: 3 ноября 2026 года
           </p>
 
           <Section id="section-1" title="1. Общие положения">

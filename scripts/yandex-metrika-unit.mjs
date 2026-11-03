@@ -145,4 +145,10 @@ testProvidersAndSettings();
 testPrivacyContract();
 testNoDuplicateEmitters();
 
+{
+  const goals = readFileSync(resolve(ROOT, "src/lib/analytics/yandex-metrika-goals.ts"), "utf8");
+  if (goals.includes("business_atlas_coffee_pdf_opened")) throw new Error("pdf_opened must not be an allowed Metrika goal");
+  if (!goals.includes('"business_atlas_coffee_pdf_downloaded"')) throw new Error("pdf_downloaded goal missing");
+}
+
 console.log("yandex-metrika-unit: ok");
