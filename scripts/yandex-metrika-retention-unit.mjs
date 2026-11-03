@@ -233,4 +233,12 @@ for (const path of ["/documents/abc", "/point", "/player", "/coffee-handoff", "/
 }
 window.location.pathname = "/music";
 assert.equal(sendYandexGoal("business_cabinet_signed_in"), true);
+{
+  const { readFileSync } = await import("node:fs");
+  const tracker = readFileSync(new URL("../src/components/business-app/BusinessAudienceTracker.tsx", import.meta.url), "utf8");
+  assert.ok(tracker.includes("isBusinessNoAnalyticsRoute(window.location.pathname || pathname)"), "excluded business routes are guarded on SPA navigation");
+  assert.ok(tracker.includes("if (metrikaLoadedInDocument()) window.location.reload();"), "loaded counter is dropped by a full document reload");
+  assert.ok(tracker.includes('document.getElementById("yandex-metrika-tag")'), "a still-loading tag also counts as loaded");
+}
+
 console.log("yandex-metrika-retention-unit: ok");
