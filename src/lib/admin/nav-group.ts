@@ -18,6 +18,7 @@ const CHILD_LABELS: Record<string, string> = {
   "/admin/business-admissions": "Допуски музыки",
   "/admin/business-verification": "Проверка правообладателей",
   "/admin/business-track-review": "Прослушивание треков",
+  "/admin/business-trials": "Подарочная неделя",
 };
 
 export function isAudioladBusinessNavHref(href: string): boolean {

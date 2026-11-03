@@ -2,9 +2,10 @@
  * Data model of a B2B vertical guide article (reference: «Кофе в зёрнах для кофейни»).
  *
  * The page renders these slots in a fixed order (docs/business/coffee-guides/TEMPLATE.md):
- * header → H1 + intro → «Четыре чашки» slider → partOne[0] → atlas cover banner →
+ * header → H1 + intro → [infographic] → «Коротко» → partOne[0] → «Четыре чашки» slider →
  * partOne[1] → table → partTwo[0] → expertOne → partTwo[1] → «10 кофеен» banner →
- * partTwo[2] → expertTwo → steps → checklist → FAQ → final cups block → «Читайте также».
+ * partTwo[2] → expertTwo → steps → atlas cover banner → checklist → FAQ → final cups block →
+ * «Читайте также». The slot in brackets is optional (article template v2, pilot set 11).
  * Text and inserts alternate: never two text sections in a row. A new article only fills
  * this data; it never adds its own markup.
  */
@@ -97,6 +98,41 @@ export type GuideFigure = {
   caption: string;
 };
 
+/** One node of a schematic infographic: a short label and one explaining line. */
+export type GuideInfographicNode = {
+  title: string;
+  text: string;
+};
+
+/**
+ * Simple schematic infographic (template v2): 3–5 nodes explaining the topic, rendered as
+ * real text by `GuideInfographic` right after the direct answer. Only facts from the brief;
+ * no invented numbers.
+ */
+export type GuideInfographic = {
+  id: string;
+  /** steps – ordered sequence; structure – a whole and its parts; comparison – options side by side. */
+  kind: "steps" | "structure" | "comparison";
+  /** Short visible heading of the scheme. */
+  title: string;
+  /** `structure` only: the whole that the nodes make up. */
+  center?: string;
+  /** 3–5 nodes. */
+  nodes: GuideInfographicNode[];
+  /** Text equivalent of the whole scheme for screen readers (aria-describedby). */
+  description: string;
+  /** Visible caption: what the scheme is based on and its limits. */
+  caption: string;
+};
+
+/** Generated text card (own artwork, not a photo) for social previews and JSON-LD. */
+export type GuideOgImage = {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+};
+
 export type VerticalGuideArticle = {
   verticalId: "coffee";
   slug: string;
@@ -110,13 +146,25 @@ export type VerticalGuideArticle = {
    * phrase is not in that file.
    */
   relatedQueries: Array<{ phrase: string; frequency: number | null; note: string }>;
+  /**
+   * ISO dates (YYYY-MM-DD). Owner decision: never rendered on the page.
+   * Used only in JSON-LD Article, sitemap lastmod and article:*_time meta.
+   */
+  publishedAt: string;
+  updatedAt: string;
   /** Social preview and JSON-LD image. Not rendered in the article header. */
   hero: GuideFigure;
-  /** Paragraphs right under the H1. */
-  intro: string[];
-  /** Heading above the «Четыре чашки» slider. */
+  /** Text card for og:image and JSON-LD (public/images/b/coffee/og/<slug>.png). */
+  ogImage: GuideOgImage;
+  /** Paragraphs right under the H1 (may carry internal links). */
+  intro: GuideParagraph[];
+  /** Template v2: schematic infographic between the direct answer (intro) and «Коротко». */
+  infographic?: GuideInfographic;
+  /** «Коротко» box under the intro: 3–5 one-sentence takeaways. */
+  summary: string[];
+  /** Lead-in above the «Четыре чашки» slider (shown after partOne[0], not a heading). */
   question: string;
-  /** [0] before the atlas cover banner, [1] before the table. */
+  /** [0] before the «Четыре чашки» slider, [1] before the table. */
   partOne: [GuideSection, GuideSection];
   table: GuideTable;
   expertOne: GuideExpertSlot;
@@ -143,6 +191,8 @@ export type B2BVertical = {
   kicker: string;
   byline?: string;
   intro: string;
+  /** «О разделе» block on the section index (anchor #o-razdele); byline links there. */
+  about?: string[];
   /** Venue landing reserved by the business page, when one exists. */
   reservedVenuePath: string | null;
 };

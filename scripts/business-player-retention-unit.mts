@@ -56,7 +56,7 @@ await runPlayerRetention({ BUSINESS_PLAYER_RETENTION_ENABLED: "TRUE", BUSINESS_P
   assert.fail("enable gate requires literal true");
 }, log);
 
-const sql = readFileSync(new URL("../supabase/migrations/20270211120000_business_player_history_retention.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../supabase/migrations/20270215120000_business_player_history_retention.sql", import.meta.url), "utf8");
 assert.match(sql, /CREATE INDEX CONCURRENTLY IF NOT EXISTS business_player_listening_history_retention_idx\s+ON public\.business_player_listening_history \(last_confirmed_at, id\)/);
 assert.ok(sql.indexOf("CREATE INDEX CONCURRENTLY") < sql.indexOf("\nBEGIN;"), "concurrent index precedes transaction");
 assert.match(sql, /CREATE OR REPLACE FUNCTION/);

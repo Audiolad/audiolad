@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
+
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
+import { businessEntrySwitchAction, type BusinessEntry } from "@/lib/business-app/live-refresh";
 
 type EntryOption = {
   id: "person" | "venue";
@@ -21,8 +26,11 @@ type EntryOption = {
  */
 export default function BusinessEntrySwitcher() {
   const domain = useBusinessDomain();
+  const hostname = useBusinessHostname();
   const point = usePointMode();
   const { entry, setEntry } = useBusinessEntry();
+  const router = useRouter();
+  const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const [hint, setHint] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -52,6 +60,22 @@ export default function BusinessEntrySwitcher() {
 
   if (domain.status !== "authenticated" || !domain.location) return null;
 
+  /**
+   * The switch used to change only client state that the home screen reads, so on any other
+   * screen nothing changed and on home the top of the page looked the same. Now the cabinet
+   * opens home for the chosen side (or re-reads it at once when already there) and scrolls up.
+   */
+  const switchTo = (next: BusinessEntry) => {
+    setEntry(next);
+    const action = businessEntrySwitchAction(pathname);
+    if (action.kind === "navigate") {
+      router.push(action.href === "/" ? businessCabinetHomePath(hostname) : action.href);
+      return;
+    }
+    window.scrollTo({ top: 0 });
+    router.refresh();
+  };
+
   const person = domain.owner.firstName.trim();
   const venue = domain.location.name.trim() || "Кофейня";
   const personOn = !point && entry === "person";
@@ -70,7 +94,7 @@ export default function BusinessEntrySwitcher() {
           return;
         }
         setHint(null);
-        setEntry("person");
+        switchTo("person");
       },
     },
     {
@@ -80,7 +104,7 @@ export default function BusinessEntrySwitcher() {
       selected: venueOn,
       onSelect: () => {
         setHint(null);
-        if (!point) setEntry("venue");
+        if (!point) switchTo("venue");
       },
     },
   ];
@@ -215,7 +239,7 @@ export default function BusinessEntrySwitcher() {
       {hint ? (
         <p className="business-entry-switcher__hint" role="status" data-testid="biz-entry-hint">
           {hint}{" "}
-          <a href="https://audiolad.ru/auth/sign-in">Войти</a>
+          <a href={businessAuthHref(hostname, "sign-in")}>Войти</a>
         </p>
       ) : null}
     </div>

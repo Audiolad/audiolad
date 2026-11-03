@@ -1,5 +1,8 @@
 import { isAnalyticsConsentGranted } from "@/lib/analytics/analytics-consent";
-import { shouldEnableYandexMetrika } from "@/lib/analytics/yandex-metrika-environment";
+import {
+  isBusinessAnalyticsHost,
+  shouldEnableYandexMetrika,
+} from "@/lib/analytics/yandex-metrika-environment";
 import {
   isYandexMetrikaGoalName,
   YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
@@ -32,7 +35,12 @@ export const YANDEX_METRIKA_GOALS = new Set<YandexMetrikaGoalName>([
   ...YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
 ]);
 
+export const YANDEX_METRIKA_READY_EVENT = "audiolad:metrika-ready";
 let initializedCounterId: number | null = null;
+
+export function isYandexMetrikaReady(): boolean {
+  return initializedCounterId !== null && canUseYandexMetrika();
+}
 
 export function getYandexMetrikaCounterId(): number | null {
   const raw = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID?.trim();
@@ -66,7 +74,7 @@ function canUseYandexMetrika(pathname?: string | null): boolean {
 
     if (
       !shouldEnableYandexMetrika({
-        pathname,
+        pathname: pathname ?? window.location.pathname,
         hostname: window.location.hostname,
       })
     ) {
@@ -92,11 +100,13 @@ export function initYandexMetrika(counterId: number, pathname?: string | null): 
     clickmap: true,
     trackLinks: true,
     accurateTrackBounce: true,
-    webvisor: true,
+    // The signed-in Business cabinet shows account and venue data: no session recording there.
+    webvisor: !isBusinessAnalyticsHost(window.location.hostname),
   });
 
   setupYandexMetrikaPrivacyMasking();
   initializedCounterId = counterId;
+  window.dispatchEvent(new Event(YANDEX_METRIKA_READY_EVENT));
 }
 
 export function reachYandexMetrikaHit(
@@ -123,15 +133,15 @@ export function reachYandexMetrikaHit(
 export function sendYandexGoal(
   goalName: string,
   params?: YandexMetrikaGoalParams | Record<string, unknown> | null,
-): void {
+): boolean {
   if (!isYandexMetrikaGoalName(goalName)) {
-    return;
+    return false;
   }
 
   const counterId = getYandexMetrikaCounterId();
 
   if (!counterId || !canUseYandexMetrika()) {
-    return;
+    return false;
   }
 
   const sanitizedParams = sanitizeYandexMetrikaGoalParams(params);
@@ -144,12 +154,14 @@ export function sendYandexGoal(
   try {
     if (Object.keys(sanitizedParams).length === 0) {
       window.ym!(counterId, "reachGoal", goalName);
-      return;
+      return true;
     }
 
     window.ym!(counterId, "reachGoal", goalName, sanitizedParams);
+    return true;
   } catch {
     // Analytics must not break UX
+    return false;
   }
 }
 

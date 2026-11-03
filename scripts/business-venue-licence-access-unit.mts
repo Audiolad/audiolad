@@ -20,12 +20,12 @@ type Paid = { userId: string; emailHash: string; until: string };
 function fakeReader(grants: GrantRow[], paid: Paid[] = []): PeekReader {
   return {
     async edges(users, hashes) {
-      return [...identities, ...grants].filter((row) => users.includes(row.userId) || hashes.includes(row.emailHash));
+      return [...identities, ...grants].filter((row) => users.includes(row.userId) || (row.emailHash !== null && hashes.includes(row.emailHash))).flatMap(({ emailHash, userId }) => emailHash === null ? [] : [{ emailHash, userId }]);
     },
     async grants(users, hashes) {
       assert.ok(users.includes("previous-account"), "walk access_grant_identities to the previous account");
       assert.ok(hashes.includes("previous-email"), "also walk grant identity edges");
-      return grants.filter((row) => users.includes(row.userId) || hashes.includes(row.emailHash));
+      return grants.filter((row) => users.includes(row.userId) || (row.emailHash !== null && hashes.includes(row.emailHash)));
     },
     async paidStamps(emailHash, userId) {
       assert.equal(userId, owner.userId, "paid access uses the owner's account, not the entire closure");

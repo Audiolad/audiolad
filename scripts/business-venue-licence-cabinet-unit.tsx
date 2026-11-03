@@ -148,7 +148,7 @@ async function main() {
   const stickerInPanel = withSticker.slice(withSticker.lastIndexOf("<section", withSticker.indexOf('data-testid="biz-venue-sticker"')));
   assert.match(stickerInPanel.slice(0, 120), /^<section class="business-app-card[^"]*" data-testid="biz-venue-sticker"/);
   checkCopy(stickerInPanel.slice(0, stickerInPanel.indexOf("</section>")), "panel");
-  assert.match(withSticker, /Управление кофейней/);
+  assert.match(withSticker, /Музыка в зале/);
   assert.ok(withSticker.includes(VENUE_STICKER_CARD_TITLE));
   assert.match(withSticker, /data-placement="venue"/);
   assert.ok(

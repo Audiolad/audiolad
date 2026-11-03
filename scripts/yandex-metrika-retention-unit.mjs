@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 
 import {
   sendYandexGoal,
+  initYandexMetrika,
+  isYandexMetrikaReady,
   resetYandexMetrikaForTests,
 } from "../src/lib/analytics/yandex-metrika.ts";
 import {
@@ -197,5 +199,46 @@ assert.deepEqual(
     browser_environment: "standalone",
   },
 );
+
+resetState();
+assert.equal(sendYandexGoal("business_cabinet_signed_in"), true);
+assert.equal(sendYandexGoal("business_trial_access_confirmed"), true);
+assert.equal(sendYandexGoal("business_paid_access_confirmed"), true);
+assert.equal(sendYandexGoal("business_access_used_confirmed"), true);
+assert.equal(sendYandexGoal("business_four_cups_clicked"), true);
+assert.equal(calls.length, 5);
+window.localStorage.getItem = () => "denied";
+assert.equal(sendYandexGoal("business_paid_access_confirmed"), false);
+assert.equal(calls.length, 5, "revoked consent blocks access goals");
+window.localStorage.getItem = () => "granted";
+window.location.hostname = "business.audiolad.ru";
+window.location.pathname = "/cabinet";
+window.dispatchEvent = () => true;
+globalThis.document = { querySelectorAll: () => [], documentElement: {} };
+globalThis.MutationObserver = class { observe() {} };
+resetState();
+initYandexMetrika(12345678, "/cabinet");
+initYandexMetrika(12345678, "/music");
+assert.equal(calls.length, 1, "same counter initialized only once across SPA routes");
+assert.equal(calls[0][2].webvisor, false, "no Webvisor session recording in the Business cabinet");
+assert.equal(calls[0][2].clickmap, true);
+assert.equal(isYandexMetrikaReady(), true);
+window.localStorage.getItem = () => "denied";
+assert.equal(isYandexMetrikaReady(), false);
+assert.equal(sendYandexGoal("business_cabinet_signed_in"), false);
+window.localStorage.getItem = () => "granted";
+for (const path of ["/documents/abc", "/point", "/player", "/coffee-handoff", "/business-app/documents/x"]) {
+  window.location.pathname = path;
+  assert.equal(sendYandexGoal("business_cabinet_signed_in"), false, `${path} has no Metrika on business hosts`);
+}
+window.location.pathname = "/music";
+assert.equal(sendYandexGoal("business_cabinet_signed_in"), true);
+{
+  const { readFileSync } = await import("node:fs");
+  const tracker = readFileSync(new URL("../src/components/business-app/BusinessAudienceTracker.tsx", import.meta.url), "utf8");
+  assert.ok(!tracker.includes("location.reload"), "never a full reload on in-app navigation (music keeps playing)");
+  assert.ok(tracker.includes("readSentGoals().has(goal)"), "per-tab dedupe survives reloads");
+  assert.ok(tracker.includes("rememberSentGoal(goal)") && !tracker.includes("rememberSentGoal(key)"), "only goal names reach sessionStorage");
+}
 
 console.log("yandex-metrika-retention-unit: ok");

@@ -1,11 +1,16 @@
 "use client";
 
+import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
+import BusinessGuestStartCta from "../BusinessGuestStartCta";
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useBusinessHostname, useBusinessDomain, useGuestStartEnabled } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+
 import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
@@ -20,7 +25,6 @@ import {
 } from "@/components/business-app/sound/AtmosphereAssembling";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
-import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app/access";
 import {
   assembleGuestCoffeeAtmosphere,
@@ -111,11 +115,13 @@ function readStoredProfile(): GuestCoffeeProfile {
 }
 
 export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
+  const hostname = useBusinessHostname();
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
-  // 30-day gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
+  // Gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
   const liveAccess = useHasLiveBusinessAccess();
   const offerGift = guest && !liveAccess;
+  const guestStartEnabled = useGuestStartEnabled();
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
@@ -433,7 +439,9 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           {showExhaustedPanel ? (
             <div className="business-app-card business-sound-limit" role="status" data-testid="biz-sound-exhausted">
               {offerGift ? (
-                <p className="text-[1.05rem] font-bold text-[var(--biz-text)]">{GUEST_COFFEE_COPY.exhaustedBanner}</p>
+                <p className="text-[1.05rem] font-bold text-[var(--biz-text)]" data-testid="biz-sound-exhausted-text">
+                  {guestStartEnabled ? GUEST_COFFEE_COPY.exhaustedBannerGuestStart : GUEST_COFFEE_COPY.exhaustedBanner}
+                </p>
               ) : (
                 <>
                   <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">
@@ -453,12 +461,10 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               ) : null}
               {offerGift ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-guest-register">
+                  {/* 253821e0: one action – the green gift CTA of the top banner, no «Подключить». */}
+                  <BusinessGuestStartCta href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-cta business-app-focus-ring" testId="biz-guest-register" enabledLabel={BUSINESS_GIFT_CTA}>
                     {GUEST_COFFEE_COPY.exhaustedRegister}
-                  </a>
-                  <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring">
-                    Подключить
-                  </Link>
+                  </BusinessGuestStartCta>
                 </div>
               ) : null}
             </div>

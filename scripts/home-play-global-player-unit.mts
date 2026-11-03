@@ -50,7 +50,8 @@ function testSurfacesUseHomePlayButton() {
 function testPreviewUsesCatalogPlayApi() {
   const play = read("src/components/home/HomeProductPlayButton.tsx");
 
-  assert.match(play, /fetchCatalogPlaySession\(authorSlug, productSlug\)/);
+  // Optional exact track (coffee atlas, 30.10.2026); home cards pass no audioItemId.
+  assert.match(play, /fetchCatalogPlaySession\(\s*authorSlug,\s*productSlug,\s*audioItemId \?\? null,?\s*\)/);
   assert.doesNotMatch(play, /resolveCatalogPlaybackMode|previewStartMs|playbackMode/);
   assert.doesNotMatch(play, /canListen|accessState/);
 }

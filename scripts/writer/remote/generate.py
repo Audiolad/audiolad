@@ -27,6 +27,7 @@ PRICES = {
     "openai/gpt-5.5": ("854.00", "5124.00"),
     "google/gemini-3.1-pro-preview": ("341.60", "2049.60"),
     "deepseek-ai/DeepSeek-V4-Pro": ("183.00", "732.00"),
+    "openai/gpt-5.4-mini": ("147.315", "883.89"),
 }
 
 

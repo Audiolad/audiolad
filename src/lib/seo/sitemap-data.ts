@@ -34,7 +34,7 @@ import {
   resolvePracticePublicLastModified,
 } from "@/lib/products/scheduled-publication";
 import { COFFEE_ATLAS_SITEMAP_PATHS } from "@/lib/business/coffee-atlas/sitemap";
-import { listVerticalGuideSitemapPaths } from "@/lib/business/vertical-guides/sitemap";
+import { listVerticalGuideSitemapEntries } from "@/lib/business/vertical-guides/sitemap";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -44,6 +44,8 @@ export const STATIC_SITEMAP_PAGES: Array<{
   path: string;
   changeFrequency: SitemapEntry["changeFrequency"];
   priority: number;
+  /** ISO date for lastmod, only where the page has a reliable content date. */
+  lastModified?: string;
 }> = [
   { path: "/", changeFrequency: "weekly", priority: 1 },
   { path: "/b", changeFrequency: "weekly", priority: 0.8 },
@@ -53,8 +55,8 @@ export const STATIC_SITEMAP_PAGES: Array<{
     changeFrequency: "monthly" as const,
     priority: 0.6,
   })),
-  ...listVerticalGuideSitemapPaths().map((path) => ({
-    path,
+  ...listVerticalGuideSitemapEntries().map((entry) => ({
+    ...entry,
     changeFrequency: "monthly" as const,
     priority: 0.6,
   })),
@@ -133,11 +135,15 @@ export function resolveContentLastModified(
 export function buildStaticSitemapEntries(
   origin: string = getAppOrigin(),
 ): SitemapEntry[] {
-  return STATIC_SITEMAP_PAGES.map((page) => ({
-    url: toAbsoluteSitemapUrl(page.path, origin),
-    changeFrequency: page.changeFrequency,
-    priority: page.priority,
-  }));
+  return STATIC_SITEMAP_PAGES.map((page) => {
+    const lastModified = page.lastModified ? toLastModified(page.lastModified) : undefined;
+    return {
+      url: toAbsoluteSitemapUrl(page.path, origin),
+      changeFrequency: page.changeFrequency,
+      priority: page.priority,
+      ...(lastModified ? { lastModified } : {}),
+    };
+  });
 }
 
 type PracticeSitemapRow = {

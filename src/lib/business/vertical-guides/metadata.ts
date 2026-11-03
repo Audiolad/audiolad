@@ -16,7 +16,7 @@ export function buildVerticalIndexMetadata(verticalId: string): Metadata {
   if (!vertical) {
     return { title: SITE_BRAND, robots: { index: false, follow: false } };
   }
-  const title = `${vertical.title} – ${SITE_BRAND} Бизнес`;
+  const title = `${vertical.title} – ${vertical.byline ?? `${SITE_BRAND} Бизнес`}`;
   const url = verticalGuideCanonical(vertical.path);
   return {
     title,
@@ -49,10 +49,15 @@ export function buildVerticalArticleMetadata(article: VerticalGuideArticle): Met
       type: "article",
       locale: "ru_RU",
       siteName: SITE_BRAND,
+      // article:published_time / article:modified_time – dates are never shown on the page.
+      publishedTime: article.publishedAt,
+      modifiedTime: article.updatedAt,
       images: [
         {
-          url: `${PRODUCTION_APP_ORIGIN}${article.hero.src}`,
-          alt: article.hero.alt,
+          url: `${PRODUCTION_APP_ORIGIN}${article.ogImage.src}`,
+          alt: article.ogImage.alt,
+          width: article.ogImage.width,
+          height: article.ogImage.height,
         },
       ],
     },
@@ -60,6 +65,7 @@ export function buildVerticalArticleMetadata(article: VerticalGuideArticle): Met
       card: "summary_large_image",
       title: article.seoTitle,
       description: article.description,
+      images: [`${PRODUCTION_APP_ORIGIN}${article.ogImage.src}`],
     },
   };
 }

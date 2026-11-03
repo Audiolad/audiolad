@@ -70,14 +70,14 @@ function atMoscow(isoDate: string, hour = 12): Date {
 const start = atMoscow("2026-03-01", 10);
 
 async function main() {
-// ---------------------------------------------------------------- one gift, exact 30*24h
+// ---------------------------------------------------------------- one gift, exact 7*24h (task 39ef47c4, was 30*24h)
 {
   const ends = addGiftPeriod(start);
   assert.equal(ends.getTime() - start.getTime(), BUSINESS_GIFT_MS);
-  assert.equal(BUSINESS_GIFT_MS, 30 * DAY);
+  assert.equal(BUSINESS_GIFT_MS, 7 * DAY);
   assert.equal(isPeriodActive(ends.toISOString(), new Date(ends.getTime() - 1)), true);
   assert.equal(isPeriodActive(ends.toISOString(), ends), false);
-  assert.equal(trialDaysLeft(ends, start), 30);
+  assert.equal(trialDaysLeft(ends, start), 7);
   assert.equal(trialDaysLeft(ends, new Date(ends.getTime() - 1)), 1);
   assert.equal(trialDaysLeft(ends, ends), 0);
   const hash = hashAccessEmail("  Cafe-Trial@Example.test ");
@@ -99,7 +99,7 @@ async function main() {
   assert.equal(first.decision, "issued");
   assert.equal(first.access.mode, "trial");
   assert.equal(first.access.player, true);
-  assert.equal(first.access.daysLeft, 30);
+  assert.equal(first.access.daysLeft, 7);
   assert.equal(store.events.filter((row) => row.name === "trial_started").length, 1);
 
   const again = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: new Date(start.getTime() + DAY) });
@@ -149,7 +149,7 @@ async function main() {
     updatedAt: start.toISOString(),
   });
   const paidUntil = new Date(start.getTime() + 40 * DAY);
-  const during = await recordPaidRenewal(store, { userId: USER_A, email: EMAIL, paidUntil, now: new Date(start.getTime() + 10 * DAY) });
+  const during = await recordPaidRenewal(store, { userId: USER_A, email: EMAIL, paidUntil, now: new Date(start.getTime() + 3 * DAY) });
   assert.equal(during.mode, "paid");
   assert.equal(during.player, true);
   assert.equal(store.grants[0]?.endsAt, originalEnd, "payment during the trial keeps the original gift end");
@@ -169,24 +169,13 @@ async function main() {
   const store = createMemoryAccessGrantStore();
   const issued = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
   const day7 = atMoscow("2026-03-07");
-  const day14 = atMoscow("2026-03-14");
-  const day30 = atMoscow("2026-03-30");
   assert.equal(moscowCalendarDayIndex(start, day7), 6);
-  assert.equal(moscowCalendarDayIndex(start, day14), 13);
-  assert.equal(moscowCalendarDayIndex(start, day30), 29);
   const played = await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: start, action: "play" });
   assert.deepEqual(played, ["first_useful_action"]);
   const playedAgain = await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: start, action: "play" });
   assert.deepEqual(playedAgain, []);
   assert.deepEqual(await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day7, action: "visit" }), ["activity_day_7"]);
-  assert.deepEqual(
-    await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day14, action: "visit" }),
-    ["activity_day_14"],
-  );
-  assert.deepEqual(
-    await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day30, action: "visit" }),
-    ["activity_day_30"],
-  );
+  assert.deepEqual(await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day7, action: "visit" }), [], "day 7 once");
   const graceAt = new Date(Date.parse(issued.grant!.endsAt) + 1000);
   const duringGrace = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: graceAt });
   assert.equal(duringGrace.access.mode, "grace");
@@ -237,7 +226,7 @@ async function main() {
 for (const reverse of [false, true]) {
   const store = createMemoryAccessGrantStore();
   const original = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
-  const other = await activateBusinessTrial(store, { userId: USER_B, email: "second@example.test", now: new Date(start.getTime() + 20 * DAY) });
+  const other = await activateBusinessTrial(store, { userId: USER_B, email: "second@example.test", now: new Date(start.getTime() + 30 * DAY) });
   const collided = await activateBusinessTrial(store, {
     userId: reverse ? USER_A : USER_B,
     email: reverse ? "second@example.test" : EMAIL,
@@ -281,7 +270,8 @@ for (const reverse of [false, true]) {
   assert.equal(workspaceDeadlineDelay(end, deadline - 1), 1);
   assert.equal(workspaceDeadlineDelay(end, deadline), 0);
   assert.equal(workspaceDeadlineDelay(end, deadline + 1), 0);
-  assert.equal(workspaceDeadlineDelay(end, start.getTime()), 2 ** 31 - 1);
+  assert.equal(workspaceDeadlineDelay(end, start.getTime()), BUSINESS_GIFT_MS, "7-day gift fits the timer without the cap");
+  assert.equal(workspaceDeadlineDelay(end, deadline - 30 * DAY), 2 ** 31 - 1);
   for (const pauseFirst of [false, true]) {
     let now = deadline - 1000;
     let playCount = 0;
@@ -457,7 +447,7 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 // ---------------------------------------------------------------- registration metadata, not a second signup system
 {
   const actions = read("src/app/(platform)/auth/sign-up/actions.ts");
-  assert.doesNotMatch(actions, /emailRedirectTo/);
+  assert.match(actions, /emailRedirectTo/);
   assert.doesNotMatch(actions, /activateBusinessTrial|createSupabaseAccessGrantStore/);
   const callback = read("src/app/(platform)/auth/callback/route.ts");
   assert.match(callback, /getSafeNextPath/);
@@ -474,8 +464,8 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   const activateAt = back.indexOf("await activateBusinessTrial");
   assert.ok(confirmAt >= 0 && activateAt > confirmAt, "unconfirmed email never reaches activation");
 
-  async function submit(next: string | null, authError: string | null = null) {
-    const box: { trial?: string } = {};
+  async function submit(next: string | null, authError: string | null = null, host = "audiolad.ru") {
+    const box: { trial?: string; emailRedirectTo?: string } = {};
     const previousCorporateDomains = process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
     process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS = "example.test";
     try {
@@ -490,10 +480,12 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
           next,
         },
         {
+          requestHeaders: async () => new Headers({ host }),
           createClient: async () => ({
             auth: {
-              signUp: async (args: { options?: { data?: Record<string, string> } }) => {
+              signUp: async (args: { options?: { data?: Record<string, string>; emailRedirectTo?: string } }) => {
                 box.trial = args.options?.data?.business_trial;
+                box.emailRedirectTo = args.options?.emailRedirectTo;
                 return {
                   data: { user: authError ? null : { id: USER_A }, session: null },
                   error: authError ? { message: authError } : null,
@@ -505,7 +497,7 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
           onNewListenerCreated: async () => ({ ok: true, status: "sent" }),
         },
       );
-      return { result, trial: box.trial };
+      return { result, trial: box.trial, emailRedirectTo: box.emailRedirectTo };
     } finally {
       if (previousCorporateDomains === undefined) {
         delete process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
@@ -518,9 +510,34 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   const gift = await submit("/auth/business-return");
   assert.equal(gift.result.ok, true);
   assert.equal(gift.trial, "1");
+  const coffeeGift = await submit("/auth/business-return?site=coffee");
+  assert.equal(coffeeGift.result.ok, true);
+  assert.equal(coffeeGift.trial, "1");
+  if (coffeeGift.result.ok) assert.equal(coffeeGift.result.destination, "/auth/business-return?site=coffee");
   const listener = await submit("/profile");
   assert.equal(listener.result.ok, true);
   assert.equal(listener.trial, undefined);
+  const savedFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  try {
+    for (const enabled of [undefined, "1"]) {
+      if (enabled) process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = enabled;
+      else delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+      for (const host of ["audiolad.ru", "business.audiolad.ru", "coffee.audiolad.ru", "evil.test"]) {
+        for (const next of ["/auth/business-return?site=coffee", "https://evil.test", null]) {
+          const signup = await submit(next, null, host);
+          const coffee = enabled && host === "coffee.audiolad.ru";
+          const destination = getSafeNextPath(next, coffee ? "/cabinet" : "/my-practices");
+          assert.equal(signup.emailRedirectTo, coffee
+            ? `https://coffee.audiolad.ru/auth/callback?${new URLSearchParams({ next: destination })}`
+            : undefined);
+          if (signup.result.ok) assert.equal(signup.result.destination, destination);
+        }
+      }
+    }
+  } finally {
+    if (savedFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = savedFlag;
+  }
   const store = createMemoryAccessGrantStore();
   const duplicate = await submit(null, "User already registered");
   assert.equal(duplicate.result.ok, false);
@@ -530,11 +547,11 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 // ---------------------------------------------------------------- screens
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-function wrap(pathname: string, node: React.ReactNode) {
+function wrap(pathname: string, node: React.ReactNode, hostname = "", guestStartEnabled = false) {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={fakeRouter}>
       <PathnameContext.Provider value={pathname}>
-        <BusinessDomainProvider value={anonymous}>{node}</BusinessDomainProvider>
+        <BusinessDomainProvider value={anonymous} hostname={hostname} guestStartEnabled={guestStartEnabled}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
   );
@@ -557,10 +574,10 @@ const playlists: GuestCoffeePlaylist[] = [{
 }];
 {
   const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="ok"><main>page</main></BusinessAppShell>);
-  assert.match(html, /Получить 30 дней бесплатно/, "gift CTA before the meter runs out");
+  assert.match(html, /Получить 7 дней бесплатно/, "gift CTA before the meter runs out");
   assert.doesNotMatch(html, /data-testid="biz-connect"/, "guest banner: one action, no «Подключить»");
   assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-trial-cta"/, "gift CTA is green (pine)");
-  assert.match(html, /30 дней в подарок – полный доступ ко всем функциям/);
+  assert.match(html, /7 дней в подарок – полный доступ ко всем функциям/);
   assert.doesNotMatch(html, /30 минут/, "top banner does not mention the 30 minutes yet");
 }
 {
@@ -572,11 +589,35 @@ const playlists: GuestCoffeePlaylist[] = [{
   assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/);
 }
 {
+  // 253821e0, guest start on: the whole exhausted page (top banner + «Ваша атмосфера») never asks to register.
+  const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="exhausted"><BusinessSoundStudio playlists={playlists} initialLimit="exhausted" /></BusinessAppShell>, "", true);
+  const bar = html.slice(html.indexOf('data-testid="biz-guest-status"'), html.indexOf("</section>", html.indexOf('data-testid="biz-guest-status"')));
+  assert.match(bar, /data-testid="biz-guest-exhausted">Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\.</, "top banner: same text as the block");
+  assert.equal((bar.match(/<a |<button /g) ?? []).length, 1, "top banner: exactly one CTA");
+  assert.match(bar, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "top banner: green guest-start CTA");
+  assert.match(html, /data-testid="biz-sound-exhausted"/);
+  assert.doesNotMatch(html, /Зарегистрируйтесь|Зарегистрироваться|на этом устройстве закончились|\u2014/, "no registration wording anywhere on the exhausted page");
+}
+{
   const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   assert.match(html, /data-testid="biz-sound-exhausted"/);
   assert.match(html, /Зарегистрироваться/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
-  assert.match(html, /Подключить/);
+  // 253821e0: one green action in the exhausted block, no «Подключить».
+  const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
+  assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag off): exactly one CTA");
+  assert.match(block, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/, "exhausted CTA is green (pine)");
+  assert.doesNotMatch(block, /Подключить|business-app-btn-primary/);
+}
+{
+  // 253821e0, AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED on: the same guest start as the top banner, no registration wording.
+  const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "", true);
+  const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
+  assert.match(block, /Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./);
+  assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag on): exactly one CTA");
+  assert.match(block, /<button type="button" class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "green guest-start button");
+  assert.match(block, /data-testid="biz-guest-register-guest-start"/, "leads into the guest start flow");
+  assert.doesNotMatch(block, /Подключить|Зарегистрируйтесь|Зарегистрироваться|\u2014/);
 }
 {
   const workspace = wrap("/workspace", <BusinessAppShell><main>page</main></BusinessAppShell>);
@@ -713,7 +754,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx"), /writeLocal/);
   assert.doesNotMatch(html, /\u2014/);
   assert.doesNotMatch(html, /Кафе, рестораны и отели/);
-  assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|30 дней в подарок/);
+  assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|7 дней в подарок/);
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
@@ -854,7 +895,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(html, /href="\/help"/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   assert.doesNotMatch(back, /href="\/help"/);
-  assert.match(back, /href=\{BUSINESS_TRIAL_RETURN_PATH\}/);
+  assert.match(back, /href=\{returnPath\}/);
   const landing = read("src/components/business/BusinessLandingView.tsx");
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
@@ -911,8 +952,8 @@ for (const file of [
   assert.doesNotMatch(visible, /\u2014/, `${file}: en dash only`);
 }
 
-assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
-assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.");
 assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
 assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
 assert.equal(businessGiftPriceNote().replace(/\s/gu, " "), "799 ₽ за 30 дней, картой или по СБП. Автосписания нет.");
@@ -921,7 +962,7 @@ for (const [name, text] of [
   ["licence note", BUSINESS_GIFT_LICENSE_NOTE],
   ["price note", businessGiftPriceNote()],
 ] as const) {
-  assertNoForbiddenGiftText(text, name, [["gift title", /30 дней в подарок/]]);
+  assertNoForbiddenGiftText(text, name, [["gift title", /7 дней в подарок/]]);
 }
 const giftCopy = read("src/lib/access-grants/copy.ts");
 assert.doesNotMatch(giftCopy, /не становится безлимитной|Пределы Студии|Гостевой проект Студии|один раз на подтверждённый адрес|businessGiftRulesText/);
@@ -938,7 +979,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assertNoForbiddenGiftText(stripComments(giftCopy), "copy.ts");
   assertNoForbiddenGiftText(stripComments(pending), "business-return page");
   const card = stripComments(read("src/components/business-app/BusinessHomeAccessCard.tsx"));
-  assertNoForbiddenGiftText(card, "BusinessHomeAccessCard", [["gift title", /BUSINESS_GIFT_TITLE|30 дней в подарок/]]);
+  assertNoForbiddenGiftText(card, "BusinessHomeAccessCard", [["gift title", /BUSINESS_GIFT_TITLE|7 дней в подарок/]]);
 }
 
 // ---------------------------------------------------------------- cafe cabinet: curated authors, rights gate, venue link
@@ -1094,7 +1135,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(businessOnboardingEntryHref("cafe"), /^https:\/\/business\.audiolad\.ru\/onboarding\?type=cafe&next=/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   assert.ok(back.indexOf("await activateBusinessTrial") < back.indexOf("await loadBusinessOwnerHomeContext"));
-  assert.match(back, /businessOnboardingEntryHref\("cafe"\)/);
+  assert.match(back, /businessReturnTarget\(\{ site, needsVenue \}\)/);
   assert.match(back, /!domain\.organizationId/);
 
   const connect = renderToStaticMarkup(<BusinessWorkspace model={model({
@@ -1209,6 +1250,21 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(cabinetLink, /data-testid="onboarding-open-cabinet"/);
   assert.match(cabinetLink, /href="\/workspace\?space=cafe"/);
   assert.match(cabinetLink, /Открыть кабинет/);
+}
+
+{
+  const previousFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
+  try {
+    const html = wrap("/onboarding", <BusinessOnboardingWizardPage />, "coffee.audiolad.ru");
+    assert.match(html, /href="https:\/\/coffee.audiolad.ru\/auth\/sign-in\?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee"/);
+    assert.match(html, /href="https:\/\/coffee.audiolad.ru\/auth\/sign-up\?next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee"/);
+    const workspace = wrap("/music", <BusinessWorkspace model={model({ status: "anonymous" })} />, "coffee.audiolad.ru");
+    assert.match(workspace, /next=%2Fauth%2Fbusiness-return%3Fsite%3Dcoffee/);
+  } finally {
+    if (previousFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = previousFlag;
+  }
 }
 
 console.log("business-workspace-trial-unit: ok");

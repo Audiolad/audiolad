@@ -130,7 +130,7 @@ function htmlOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
 
 const trialHtml = htmlOf("trial");
 assert.match(trialHtml, /data-status="trial"/);
-assert.match(trialHtml, /30 дней в подарок/);
+assert.match(trialHtml, /7 дней в подарок/);
 assert.match(trialHtml, /Бесплатный доступ до /);
 assert.match(trialHtml, /Образец кофейни/);
 
@@ -142,7 +142,8 @@ assert.doesNotMatch(paidHtml, /Подарочный период закончи�
 const graceHtml = htmlOf("grace");
 assert.match(graceHtml, /data-status="grace"/);
 assert.match(graceHtml, /Срок закончился/);
-assert.match(graceHtml, /Музыка играет ещё 1 день, затем остановится/);
+assert.match(graceHtml, /(Подарочный период|Подписка) закончил(ся|ась) [^<]+\. Оплатите, чтобы музыка продолжала играть\./u);
+assert.doesNotMatch(graceHtml, /[её]щ[её] \d+ (день|дня|дней)|остановится|льготн/u, "no grace countdown (253821e0)");
 
 const expiredHtml = htmlOf("expired");
 assert.match(expiredHtml, /data-status="expired"/);

@@ -12,7 +12,7 @@ tables = original[original.index('CREATE TABLE'):original.index('ALTER TABLE')]
 stub = 'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;\n'
 for table in ['business_players', 'business_organizations', 'business_locations', 'audio_items']:
     stub += f"CREATE TABLE public.{table} (id uuid PRIMARY KEY); INSERT INTO public.{table} VALUES ('00000000-0000-0000-0000-000000000001');\n"
-migration = root / 'supabase/migrations/20270211120000_business_player_history_retention.sql'
+migration = root / 'supabase/migrations/20270215120000_business_player_history_retention.sql'
 smoke = root / 'supabase/tests/business_player_retention_smoke.sql'
 # Enough fresh rows and a selective old tail to test the planner without disabling seqscan.
 plan_sql = """

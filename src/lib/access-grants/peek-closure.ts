@@ -24,7 +24,7 @@ export const PEEK_MAX_ROUNDS = 25;
 
 export async function identityClosure(
   reader: PeekReader,
-  start: { userId: string; emailHash: string | null },
+  start: { userId: string; emailHash: string | null; kind?: "email" | "guest" },
 ): Promise<{ userIds: string[]; emailHashes: string[] }> {
   const users = new Set<string>([start.userId]);
   const hashes = new Set<string>(start.emailHash ? [start.emailHash] : []);
@@ -50,10 +50,14 @@ export async function identityClosure(
 
 export function earliestGrant(rows: GrantRow[]): GrantRow | null {
   const sorted = [...rows].sort(
-    (a, b) =>
-      Date.parse(a.startsAt) - Date.parse(b.startsAt) ||
-      Date.parse(a.endsAt) - Date.parse(b.endsAt) ||
-      (a.emailHash < b.emailHash ? -1 : a.emailHash > b.emailHash ? 1 : 0),
+    (a, b) => {
+      const clock = Date.parse(a.startsAt) - Date.parse(b.startsAt) || Date.parse(a.endsAt) - Date.parse(b.endsAt);
+      if (clock) return clock;
+      // PostgreSQL ORDER BY email_hash defaults to NULLS LAST.
+      if (a.emailHash === null) return b.emailHash === null ? 0 : 1;
+      if (b.emailHash === null) return -1;
+      return a.emailHash < b.emailHash ? -1 : a.emailHash > b.emailHash ? 1 : 0;
+    },
   );
   return sorted[0] ?? null;
 }
@@ -61,8 +65,12 @@ export function earliestGrant(rows: GrantRow[]): GrantRow | null {
 /** Raw periods shared by the cabinet chrome and the public licence presenter. */
 export async function peekAccessPeriodsWith(
   reader: PeekReader,
-  start: { userId: string; emailHash: string | null },
+  start: { userId: string; emailHash: string | null; kind?: "email" | "guest" },
 ): Promise<{ grant: GrantRow | null; paidUntil: string | null }> {
+  // No email closure for a guest: user-id lookup only, no identity traversal.
+  if (start.kind === "guest") {
+    return { grant: earliestGrant(await reader.grants([start.userId], [])), paidUntil: null };
+  }
   const closure = await identityClosure(reader, start);
   const grant = earliestGrant(await reader.grants(closure.userIds, closure.emailHashes));
   const stamps = await reader.paidStamps(start.emailHash, start.userId);
@@ -74,7 +82,7 @@ export async function peekAccessPeriodsWith(
 
 export async function peekChromeAccessWith(
   reader: PeekReader,
-  start: { userId: string; emailHash: string | null },
+  start: { userId: string; emailHash: string | null; kind?: "email" | "guest" },
   now: Date,
 ): Promise<BusinessChromeAccess> {
   const { grant, paidUntil } = await peekAccessPeriodsWith(reader, start);

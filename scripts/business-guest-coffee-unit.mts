@@ -72,7 +72,10 @@ assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sideba
 assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
 assert.match(page, /<BusinessMusicSection/, "guest entry keeps the demo studio");
-assert.doesNotMatch(page, /BusinessWorkspace/, "guest demo is not the member catalog");
+// Stage 3: only a flag-gated, server-verified ready guest start sees its own workspace; the demo stays for everyone else.
+const pageWithoutGuestStart = page.replace(/if \(process\.env\.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1"\) \{[\s\S]*?\.eq\("status", "ready"\)[\s\S]*?\n  \}\n/, "");
+assert.notEqual(pageWithoutGuestStart, page, "ready-guest branch is gated by the flag and a ready start row");
+assert.doesNotMatch(pageWithoutGuestStart.replace(/^import BusinessWorkspace .*$/m, ""), /BusinessWorkspace/, "guest demo is not the member catalog");
 assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land straight in the cabinet");
 const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
 assert.match(musicSection, /loadGuestCoffeeShelf/);
@@ -389,7 +392,8 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   assert.match(cabinet, /GUEST_COFFEE_ATLAS_URL/, "way back to the atlas");
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
   assert.match(copy, /BUSINESS_GIFT_TITLE/);
-  assert.match(copy, /30 дней в подарок начинаются после подтверждения почты/);
+  assert.match(copy, /\$\{BUSINESS_GIFT_TITLE\} начинаются после подтверждения почты/);
+  assert.match(copy, /получите \$\{BUSINESS_GIFT_TITLE\} с полным доступом/);
 // Typography (as in the atlas, #900): visible texts use the en dash, never the em dash.
 for (const file of [
   "src/lib/business-app/guest-coffee/copy.ts",

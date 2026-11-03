@@ -63,6 +63,9 @@ jobs:
           PGPASSWORD: postgres
         run: |
           pg_isready --host 127.0.0.1 --port 5432 --username supabase_admin --dbname postgres
+          npm run test:advertising-consent
+          npm run test:vk-ads
+          node scripts/yandex-metrika-unit.mjs
           npm run test:password-recovery
           npm run test:auth-network-timeout
           npm run test:practice-embed
@@ -137,6 +140,9 @@ jobs:
           npm run test:admin-nav-author-space
           npm run test:admin-nav-moderation-badge
           npm run test:admin-business-nav
+          npm run test:admin-business-trials
+          npm run test:business-trial-activity
+          npm run test:business-trial-attribution
           npm run test:application-email-outbox-timer
           npm run test:next-step-product-picker
           # Dummy public Supabase config so `/` renders in the head-render check (validation build only).

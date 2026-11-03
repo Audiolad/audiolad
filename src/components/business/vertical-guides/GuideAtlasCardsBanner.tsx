@@ -54,7 +54,7 @@ export default function GuideAtlasCardsBanner() {
                 <span className="guide-atlas-card__media">
                   <Image
                     src={coffeeAtlasAsset(`${shop.slug}-hero.webp`)}
-                    alt=""
+                    alt={`${ATLAS_CARD_NAMES_RU[shop.slug] ?? shop.name}, ${shop.city} – обложка карточки атласа`}
                     width={756}
                     height={807}
                     sizes="(min-width: 960px) 190px, (min-width: 600px) 30vw, 45vw"

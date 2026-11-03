@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { NextRequest, NextResponse } from "next/server";
-import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_SITE_PATH, COFFEE_HOSTNAME, coffeeStorefrontUrl, isBusinessHostname } from "../src/lib/business-app/host";
+import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_SITE_PATH, COFFEE_HOSTNAME, COFFEE_ORIGIN, BUSINESS_ORIGIN, businessCabinetHomePath, coffeeStorefrontUrl, isBusinessHostname, isCoffeeHostRequest } from "../src/lib/business-app/host";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
-import { buildBusinessAppMetadata, buildBusinessAppPageMetadata } from "../src/lib/business-app/seo";
+import { buildBusinessAppMetadata, buildBusinessAppPageMetadata, buildBusinessAppRobotsRoute, buildCoffeePublicPageMetadata, buildCoffeeRobotsRoute, buildCoffeeSitemap } from "../src/lib/business-app/seo";
+import { businessAuthHref, businessReturnPath, businessReturnTarget, isBusinessTrialNext, isBusinessCabinetReturnNext, BUSINESS_TRIAL_SIGN_UP_HREF } from "../src/lib/access-grants/paths";
+import { buildBusinessSubscriptionPaidHref, buildBusinessSubscriptionSignInHref } from "../src/lib/payments/checkout-result-cta";
+import { getSafeNextPath } from "../src/lib/auth/routes";
 import { readFileSync } from "node:fs";
 import { getHostBrandMetadata } from "../src/lib/business-app/brand-icons";
-import { coffeeHandoffRedirect, migrateCoffeeGuestCookie } from "../src/lib/business-app/coffee-host-proxy";
+import { migrateCoffeeGuestCookie } from "../src/lib/business-app/coffee-host-proxy";
 import { COFFEE_HANDOFF_COOKIE, SHARED_GUEST_COFFEE_COOKIE, coffeeReturnPath, selectGuestToken, sharedGuestOptions } from "../src/lib/business-app/guest-coffee/shared-identity";
 import { coffeeStorage, migrateCoffeeSettings, normalizeSharedCoffeeValue, sharedCoffeeStorageKey } from "../src/lib/business-app/shared-coffee-storage";
 import { hashGuestCoffeeToken } from "../src/lib/business-app/guest-coffee/identity";
@@ -17,7 +20,7 @@ const SUPABASE_URL = "https://abcdefghijklmnop.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
 process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "test";
 const AUTH_KEY = allSupabaseAuthCookieNames(getSupabaseAuthStorageKey(SUPABASE_URL))[0]!;
-const { proxy, config, PROXY_STATIC_FILE_PATTERN } = await import("../src/proxy");
+const { proxy, config, PROXY_STATIC_FILE_PATTERN, setProxyUpdateSessionForTests } = await import("../src/proxy");
 const cookieLines = (res: Response) => res.headers.getSetCookie();
 const cookieValue = (res: Response, name: string) =>
   cookieLines(res).find((l) => l.startsWith(`${name}=`))?.split(";")[0]!.slice(name.length + 1);
@@ -31,20 +34,97 @@ try {
   assert.equal(coffeeStorefrontUrl(), "https://business.audiolad.ru/guest/coffee");
   assert.equal(isBusinessHostname(COFFEE_HOSTNAME), false);
   assert.deepEqual(resolveBusinessProxyAction(COFFEE_HOSTNAME, "/"), { action: "not_found" });
-  assert.equal(coffeeHandoffRedirect(req(COFFEE_HOSTNAME)), null);
+  for (const path of ["/", "/cabinet", "/help", "/documents", "/sitemap.xml", "/guest/coffee"]) {
+    assert.equal(resolveBusinessProxyAction(COFFEE_HOSTNAME, path).action, "not_found");
+  }
+  assert.equal(businessReturnPath("/auth/business-return", "coffee"), "/auth/business-return");
+  assert.equal(buildBusinessSubscriptionPaidHref(), `${BUSINESS_ORIGIN}/#dostup`);
+  assert.equal(buildBusinessSubscriptionSignInHref(), "/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet");
+  assert.deepEqual(buildCoffeePublicPageMetadata(COFFEE_HOSTNAME, "/", "Заголовок", "Описание"), {});
+  assert.equal(businessAuthHref(COFFEE_HOSTNAME, "sign-in"), "https://audiolad.ru/auth/sign-in");
+  assert.equal(businessAuthHref(COFFEE_HOSTNAME, "sign-up", true), BUSINESS_TRIAL_SIGN_UP_HREF);
+  assert.equal(businessCabinetHomePath(COFFEE_HOSTNAME), "/");
+  assert.equal(businessReturnTarget({ site: "coffee", cabinet: true }), `${BUSINESS_ORIGIN}/#dostup`);
   assert.equal(sharedGuestOptions("business.audiolad.ru"), undefined);
   assert.equal(migrateCoffeeGuestCookie(req("business.audiolad.ru", "/", `al_biz_guest=${oldToken}`), NextResponse.next()).headers.get("set-cookie"), null);
   process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
   assert.equal(coffeeStorefrontUrl(), "https://coffee.audiolad.ru/");
+  assert.equal(isCoffeeHostRequest(new Headers({ host: COFFEE_HOSTNAME, "x-forwarded-host": "evil.test" })), true);
+  assert.equal(isCoffeeHostRequest(new Headers({ host: "business.audiolad.ru", "x-forwarded-host": COFFEE_HOSTNAME })), false);
+  assert.equal(isCoffeeHostRequest(new Headers({ host: "audiolad.ru", "x-forwarded-host": COFFEE_HOSTNAME })), false);
+  setProxyUpdateSessionForTests(async () => NextResponse.next());
+  try {
+    for (const method of ["GET", "POST"]) {
+      const response = await proxy(new NextRequest(`${COFFEE_ORIGIN}/auth/sign-up?next=%2Fcabinet`, {
+        method, headers: { host: COFFEE_HOSTNAME, origin: COFFEE_ORIGIN },
+      }));
+      assert.equal(response.headers.get("x-middleware-next"), "1");
+      assert.equal(response.headers.get("x-middleware-rewrite"), null);
+      assert.equal(response.headers.get("location"), null);
+    }
+    const realCoffee = await proxy(new NextRequest(`${COFFEE_ORIGIN}/auth/sign-in`, {
+      headers: { host: COFFEE_HOSTNAME, "x-forwarded-host": "business.audiolad.ru" },
+    }));
+    assert.equal(realCoffee.headers.get("x-middleware-next"), "1", "real coffee Host controls admission");
+    const spoofedCoffee = await proxy(new NextRequest(`${BUSINESS_ORIGIN}/auth/sign-in`, {
+      headers: { host: "business.audiolad.ru", "x-forwarded-host": COFFEE_HOSTNAME },
+    }));
+    assert.equal(spoofedCoffee.status, 404, "business auth remains blocked");
+  } finally {
+    setProxyUpdateSessionForTests(null);
+  }
+  assert.equal(businessCabinetHomePath(COFFEE_HOSTNAME), "/cabinet");
+  assert.equal(businessCabinetHomePath("business.audiolad.ru"), "/");
+  assert.equal(businessAuthHref("business.audiolad.ru", "sign-in"), "https://audiolad.ru/auth/sign-in");
+  assert.equal(businessAuthHref("business.audiolad.ru", "sign-up", true), BUSINESS_TRIAL_SIGN_UP_HREF);
+  for (const route of ["sign-in", "sign-up"] as const) {
+    const gift = new URL(businessAuthHref(COFFEE_HOSTNAME, route, true));
+    assert.equal(gift.origin, COFFEE_ORIGIN);
+    assert.equal(gift.searchParams.get("next"), "/auth/business-return?site=coffee");
+  }
+  assert.equal(businessAuthHref(COFFEE_HOSTNAME, "sign-in"), `${COFFEE_ORIGIN}/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee`);
+  assert.equal(new URL(businessAuthHref(COFFEE_HOSTNAME, "sign-in")).searchParams.get("next"), "/auth/business-cabinet?site=coffee");
+  assert.equal(isBusinessTrialNext("/auth/business-return?site=coffee"), true);
+  assert.equal(isBusinessCabinetReturnNext("/auth/business-cabinet?site=coffee"), true);
+  assert.equal(getSafeNextPath("/auth/business-return?site=coffee"), "/auth/business-return?site=coffee");
+  assert.equal(getSafeNextPath("/auth/business-cabinet?site=coffee"), "/auth/business-cabinet?site=coffee");
+  assert.equal(businessReturnPath("/auth/business-return", "coffee"), "/auth/business-return?site=coffee");
+  assert.equal(businessReturnTarget({ site: "coffee" }), `${COFFEE_ORIGIN}/workspace?space=cafe`);
+  assert.equal(businessReturnTarget({ site: "coffee", needsVenue: true }), `${COFFEE_ORIGIN}/onboarding?type=cafe&next=%2Fworkspace%3Fspace%3Dcafe`);
+  assert.equal(businessReturnTarget({ site: "coffee", cabinet: true }), `${COFFEE_ORIGIN}/cabinet#dostup`);
+  for (const site of [undefined, "Coffee", "https://evil.test", "coffee.audiolad.ru"]) {
+    assert.equal(businessReturnTarget({ site }), `${BUSINESS_ORIGIN}/workspace?space=cafe`);
+    assert.equal(businessReturnTarget({ site, cabinet: true }), `${BUSINESS_ORIGIN}/#dostup`);
+  }
+  // Without an explicit payment return marker, business targets stay identical.
+  assert.equal(buildBusinessSubscriptionPaidHref(), `${BUSINESS_ORIGIN}/#dostup`);
+  assert.equal(buildBusinessSubscriptionSignInHref(), "/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet");
+  assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/coffee-handoff"), { action: "rewrite_business_app", pathname: "/business-app/coffee-handoff" });
+  assert.equal(resolveBusinessProxyAction("business.audiolad.ru", "/sitemap.xml").action, "not_found");
+  const publicPaths = ["/", "/help", "/documents", "/documents/venue-license", "/documents/b2b-terms", "/documents/claims-procedure", "/documents/claim-reply-kit"];
+  assert.deepEqual(buildCoffeeSitemap().map((entry) => entry.url), publicPaths.map((path) => COFFEE_ORIGIN + path));
+  assert.equal(buildCoffeeRobotsRoute().sitemap, `${COFFEE_ORIGIN}/sitemap.xml`);
+  assert.equal(buildCoffeeRobotsRoute().host, COFFEE_ORIGIN);
+  assert.deepEqual(buildBusinessAppRobotsRoute(), { rules: { userAgent: "*", disallow: "/" } });
+  assert.deepEqual(buildCoffeeRobotsRoute().rules, { userAgent: "*", allow: ["/$", "/help$", "/documents$", "/documents/"], disallow: "/" });
+  for (const path of publicPaths) {
+    const metadata = buildCoffeePublicPageMetadata(COFFEE_HOSTNAME, path, "Заголовок", "Описание");
+    assert.equal(metadata.alternates?.canonical, COFFEE_ORIGIN + path);
+    assert.deepEqual(metadata.robots, { index: true, follow: true, googleBot: { index: true, follow: true } });
+    assert.equal(metadata.openGraph?.url, COFFEE_ORIGIN + path);
+    assert.deepEqual(buildCoffeePublicPageMetadata("business.audiolad.ru", path, "Заголовок", "Описание"), {});
+  }
+  assert.deepEqual(buildCoffeePublicPageMetadata(COFFEE_HOSTNAME, "/cabinet", "Кабинет", "Описание"), {});
+
   assert.deepEqual(Object.keys(BUSINESS_PUBLIC_PATH_REWRITES).map((path) => resolveBusinessProxyAction("business.audiolad.ru", path)), businessBefore);
   for (const [path, internal] of Object.entries(BUSINESS_PUBLIC_PATH_REWRITES)) {
     assert.deepEqual(resolveBusinessProxyAction(COFFEE_HOSTNAME, path), path === "/spa" ? { action: "not_found" } :
       { action: "rewrite_business_app", pathname: path === "/" ? `${BUSINESS_SITE_PATH}/guest/coffee` : internal });
   }
-  for (const path of ["/spa", "/business-app/spa", "/catalog", "/sitemap.xml", "/coffee-handoff", "/business-app/coffee-handoff"]) {
+  for (const path of ["/spa", "/business-app/spa", "/catalog", "/coffee-handoff", "/business-app/coffee-handoff"]) {
     assert.equal(resolveBusinessProxyAction(COFFEE_HOSTNAME, path).action, "not_found");
   }
-  for (const path of ["/robots.txt", "/api/business/guest/coffee/usage", "/api/business/workspace/queue", "/api/business/subscription/checkout", "/api/business/player/report"]) {
+  for (const path of ["/robots.txt", "/sitemap.xml", "/api/business/guest/coffee/usage", "/api/business/workspace/queue", "/api/business/subscription/checkout", "/api/business/player/report"]) {
     assert.equal(resolveBusinessProxyAction(COFFEE_HOSTNAME, path).action, "pass_through");
   }
   // MAJOR 2 regression: /spa pilot player APIs are not served on coffee; business unchanged.
@@ -70,12 +150,7 @@ try {
     assert.equal(sharedGuestOptions(host), undefined);
     assert.equal(migrateCoffeeGuestCookie(req(host, "/", `al_biz_guest=${oldToken}`), NextResponse.next()).headers.get("set-cookie"), null);
   }
-  const redirect = coffeeHandoffRedirect(req(COFFEE_HOSTNAME, "/?utm_source=atlas&from=coffee"))!;
-  const target = new URL(redirect.headers.get("location")!);
-  assert.equal(target.origin, "https://business.audiolad.ru");
-  assert.equal(target.pathname, "/coffee-handoff");
-  assert.equal(target.searchParams.get("next"), "/?utm_source=atlas&from=coffee");
-  const migrated = migrateCoffeeGuestCookie(req("business.audiolad.ru", target.pathname, `al_biz_guest=${oldToken}`), NextResponse.next());
+  const migrated = migrateCoffeeGuestCookie(req("business.audiolad.ru", "/coffee-handoff", `al_biz_guest=${oldToken}`), NextResponse.next());
   assert.equal(cookieValue(migrated, SHARED_GUEST_COFFEE_COOKIE), oldToken);
   assert.equal(cookieValue(migrated, COFFEE_HANDOFF_COOKIE), "1");
   assert.ok(cookieLines(migrated).every((l) => /Domain=\.audiolad\.ru/i.test(l) && /HttpOnly/i.test(l) && /Secure/i.test(l)));
@@ -90,7 +165,6 @@ try {
   assert.ok(kept.some((l) => l.startsWith(`${SUPABASE_COOKIE_SCOPE_MARKER}=`)), "al-auth-scope marker kept");
   assert.ok(kept.some((l) => l.startsWith(`${SHARED_GUEST_COFFEE_COOKIE}=`)));
   assert.equal(hashGuestCoffeeToken(selectGuestToken(oldToken, undefined)!), hashGuestCoffeeToken(oldToken), "same DB meter key on coffee");
-  assert.equal(coffeeHandoffRedirect(req(COFFEE_HOSTNAME, "/", `${COFFEE_HANDOFF_COOKIE}=1; ${SHARED_GUEST_COFFEE_COOKIE}=${oldToken}`)), null);
   assert.equal(migrateCoffeeGuestCookie(req("business.audiolad.ru", "/", `al_biz_guest=${oldToken}; ${SHARED_GUEST_COFFEE_COOKIE}=${liveToken}`), NextResponse.next()).headers.get("set-cookie"), null, "stale legacy identity never overwrites shared identity");
   assert.equal(selectGuestToken("invalid", oldToken), oldToken);
   assert.equal(selectGuestToken(undefined, "invalid"), undefined);
@@ -150,6 +224,16 @@ try {
     const res = await proxy(req(COFFEE_HOSTNAME, path));
     assert.equal(res.headers.get("x-middleware-next"), "1", `flag ON ${path} passes through untouched`);
     assert.equal(cookieLines(res).length, 0);
+  }
+
+  for (const path of ["/", "/help", "/documents", "/guest/coffee", "/cabinet"]) {
+    const response = await proxy(req(COFFEE_HOSTNAME, `${path}?utm_source=atlas`));
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("location"), null, path);
+    const rewrite = new URL(response.headers.get("x-middleware-rewrite")!);
+    assert.equal(rewrite.hostname, COFFEE_HOSTNAME);
+    assert.equal(rewrite.pathname, path === "/" ? "/business-app/guest/coffee" : BUSINESS_PUBLIC_PATH_REWRITES[path]);
+    assert.equal(rewrite.searchParams.get("utm_source"), "atlas");
   }
 
   // MAJOR 1 regression through the real proxy: legacy host-only Supabase cookie on

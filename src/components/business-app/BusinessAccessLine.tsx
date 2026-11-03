@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
@@ -27,6 +27,12 @@ export function BusinessChromeAccessProvider({ value, children }: { value: Busin
   // Signed out (the layout sends null): forget a period reported for the previous session.
   if (value == null && reported !== null) setReported(null);
   const access = effectiveChromeAccess(value, reported);
+  useEffect(() => {
+    const reportAccess = () => window.dispatchEvent(new CustomEvent("audiolad:vk-business-access", { detail: access.mode }));
+    reportAccess();
+    window.addEventListener("audiolad:vk-business-access-request", reportAccess);
+    return () => window.removeEventListener("audiolad:vk-business-access-request", reportAccess);
+  }, [access.mode]);
   const state = useMemo(() => ({ access, report }), [access, report]);
   return <ChromeAccessContext.Provider value={state}>{children}</ChromeAccessContext.Provider>;
 }
@@ -44,13 +50,13 @@ export function useReportBusinessChromeAccess(): (access: BusinessChromeAccess) 
   return useContext(ChromeAccessContext).report;
 }
 
-/** True while the 30-day gift or a paid period is live: do not offer the gift or show its price. */
+/** True while the gift or a paid period is live: do not offer the gift or show its price. */
 export function useHasLiveBusinessAccess(): boolean {
   return hasLiveBusinessAccess(useContext(ChromeAccessContext).access);
 }
 
 /**
- * Quiet line instead of the guest strip once the 30-day gift (or a paid period) is live
+ * Quiet line instead of the guest strip once the gift (or a paid period) is live
  * (Sergey 23.10.2026): no «Гостевой режим», no repeated gift offer, no price.
  * The locked-section notice still has a place to be announced.
  */

@@ -1,5 +1,9 @@
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import Link from "next/link";
+
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import SignOutForm from "@/components/auth/SignOutForm";
@@ -16,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessProfilePage() {
+  const hostname = getHostnameFromHeaders(await headers());
   const domain = await loadBusinessOwnerHomeContext();
   const supabase = await createClient();
   const {
@@ -33,10 +38,10 @@ export default async function BusinessProfilePage() {
         <section className="business-app-card space-y-3">
           <p>Войдите в аккаунт, чтобы видеть кофейню и документы.</p>
           <div className="flex flex-wrap gap-2">
-            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href="https://audiolad.ru/auth/sign-in">
+            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={businessAuthHref(hostname, "sign-in")}>
               Войти
             </a>
-            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href="https://audiolad.ru/auth/sign-up">
+            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={businessAuthHref(hostname, "sign-up")}>
               Регистрация
             </a>
           </div>

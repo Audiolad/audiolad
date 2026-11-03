@@ -1,0 +1,28 @@
+{
+  "note": "Approved sz template (sergey-zoya.ru). Do not edit by hand; see sz-template-lock.mjs.",
+  "files": {
+    "lib/sites/sz/apply.mjs": "e75c964ad7bc3ecf99a406ccced21fac2efd048901d5074fab6477beca28757d",
+    "lib/sites/sz/assemble.mjs": "8625f56a5c3d9cf663250a74453d5e825fcc6be6ff37469185948fab2659d406",
+    "lib/sites/sz/brief.mjs": "1fa9f389b9751e402a745d06dfa42872b49e30f25125f49d5a845a3318867a11",
+    "lib/sites/sz/checks.mjs": "fce399a980aab1330a9dfdebde37dfee688bc0dd379e2beaa8e9bfc1fd101541",
+    "lib/sites/sz/config.mjs": "988da3e93824bf363099dc2af4fd220c78aa38986884fece7eb38350b4ddf99e",
+    "lib/sites/sz/context.mjs": "d0ce74b2fdba8441dd25b0ca9be166decd6cff47655eb0a77e6716df136dd35d",
+    "lib/sites/sz/experts.mjs": "6ad8ba32915fd1fa17a75d9af03a3b2982dc5c8a22de76917b8980996b1c05d2",
+    "lib/sites/sz/extract.mjs": "40ba31abe0583bbafe849332fd91ceb19cd24e98521546433e1838b423dc8796",
+    "lib/sites/sz/gitleaks.toml": "31a3374ddd766baf44a040300554b990e7650283f1604454a4b1dce3fe3f490c",
+    "lib/sites/sz/knowledge/EXPERTS_RU.md": "7a6623cfa06a7c63c53463f7d2904cc750a9f50383270f7162b45b8e66212ef8",
+    "lib/sites/sz/knowledge/GUIDE.md": "498b263479abf136597e27f31d0368fe117bf10c861aca3c0496b73fc5bd373a",
+    "lib/sites/sz/knowledge/LESSONS.md": "a62f060fbea547e4b891f6f759445a6d8a94d9f4b3db1e7f2a07180490dad92f",
+    "lib/sites/sz/knowledge/pack-brief.template.json": "c8c63359a64541e53993f8afaca6e0543b3f07d7e5893231ed45811938486d0c",
+    "lib/sites/sz/knowledge/reference-angel-hranitel.md": "c19277fbe1c0d6c31f456adfcfac07081be305a2b4c3c35983f8ec728b3d706f",
+    "lib/sites/sz/knowledge/reference-prakticheskaya-ezoterika.md": "bcd2a08f92eeb4e3beb3bf94d324a1c8966afe9db670ed7b1246c955d7c68086",
+    "lib/sites/sz/knowledge.mjs": "acaacc2e15906d45b3a2dac7533d1eddc5f2c163c7fa5515403fec8de891824c",
+    "lib/sites/sz/make-og.py": "fec0ec502098adbdf762c8bf0318897ac2697aaea4282bf2c2291f6f2dc7945a",
+    "lib/sites/sz/pipeline.mjs": "d9b45895f853267a69b4d57fc4aeae885097abe9c97cecf69f4098dd60d336b5",
+    "lib/sites/sz/prompt.mjs": "2beffd7162887582d207cbce9b97508455fe51893fa560e2b9c9851eab5c4495",
+    "lib/sites/sz/rules.mjs": "2840bbc11694c3c4b80e68bd3488efc329699ad0e9922f4d0a3a0da6cf084788",
+    "sz-unit.mjs": "9b4f1384f89b0c629b37b61f7fd556add98a302641c9b8f6872607acf0aa0e7b",
+    "fixtures/sz/angel-hranitel.json": "4c09752a32673edb3537b1f3220db2849b8bb66896e5018f7801b3e51b253800",
+    "fixtures/sz/pack-angel-replay.json": "578e0cca2cd07cfe9b30daf32eb906240596bd5bbf8d8ff7721efe62ca464668"
+  }
+}

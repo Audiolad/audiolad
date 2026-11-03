@@ -13,6 +13,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  coffee-host-production-smoke:
+    name: Coffee host production smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54399
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-dummy-publishable-key
+      NEXT_PUBLIC_APP_URL: https://audiolad.ru
+      NEXT_PUBLIC_SITE_URL: https://audiolad.ru
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npx next build
+
+      - name: Real requests against next start (nginx headers)
+        run: npm run test:coffee-host-production-smoke
+
   business-validation:
     name: Audiolad Business Validation
     runs-on: ubuntu-latest
@@ -40,11 +68,16 @@ jobs:
       - name: Validate Audiolad Business
         run: |
           set -euo pipefail
+          npm run test:advertising-consent
+          npm run test:vk-ads
+          node scripts/yandex-metrika-unit.mjs
           npx tsx scripts/business-landing-unit.mts
           npm run test:business-app-domain-bind
           npm run test:business-coffee-host
           npm run test:business-coffee-atlas
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas
+          npm run test:writer-coffee
+          npm run test:business-coffee-guide
           npm run test:business-app-proxy-routing
           npx tsx scripts/business-venue-licence-unit.tsx
           node scripts/business-venue-licence-isolation-unit.mjs
@@ -55,9 +88,15 @@ jobs:
           npm run test:supabase-cookie-domain
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:supabase-cookie-domain
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-host
+          npm run test:business-guest-auth-hook
+          npm run test:business-guest-start
+          npm run test:business-guest-principal
+          npm run test:anonymous-rls-audit
           npm run test:business-guest-shell
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-guest-shell
+          npm run test:business-nav-active
           npm run test:business-ru-copy
+          npm run test:business-no-grace-copy
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
@@ -84,6 +123,9 @@ jobs:
           npm run test:business-catalog-approved-email
           npm run test:admin-business-verification
           npm run test:admin-business-nav
+          npm run test:admin-business-trials
+          npm run test:business-trial-activity
+          npm run test:business-trial-attribution
           npm run test:admin-business-case-collapsible
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:unified-agreement
           npm run test:business-rightsholder-examples-ui

@@ -67,9 +67,9 @@ export default function GuideFourCups({ question }: GuideFourCupsProps) {
 
   return (
     <div className="guide-cups" data-coffee-cups="slider">
-      <h2 id="guide-cups-title" className="guide-question">
+      <p id="guide-cups-title" className="guide-question">
         {question}
-      </h2>
+      </p>
       <div
         className="guide-cups__frame"
         role="region"
@@ -114,7 +114,7 @@ export default function GuideFourCups({ question }: GuideFourCupsProps) {
               >
                 <Image
                   src={slide.src}
-                  alt={current ? slide.alt : ""}
+                  alt={slide.alt}
                   fill
                   sizes="(min-width: 800px) 540px, 82vw"
                   draggable={false}

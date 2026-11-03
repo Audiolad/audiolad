@@ -62,11 +62,11 @@ const member: BusinessOwnerHomeContext = {
   signals: null,
 };
 
-function wrap(domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) {
+function wrap(domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode, guestStartEnabled = false) {
   return renderToStaticMarkup(
     <AppRouterContext.Provider value={fakeRouter}>
       <PathnameContext.Provider value={pathname}>
-        <BusinessDomainProvider value={domain}>{node}</BusinessDomainProvider>
+        <BusinessDomainProvider value={domain} guestStartEnabled={guestStartEnabled}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
   );
@@ -112,8 +112,8 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   const bar = g.slice(g.indexOf('data-testid="biz-guest-status"'), g.indexOf("</section>", g.indexOf('data-testid="biz-guest-status"')));
-  has(bar, /30 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
-  has(bar, /Получить 30 дней бесплатно/);
+  has(bar, /7 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  has(bar, /Получить 7 дней бесплатно/);
   hasNot(bar, /30 минут/, "the top banner does not mention the 30 minutes before they run out");
   hasNot(bar, /Гостевой режим/);
   const bottom = g.slice(g.indexOf('aria-label="Мобильная навигация"'), g.indexOf("</nav>", g.indexOf('aria-label="Мобильная навигация"')));
@@ -163,10 +163,17 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
     wrap(anonymous, path, <BusinessAppShell initialGuestLimit={limit}><main>page</main></BusinessAppShell>);
   const exhaustedHome = at("exhausted", "/");
   has(exhaustedHome, /data-limit="exhausted"/, "exhausted shown on Home");
-  has(exhaustedHome, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(exhaustedHome, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(exhaustedHome, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/);
   has(exhaustedHome, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
   hasNot(exhaustedHome, /30 минут прослушивания без регистрации/);
+  // 253821e0, guest start on: same no-registration text as the Music block, one green CTA, no «Зарегистрируйтесь» on the page.
+  const onPage = wrap(anonymous, "/guest/coffee", <BusinessAppShell initialGuestLimit="exhausted"><BusinessSoundStudio playlists={[]} initialLimit="exhausted" /></BusinessAppShell>, true);
+  const onBar = onPage.slice(onPage.indexOf('data-testid="biz-guest-status"'), onPage.indexOf("</section>", onPage.indexOf('data-testid="biz-guest-status"')));
+  has(onBar, /data-testid="biz-guest-exhausted">Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\.</, "flag on: top banner text");
+  assert.equal((onBar.match(/<a |<button /g) ?? []).length, 1, "flag on: top banner has exactly one CTA");
+  has(onBar, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: top banner CTA is green guest start");
+  hasNot(onPage, /Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording anywhere on the exhausted page");
   has(at("exhausted", "/onboarding"), /data-limit="exhausted"/, "exhausted shown on onboarding");
   const near = at("near_end", "/");
   has(near, /полный доступ ко всем функциям/);
@@ -176,7 +183,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   const layout = read("src/app/business-app/layout.tsx");
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
   has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\}>/);
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\} initialEntry=\{initialEntry\}>/);
   const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-reader.server.ts") + read("src/lib/access-grants/peek-closure.ts");
   hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
@@ -202,7 +209,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   if (name === "guest") {
     has(html, /data-testid="biz-guest-gift-cta"/, "guest gift button");
     has(html, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-gift-cta"/, "guest gift button is green (pine)");
-    has(html, /Получить 30 дней в подарок/);
+    has(html, /Получить 7 дней в подарок/);
     has(html, /Со всеми функциями\. Далее /);
     has(html, /799/);
     has(html, /без привязки карты/);
@@ -216,10 +223,20 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
 {
   const g = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   has(g, /data-testid="biz-sound-exhausted"/);
-  has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(g, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/, "register button after the meter");
   has(g, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
-  has(g, /href="\/onboarding\?type=cafe"/, "exhausted → real connect path");
+  // 253821e0: one green CTA in the exhausted block, no «Подключить».
+  const gBlock = g.slice(g.indexOf('data-testid="biz-sound-exhausted"'), g.indexOf("business-atmosphere-anchor"));
+  assert.equal((gBlock.match(/<a |<button /g) ?? []).length, 1, "exhausted block: exactly one CTA");
+  has(gBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/, "exhausted CTA is green (pine)");
+  hasNot(gBlock, /Подключить|href="\/onboarding/, "no «Подключить» in the exhausted block");
+  const on = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, true);
+  const onBlock = on.slice(on.indexOf('data-testid="biz-sound-exhausted"'), on.indexOf("business-atmosphere-anchor"));
+  has(onBlock, /Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./, "flag on: no-registration copy");
+  assert.equal((onBlock.match(/<a |<button /g) ?? []).length, 1, "flag on: exactly one CTA");
+  has(onBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: green guest-start CTA");
+  hasNot(onBlock, /Подключить|Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording, no «Подключить»");
   const m = wrap(member, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   hasNot(m, /href="\/onboarding/);
   has(m, /плеер программы/);
@@ -275,7 +292,7 @@ async function closedApis() {
     wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
   for (const path of ["/", "/onboarding", "/settings"]) {
     const t = withAccess(signedInNoOrg, path, trial);
-    hasNot(t, /biz-guest-status|Гостевой режим|Получить 30 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
+    hasNot(t, /biz-guest-status|Гостевой режим|Получить 7 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
     has(t, /data-testid="biz-access-line"[^>]*>[\s\S]*Бесплатный доступ до 22 ноября 2026/, `${path}: calm access line with the Moscow end date`);
   }
   const paid = withAccess(signedInNoOrg, "/", { mode: "paid" as const, endsAt: "2026-12-31T10:00:00Z" });
@@ -292,11 +309,11 @@ async function closedApis() {
   const inTrial = (domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) =>
     wrap(domain, pathname, <BusinessChromeAccessProvider value={trial}>{node}</BusinessChromeAccessProvider>);
   const onb = inTrial(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />);
-  hasNot(onb, /onboarding-terms-note|30 дней в подарок|799/, "onboarding in trial: no gift terms / price");
+  hasNot(onb, /onboarding-terms-note|7 дней в подарок|799/, "onboarding in trial: no gift terms / price");
   has(onb, /data-testid="onboarding-access-line"[^>]*>Бесплатный доступ до 22 ноября 2026/, "onboarding in trial: end date line");
   has(wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />), /onboarding-terms-note/, "onboarding without gift keeps the terms");
   const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
-  hasNot(studio, /biz-trial-cta|Получить 30 дней бесплатно|799/, "sound limit in trial: no gift CTA");
+  hasNot(studio, /biz-trial-cta|Получить 7 дней бесплатно|799/, "sound limit in trial: no gift CTA");
   has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
 
   // First visit: /workspace issues the gift while the (persisting) layout peek may already have
@@ -340,9 +357,9 @@ void (async () => {
   const reader = (paid: string[] = []): PeekReader => ({
     async edges(users, hashes) {
       reads.push("edges");
-      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || hashes.includes(e.emailHash)).map(({ emailHash, userId }) => ({ emailHash, userId }));
+      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || (e.emailHash !== null && hashes.includes(e.emailHash))).flatMap(({ emailHash, userId }) => emailHash === null ? [] : [{ emailHash, userId }]);
     },
-    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || hashes.includes(g.emailHash)); },
+    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || (g.emailHash !== null && hashes.includes(g.emailHash))); },
     async paidStamps() { return paid; },
   });
   const now = new Date("2026-10-23T15:00:00Z");

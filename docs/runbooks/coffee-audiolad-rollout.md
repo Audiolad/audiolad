@@ -1,12 +1,17 @@
 # Витрина АудиоЛад Кофе
 
 Код использует существующий кабинет `/business-app`, каталог, API, регистрацию,
-доступ на 30 дней и оплату. Реальная стартовая страница – `/business-app/guest/coffee`,
+7 дней в подарок (затем 3 дня льготного периода) и оплату 30 дней. Реальная стартовая страница – `/business-app/guest/coffee`,
 публичный постоянный адрес – `https://business.audiolad.ru/guest/coffee`.
 Новый адрес – `https://coffee.audiolad.ru/`. Отрасль SPA на coffee закрыта.
-Дизайн и содержимое кабинета сохранены. Оба кабинета закрыты от индексации:
-noindex/nofollow и robots disallow-all, sitemap на coffee отсутствует.
-Canonical coffee указывает на coffee, business остаётся прежним.
+Coffee открывается напрямую через rewrite, без первого перехода на business.
+Корень coffee остаётся гостевым кабинетом. Главная владельца с карточкой доступа
+и оплатой 799 ₽ доступна по `/cabinet` (также alias на business).
+Публичные страницы coffee `/`, `/help`, `/documents` и тексты документов
+индексируются: index/follow, canonical и OpenGraph указывают на соответствующую
+страницу coffee. Robots разрешает только эти страницы; sitemap содержит только их.
+Остальные страницы кабинета coffee сохраняют noindex/nofollow.
+Business сохраняет noindex/nofollow, robots disallow-all и 404 для sitemap.
 
 ## Флаг и безопасный выпуск до DNS
 
@@ -41,13 +46,13 @@ Business сохраняет свои маршруты, интерфейс и п�
   Secure и SameSite=Lax. Клиент читает их, поэтому HttpOnly здесь неприменим.
   Запись также сохраняет локальную копию. Общие настройки имеют приоритет над
   старой локальной копией. Существующие парсеры проверяют значения.
-- Первый переход на coffee делает 307 через business `/coffee-handoff`, сохраняя
-  исходные path/query, включая UTM. Business переносит HttpOnly идентификатор,
-  клиент переносит allowlist настроек из старого origin и возвращается на coffee.
-  Общий HttpOnly marker `al_coffee_handoff` предотвращает повторный переход.
-  Это работает и для первого прямого входа на coffee без предварительного посещения
-  business после обновления. При выключенном JS есть ссылка продолжения, но перенос
-  localStorage требует JS, как и сам плеер. Cookie должны быть разрешены.
+- Принудительного handoff при первом входе нет. Миграция выполняется лениво:
+  на запросах business `migrateCoffeeGuestCookie` переносит старый HttpOnly токен;
+  при чтении `coffeeStorage` зеркалирует разрешённые legacy localStorage настройки
+  в общие cookie. На coffee гостевой usage API уже выдаёт общий токен.
+  Первый прямой вход coffee не может прочитать host-only cookie и localStorage
+  business до посещения business после обновления. Старый `/coffee-handoff`
+  продолжает работать для ранее выданных ссылок, включая перенос настроек и marker.
 - Настройки зарегистрированной точки уже хранятся в БД; сохранённая серверная
   конфигурация по-прежнему имеет приоритет. Регистрация, подарочный доступ и
   аккаунт используют существующий путь; второго кабинета/бэкенда/регистрации нет.
@@ -73,7 +78,8 @@ Business сохраняет свои маршруты, интерфейс и п�
    `nginx -t`, затем согласованный graceful reload. Пример не является live-конфигом.
 4. **OK Сергея: флаг ON и release.** Собрать candidate с флагом `1`, выполнить
    проверки ниже, выпустить штатным pipeline. Самовольный PM2 restart запрещён.
-   До этого можно выпустить код с OFF. Не менять Supabase, БД, billing или secrets.
+   До этого можно выпустить код с OFF. Оркестратор добавляет только согласованный
+   GoTrue redirect allowlist entry `https://coffee.audiolad.ru/**`; БД, billing и secrets не менять.
 
 ## Проверка перед включением и после выпуска
 
@@ -81,23 +87,27 @@ Business сохраняет свои маршруты, интерфейс и п�
 
 - OFF: Atlas CTA на business; business `/`, `/guest/coffee`, `/music`, auth и
   существующая сессия работают как прежде; coffee не открывает витрину.
-- ON: прямой вход coffee `/`, вход из Атласа с UTM, один переход через handoff,
-  возврат в исходный path/query. `/guest/coffee` также открывает реальный кабинет.
+- ON: прямой вход coffee `/`, `/help`, `/documents`, вход из Атласа с UTM
+  открываются без редиректа на business. `/guest/coffee` открывает гостевой кабинет,
+  `/cabinet` – главную владельца с карточкой доступа и оплатой.
 - До первого входа coffee в старом business-госте выбрать характер, звучание,
   день/энергию и расписание, потратить часть 30 минут. После перехода проверить
-  те же настройки и остаток лимита. Вернуться в business, изменить настройки
+  те же настройки и остаток лимита после ленивой миграции на business. Вернуться в business, изменить настройки
   на coffee и убедиться, что последующее чтение на business использует новое значение.
 - Проверить новый чистый браузер, существующий общий токен с устаревшим host-only
   токеном, запрет localStorage, недоступность счётчика (fail closed).
-- Проверить гостевое прослушивание до лимита, регистрацию на apex, доступ на
-  30 дней, возврат в кабинет, сохранённые настройки точки, подборки, плеер и оплату.
+- Проверить гостевое прослушивание до лимита, регистрацию на coffee, подтверждение email, восстановление пароля, доступ на
+  7 дней и следующие 3 дня льготного периода, возврат в кабинет, сохранённые
+  настройки точки, подборки, плеер и оплату.
   Login/logout должны отражаться на обоих host; не создавать отдельный аккаунт.
 - Проверить business и coffee `/music`, `/workspace`, `/preferences`, `/profile`,
   доступ к документам и API плеера. Другие отрасли не доступны на coffee.
 - Проверить все 10 страниц кофеен, их примеры, ссылку PDF и скачивание PDF.
   Старый URL из PDF продолжает работать, аналитические goal names сохранены.
-- Проверить canonical/noindex/robots, 404 sitemap, отсутствие listener/admin/catalog
-  на coffee. Проверить сертификат без отключения TLS verification.
+- Проверить canonical/OpenGraph/index/follow публичных страниц coffee, noindex
+  остальных страниц и coffee robots/sitemap. На business robots запрещает всё,
+  sitemap – 404. Проверить отсутствие listener/admin/catalog на coffee
+  и сертификат без отключения TLS verification.
 - Не выводить cookie, токены, персональные данные и env значения в smoke-отчёт.
 
 ## Исправления по review PR #1073
@@ -130,7 +140,111 @@ DNS/TLS не удалять до истечения кэшей и заверше
 проверить candidate в браузерах и согласовать ON release. Эта сессия инфраструктуру
 не меняет, коммит/PR делает оркестратор.
 
-## Локальная проверка этой поставки
+## Авторизация на coffee и возврат после оплаты
+
+Только при ON и реальном Host `coffee.audiolad.ru` auth обслуживается на coffee.
+Business остаётся общим входом для всех отраслей: его href, маршруты и платежные
+возвраты не меняются. На apex поведение тоже сохраняется.
+
+Точный coffee allowlist (pass_through, без rewrite в `/business-app`):
+
+- `/auth/sign-in`, `/auth/sign-up` – формы, включая POST server actions;
+- `/auth/forgot-password`, `/auth/recovery`, `/auth/reset-password` – весь recovery-flow;
+- `/auth/callback` – обмен кода подтверждения и безопасный возврат;
+- `/auth/sign-out` – существующий logout action (из профиля POST идёт на текущую страницу);
+- `/auth/business-return`, `/auth/business-cabinet` – возврат подарка и оплаты;
+- `/auth/claim-partner-attribution`, `/auth/claim-guest-ratings` – существующие claims,
+  импортируемые формой входа; обычно Next отправляет их POST на `/auth/sign-in`;
+- `/api/analytics/track`, `/api/analytics/signup/complete` – условные вызовы клиентской
+  формы регистрации, если имеется analytics session.
+
+Другие platform-only пути остаются 404. Дополнительные platform providers на
+coffee auth не монтируются: нет восстановления listener-плеера, его API или PWA chrome.
+Навигация auth ведёт на `/`, `/cabinet`, `/documents`; юридические тексты и статья
+о письме открываются по абсолютным apex URL. Auth сохраняет noindex/nofollow,
+no-store и no-referrer.
+
+Ссылки coffee ведут на coffee sign-in/sign-up с прежним validated relative `next`:
+`/auth/business-return?site=coffee` для подарка,
+`/auth/business-cabinet?site=coffee` для обычного входа.
+Без `next` вход и регистрация на coffee ведут на `/cabinet`.
+Без `site=coffee` return-страницы сохраняют прежний business target.
+
+До выпуска ON оркестратор обязан добавить в **self-hosted GoTrue** Redirect URLs:
+`https://coffee.audiolad.ru/**`. Это не настройка supabase.com.
+Регистрация на coffee передаёт `emailRedirectTo` на
+`https://coffee.audiolad.ru/auth/callback?next=<validated relative next>`;
+recovery передаёт `redirectTo` на `https://coffee.audiolad.ru/auth/recovery?next=...`.
+На business/apex параметры остаются прежними. OAuth и magic link не добавлены.
+
+Supabase login/refresh/logout используют существующий Domain=.audiolad.ru,
+Secure, Path=/; logout удаляет общую сессию, proxy также удаляет legacy host-only
+двойников. Область других cookies не расширена: recovery stage и intent остаются
+host-only на `/auth/recovery` и `/auth/reset-password`, attribution, guest ratings
+и price visitor – host-only, Path=/. Cookies apex не переносятся на coffee:
+claims/price binding используют только cookie текущего host. Это не блокирует вход.
+
+`serverActions.allowedOrigins` не задан; Next проверяет совпадение Origin и
+Host/X-Forwarded-Host. Coffee формы и actions работают same-origin; глобальные
+исключения и wildcard origins не добавлены. Прокси должен выставлять оба host
+заголовка одинаково, как в существующем nginx-примере. Auth actions и два
+разрешённых analytics API не содержат отдельных origin/referrer allowlist.
+
+Платёж, начатый через business subscription checkout с реальным coffee Host,
+передаёт серверный `returnSite=coffee`. Клиент не задаёт returnSite.
+Tochka redirectUrl и failRedirectUrl остаются на `config.siteUrl` (apex):
+`order_id`, `token`, затем `status=failed` для fail URL, затем `site=coffee`.
+Без returnSite строки URL идентичны прежним; остальные order kinds не меняются.
+Только точный `site=coffee`, ON и подтверждённый status API `business_subscription`
+выбирают цели: `https://coffee.audiolad.ru/cabinet#dostup` либо
+`https://coffee.audiolad.ru/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee`.
+Это фиксированные константы, а не отражение query/Host. Остальные значения выбирают
+прежние business цели. Poll/re-check сохраняет URL страницы и marker.
+
+**Повторный платёж:** существующая валидная pending payment link используется без
+изменений (reuse logic не менялась) и сохраняет marker, выбранный при её создании.
+Поэтому checkout API при каждом старте ставит cookie `al_checkout_return_site`
+(`coffee` или `business`, Domain=.audiolad.ru, Secure, SameSite=Lax, 24 часа, не
+httpOnly, без персональных данных). checkout/result берёт сайт из cookie последнего
+старта, а marker `site=coffee` в URL – только если cookie нет. Принимаются только
+точные значения `coffee`/`business`; цели – те же фиксированные константы.
+
+При откате OFF coffee снова возвращает 404, а apex checkout/result даже с
+`site=coffee` выбирает прежние business цели. Ранее выданные coffee email-ссылки
+без дополнительного согласованного redirect перестанут открываться: учесть их
+срок действия перед откатом. GoTrue allowlist не удалять до завершения этого окна.
+Платежные ссылки, общие cookies и данные не удалять.
+
+Оставшийся отдельный gate: MAX/VK callbacks требуют отдельной проверки и настройки.
+
+## Проверки изменений auth/payment
+
+В этой рабочей копии нет Node/npm/node_modules. Установка, сеть, dev server,
+build и коммит запрещены заданием. Unit-сценарии расширены, но не запускались.
+Оркестратору выполнить tsc, ESLint и unit scripts: business-coffee-host,
+business-app-proxy-routing, public-request-origin, password-recovery-navigation,
+supabase-cookie-domain, business-subscription-payment, business-workspace-trial,
+listener-welcome; затем существующие checkout regressions.
+Проверить отдельно OFF/ON, coffee/business/apex, signup с autoconfirm и email
+confirmation, recovery/reset, callback errors, login/logout общей сессии,
+payment paid/processing/failed/cancelled/refunded с сессией и без неё.
+Браузерная проверка и реальная GoTrue/Tochka конфигурация здесь не проверялись.
+
+Точка продолжения этой задачи: review diff, проверки оркестратора, затем настройка
+GoTrue allowlist и browser smoke на candidate. Коммит и release делает оркестратор.
+
+## История проверок поставки до изменений auth/payment
+
+Node 20 (для тестов с proxy – `--experimental-websocket`), флаг OFF и ON:
+`tsc --noEmit` прошёл, ESLint изменённых файлов без замечаний,
+unit-проверки business-coffee-host, business-app-proxy-routing,
+business-coffee-atlas, business-guest-coffee, supabase-cookie-domain,
+business-brand-icons, business-app-domain-bind, business-ru-copy,
+business-trial-7-days, business-subscription-payment, business-guest-shell,
+business-workspace-trial прошли. Business `/`, его canonical/OG, robots и sitemap
+не менялись. Браузерная проверка coffee и business – после выпуска.
+
+## История проверок предыдущей поставки
 
 Использован Node 20.
 Ничего не устанавливалось, symlink node_modules не менялся.
@@ -163,7 +277,7 @@ NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 NODE_OPTIONS='--require ./scripts/cjs
 матрицу на candidate. Полный repo lint не запускался, ESLint проверял изменённые файлы.
 `git diff --check` прошёл. Коммит, push, merge и deploy не выполнялись.
 
-## Файлы поставки
+## Файлы предыдущей поставки
 
 - `.github/workflows/business-pr-validation.yml`
 - `deploy/nginx/coffee.audiolad.ru.conf.example`
@@ -191,3 +305,11 @@ NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 NODE_OPTIONS='--require ./scripts/cjs
 - `src/lib/business-app/shared-coffee-storage.ts`
 - `src/lib/business/coffee-atlas/constants.ts`
 - `src/proxy.ts`
+
+## Incident 02.11.2026 and production smoke
+
+After 39ccd7e1 (PR #1111) was deployed, every coffee page that the proxy rewrites to `/business-app/*` (`/`, `/help`, `/documents`, `/cabinet`, `/guest/coffee`) returned an empty 404. Production was rolled back with `rollback.sh`, and the change was reverted in PR #1114.
+
+Cause: Next.js runs `NextResponse.rewrite(http://localhost:<PORT>/business-app/...)` as a second HTTP request with `Host: localhost:<PORT>` and keeps `X-Forwarded-Host`. The "Host beats X-Forwarded-Host" rule for coffee therefore resolved that internal request as `localhost`, and `/business-app/*` became 404. Fix: for a loopback Host the proxy routes by `X-Forwarded-Host` (`src/lib/business-app/proxy-hostname.ts`).
+
+Guard: `npm run test:coffee-host-production-smoke` starts `next start` on an already built `.next` and sends real requests with nginx headers (`Host` = `X-Forwarded-Host` = `$host`) to coffee, business and audiolad.ru. In CI it is the `coffee-host-production-smoke` job in `.github/workflows/business-pr-validation.yml`.

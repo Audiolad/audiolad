@@ -1,7 +1,14 @@
 "use client";
 
+import BusinessGuestStartCta from "../BusinessGuestStartCta";
+import { useGuestStartEnabled } from "../BusinessDomainProvider";
+
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath } from "@/lib/business-app/host";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
@@ -16,7 +23,7 @@ import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
 import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
-import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
@@ -49,6 +56,8 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
 }
 
 function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageModel }) {
+  const hostname = useBusinessHostname();
+  const guestStartEnabled = useGuestStartEnabled();
   const player = useCabinetPlayer();
   const adopt = player.adopt;
   const release = player.release;
@@ -82,8 +91,21 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       });
     }
   }, [model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
-  const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
-  const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
+  // The live refresh (router.refresh every few seconds) passes a new model object with the same
+  // tracks. The queue request depends on this key, not on object identity: an unchanged key keeps
+  // the queue the player already has instead of asking the server for a new random mix.
+  const queueBuildKey = cafeQueueBuildKey({
+    spaceId: model.spaceId,
+    tracks: model.tracks,
+    character: queue.profile.character,
+    direction: queue.profile.direction,
+    daypart: queue.effectiveDaypart,
+    feedback: queue.feedback,
+  });
+  const queueInputRef = useRef({ model, queue });
+  useLayoutEffect(() => {
+    queueInputRef.current = { model, queue };
+  });
   const boundaryRef = useRef<string | null>(null);
   const statusRef = useRef(player.view.status);
   useEffect(() => {
@@ -111,6 +133,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   };
   useEffect(() => {
     if (player.pointDevice) return;
+    const { model, queue } = queueInputRef.current;
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
     let cancelled = false;
@@ -174,14 +197,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     player.pointDevice,
     open,
     queue.ready,
-    queue.effectiveDaypart,
-    queue.profile.character,
-    queue.profile.direction,
-    queue.feedback,
-    feedbackKey,
-    trackKey,
-    model.spaceId,
-    model.tracks,
+    queueBuildKey,
     setQueueOrder,
     applyAtmosphereQueue,
   ]);
@@ -240,12 +256,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
       {model.status === "anonymous" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
-          <p>Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна.</p>
+          <p>{guestStartEnabled ? "Откройте кабинет без регистрации. Карта не нужна." : "Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна."}</p>
           <div className="flex flex-wrap gap-2">
-            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.signUpHref} data-testid="biz-workspace-signup">
+            <BusinessGuestStartCta className="business-app-btn business-app-btn-primary business-app-focus-ring" href={businessAuthHref(hostname, "sign-up", true)} testId="biz-workspace-signup">
               {BUSINESS_GIFT_CTA}
-            </a>
-            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={model.signInHref}>
+            </BusinessGuestStartCta>
+            <a className="business-app-btn business-app-btn-secondary business-app-focus-ring" href={businessAuthHref(hostname, "sign-in", true)}>
               Войти
             </a>
           </div>
@@ -256,7 +272,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unconfirmed">
           <p>{BUSINESS_UNCONFIRMED_NOTE}</p>
           <p className="flex flex-wrap gap-3">
-            <a className="underline" href={model.signInHref}>Перейти и войти после подтверждения</a>
+            <a className="underline" href={businessAuthHref(hostname, "sign-in", true)}>Перейти и войти после подтверждения</a>
             <Link className="underline" href={model.helpHref}>Перейти и найти письмо</Link>
           </p>
         </section>
@@ -284,7 +300,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               : "Подарочный период закончился. Полный плеер закрыт."}
           </p>
           <p>
-            <Link className="underline" href="/#dostup" data-testid="biz-workspace-terms">Условия и подписка</Link>
+            <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
           </p>
         </section>
       ) : null}

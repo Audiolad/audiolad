@@ -100,6 +100,17 @@ export function isBusinessNavItemCurrent(
   return paths.some((href) => isBusinessNavItemActive(pathname, href));
 }
 
+/**
+ * The one current section among `items` for a normalized pathname (see `businessNavPathname`),
+ * or null. The first matching item wins, so the bar never highlights two tabs at once.
+ */
+export function businessActiveNavItemId(
+  pathname: string,
+  items: readonly Pick<BusinessNavItem, "id" | "href" | "aliases" | "guestHref">[],
+): string | null {
+  return items.find((item) => isBusinessNavItemCurrent(pathname, item))?.id ?? null;
+}
+
 export function isBusinessNavItemActive(
   pathname: string,
   href: string,

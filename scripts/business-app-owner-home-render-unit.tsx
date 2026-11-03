@@ -9,7 +9,8 @@ import BusinessHomePage, { type BusinessHomePageProps } from "../src/components/
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, BUSINESS_GIFT_TITLE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
 import { assertNoForbiddenGiftText, visibleLines } from "./business-gift-copy-guard";
-import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "../src/lib/access-grants/policy";
+import { formatMoscowDateTime } from "../src/lib/access-grants/policy";
+import { BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-home-signals";
@@ -30,64 +31,44 @@ const render = (signals = context.signals, props: BusinessHomePageProps = {}) =>
 );
 // Live refresh (c02fe282) uses router.refresh(); SSR render needs an app router.
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-assert.match(readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8"), /<BusinessOwnerHomeLiveRefresh \/>/);
-const track = { title: "Реальный трек", coverUrl: "/real-cover.webp" };
-for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, { ...context.signals!, secondsSinceHeartbeat: 301 }, { ...context.signals!, lastBusinessPlayAt: new Date().toISOString(), lastPlayMinutesAgo: 0 }]) {
-  const html = render(signals, { currentTrack: track });
-  assert.match(html, /Тестовая точка/);
-  assert.match(html, /Последний сигнал от плеера/);
-  assert.match(html, /aria-live="polite"/);
-  assert.match(html, /Воспроизведение не подтверждено/);
-  assert.match(html, /Название трека появится, когда плеер сообщит, что музыка играет./);
-  assert.match(html, /Лицензия: нет подтверждённых данных/);
-  assert.match(html, /href="\/music"/);
-  assert.match(html, /Открыть музыку/);
-  assert.match(html, /href="\/help"[^>]*>Проверить работу музыки<\/a>/);
-  assert.doesNotMatch(html, /Диагностика для поддержки/);
-  assert.equal((html.match(/data-testid="owner-home-overall-status"/g) ?? []).length, 1);
-  assert.match(html, /<details class="business-app-owner-signal-details"><summary[^>]*>Подробнее<\/summary><ul[^>]*>[\s\S]*?<li[^>]*><strong>[^<]+<\/strong>[\s\S]*?<li[^>]*><strong>Воспроизведение[\s\S]*?<\/ul><\/details>/);
-  assert.doesNotMatch(html, /<details[^>]*open/);
-  assert.doesNotMatch(html, /Реальный трек|real-cover|Музыка играет|data-tone="error"|Лицензия активна/);
-  for (const label of ["Атмосфера", "Следующая смена музыкального дня", "История звучания", "скоро"]) {
+// Live refresh moved from the home page into the shell (every cabinet screen, 3 s, 30.10.2026).
+assert.doesNotMatch(readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8"), /BusinessOwnerHomeLiveRefresh/);
+assert.match(readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8"), /<BusinessLiveRefresh enabled=/);
+// Главная «С чего начать» (03.11.2026): a checklist, no venue controls and no status board.
+const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8");
+assert.doesNotMatch(home, /VenueControlPanel|StatusBanner|Слушать у себя|Устройство у колонки|Сейчас звучит/);
+assert.doesNotMatch(home, /<a\s+href="\/music"/, "client navigation keeps the cabinet player playing");
+for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, { ...context.signals!, secondsSinceHeartbeat: 301 }]) {
+  const html = render(signals);
+  assert.match(html, /<h2[^>]*>С чего начать<\/h2>/);
+  assert.match(html, /<ol class="business-app-steps/);
+  assert.match(html, /Включите музыку/);
+  assert.match(html, /href="\/music"[^>]*>[\s\S]*?Открыть музыку<\/a>/);
+  assert.match(html, /Подключите устройство в зале/);
+  assert.match(html, /href="\/preferences#device"[^>]*>[\s\S]*?Открыть настройку<\/a>/);
+  assert.match(html, /Посмотрите документы/);
+  assert.match(html, /href="\/documents"[^>]*>[\s\S]*?Открыть документы<\/a>/);
+  assert.match(html, /data-step="music" data-done="false"/);
+  assert.match(html, /data-step="device" data-done="unknown"/);
+  assert.match(html, /data-step="documents" data-done="unknown"/);
+  assert.match(html, /business-app-btn-cta/);
+  for (const label of ["Пауза в зале", "Разрешить менять музыку", "Сохранить название", "Изменить звучание", "Последний сигнал от плеера", "Лицензия: нет подтверждённых данных", "data-tone=\"error\"", "Нет связи"]) {
     assert.equal(html.includes(label), false, label);
   }
-  assert.equal((html.match(/<section[^>]*aria-disabled="true"/g) ?? []).length, 0);
+  assert.doesNotMatch(html, /https?:\/\//, "no external links");
+  assert.doesNotMatch(html, /\u2014/);
 }
-assert.match(render(null), /Нет данных о плеере/);
-assert.match(render(context.signals), /Плеер на связи/);
-assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 301 }), /Нет связи с плеером/);
-assert.match(render({ ...context.signals!, lastPlayMinutesAgo: 2 }), /Последнее воспроизведение: 2 мин назад/);
+assert.match(render({ ...context.signals!, lastPlayMinutesAgo: 2 }), /data-step="music" data-done="true"[\s\S]*?Музыка уже звучала в кабинете\./);
 const nowMs = Date.parse("2026-10-14T12:00:00Z");
 const confirmed = { nowMs, playbackState: "playing" as const, playbackConfirmedAt: new Date(nowMs).toISOString() };
-assert.match(render(context.signals, { currentTrack: track, playbackConfirmation: confirmed }), /Реальный трек/);
-assert.match(render(context.signals, { currentTrack: track, playbackConfirmation: confirmed }), /src="\/real-cover.webp"/);
-for (const playbackConfirmation of [{ ...confirmed, playbackState: "paused" as const }, { ...confirmed, playbackConfirmedAt: new Date(nowMs - 301_000).toISOString() }, { ...confirmed, errorConfirmed: true }]) {
-  assert.doesNotMatch(render(context.signals, { currentTrack: track, playbackConfirmation }), /Реальный трек|real-cover/);
-}
-assert.match(render(context.signals, { playbackConfirmation: { nowMs, errorConfirmed: true } }), /data-tone="error"/);
-// Part B: live state from the /spa player.
-const fresh = new Date().toISOString();
-const live = { ...emptyBusinessOwnerHomeSignals(), lastSeenSeconds: 20, liveConnected: true, playbackState: "playing" as const, playbackConfirmedAt: fresh, playbackConfirmedSecondsAgo: 20, currentTrack: { title: "Живой трек" } };
-const liveHtml = render(live);
-assert.match(liveHtml, /Плеер на связи/);
-assert.match(liveHtml, /Воспроизведение подтверждено/);
-assert.match(liveHtml, /Живой трек/);
-const notConfirmed = render({ ...live, playbackConfirmedAt: null });
-assert.match(notConfirmed, /Воспроизведение не подтверждено/);
-assert.doesNotMatch(notConfirmed, /Живой трек/);
-const lost = render({ ...live, lastSeenSeconds: 900, liveConnected: false, playbackConfirmedAt: new Date(Date.now() - 900_000).toISOString(), playbackConfirmedSecondsAgo: 900 });
-assert.match(lost, /Нет связи с плеером/);
-assert.doesNotMatch(lost, /data-tone="error"|Живой трек|остановлен/);
-assert.match(render({ ...live, playbackState: "error" }), /data-tone="error"/);
-assert.doesNotMatch(render({ ...live, playbackState: "error", lastSeenSeconds: 900, liveConnected: false }), /data-tone="error"/);
-assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 0 }), /Последний сигнал от плеера: только что/);
-assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 29 }), /Последний сигнал от плеера: только что/);
-assert.match(render(context.signals), /Последний сигнал от плеера: меньше минуты назад/);
-assert.match(render(context.signals, { playbackConfirmation: confirmed }), /data-testid="owner-home-overall-status">Музыка играет – воспроизведение подтверждено/);
-assert.match(render(context.signals, { playbackConfirmation: { nowMs, errorConfirmed: true } }), /data-testid="owner-home-overall-status">Сбой воспроизведения подтверждён/);
+assert.match(render(context.signals, { playbackConfirmation: confirmed }), /data-step="music" data-done="true"/);
+assert.match(render(context.signals, { playbackConfirmation: { nowMs, errorConfirmed: true } }), /data-step="music" data-done="false"/);
+assert.match(render(context.signals, { pointLinked: true }), /data-step="device" data-done="true"[\s\S]*?Устройство в зале подключено\./);
+assert.match(render(context.signals, { pointLinked: false }), /data-step="device" data-done="false"/);
+assert.match(render(context.signals, { pointLinked: true }), /aria-label="Готово"/);
 const css = readFileSync(new URL("../src/components/business-app/business-app.css", import.meta.url), "utf8");
-assert.match(css, /\.business-app-owner-desktop-signals\s*\{\s*display: none;/);
-assert.match(css, /@media \(min-width: 768px\)\s*\{\s*\.business-app-owner-compact-status\s*\{\s*display: none;\s*\}\s*\.business-app-owner-desktop-signals\s*\{\s*display: grid;/);
+assert.match(css, /\.business-app-step-mark\[data-done="true"\]\s*\{\s*background: var\(--biz-play\);/);
+assert.doesNotMatch(css, /business-app-owner-signals|business-app-owner-compact-status/);
 for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostics({ hasUser: true, organizationId: "org", organizationName: "Организация", location: null, players: [{ playerId: "p", playerCode: "Плеер 1", displayName: null, playerStatus: "active", healthStatus: "online", secondsSinceHeartbeat: 12, lastHeartbeatAt: null, locationId: null, zoneId: null }], lastPlay: { occurredAt: "2026-10-14T12:00:00Z", minutesAgo: 0, audioItemId: null, playerId: "p", locationId: null } })]) {
   const html = renderToStaticMarkup(<BusinessSupportDiagnosticPage diagnostics={diagnostics} />);
   assert.match(html, /<h1[^>]*>Проверить работу музыки<\/h1>/);
@@ -100,7 +81,6 @@ for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostic
 }
 assert.doesNotMatch(render(), /data-testid="biz-home-access"/, "no trial card without a live or ended period");
 const trialEnds = "2026-11-22T14:11:37.762Z";
-const trialDays = trialDaysLeft(new Date(trialEnds), new Date());
 const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string | null }) => renderToStaticMarkup(
   <AppRouterContext.Provider value={fakeRouter}>
     <BusinessDomainProvider value={context}>
@@ -112,34 +92,68 @@ const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string |
 );
 const trialHome = withAccess({ mode: "trial", endsAt: trialEnds });
 assert.match(trialHome, /data-testid="biz-home-access"/);
-assert.equal(BUSINESS_GIFT_TITLE, "30 дней в подарок");
-assert.match(trialHome, new RegExp(`Осталось ${trialDays} ${ruDaysWord(trialDays)}`));
-const trialCardStart = trialHome.lastIndexOf("<section", trialHome.indexOf('data-testid="biz-home-access"'));
-const trialCard = trialHome.slice(trialCardStart, trialHome.indexOf("</section>", trialCardStart) + "</section>".length);
-assert.ok(trialCardStart >= 0 && trialCard.startsWith("<section") && !trialCard.slice(1).includes("<section"));
-assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
-assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
+assert.equal(BUSINESS_GIFT_TITLE, "7 дней в подарок");
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.");
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
 assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
 assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
-// The gift card shows exactly these lines, in this order, and nothing else.
+const stepOf = (html: string, id: string) => {
+  const start = html.lastIndexOf("<li", html.indexOf(`data-step="${id}"`));
+  assert.ok(start >= 0, id);
+  return html.slice(start, html.indexOf("</li>", start) + "</li>".length);
+};
+// Terms step: accepted already, the offer stays one tap away.
+const termsStep = stepOf(trialHome, "terms");
+assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Условия приняты:", BUSINESS_OFFER_TITLE, "."]);
+assert.match(termsStep, /data-done="true"/);
+assert.match(termsStep, /href="\/documents\/b2b-terms"/);
+// Pay step: exactly these lines, in this order.
+const trialCard = stepOf(trialHome, "pay");
+assert.match(trialCard, /id="dostup"/);
+assert.match(trialCard, /data-mode="trial"/);
 assert.deepEqual(visibleLines(trialCard), [
-  `Осталось ${trialDays} ${ruDaysWord(trialDays)}`,
-  `до ${formatMoscowDateTime(new Date(trialEnds))}`,
-  "После срока плеер закрыт до оплаты.",
-  "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.",
+  "5",
+  "Оплатите подписку",
+  "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.",
+  "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.",
   `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`,
   "Оплатить",
 ]);
-assert.equal(trialCard.split('data-testid="biz-home-license"').length, 2, "licence note once");
 assert.equal(trialCard.split(BUSINESS_GIFT_LICENSE_NOTE).length, 2, "licence text once");
-assert.match(trialCard, /data-testid="biz-home-pay-button"/);
-assertNoForbiddenGiftText(visibleLines(trialCard).join("\n"), "trial card", [
-  ["gift title", /30 дней в подарок/],
+assert.match(trialCard, /data-testid="biz-home-pay-button"[^>]*>Оплатить|class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-home-pay-button"/);
+assertNoForbiddenGiftText(visibleLines(trialHome).join("\n"), "home", [
+  ["gift title", /7 дней в подарок/],
   ["old rules", /один раз на подтверждённый адрес|без карты и без автосписания|Генерация музыки|Пределы|Гостевой проект|круглую кнопку|«Играть»/i],
+  ["grace", /3 дн|три дня|льготн/i],
 ]);
-assertNoForbiddenGiftText(trialCard, "trial card markup", [["gift title", /30 дней в подарок/]]);
+// Not accepted yet: accept in the terms step, the pay step waits for it.
+const notAccepted = renderToStaticMarkup(
+  <AppRouterContext.Provider value={fakeRouter}>
+    <BusinessDomainProvider value={{ ...context, offerAccepted: false }}>
+      <BusinessChromeAccessProvider value={{ mode: "trial", endsAt: trialEnds }}>
+        <BusinessHomePage />
+      </BusinessChromeAccessProvider>
+    </BusinessDomainProvider>
+  </AppRouterContext.Provider>,
+);
+assert.match(stepOf(notAccepted, "terms"), /data-testid="biz-home-accept"/);
+assert.match(stepOf(notAccepted, "terms"), /business-app-btn-cta/);
+assert.doesNotMatch(notAccepted, /biz-home-pay-button/);
+assert.match(stepOf(notAccepted, "pay"), /Кнопка оплаты появится, когда вы примете условия – шаг выше\./);
+// A manager sees no terms and pay steps.
+const manager = renderToStaticMarkup(
+  <AppRouterContext.Provider value={fakeRouter}>
+    <BusinessDomainProvider value={{ ...context, canPay: false }}>
+      <BusinessChromeAccessProvider value={{ mode: "trial", endsAt: trialEnds }}>
+        <BusinessHomePage />
+      </BusinessChromeAccessProvider>
+    </BusinessDomainProvider>
+  </AppRouterContext.Provider>,
+);
+assert.doesNotMatch(manager, /data-step="terms"|data-step="pay"|biz-home-access/);
 const paidHome = withAccess({ mode: "paid", endsAt: "2026-12-31T10:00:00.000Z" });
 assert.match(paidHome, /data-mode="paid"/);
+assert.match(stepOf(paidHome, "pay"), /data-done="true"/);
 assert.ok(paidHome.includes(`Подписка до ${formatMoscowDateTime(new Date("2026-12-31T10:00:00.000Z"))}`));
 const endedHome = withAccess({ mode: "offer", endsAt: trialEnds });
 assert.match(endedHome, /id="dostup"/);

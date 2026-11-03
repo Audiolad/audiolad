@@ -65,8 +65,10 @@ assert.equal(cafeDaypartAtMinute(venueMinuteOfDay("UTC", at), CAFE_DAYPART_HOURS
 assert.equal(pointDaypart({ daypartMode: "evening", hours: CAFE_DAYPART_HOURS_DEFAULT, timezone: "UTC" }, at), "evening");
 
 const home = readFileSync(new URL("../src/components/business-app/BusinessHomePage.tsx", import.meta.url), "utf8");
-assert.match(home, /Слушать у себя/);
-assert.match(home, /VenueControlPanel/);
+// Главная «С чего начать» (03.11.2026): venue controls live only on «Настройка».
+assert.doesNotMatch(home, /Слушать у себя|VenueControlPanel/);
+const settingsPage = readFileSync(new URL("../src/app/business-app/settings/page.tsx", import.meta.url), "utf8");
+assert.match(settingsPage, /<VenueControlPanel/);
 const panel = readFileSync(new URL("../src/components/business-app/VenueControlPanel.tsx", import.meta.url), "utf8");
 assert.match(panel, /Разрешить менять музыку с устройства в заведении/);
 assert.match(panel, /Поставить музыку в зале на паузу\?/);
@@ -76,9 +78,11 @@ assert.match(panel, /commandId/);
 assert.match(panel, /Изменить звучание/);
 assert.match(panel, /VENUE_SOUND_HREF = "\/preferences\?sound=open"/);
 const homePage = readFileSync(new URL("../src/components/business-app/BusinessHomePage.tsx", import.meta.url), "utf8");
-assert.match(homePage, /href="\/player"/);
-assert.match(homePage, /href="\/help"/);
-assert.match(homePage, /Откройте плеер кофейни/);
+assert.match(homePage, /<BusinessHomeChecklist steps=\{steps\}/);
+const checklist = readFileSync(new URL("../src/lib/business-app/home-checklist.ts", import.meta.url), "utf8");
+assert.match(checklist, /href: "\/music"/);
+assert.match(checklist, /BUSINESS_HOME_DEVICE_HREF = "\/preferences#device"/);
+assert.match(checklist, /href: "\/documents"/);
 const player = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(player, /keepCurrent: true/);
 assert.match(player, /createPointSoundApplier/);
@@ -100,8 +104,8 @@ assert.match(switcher, /role="option"/);
 assert.match(switcher, /aria-selected=\{option\.selected\}/);
 assert.match(switcher, /case "Escape"/);
 assert.match(switcher, /addEventListener\("pointerdown"/);
-assert.match(switcher, /setEntry\("person"\)/);
-assert.match(switcher, /if \(!point\) setEntry\("venue"\)/);
+assert.match(switcher, /switchTo\("person"\)/);
+assert.match(switcher, /if \(!point\) switchTo\("venue"\)/);
 assert.match(switcher, /Войдите со своего телефона/);
 assert.doesNotMatch(switcher, /business-sound-chip/);
 assert.doesNotMatch(switcher, /\u2014/);

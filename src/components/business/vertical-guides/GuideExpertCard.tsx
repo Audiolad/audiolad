@@ -8,10 +8,14 @@ import { GuideParagraphs } from "./GuideSections";
 /**
  * One expert block: real portrait (required, the registry rejects experts without one),
  * name and role, the editor's heading, a plain-text source line, the lead, the verbatim
- * quote (a foreign quote is shown only as a Russian translation with a «Перевод с
- * английского» note; the original stays in the registry, never on the page) and the
+ * quote (a foreign quote is shown only as a Russian translation with a note in the quote's
+ * language: «Перевод с английского», «Перевод с чешского»; the original stays in the registry,
+ * never on the page) and the
  * editor's explanation. Everything printed is Russian. No outgoing links.
  */
+/** Genitive language names for the «Перевод с …» note (registry `language`). */
+const TRANSLATED_FROM: Record<string, string> = { en: "английского", cs: "чешского", it: "итальянского", fr: "французского", de: "немецкого", es: "испанского" };
+
 export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
   const expert = getCoffeeExpert(slot.expertId);
   if (!expert) {
@@ -35,6 +39,11 @@ export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
             alt={`${expert.name}, портрет`}
             width={80}
             height={80}
+            // Served as the static 600×600 webp, not through /_next/image: on next 16.3.x a
+            // client that aborts a cold transform (lazy avatar scrolled past on a phone) wedges
+            // that exact url+w+q key until restart (vercel/next.js#96538, fixed in 16.4 by #98168),
+            // and the 2x avatar (w=256) came back 504 – an empty circle on mobile.
+            unoptimized
           />
           <div>
             <p className="guide-expert__name">{expert.name}</p>
@@ -52,7 +61,7 @@ export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
         <blockquote className="guide-expert__quote" lang="ru">
           <p>{translated ? slot.translation : quote.text}</p>
         </blockquote>
-        {translated ? <p className="guide-expert__translation-note">Перевод с английского</p> : null}
+        {translated ? <p className="guide-expert__translation-note">Перевод с {TRANSLATED_FROM[quote.language ?? "en"] ?? "иностранного"}</p> : null}
         <div className="guide-prose">
           <GuideParagraphs paragraphs={slot.after} keyPrefix={`${expert.id}-after`} />
         </div>

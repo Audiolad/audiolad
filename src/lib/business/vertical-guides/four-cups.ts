@@ -1,10 +1,16 @@
 /**
  * Owner slides for the coffee pilot carousel, in carousel order.
- * The only external URL allowed on the pilot page.
+ * The only external URLs allowed on a guide page: the «Четыре чашки» site link of MAX Поток,
+ * opened in the MAX bot (default) or in the Telegram bot (`?ch=tg`). Both buttons are nofollow.
  */
 export const FOUR_CUPS_MAX_HREF = "https://max-potok.ru/r/gqwvf";
 
+export const FOUR_CUPS_TG_HREF = `${FOUR_CUPS_MAX_HREF}?ch=tg`;
+
 export const FOUR_CUPS_MAX_LABEL = "Выбрать чашку и узнать характер кофейни в Максе";
+
+/** Telegram label mirrors the MAX one: same text, «в Максе» → «в Телеграме». */
+export const FOUR_CUPS_TG_LABEL = FOUR_CUPS_MAX_LABEL.replace(/в Максе$/, "в Телеграме");
 
 export const FOUR_CUPS_SLIDES = [
   {
@@ -40,5 +46,5 @@ export const FOUR_CUPS_SLIDES = [
 /** The single picture of the bottom block: all four cups side by side. */
 export const FOUR_CUPS_FINAL_IMAGE = {
   src: "/images/b/coffee/four-cups/06-all-cups.jpg",
-  alt: "Кофе в зёрнах для кофейни – четыре чашки, четыре характера: светлая кружка, зелёный стакан, фарфор с золотом и голубая керамика.",
+  alt: "Четыре чашки – четыре характера кофейни: светлая кружка, зелёный стакан, фарфор с золотом и голубая керамика.",
 } as const;

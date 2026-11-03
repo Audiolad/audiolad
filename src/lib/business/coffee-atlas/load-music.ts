@@ -11,8 +11,8 @@ export type { CoffeeAtlasTrack };
 /**
  * Resolve the shop → track mapping against the published music catalogue (guest viewer,
  * same source as the /b listen rail) and keep only tracks the existing player can start
- * for a guest — the same read-only session loader `/api/catalog/play` uses. On any error
- * the atlas simply shows no examples — never a fake or broken player.
+ * for a guest – the same read-only session loader `/api/catalog/play` uses. On any error
+ * the atlas simply shows no examples – never a fake or broken player.
  */
 export async function loadCoffeeAtlasMusic(): Promise<Record<string, CoffeeAtlasTrack[]>> {
   try {
@@ -20,14 +20,17 @@ export async function loadCoffeeAtlasMusic(): Promise<Record<string, CoffeeAtlas
     return await buildCoffeeAtlasMusic({
       loadPublishedProducts: () =>
         getPublishedCatalogProducts(supabase, { productKind: "music" }),
-      isPlayable: async (track) => {
-        const session = await loadCatalogPlaySession(
+      loadPlayableTracks: async (track) => {
+        const loaded = await loadCatalogPlaySession(
           supabase,
           track.authorSlug,
           track.slug,
           null,
+          { audioItemId: track.audioItemId },
         );
-        return session.ok;
+        return loaded.ok
+          ? loaded.session.tracks.map((item) => ({ id: item.id, title: item.title }))
+          : null;
       },
     });
   } catch (error) {

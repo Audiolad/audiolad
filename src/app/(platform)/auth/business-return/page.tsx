@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -11,7 +13,8 @@ import {
   BUSINESS_UNCONFIRMED_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
-import { businessOnboardingEntryHref, businessWorkspaceHref, BUSINESS_TRIAL_SIGN_IN_HREF, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
+import { businessReturnTarget, businessReturnPath, businessAuthHref, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
+import { COFFEE_HOSTNAME } from "@/lib/business-app/host";
 import { isEmailConfirmed } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
@@ -27,18 +30,25 @@ const HELP_HREF = helpArticlePath(emailNotReceivedArticle);
  * Lands here after the existing email registration or sign-in (next=/auth/business-return).
  * Confirmed addresses continue into the business workspace. The gift is issued once.
  */
-export default async function BusinessTrialReturnPage() {
+export default async function BusinessTrialReturnPage({ searchParams }: {
+  searchParams: Promise<{ site?: string | string[] }>;
+}) {
+  const coffee = isCoffeeHostRequest(await headers());
+  const { site: requestedSite } = await searchParams;
+  const site = typeof requestedSite === "string" ? requestedSite : undefined;
+  const returnPath = businessReturnPath(BUSINESS_TRIAL_RETURN_PATH, site);
+  const signInHref = businessAuthHref(site === "coffee" ? COFFEE_HOSTNAME : "", "sign-in", true);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(BUSINESS_TRIAL_SIGN_IN_HREF);
+    redirect(signInHref);
   }
 
   if (!isEmailConfirmed(user) || !user.email) {
-    return <BusinessTrialReturnPending />;
+    return <BusinessTrialReturnPending signInHref={signInHref} helpHref={coffee ? `https://audiolad.ru${HELP_HREF}` : HELP_HREF} />;
   }
 
   try {
@@ -52,7 +62,7 @@ export default async function BusinessTrialReturnPage() {
         <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
         <p className="mt-4 text-sm leading-6 text-[#7d70a2]">{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
         <p className="mt-6">
-          <a className="font-semibold text-[#7042c5] underline" href={BUSINESS_TRIAL_RETURN_PATH}>
+          <a className="font-semibold text-[#7042c5] underline" href={returnPath}>
             Перейти и повторить
           </a>
         </p>
@@ -68,15 +78,11 @@ export default async function BusinessTrialReturnPage() {
     needsVenue = false;
   }
 
-  if (needsVenue) {
-    redirect(businessOnboardingEntryHref("cafe"));
-  }
-
-  redirect(businessWorkspaceHref("cafe"));
+  redirect(businessReturnTarget({ site, needsVenue }));
 }
 
 /** Unconfirmed address: the same short gift lines as the cabinet home card. The period has not started. */
-export function BusinessTrialReturnPending() {
+export function BusinessTrialReturnPending({ signInHref = businessAuthHref("", "sign-in", true), helpHref = HELP_HREF }: { signInHref?: string; helpHref?: string } = {}) {
   return (
     <main className="mx-auto min-h-screen max-w-[430px] bg-platform-surface px-5 py-10 text-[#25135c]" data-testid="biz-return-access">
       <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
@@ -86,10 +92,10 @@ export function BusinessTrialReturnPending() {
       <p className="mt-3 text-sm leading-6 text-[#7d70a2]" data-testid="biz-return-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
       <p className="mt-3 text-sm leading-6 text-[#7d70a2]" data-testid="biz-return-price">{businessGiftPriceNote()}</p>
       <p className="mt-6 flex flex-wrap gap-3 text-sm">
-        <Link className="font-semibold text-[#7042c5] underline" href={BUSINESS_TRIAL_SIGN_IN_HREF}>
+        <Link className="font-semibold text-[#7042c5] underline" href={signInHref}>
           Перейти и войти после подтверждения
         </Link>
-        <Link className="font-semibold text-[#7042c5] underline" href={HELP_HREF}>
+        <Link className="font-semibold text-[#7042c5] underline" href={helpHref}>
           Перейти и найти письмо
         </Link>
       </p>

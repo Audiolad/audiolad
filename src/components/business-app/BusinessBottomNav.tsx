@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessCabinetHomePath, businessNavPathname } from "@/lib/business-app/host";
+
 import {
   BizDocumentsIcon,
   BizHomeIcon,
@@ -12,7 +15,6 @@ import {
   BizProfileIcon,
   BizSettingsIcon,
 } from "@/components/business-app/BusinessIcons";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { usePointMode } from "@/components/business-app/BusinessPointMode";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
@@ -21,10 +23,9 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "@/lib/business-app/access";
-import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 import {
   BUSINESS_MOBILE_NAV_ITEMS,
-  isBusinessNavItemCurrent,
+  businessActiveNavItemId,
   type BusinessNavIconKey,
 } from "@/lib/business-app/nav";
 
@@ -44,18 +45,20 @@ const ICONS: Record<
  * name stays on aria-label and title. A locked section keeps a small lock on the icon.
  */
 export default function BusinessBottomNav() {
-  const pathname = normalizeBusinessAppPathname(usePathname() || "/");
+  const hostname = useBusinessHostname();
+  const pathname = businessNavPathname(usePathname() || "/", hostname);
   const pointMode = usePointMode();
   const items = pointMode
     ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music" || item.id === "settings")
     : BUSINESS_MOBILE_NAV_ITEMS;
   const access = resolveBusinessAccess(useBusinessDomain(), pointMode);
   const { showLocked } = useBusinessGuestStatus();
+  const activeId = businessActiveNavItemId(pathname, items);
 
   return (
     <nav className="business-app-bottom-nav" aria-label="Мобильная навигация">
       {items.map((item) => {
-        const active = isBusinessNavItemCurrent(pathname, item);
+        const active = item.id === activeId;
         const locked = isBusinessNavItemLocked(item, access);
         const Icon = ICONS[item.icon as keyof typeof ICONS];
         const name = locked ? `${item.title} – ${BUSINESS_LOCKED_LABEL}` : item.title;
@@ -75,7 +78,8 @@ export default function BusinessBottomNav() {
               aria-label={name}
               title={name}
               onClick={() => showLocked(item.title)}
-              className="business-app-focus-ring business-app-bottom-nav__item business-app-nav-locked"
+              className={`business-app-focus-ring business-app-bottom-nav__item business-app-nav-locked${active ? " is-active" : ""}`}
+              aria-current={active ? "page" : undefined}
             >
               {icon}
             </button>
@@ -84,7 +88,7 @@ export default function BusinessBottomNav() {
         return (
           <Link
             key={item.id}
-            href={businessNavHref(item, access)}
+            href={item.href === "/" ? businessCabinetHomePath(hostname) : businessNavHref(item, access)}
             data-nav-id={item.id}
             aria-label={name}
             title={name}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
+import ReplyEmojiButtons from "@/components/practice-comments/ReplyEmojiButtons";
 import {
   AUTHOR_UNREAD_CARD_CLASS,
   publishAuthorUnreadCount,
@@ -283,6 +284,7 @@ function FeedbackCard({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const cardRef = useRef<HTMLLIElement>(null);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   const parsed = parsePracticePublicPath(item.practiceHref);
   const slug = item.authorSlug || parsed?.authorSlug || "";
   const product = item.productSlug || parsed?.productSlug || "";
@@ -403,12 +405,14 @@ function FeedbackCard({
       ) : (
         <form className="mt-3" onSubmit={(event) => void send(event)}>
           <textarea
+            ref={replyRef}
             className="min-h-20 w-full rounded-[16px] border border-[#e4d7f4] px-3 py-3 text-base"
             placeholder={AUTHOR_FEEDBACK_REPLY_PLACEHOLDER}
             value={reply}
             maxLength={2000}
             onChange={(event) => setReply(event.target.value)}
           />
+          <ReplyEmojiButtons textareaRef={replyRef} onChange={setReply} />
           <button
             type="submit"
             className="mt-2 inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60"

@@ -1,10 +1,13 @@
 "use client";
 
+import BusinessGuestStartCta from "./BusinessGuestStartCta";
+
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
-import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
-import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
+import { useBusinessHostname, useGuestStartEnabled } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { BUSINESS_GIFT_CTA, BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { businessLockedNotice } from "@/lib/business-app/access";
 import { GUEST_COFFEE_COPY, GUEST_COFFEE_TERMS } from "@/lib/business-app/guest-coffee/copy";
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
@@ -52,23 +55,28 @@ export function useBusinessGuestStatus(): GuestStatus {
 
 /**
  * Strip at the top of every cabinet screen for a guest.
- * Before the meter runs out it offers only the 30-day gift. The 30 minutes are
+ * Before the meter runs out it offers only the gift (BUSINESS_GIFT_TITLE). The 30 minutes are
  * named only in the exhausted banner, after the server limit is reached.
  * Sergey 28.10.2026: one green action only – no secondary «Подключить» on the guest banner.
  */
 export function BusinessGuestStatusBar() {
+  const hostname = useBusinessHostname();
   const { limit, notice } = useBusinessGuestStatus();
   const exhausted = limit === "exhausted";
+  // 253821e0: with the no-registration guest start on, the exhausted text does not ask to register.
+  const guestStartEnabled = useGuestStartEnabled();
   return (
     <section
       className="business-app-guest-bar"
-      aria-label={exhausted ? "Гостевое время закончилось" : "30 дней в подарок"}
+      aria-label={exhausted ? "Гостевое время закончилось" : BUSINESS_GIFT_TITLE}
       data-testid="biz-guest-status"
       data-limit={limit ?? "unknown"}
     >
       <div className="business-app-guest-bar__text">
         {exhausted ? (
-          <p data-testid="biz-guest-exhausted">{GUEST_COFFEE_COPY.exhaustedBanner}</p>
+          <p data-testid="biz-guest-exhausted">
+            {guestStartEnabled ? GUEST_COFFEE_COPY.exhaustedBannerGuestStart : GUEST_COFFEE_COPY.exhaustedBanner}
+          </p>
         ) : (
           <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS}.</p>
         )}
@@ -81,21 +89,22 @@ export function BusinessGuestStatusBar() {
       ) : null}
       <div className="business-app-guest-bar__actions">
         {exhausted ? (
-          <a
-            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+          <BusinessGuestStartCta
+            href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
-            data-testid="biz-guest-register"
+            testId="biz-guest-register"
+            enabledLabel={BUSINESS_GIFT_CTA}
           >
             {GUEST_COFFEE_COPY.exhaustedRegister}
-          </a>
+          </BusinessGuestStartCta>
         ) : (
-          <a
-            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+          <BusinessGuestStartCta
+            href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
-            data-testid="biz-trial-cta"
+            testId="biz-trial-cta"
           >
             {BUSINESS_GIFT_CTA}
-          </a>
+          </BusinessGuestStartCta>
         )}
       </div>
     </section>

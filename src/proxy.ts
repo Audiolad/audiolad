@@ -2,13 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { MAX_SITE_PATH } from "@/lib/max/host";
 import { resolveMaxProxyAction } from "@/lib/max/proxy-policy";
-import {
-  normalizeHostname,
-  SCHOOL_SITE_PATH,
-} from "@/lib/school/host";
+import { SCHOOL_SITE_PATH } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
-import { coffeeHandoffRedirect, migrateCoffeeGuestCookie } from "@/lib/business-app/coffee-host-proxy";
+import { migrateCoffeeGuestCookie } from "@/lib/business-app/coffee-host-proxy";
 import { COFFEE_HOSTNAME, coffeeHostEnabled } from "@/lib/business-app/host";
+import { resolveProxyRequestHostname } from "@/lib/business-app/proxy-hostname";
 import { resolveBusinessProxyAction } from "@/lib/business-app/proxy-policy";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
@@ -27,9 +25,7 @@ export function setProxyUpdateSessionForTests(fn: UpdateSessionFn | null) {
 }
 
 function getRequestHostname(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-host");
-  const host = request.headers.get("host");
-  return normalizeHostname(forwarded ?? host);
+  return resolveProxyRequestHostname(request.headers);
 }
 
 /** Same exclusions as the general matcher below (files the proxy normally never sees). */
@@ -66,8 +62,6 @@ export async function proxy(request: NextRequest) {
   }
 
   if (businessAction.action === "rewrite_business_app") {
-    const handoff = coffeeHandoffRedirect(request);
-    if (handoff) return handoff;
     return migrateCoffeeGuestCookie(request, await updateSession(request, {
       rewritePathname: businessAction.pathname,
     }));

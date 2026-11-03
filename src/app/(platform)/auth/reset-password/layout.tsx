@@ -1,4 +1,4 @@
-import BottomNav from "@/components/BottomNav";
+import BottomNav from "@/components/auth/AuthHostNavigation";
 import { hasValidRecoveryIntent } from "@/lib/auth/recovery-intent";
 import { PASSWORD_RESET_EXPIRED_MESSAGE } from "@/lib/auth/recovery-messages";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";

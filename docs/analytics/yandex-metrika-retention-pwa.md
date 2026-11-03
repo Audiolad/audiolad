@@ -91,6 +91,10 @@ PII и технические идентификаторы отбрасываю�
 - Админ-контент с `data-admin-panel` / `data-admin-form` получает `ym-hide-content`
 - Маршруты `/admin` не загружают счётчик
 
+## Кабинет кофеен (business-хосты)
+
+Кабинет на coffee.audiolad.ru и business.audiolad.ru подключает тот же счётчик через `BusinessAudienceTracker` с тем же баннером согласия; Вебвизор там выключен, `/documents`, `/point`, `/player`, `/coffee-handoff` без Метрики. Цели и сегменты – [отчёт по аудиториям Атласа](../business/yandex-audiences-atlas-coffee-8f5c0285-REPORT_RU.md).
+
 ## SPA pageviews
 
 - Первый автоматический hit от `tag.js` сохраняется

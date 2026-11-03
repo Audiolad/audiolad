@@ -4,7 +4,7 @@ One module for tasks **ba344b7f** and **1e008ee8**. Do not add a second registra
 
 ## What it does
 
-- A confirmed email that enters through the offer (`/auth/business-return` or the business workspace) receives one period of `30 * 24` hours.
+- A confirmed email that enters through the offer (`/auth/business-return` or the business workspace) receives one period of `BUSINESS_GIFT_DAYS * 24` hours (`src/lib/business/plan.ts`; 7 days since task 39ef47c4, was 30). The length is fixed at issue time in `access_grants.ends_at`: grants issued earlier keep their stored end and are not shortened. After `ends_at` the 3-day grace (`BUSINESS_GRACE_DAYS`) keeps the player open; a paid period is 30 days (`BUSINESS_PAID_PERIOD_DAYS`). See `docs/business/TRIAL_7_DAYS_AUDIT_RU.md`.
 - Identity is `sha256` of the trimmed lowercased email, plus the user id. Both are unique for kind `business_new_client`. The raw email is not stored.
 - There is no foreign key to `auth.users`. Deleting the account does not delete the grant, so a new registration of the same address does not restart the clock. Every observed email-hash/user-id pair is retained in `access_grant_identities`. Re-registration and later email changes resolve the connected identities to the earliest original window, including expired grants. Collisions never restart or extend it. Grant resolution and issuance use service-role-only RPCs with a transaction advisory lock, unique constraints and insert-on-conflict-do-nothing followed by a re-read.
 - Renewals preserve the maximum `paid_until` (GREATEST semantics): insert-on-conflict-do-nothing, then an atomic conditional update only when the stored date is earlier. Access is resolved from the stored maximum.
@@ -13,7 +13,7 @@ One module for tasks **ba344b7f** and **1e008ee8**. Do not add a second registra
 - The effective gift/paid deadline travels as ISO `endsAt` in the page/state model and as a `Date` in SPA items (`playableUntil`). The engine stops buffered audio and rejects expired starts/resumes. A capped client timer closes the player and refreshes the existing state route without a reload; the local offer stays closed if the refresh fails.
 - Grant rows, event rows and playback rows are kept after expiry.
 - Studio generation is not part of the gift. The cabinet rules quote the existing Studio limits and do not promise unlimited AI.
-- Events live in `access_grant_events`, not in platform analytics and not in mailings: `trial_started`, `first_useful_action`, `activity_day_7`, `activity_day_14`, `activity_day_30`, `subscription_offer_shown`, `subscription_go_to_payment` (repeatable), `subscription_renewed`. Day indexes use the Europe/Moscow calendar and are written when the workspace is opened, not by a cron.
+- Events live in `access_grant_events`, not in platform analytics and not in mailings: `trial_started`, `first_useful_action`, `activity_day_7`, `activity_day_14`, `activity_day_30` (with the 7-day gift only `activity_day_7` is reachable; 14 and 30 remain for grants issued before task 39ef47c4), `subscription_offer_shown`, `subscription_go_to_payment` (repeatable), `subscription_renewed`. Day indexes use the Europe/Moscow calendar and are written when the workspace is opened, not by a cron.
 
 ## Rights
 
@@ -21,7 +21,7 @@ One module for tasks **ba344b7f** and **1e008ee8**. Do not add a second registra
 
 ## Return after email confirmation
 
-GoTrue allow-list URLs stay exact, without a query string. Sign-up does not set `emailRedirectTo`. The relative `next=/auth/business-return` is stored on the form, and `user_metadata.business_trial = "1"` is set only for that next path. The callback uses an explicit `next` when it is present, and otherwise the metadata flag.
+On `audiolad.ru` and `business.audiolad.ru`, GoTrue allow-list URLs stay exact, without a query string, and sign-up does not set `emailRedirectTo`. Exception – `coffee.audiolad.ru` with `NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1`: sign-up on the coffee host sets `emailRedirectTo` to `https://coffee.audiolad.ru/auth/callback?next=...`, and the GoTrue allow-list has the wildcard entry `https://coffee.audiolad.ru/**`. See `docs/runbooks/coffee-audiolad-rollout.md`. The relative `next=/auth/business-return` is stored on the form, and `user_metadata.business_trial = "1"` is set only for that next path. The callback uses an explicit `next` when it is present, and otherwise the metadata flag.
 
 ## Migration
 
@@ -46,4 +46,4 @@ DROP TABLE IF EXISTS public.access_grants;
 
 ## Residual
 
-The landing poster file `12-free-trial.webp` still shows the old 7-day line in the picture. The page alt text no longer quotes that line. Replacing the image is a separate asset change.
+The landing poster file `12-free-trial.webp` carries no day count in the picture (checked in task 39ef47c4). The page alt text does not quote the number.

@@ -52,7 +52,10 @@ function testLibraryContract() {
     "counter id from env var",
   );
   assert(!library.includes("110799004"), "counter id is not hardcoded");
-  assert(library.includes("webvisor: true"), "webvisor enabled");
+  assert(
+    library.includes("webvisor: !isBusinessAnalyticsHost(window.location.hostname)"),
+    "webvisor on audiolad.ru, off in the Business cabinet",
+  );
   assert(library.includes("clickmap: true"), "clickmap enabled");
   assert(library.includes("trackLinks: true"), "trackLinks enabled");
   assert(library.includes("accurateTrackBounce: true"), "accurateTrackBounce enabled");
@@ -83,7 +86,7 @@ function testComponentContract() {
   assert(component.includes("useAnalyticsConsentGranted"), "metrika gated by granted");
   assert(component.includes("shouldEnableYandexMetrika"), "admin/dev guard wired");
   assert(component.includes("searchParams"), "spa search params tracked safely");
-  assert(banner.includes('writeAnalyticsConsent("granted")'), "banner grant action");
+  assert(banner.includes('analytics: writeAnalyticsConsent'), "banner grant action");
   assert(
     banner.includes("shouldShowYandexAnalyticsConsentBanner"),
     "MAX host suppresses Yandex consent banner",
@@ -141,5 +144,11 @@ testClientHooks();
 testProvidersAndSettings();
 testPrivacyContract();
 testNoDuplicateEmitters();
+
+{
+  const goals = readFileSync(resolve(ROOT, "src/lib/analytics/yandex-metrika-goals.ts"), "utf8");
+  if (goals.includes("business_atlas_coffee_pdf_opened")) throw new Error("pdf_opened must not be an allowed Metrika goal");
+  if (!goals.includes('"business_atlas_coffee_pdf_downloaded"')) throw new Error("pdf_downloaded goal missing");
+}
 
 console.log("yandex-metrika-unit: ok");

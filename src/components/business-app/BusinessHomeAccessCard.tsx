@@ -8,6 +8,7 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import {
   BUSINESS_GIFT_CLOSING_NOTE,
   BUSINESS_GIFT_LICENSE_NOTE,
+  BUSINESS_PERIOD_ENDED_PAY_NOTE,
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
@@ -16,7 +17,7 @@ import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } f
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import type { BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
 
-type PayError = { code: BusinessPayErrorCode; href: string | null };
+export type PayError = { code: BusinessPayErrorCode; href: string | null };
 
 function unavailablePayError(): PayError {
   return { code: "internal_error", href: null };
@@ -29,8 +30,11 @@ function payErrorFromPayload(payload: { error?: string; href?: string } | null):
   };
 }
 
-/** Owner payment on Главная. A manager and a venue device do not see the button. */
-export default function BusinessHomeAccessCard() {
+/**
+ * Terms acceptance and payment state shared by the access card and the «С чего начать» steps.
+ * The return to Главная after payment lands on `#dostup`.
+ */
+export function useBusinessHomePay() {
   const access = useBusinessChromeAccess();
   const domain = useBusinessDomain();
   const canPay = domain.status === "authenticated" && domain.canPay;
@@ -38,7 +42,77 @@ export default function BusinessHomeAccessCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
 
-  if ((access.mode !== "trial" && access.mode !== "paid" && access.mode !== "grace" && access.mode !== "offer") || !access.endsAt) {
+  const accept = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/business/subscription/accept", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; href?: string } | null;
+      if (!response.ok) {
+        setError(payErrorFromPayload(payload));
+        return;
+      }
+      setAccepted(true);
+    } catch {
+      setError(unavailablePayError());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pay = async () => {
+    setBusy(true);
+    setError(null);
+    const params = new URLSearchParams({ space: "cafe" });
+    void fetch(`/api/business/workspace/state?${params.toString()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      body: JSON.stringify({ kind: "offer_click" }),
+    }).catch(() => {
+      /* The payment link is the action that matters. */
+    });
+    try {
+      const response = await fetch("/api/business/subscription/checkout", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        href?: string;
+        payment_url?: string;
+      } | null;
+      if (!response.ok || typeof payload?.payment_url !== "string") {
+        setError(payErrorFromPayload(payload));
+        setBusy(false);
+        return;
+      }
+      window.location.assign(payload.payment_url);
+    } catch {
+      setError(unavailablePayError());
+      setBusy(false);
+    }
+  };
+
+  const hasTerm =
+    (access.mode === "trial" || access.mode === "paid" || access.mode === "grace" || access.mode === "offer") &&
+    Boolean(access.endsAt);
+
+  return { access, hasTerm, canPay, accepted, busy, error, accept, pay };
+}
+
+/** Owner payment before the first venue. A manager and a venue device do not see the button. */
+export default function BusinessHomeAccessCard() {
+  const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay } = useBusinessHomePay();
+
+  if (!hasTerm || !access.endsAt) {
     return null;
   }
 
@@ -49,73 +123,17 @@ export default function BusinessHomeAccessCard() {
       accepted={accepted}
       busy={busy}
       error={error}
-      onAccept={async () => {
-        setBusy(true);
-        setError(null);
-        try {
-          const response = await fetch("/api/business/subscription/accept", {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-          });
-          const payload = (await response.json().catch(() => null)) as { error?: string; href?: string } | null;
-          if (!response.ok) {
-            setError(payErrorFromPayload(payload));
-            return;
-          }
-          setAccepted(true);
-        } catch {
-          setError(unavailablePayError());
-        } finally {
-          setBusy(false);
-        }
-      }}
-      onPay={async () => {
-        setBusy(true);
-        setError(null);
-        const params = new URLSearchParams({ space: "cafe" });
-        void fetch(`/api/business/workspace/state?${params.toString()}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          cache: "no-store",
-          body: JSON.stringify({ kind: "offer_click" }),
-        }).catch(() => {
-          /* The payment link is the action that matters. */
-        });
-        try {
-          const response = await fetch("/api/business/subscription/checkout", {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: { "Idempotency-Key": crypto.randomUUID() },
-          });
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            href?: string;
-            payment_url?: string;
-          } | null;
-          if (!response.ok || typeof payload?.payment_url !== "string") {
-            setError(payErrorFromPayload(payload));
-            setBusy(false);
-            return;
-          }
-          window.location.assign(payload.payment_url);
-        } catch {
-          setError(unavailablePayError());
-          setBusy(false);
-        }
-      }}
+      onAccept={accept}
+      onPay={startPay}
     />
   );
 
-  if (access.mode === "grace" && access.graceEndsAt) {
-    const days = trialDaysLeft(new Date(access.graceEndsAt), new Date());
+  if (access.mode === "grace") {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="grace">
         <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Срок закончился</h2>
         <p data-testid="biz-home-grace">
-          Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
+          {BUSINESS_PERIOD_ENDED_PAY_NOTE} Конец срока был {label}.
         </p>
         {pay}
       </section>
@@ -210,7 +228,7 @@ function BusinessPayControls({
   );
 }
 
-function BusinessPayError({ error }: { error: PayError }) {
+export function BusinessPayError({ error }: { error: PayError }) {
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">

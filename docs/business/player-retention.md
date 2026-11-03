@@ -48,7 +48,7 @@ Removing intervals is irreversible and would limit future raw-history reports.
 
 ## Implementation and controls
 
-`20270211120000_business_player_history_retention.sql` adds a B-tree index
+`20270215120000_business_player_history_retention.sql` adds a B-tree index
 `(last_confirmed_at, id)` and the service-role-only RPC
 `cleanup_business_player_listening_history`. No data is deleted when it is applied.
 Public, anonymous and authenticated execution are revoked. RPC defaults are

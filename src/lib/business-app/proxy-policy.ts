@@ -26,6 +26,7 @@ export const BUSINESS_PUBLIC_ASSET_PATHS = [
 
 /** Minimal platform telemetry endpoints still hit by root BaseProviders. */
 export const BUSINESS_ALLOWED_API_PATHS = [
+  "/api/business/guest-start",
   "/api/client-errors",
   "/api/health/build",
   // c02fe282: stable (build-independent) /spa player endpoints.
@@ -47,6 +48,28 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/point",
   // 90d24628: the venue's own QR sticker. Flag, session and membership are checked in the handler.
   "/api/business/venue-licence/sticker",
+] as const;
+
+/** Coffee-only platform auth. Server actions POST to the currently rendered page. */
+export const COFFEE_ALLOWED_AUTH_PATHS = [
+  "/auth/sign-in",
+  "/auth/sign-up",
+  "/auth/forgot-password",
+  "/auth/recovery",
+  "/auth/reset-password",
+  "/auth/callback",
+  "/auth/sign-out",
+  "/auth/business-return",
+  "/auth/business-cabinet",
+  // Post-login claims imported by sign-in (also permit their explicit action paths).
+  "/auth/claim-partner-attribution",
+  "/auth/claim-guest-ratings",
+] as const;
+
+/** Conditional telemetry called directly by the existing sign-up client. */
+export const COFFEE_ALLOWED_AUTH_API_PATHS = [
+  "/api/analytics/track", // signup_started
+  "/api/analytics/signup/complete", // authenticated signup completion
 ] as const;
 
 /**
@@ -115,13 +138,19 @@ export function resolveBusinessProxyAction(
     return { action: "pass_through" };
   }
 
-  if (pathname === "/robots.txt") {
+  if (pathname === "/robots.txt" || (hostname === COFFEE_HOSTNAME && pathname === "/sitemap.xml")) {
     return { action: "pass_through" };
   }
 
   if (hostname === COFFEE_HOSTNAME &&
       (COFFEE_BLOCKED_API_PATHS as readonly string[]).includes(pathname)) {
     return { action: "not_found" };
+  }
+
+  if (hostname === COFFEE_HOSTNAME &&
+      ((COFFEE_ALLOWED_AUTH_PATHS as readonly string[]).includes(pathname) ||
+       (COFFEE_ALLOWED_AUTH_API_PATHS as readonly string[]).includes(pathname))) {
+    return { action: "pass_through" };
   }
 
   if ((BUSINESS_ALLOWED_API_PATHS as readonly string[]).includes(pathname)) {
@@ -141,7 +170,7 @@ export function resolveBusinessProxyAction(
     return { action: "rewrite_business_app", pathname: BUSINESS_GUEST_COFFEE_INTERNAL_PATH };
   }
 
-  // After rewrite Next re-enters proxy with the internal path — pass through.
+  // After rewrite Next re-enters proxy with the internal path – pass through.
   if (isBusinessSitePath(pathname)) {
     return { action: "pass_through" };
   }
@@ -174,7 +203,7 @@ export function businessPrivateGuestRedirect(
   return BUSINESS_GUEST_COFFEE_PUBLIC_PATH;
 }
 
-/** Exported for tests — public paths the business host rewrites. */
+/** Exported for tests – public paths the business host rewrites. */
 export function listBusinessPublicRewritePaths(): string[] {
   return Object.keys(BUSINESS_PUBLIC_PATH_REWRITES);
 }

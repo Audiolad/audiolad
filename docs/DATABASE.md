@@ -2379,7 +2379,7 @@ before accepting these uploads. No production operation was performed.
 
 ## Business player listening history retention (f381f92b, proposal)
 
-New forward-only migration `20270211120000_business_player_history_retention.sql`
+New forward-only migration `20270215120000_business_player_history_retention.sql`
 builds `business_player_listening_history_retention_idx (last_confirmed_at, id)`
 with `CREATE INDEX CONCURRENTLY IF NOT EXISTS` before its function transaction.
 The official runner uses psql stdin without an outer transaction

@@ -1,9 +1,12 @@
+import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import BusinessAppShell from "@/components/business-app/BusinessAppShell";
+import BusinessAttributionCapture from "@/components/business-app/BusinessAttributionCapture";
+import { businessTrialAttributionConfig } from "@/lib/business-trial-attribution/config";
 import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
 import "@/components/business-app/theme/business-theme.css";
 import "@/components/business-app/business-app.css";
@@ -12,6 +15,7 @@ import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { BUSINESS_ENTRY_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
 import { guestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import {
@@ -54,10 +58,16 @@ export default async function BusinessAppLayout({
       ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
       : null;
 
+  // Header switcher side (UI only) so a reload opens the same side without a flash.
+  const initialEntry = parseBusinessEntry((await cookies()).get(BUSINESS_ENTRY_COOKIE)?.value);
+
+  const attributionEnabled = businessTrialAttributionConfig(process.env).enabled;
+
   return (
     <div className="business-app-root" data-biz-theme={theme}>
-      <BusinessDomainProvider value={domain}>
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports}>{children}</BusinessAppShell>
+      <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
+        {attributionEnabled ? <BusinessAttributionCapture /> : null}
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

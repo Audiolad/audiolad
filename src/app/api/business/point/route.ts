@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS } from "@/lib/business-app/cafe-queue/prefs";
 import { GUEST_COFFEE_DEFAULT_PROFILE } from "@/lib/business-app/guest-coffee/catalog";
@@ -11,6 +11,8 @@ import { pointCodeSecondsLeft } from "@/lib/business-app/point-share";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
+import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
+import { recordBusinessTrialPointListen } from "@/lib/business-trial-activity/record.server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -271,6 +273,10 @@ export async function POST(request: Request) {
       p_playing_confirmed: report?.playingConfirmed ?? false,
       p_error_code: report?.errorCode ?? null,
     });
+    // Gift-week minutes (flag OFF by default): only confirmed playback on a valid session.
+    if (!error && report?.state === "playing" && report.playingConfirmed && businessTrialActivityConfig(process.env).enabled) {
+      after(() => recordBusinessTrialPointListen(token));
+    }
     return json(error ? { ok: false, reason: "report_failed" } : { ok: true, data: null });
   }
 

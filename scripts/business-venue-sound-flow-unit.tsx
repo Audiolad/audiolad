@@ -51,10 +51,11 @@ const at = (html: string, testid: string) => {
   const closed = inRouter(
     <VenueControlPanel locationId="loc-1" locationName="Кофе" pointCanEdit soundSlot={<p data-testid="slot">picker</p>} />,
   );
-  assert.match(closed, /Управление кофейней/);
+  assert.match(closed, /Музыка в зале/);
   assert.match(closed, /Название кофейни/);
   assert.doesNotMatch(closed, /точк/i);
-  assert.match(closed, /Пауза, продолжение, следующий трек и отправка атмосферы спрашивают подтверждение и уходят в кофейню\. Слушать у себя это не включает\./);
+  assert.match(closed, /Пауза, продолжение, следующий трек и новое звучание уходят в зал после подтверждения\. Вкладка «Музыка» играет только у вас\./);
+  assert.equal((closed.match(/подтвержд/g) ?? []).length, 1, "the confirmation is said once in the panel");
   assert.doesNotMatch(closed, /Каждое действие/);
   assert.doesNotMatch(closed, /—/);
   assert.doesNotMatch(closed, /data-testid="slot"/, "picker stays closed until the owner asks");

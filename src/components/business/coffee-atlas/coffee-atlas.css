@@ -1006,19 +1006,21 @@
 }
 
 .atlas-track__title {
+  font-family: var(--atlas-display-font);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.45rem);
+  line-height: 1.2;
   color: inherit;
+}
+
+.atlas-track__album {
+  font-size: 0.92rem;
+  color: rgba(246, 234, 215, 0.72);
   text-decoration: none;
 }
 
-.atlas-track__title:hover {
+.atlas-track__album:hover {
   text-decoration: underline;
-}
-
-.atlas-track__author {
-  font-size: 0.88rem;
-  color: rgba(246, 234, 215, 0.7);
 }
 
 .atlas-track__play {

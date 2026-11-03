@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAuthHref } from "@/lib/access-grants/paths";
+import { businessCabinetHomePath } from "@/lib/business-app/host";
+
 import { bootstrapBusinessOrganizationWithLocation } from "@/app/business-app/actions";
 import OnboardingPreviewPlayer from "@/components/business-app/OnboardingPreviewPlayer";
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { businessAccessLine } from "@/lib/access-grants/access-line";
 import {
   GUEST_COFFEE_COPY,
@@ -39,7 +42,8 @@ export default function BusinessOnboardingWizardPage({
   returnHref?: string | null;
 } = {}) {
   const domain = useBusinessDomain();
-  // Gift already live: show its end date instead of re-offering «30 дней в подарок, затем 799 ₽».
+  const hostname = useBusinessHostname();
+  // Gift already live: show its end date instead of re-offering «N дней в подарок, затем 799 ₽» (BUSINESS_GIFT_TITLE).
   const accessLine = businessAccessLine(useBusinessChromeAccess());
   const router = useRouter();
   const [step, setStep] = useState<BusinessOnboardingStep>("type");
@@ -88,13 +92,13 @@ export default function BusinessOnboardingWizardPage({
           </p>
           <div className="flex flex-wrap gap-2">
             <a
-              href="https://audiolad.ru/auth/sign-in"
+              href={businessAuthHref(hostname, "sign-in")}
               className="business-app-btn business-app-btn-primary business-app-focus-ring"
             >
               Войти
             </a>
             <a
-              href="https://audiolad.ru/auth/sign-up"
+              href={businessAuthHref(hostname, "sign-up")}
               className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Зарегистрироваться
@@ -134,7 +138,7 @@ export default function BusinessOnboardingWizardPage({
               </Link>
             ) : null}
             <Link
-              href="/"
+              href={businessCabinetHomePath(hostname)}
               className={`business-app-btn business-app-focus-ring ${returnHref ? "business-app-btn-secondary" : "business-app-btn-primary"}`}
             >
               На главную
@@ -428,7 +432,7 @@ export default function BusinessOnboardingWizardPage({
                 Открыть музыку
               </Link>
               <Link
-                href="/"
+                href={businessCabinetHomePath(hostname)}
                 className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 На главную

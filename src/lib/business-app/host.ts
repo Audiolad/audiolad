@@ -55,6 +55,7 @@ export function isBusinessSitePath(pathname: string): boolean {
  */
 export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/": BUSINESS_SITE_PATH,
+  "/cabinet": BUSINESS_SITE_PATH,
   "/locations": `${BUSINESS_SITE_PATH}/locations`,
   "/music": `${BUSINESS_SITE_PATH}/music`,
   "/stats": `${BUSINESS_SITE_PATH}/stats`,
@@ -127,7 +128,7 @@ export function resolveVenueLicenceInternalPath(pathname: string): string | null
 
 /** Normalize usePathname() whether it returns public or internal path. */
 export function normalizeBusinessAppPathname(pathname: string): string {
-  if (pathname === BUSINESS_SITE_PATH || pathname === "/") {
+  if (pathname === BUSINESS_SITE_PATH || pathname === "/" || pathname === "/cabinet") {
     return "/";
   }
   if (pathname.startsWith(`${BUSINESS_SITE_PATH}/`)) {
@@ -138,4 +139,25 @@ export function normalizeBusinessAppPathname(pathname: string): string {
     return rest || "/";
   }
   return pathname;
+}
+
+/** The coffee root is the guest player; the owner home has its own public alias. */
+export function businessCabinetHomePath(hostname: string): string {
+  return coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? "/cabinet" : "/";
+}
+
+/**
+ * The section path for navigation highlight, the same on the server and in the browser.
+ * On the coffee host `/` is the guest player: the server render sees the rewritten
+ * `/business-app/guest/coffee`, the browser sees `/`. Plain normalizing turned the browser `/`
+ * into the cabinet home, so the server marked «Музыка» and the browser marked «Главная».
+ * React keeps server attributes on a hydration mismatch, so «Музыка» stayed highlighted on
+ * every page until the user opened it once. Both sides now resolve the coffee `/` to the
+ * music section.
+ */
+export function businessNavPathname(rawPathname: string, hostname: string): string {
+  if (coffeeHostEnabled() && hostname === COFFEE_HOSTNAME && rawPathname === "/") {
+    return BUSINESS_GUEST_COFFEE_PUBLIC_PATH;
+  }
+  return normalizeBusinessAppPathname(rawPathname || "/");
 }
