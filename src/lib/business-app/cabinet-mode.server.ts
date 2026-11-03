@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -15,6 +16,7 @@ import {
 import { BUSINESS_VIEW_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
 import { businessHallDeviceCookie } from "@/lib/business-app/point-session.server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 /** Verified JWT claims of this request (null when signed out). One read per request. */
 const loadBusinessClaims = cache(async (): Promise<Record<string, unknown> | null> => {
@@ -44,7 +46,35 @@ export type BusinessCabinetModeState = {
    * out at once (BusinessCabinetModeBanner), so no reusable owner credential stays in the hall.
    */
   staleOwnerSession: boolean;
+  /**
+   * The account session id on the hall device (JWT session_id), so the browser cleanup signs out
+   * exactly that session and never a fresh unlock made in the meantime.
+   */
+  hallSessionId: string | null;
 };
+
+/**
+ * Server side, without the browser's JS: an account session on the hall device without a fresh
+ * password is ended on the auth server (its refresh token stops working), after the response.
+ * The token is read during the request; `after` only calls the auth server.
+ */
+async function revokeStaleHallSession(): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getSession();
+    const jwt = data.session?.access_token;
+    if (!jwt) return;
+    after(async () => {
+      try {
+        await createServiceRoleClient().auth.admin.signOut(jwt, "local");
+      } catch {
+        // The browser cleanup (BusinessCabinetModeBanner) and the next request try again.
+      }
+    });
+  } catch {
+    // Same: the mode is already "point", nothing here can open the owner cabinet.
+  }
+}
 
 /**
  * The mode of this request (one read per request). Only a signed-in person can preview; the
@@ -53,11 +83,14 @@ export type BusinessCabinetModeState = {
 export const loadBusinessCabinetMode = cache(async (): Promise<BusinessCabinetModeState> => {
   const pointAlive = await businessHallDeviceCookie();
   const ownerUnlockUntil = pointAlive ? await loadBusinessOwnerUnlockUntil() : null;
-  const staleOwnerSession = pointAlive && ownerUnlockUntil === null && typeof (await loadBusinessClaims())?.sub === "string";
+  const hallClaims = pointAlive ? await loadBusinessClaims() : null;
+  const staleOwnerSession = pointAlive && ownerUnlockUntil === null && typeof hallClaims?.sub === "string";
+  if (staleOwnerSession) await revokeStaleHallSession();
+  const hallSessionId = typeof hallClaims?.session_id === "string" ? hallClaims.session_id : null;
   const previewChosen = !pointAlive && parseBusinessEntry((await cookies()).get(BUSINESS_VIEW_COOKIE)?.value) === "venue";
   const canPreview = previewChosen && typeof (await loadBusinessClaims())?.sub === "string";
   const mode = resolveBusinessCabinetMode({ pointAlive, ownerUnlocked: ownerUnlockUntil !== null, previewChosen, canPreview });
-  return { mode, pointAlive, ownerUnlockUntil, staleOwnerSession };
+  return { mode, pointAlive, ownerUnlockUntil, staleOwnerSession, hallSessionId };
 });
 
 /**

@@ -15,6 +15,7 @@ import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-sto
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
+import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { pointDeviceWorkspaceAccess, type PointDeviceVenue } from "@/lib/business-app/point-device";
 import { loadPointDeviceAccess, loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
@@ -532,6 +533,9 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
   // decide which venue plays here (and must never turn it into the guest preview).
   const pointVenue = await loadPointDeviceVenue();
   if (pointVenue) return loadPointDeviceWorkspacePage(pointVenue, space, model);
+  // Fail closed: a hall device whose venue could not be read (revoked, lookup error) never falls
+  // back to the account kept on this browser – only the owner's fresh password unlocks that.
+  if (await businessHallDeviceLocked()) return model;
   const supabase = await createClient();
   const {
     data: { user },
@@ -637,6 +641,8 @@ export async function loadWorkspaceActor(spaceParam: string | null): Promise<Wor
       space,
     };
   }
+  // Fail closed, like the page: no account fallback on a locked hall device.
+  if (await businessHallDeviceLocked()) return { ok: false, reason: "no_access" };
   const supabase = await createClient();
   const {
     data: { user },

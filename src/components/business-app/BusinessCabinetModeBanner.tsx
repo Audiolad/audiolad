@@ -6,16 +6,40 @@ import { useRouter } from "next/navigation";
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
 import { createClient } from "@/lib/supabase/client";
 
+/** session_id of the access token held by this browser (only compared, never trusted for access). */
+function tokenSessionId(accessToken: string | undefined): string | null {
+  try {
+    const part = accessToken?.split(".")[1];
+    if (!part) return null;
+    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "="))) as { session_id?: unknown };
+    return typeof payload.session_id === "string" ? payload.session_id : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Account sign-out on this browser only (the owner's phone stays signed in). Same order as the
- * site sign-out: the analytics identity link is closed first.
+ * site sign-out: the analytics identity link is closed first. With `onlySessionId` it ends only
+ * that session: a fresh unlock made meanwhile on «Кабинет владельца» stays.
  */
-async function signOutThisBrowser(): Promise<void> {
+async function signOutThisBrowser(onlySessionId?: string | null): Promise<void> {
   const supabase = createClient();
+  const sessionMatches = async () => {
+    if (onlySessionId === undefined) return true;
+    const { data } = await supabase.auth.getSession();
+    const current = tokenSessionId(data.session?.access_token);
+    // No session left: nothing to end. Unknown id on either side: end it (fail closed), unless a
+    // different, known session is there now.
+    if (!data.session) return false;
+    return onlySessionId === null || current === null || current === onlySessionId;
+  };
+  if (!(await sessionMatches())) return;
   await supabase.rpc("unlink_analytics_identity").then(
     () => undefined,
     () => undefined,
   );
+  if (!(await sessionMatches())) return;
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
 }
 
@@ -39,6 +63,7 @@ export default function BusinessCabinetModeBanner() {
   const unlockUntil = cabinet.mode === "owner" && cabinet.pointReports ? cabinet.ownerUnlockUntil : null;
   const [locking, setLocking] = useState(false);
   const staleOwnerSession = cabinet.mode === "point" && cabinet.staleOwnerSession === true;
+  const hallSessionId = cabinet.hallSessionId ?? null;
 
   // No reusable owner credential stays on the hall device: an account session without a fresh
   // password (an old login, or the unlock that just ended) is signed out on this browser only.
@@ -46,13 +71,13 @@ export default function BusinessCabinetModeBanner() {
   useEffect(() => {
     if (!staleOwnerSession) return;
     let cancelled = false;
-    void signOutThisBrowser().then(() => {
+    void signOutThisBrowser(hallSessionId).then(() => {
       if (!cancelled) router.refresh();
     });
     return () => {
       cancelled = true;
     };
-  }, [staleOwnerSession, router]);
+  }, [staleOwnerSession, hallSessionId, router]);
 
   // The unlock ends on the server by itself; then sign this browser out and re-read the page, so
   // the hall menu comes back.
@@ -60,10 +85,10 @@ export default function BusinessCabinetModeBanner() {
     if (!unlockUntil) return;
     const ms = Math.max(1_000, unlockUntil * 1000 - Date.now() + 1_000);
     const timer = window.setTimeout(() => {
-      void signOutThisBrowser().then(() => router.refresh());
+      void signOutThisBrowser(hallSessionId).then(() => router.refresh());
     }, Math.min(ms, 2_147_000_000));
     return () => window.clearTimeout(timer);
-  }, [unlockUntil, router]);
+  }, [unlockUntil, hallSessionId, router]);
 
   if (cabinet.mode === "preview") {
     // Back to the owner's own cabinet on the same screen (every venue screen is the owner's too).

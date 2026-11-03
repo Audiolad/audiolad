@@ -131,14 +131,22 @@ for (const path of [
 // Codex review1 (03.11.2026): fail closed, no reusable owner session in the hall, every owner door guarded.
 const pointSession = read("src/lib/business-app/point-session.server.ts");
 assert.match(pointSession, /if \(error \|\| typeof data !== "boolean"\) return "unknown";/);
-assert.match(pointSession, /return status === "alive" \|\| status === "unknown";/, "an unchecked device cookie counts as the hall device");
+assert.match(pointSession, /return \(await businessPointDeviceStatus\(\)\) !== "none";/, "alive, revoked or unchecked device cookie: hall device");
 assert.match(server, /const pointAlive = await businessHallDeviceCookie\(\);/);
 assert.match(server, /staleOwnerSession = pointAlive && ownerUnlockUntil === null/);
 const banner = read("src/components/business-app/BusinessCabinetModeBanner.tsx");
 assert.match(banner, /signOut\(\{ scope: "local" \}\)/, "this browser only");
 assert.match(banner, /if \(!staleOwnerSession\) return;/);
-assert.match(banner, /void signOutThisBrowser\(\)\.then\(\(\) => router\.refresh\(\)\)/, "unlock end signs the hall browser out");
-assert.match(route, /await supabase\.auth\.signOut\(\{ scope: "local" \}\);[\s\S]*?response\.cookies\.set\(BUSINESS_POINT_COOKIE, ""/, "disconnect never promotes a kept account session");
+assert.match(banner, /void signOutThisBrowser\(hallSessionId\)\.then\(\(\) => router\.refresh\(\)\)/, "unlock end signs the hall browser out");
+// Codex review2: checked sign-out before the revoke; revoked cookie stays until a fresh password.
+assert.match(route, /const \{ error: signOutError \} = await supabase\.auth\.signOut\(\{ scope: "local" \}\);\n\s*if \(signOutError\) return json[\s\S]*?revoked_at[\s\S]*?response\.cookies\.set\(BUSINESS_POINT_COOKIE, ""/, "disconnect never promotes a kept account session");
+assert.match(route, /body\.action === "forget-revoked"[\s\S]{0,500}loadBusinessOwnerUnlockUntil\(\)\) === null\) return json[\s\S]{0,200}businessPointDeviceStatus\(\)\) !== "revoked"/);
+assert.match(server, /if \(staleOwnerSession\) await revokeStaleHallSession\(\);/, "stale hall session ended on the auth server, no JS needed");
+assert.match(server, /auth\.admin\.signOut\(jwt, "local"\)/);
+assert.match(banner, /signOutThisBrowser\(hallSessionId\)/, "cleanup bound to the stale session id");
+assert.match(banner, /current === onlySessionId/);
+const workspaceLoad = read("src/lib/business-workspace/load.server.ts");
+assert.equal((workspaceLoad.match(/if \(await businessHallDeviceLocked\(\)\) return/g) ?? []).length, 2, "workspace page and actor: no account fallback on the hall device");
 assert.match(read("src/app/api/business/guest-start/route.ts"), /async function handle\(request: Request\) \{\n[\s\S]{0,200}if \(await businessHallDeviceLocked\(\)\)/, "no new venue from the hall device, before any sign-in");
 assert.match(read("src/lib/business-app/spa-pilot.ts"), /loadSpaPilotContext\(\)[^{]*\{\n[^\n]*\n  if \(await businessHallDeviceLocked\(\)\) return null;/);
 assert.match(read("src/lib/business-app/onboarding-preview.server.ts"), /if \(await businessHallDeviceLocked\(\)\) return "no_access";/);

@@ -39,6 +39,13 @@ export default function BusinessOwnerUnlockForm({ defaultEmail, next }: { defaul
         return;
       }
       setPassword("");
+      // A device cookie revoked from the owner's phone (for example on the owner's own phone) is
+      // dropped now, so this browser is the owner cabinet again; an alive one stays (hall device).
+      await fetch("/api/business/point", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "forget-revoked" }),
+      }).catch(() => undefined);
       router.replace(safeBusinessNextPath(next));
       router.refresh();
     } catch {

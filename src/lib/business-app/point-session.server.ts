@@ -32,12 +32,14 @@ export async function businessPointSessionAlive(): Promise<boolean> {
 }
 
 /**
- * Guards fail closed: a device cookie that could not be checked counts as the hall device, so a
- * failed lookup never turns a hall browser with an old owner session into the owner cabinet.
+ * Guards fail closed: any device cookie on this browser counts as the hall device – alive, revoked
+ * from the owner's phone, or not checked because the lookup failed. Only the owner's fresh password
+ * (and then «forget-revoked» in the point route) or «Отключить это устройство» removes it, so neither
+ * a failed lookup nor a remote revoke turns a hall browser with an old account session into the
+ * owner cabinet.
  */
 export async function businessHallDeviceCookie(): Promise<boolean> {
-  const status = await businessPointDeviceStatus();
-  return status === "alive" || status === "unknown";
+  return (await businessPointDeviceStatus()) !== "none";
 }
 
 /** Atmosphere permission for this device. Missing row stays allowed. */

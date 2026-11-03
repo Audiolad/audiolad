@@ -27,6 +27,8 @@ export type BusinessCabinetServerMode = {
   ownerUnlockUntil: number | null;
   /** Hall device with an account session but no fresh password: the browser signs it out. */
   staleOwnerSession?: boolean;
+  /** Account session id on the hall device: the cleanup signs out only this one. */
+  hallSessionId?: string | null;
   /** A signed-in person may look at the cabinet «как видит точка». */
   canPreview: boolean;
 };

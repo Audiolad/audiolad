@@ -5,7 +5,8 @@ import { after, NextResponse } from "next/server";
 import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS } from "@/lib/business-app/cafe-queue/prefs";
 import { GUEST_COFFEE_DEFAULT_PROFILE } from "@/lib/business-app/guest-coffee/catalog";
 import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
-import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
+import { businessHallDeviceLocked, loadBusinessOwnerUnlockUntil } from "@/lib/business-app/cabinet-mode.server";
+import { businessPointDeviceStatus } from "@/lib/business-app/point-session.server";
 import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, pointSoundUpdate, soundDraftFromBody } from "@/lib/business-app/point-sound";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
@@ -70,6 +71,14 @@ export async function POST(request: Request) {
   if (body.action === "disconnect-self") {
     // «Отключить это устройство»: closes only this browser's own device session, by its own cookie.
     // No account needed; the token never leaves the server and no other session is touched.
+    // First the account session on this browser (this browser only, checked): if it stayed, the
+    // browser would turn into the owner cabinet once the device cookie is gone.
+    try {
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+    } catch {
+      return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+    }
     const token = readCookie(request.headers.get("cookie") ?? "", BUSINESS_POINT_COOKIE);
     if (isPointToken(token)) {
       try {
@@ -84,14 +93,18 @@ export async function POST(request: Request) {
         return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
       }
     }
-    // An account session left on this browser must not turn into the owner cabinet once the device
-    // cookie is gone: sign it out here (this browser only), so the owner logs in again on purpose.
-    try {
-      await supabase.auth.signOut({ scope: "local" });
-    } catch {
-      return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
-    }
     const response = json({ ok: true });
+    response.cookies.set(BUSINESS_POINT_COOKIE, "", { ...pointCookieOptions(secure), maxAge: 0 });
+    return response;
+  }
+
+  if (body.action === "forget-revoked") {
+    // After the owner's fresh password on a browser whose device was revoked (for example their own
+    // phone): drop the dead device cookie, so this browser is the owner cabinet again. Only a
+    // definitely revoked cookie and only with a fresh password; an alive or unchecked one stays.
+    if ((await loadBusinessOwnerUnlockUntil()) === null) return json({ ok: false, reason: "unauthorized" }, 401);
+    if ((await businessPointDeviceStatus()) !== "revoked") return json({ ok: true, cleared: false });
+    const response = json({ ok: true, cleared: true });
     response.cookies.set(BUSINESS_POINT_COOKIE, "", { ...pointCookieOptions(secure), maxAge: 0 });
     return response;
   }
