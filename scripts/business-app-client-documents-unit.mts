@@ -386,3 +386,63 @@ console.log("business-app-client-documents-unit OK");
   assert.match(card, /<VenueQrShowButton\s+url=\{qrUrl\}\s+variant="secondary"\s+testId="biz-inspector-qr-show"\s+label=\{INSPECTOR_BUTTONS\.qr\}/, "inspector card opens the QR too, with the explicit label");
   assert.match(docs, /<InspectorContactCard qrUrl=\{sticker \? venueLicencePublicUrl\(sticker\.publicId\) : null\} \/>/);
 }
+
+// Rendered markup (not only source patterns): order, labels, links, targets, classes in both placements.
+{
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { default: InspectorContactCard } = await import("../src/components/business-app/InspectorContactCard");
+  const { default: ProfileHelpContact } = await import("../src/components/business-app/ProfileHelpContact");
+  const { SERGEY_CONTACT: c, SERGEY_CONTACT_LABELS: l } = await import("../src/lib/business-app/sergey-contact");
+  const { INSPECTOR_BUTTONS } = await import("../src/lib/business-app/inspector-contact");
+  const { VENUE_QR_SHOW_LABEL, default: VenueQrShowButton } = await import("../src/components/business-app/venue-licence/VenueQrFullscreen");
+  type El = { id: string; tag: string; attrs: string; text: string };
+  const els = (html: string): El[] =>
+    [...html.matchAll(/<(a|button|p)\b([^>]*data-testid="([^"]+)"[^>]*)>([^<]*)</g)].map((m) => ({ tag: m[1], attrs: m[2], id: m[3], text: m[4] }));
+  const attr = (e: El, n: string) => e.attrs.match(new RegExp(`\\b${n}="([^"]*)"`))?.[1] ?? null;
+  const expectPart = (e: El, part: string) => {
+    const want: Record<string, [string, string | null, string | null, string]> = {
+      phone: ["p", null, null, c.phoneDisplay],
+      call: ["a", c.phoneHref, null, l.call],
+      max: ["a", c.maxHref, "_blank", l.max],
+      telegram: ["a", c.telegramHref, "_blank", l.telegram],
+      email: ["a", c.emailHref, null, l.email],
+    };
+    const [tag, href, target, text] = want[part];
+    assert.equal(e.tag, tag, `${e.id} tag`);
+    assert.equal(attr(e, "href"), href, `${e.id} href`);
+    assert.equal(attr(e, "target"), target, `${e.id} target`);
+    if (target) assert.equal(attr(e, "rel"), "noopener noreferrer", `${e.id} rel`);
+    assert.equal(e.text, text, `${e.id} text`);
+    if (part === "call") assert.match(attr(e, "class") ?? "", /\bbusiness-app-btn-cta\b/, "«Позвонить» is green");
+    if (tag === "a") assert.match(attr(e, "class") ?? "", /\bbusiness-app-focus-ring\b/);
+  };
+
+  const card = els(renderToStaticMarkup(createElement(InspectorContactCard, { qrUrl: "https://business.audiolad.ru/v/0123456789abcdef0123456789abcdef" })));
+  assert.deepEqual(
+    card.map((e) => e.id),
+    ["biz-inspector-name", "biz-inspector-phone", "biz-inspector-call", "biz-inspector-max", "biz-inspector-telegram", "biz-inspector-email", "biz-inspector-qr-show"],
+    "rendered inspector card order",
+  );
+  for (const e of card.slice(1, 6)) expectPart(e, e.id.replace("biz-inspector-", ""));
+  const qr = card[6];
+  assert.equal(qr.tag, "button");
+  assert.equal(qr.text, INSPECTOR_BUTTONS.qr);
+  assert.match(attr(qr, "class") ?? "", /\bbusiness-app-btn-secondary\b.*\bbusiness-contact__btn\b/);
+  assert.equal(els(renderToStaticMarkup(createElement(InspectorContactCard, { qrUrl: null }))).some((e) => e.id === "biz-inspector-qr-show"), false);
+
+  const help = renderToStaticMarkup(createElement(ProfileHelpContact));
+  assert.ok(help.includes(">По любым вопросам пишите напрямую Сергею Петрову</h2>"), "profile help title");
+  const helpEls = els(help);
+  assert.deepEqual(
+    helpEls.map((e) => e.id),
+    ["biz-profile-contact-max", "biz-profile-contact-telegram", "biz-profile-contact-email", "biz-profile-contact-phone", "biz-profile-contact-call"],
+    "rendered profile help order",
+  );
+  for (const e of helpEls) expectPart(e, e.id.replace("biz-profile-contact-", ""));
+
+  // Other VenueQrShowButton callers keep the default label and classes.
+  const def = els(renderToStaticMarkup(createElement(VenueQrShowButton, { url: "https://business.audiolad.ru/v/x", testId: "q" })))[0];
+  assert.equal(def.text, VENUE_QR_SHOW_LABEL);
+  assert.doesNotMatch(attr(def, "class") ?? "", /business-contact__btn|\s$/);
+}
