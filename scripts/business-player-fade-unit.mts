@@ -812,6 +812,38 @@ for (const file of [
   assert.match(src, /fadeRef\.current\.setVolume\(/, file);
   assert.doesNotMatch(src, /createMediaElementSource/, file);
 }
+// 38. Cabinet / hall device: while the previous track fades out after a skip, its time is
+// never stored, reported or sought as the chosen track's (timeupdate, toggle, seek).
+{
+  const src = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
+  assert.match(src, /const onTime = \(\) => \{\n(?:\s*\/\/[^\n]*\n)*\s*if \(ctl\.fadingOutPrevious\) return;/);
+  assert.match(src, /const positionSec = ctl\.fadingOutPrevious \? 0 : \(audioRef\.current\?\.currentTime \?\? 0\);\n\s*remember\(\{ index: ctl\.index < 0 \? index : ctl\.index, positionSec \}/);
+  assert.match(src, /if \(ctlRef\.current\?\.fadingOutPrevious\) return;\n\s*const nextTime/);
+  assert.match(src, /const audible = ctl\.audibleItemId;/);
+  assert.equal((src.match(/positionSec: (?:audio|audioRef)/g) ?? []).length, 1, "only the guarded timeupdate write reads the element time");
+}
+// 39. Controller: next → pause → play → pause inside the skip keeps the previous track
+// marked as fading (the toggle wrapper stores position 0 for the chosen one).
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  m.currentTime = 120;
+  const next = p.next();
+  c.advance(100);
+  await p.toggle();
+  await next;
+  const again = p.toggle();
+  c.advance(100);
+  await p.toggle();
+  assert.equal(p.current?.title, "T2");
+  assert.equal(p.fadingOutPrevious, true, "old source still fading");
+  c.advance(PLAYER_FADE_MS + PLAYER_SKIP_FADE_OUT_MS);
+  await again;
+  await flush();
+  assert.equal(p.fadingOutPrevious, false);
+  assert.equal(m.src, "");
+}
 {
   const src = readFileSync(new URL("../src/lib/business-app/spa-online-player.ts", import.meta.url), "utf8");
   assert.match(src, /if \(this\.d\.audio\.fadeOut && !this\.expired\(cur\)\) \{\n\s+void this\.d\.audio\.fadeOut\(\);/);

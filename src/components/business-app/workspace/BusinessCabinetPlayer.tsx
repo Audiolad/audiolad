@@ -426,7 +426,9 @@ export function BusinessCabinetPlayerProvider({
     } else {
       await ctl.playIndex(index);
     }
-    remember({ index: ctl.index < 0 ? index : ctl.index, positionSec: audioRef.current?.currentTime ?? 0 }, ctl.status === "playing");
+    // Mid skip the element still holds the previous track's time: the chosen one starts at 0.
+    const positionSec = ctl.fadingOutPrevious ? 0 : (audioRef.current?.currentTime ?? 0);
+    remember({ index: ctl.index < 0 ? index : ctl.index, positionSec }, ctl.status === "playing");
     reportPlayback();
   }, [remember, reportPlayback]);
 
@@ -764,6 +766,8 @@ export function BusinessCabinetPlayerProvider({
     // the current track: this does not change the music. Commands refresh it sooner.
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    // The previous track is fading out after a skip: the bar already shows the chosen one.
+    if (ctlRef.current?.fadingOutPrevious) return;
     const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
     audio.currentTime = nextTime;
     setView((prev) => ({ ...prev, currentTime: nextTime }));
