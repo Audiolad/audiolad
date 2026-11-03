@@ -286,6 +286,7 @@ export class FadingAudio {
   }
 
   dispose(): void {
+    ++this.gen;
     this.stopTimer();
     this.dir = 0;
     this.level = 1;

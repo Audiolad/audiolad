@@ -122,6 +122,27 @@ export class SpaOnlinePlayer {
     }, Math.min(ms, 2 ** 31 - 1));
   }
 
+  /**
+   * Soft pause keeps sounding for the fade-out: if playable_until passes meanwhile, stop
+   * the audio at once (hard pause, no auto-advance – the user paused). Re-reads the
+   * current manifest entry like armDeadline. A play / track switch bumps `op` and
+   * clears the timer.
+   */
+  private armFadeGuard(id: string, op: number) {
+    this.clearDeadline();
+    const item = this.fresh(id);
+    if (!item?.playableUntil) return;
+    const ms = Math.max(0, item.playableUntil.getTime() - this.now());
+    const set = this.d.setTimer ?? ((fn, t) => setTimeout(fn, t));
+    this.deadlineTimer = set(() => {
+      this.deadlineTimer = null;
+      if (op !== this.op || this.disposed) return;
+      const cur = this.fresh(id);
+      if (cur && !this.expired(cur)) return this.armFadeGuard(id, op);
+      this.d.audio.pause();
+    }, Math.min(ms, 2 ** 31 - 1));
+  }
+
   /** `resume`: continue with another track only if playback was active (never override a pause). */
   private async onDeadline(resume: boolean): Promise<void> {
     this.op++;
@@ -203,8 +224,12 @@ export class SpaOnlinePlayer {
       this.clearDeadline();
       // Soft pause where available: the status is "paused" at once (UI, remote commands),
       // the music fades out for PLAYER_FADE_MS and then the element pauses.
-      if (this.d.audio.fadeOut) void this.d.audio.fadeOut();
-      else this.d.audio.pause();
+      const cur = this.current;
+      if (this.d.audio.fadeOut && !this.expired(cur)) {
+        void this.d.audio.fadeOut();
+        // Rights window: the fade-out is still audible, so playable_until still applies.
+        if (cur) this.armFadeGuard(cur.audioItemId, this.op);
+      } else this.d.audio.pause();
       return this.set("paused");
     }
     if (this.status === "paused" && this.d.audio.src && this.current && !this.expired(this.current)) {
@@ -283,6 +308,7 @@ export class SpaOnlinePlayer {
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
       if (this.expired(items[idx])) return this.onDeadline(wasActive);
       if (this.status === "playing") this.armDeadline(currentId as string, this.op);
+      else if (this.status === "paused" && this.deadlineTimer !== null) this.armFadeGuard(currentId as string, this.op);
       this.d.onChange();
       return;
     }

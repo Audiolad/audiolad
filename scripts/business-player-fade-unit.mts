@@ -387,6 +387,80 @@ function player() {
   assert.equal(m.paused, false, "the cancelled fade-out never pauses the new track");
 }
 
+// 20. Rights deadline inside the fade-out: hard stop at playable_until, no auto-advance.
+{
+  const { m, c, f } = rig();
+  const timeouts: { at: number; fn: () => void; live: boolean }[] = [];
+  const until = new Date(c.now() + 3_000);
+  const limited = (n: number): SpaManifestItem => ({ ...item(n), playableUntil: until });
+  const p = new SpaOnlinePlayer(
+    {
+      audio: f,
+      sign: async (id) => ({ ok: true, data: { url: `https://s/${id}?token=x` } }),
+      onChange() {},
+      now: c.now,
+      setTimer: (fn, ms) => { const t = { at: c.now() + ms, fn, live: true }; timeouts.push(t); return t; },
+      clearTimer: (t) => { (t as { live: boolean }).live = false; },
+    },
+    [limited(1), item(2)],
+  );
+  const runDue = () => { for (const t of timeouts) if (t.live && t.at <= c.now()) { t.live = false; t.fn(); } };
+  f.setVolume(0.8);
+  await p.toggle();
+  c.advance(2_000);
+  assert.equal(p.status, "playing");
+  await p.toggle(); // pause 1 s before the window ends
+  assert.equal(p.status, "paused");
+  assert.equal(m.paused, false, "still fading");
+  c.advance(1_000);
+  runDue();
+  assert.equal(m.paused, true, "hard stop at playable_until");
+  near(m.volume, 0.8, 1e-9);
+  assert.equal(f.fadingOut, false);
+  assert.equal(p.status, "paused", "no auto-advance after a user pause");
+  assert.equal(p.current?.audioItemId, item(1).audioItemId);
+  const pausesAtStop = m.pauses;
+  c.advance(2_000);
+  runDue();
+  assert.equal(m.pauses, pausesAtStop, "nothing else fires later");
+  assert.equal(m.plays, 1);
+}
+
+// 21. Pause after playable_until already passed: no fade-out, hard pause at once.
+{
+  const { m, c, f } = rig();
+  let clockOffset = 0;
+  const until = new Date(c.now() + 1_000);
+  const p = new SpaOnlinePlayer(
+    {
+      audio: f,
+      sign: async (id) => ({ ok: true, data: { url: `https://s/${id}?token=x` } }),
+      onChange() {},
+      now: () => c.now() + clockOffset,
+      setTimer: () => 0,
+      clearTimer: () => {},
+    },
+    [{ ...item(1), playableUntil: until }, item(2)],
+  );
+  await p.toggle();
+  clockOffset = 5_000; // the deadline timer did not fire (suspended tab)
+  await p.toggle();
+  assert.equal(m.paused, true);
+  assert.equal(f.fadingOut, false);
+}
+
+// 22. dispose() during a pending play(): no ramp starts afterwards.
+{
+  const { m, c, f } = rig();
+  let resolvePlay: () => void = () => {};
+  m.play = () => new Promise<void>((ok) => { resolvePlay = () => { m.paused = false; ok(); }; });
+  const pending = f.play();
+  f.dispose();
+  resolvePlay();
+  await pending;
+  assert.equal(c.running, false);
+}
+
 // 19. Wiring: both Business players route the element through FadingAudio and set the
 // volume through it (cabinet / hall device, guest /guest/coffee).
 for (const file of [
@@ -401,7 +475,7 @@ for (const file of [
 }
 {
   const src = readFileSync(new URL("../src/lib/business-app/spa-online-player.ts", import.meta.url), "utf8");
-  assert.match(src, /if \(this\.d\.audio\.fadeOut\) void this\.d\.audio\.fadeOut\(\);/);
+  assert.match(src, /if \(this\.d\.audio\.fadeOut && !this\.expired\(cur\)\) \{\n\s+void this\.d\.audio\.fadeOut\(\);/);
   assert.match(src, /return this\.advance\(true\);/);
 }
 
