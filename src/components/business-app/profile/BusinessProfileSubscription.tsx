@@ -5,7 +5,7 @@ import { BusinessPayControls, useBusinessHomePay } from "@/components/business-a
 import { businessProfileSubscription } from "@/lib/business-app/profile-subscription";
 
 export default function BusinessProfileSubscription({ timezone, nowIso, offerAccepted }: { timezone: string; nowIso: string; offerAccepted: boolean }) {
-  const { access, canPay, accepted, busy, error, accept, pay } = useBusinessHomePay();
+  const { access, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } = useBusinessHomePay();
   const [now, setNow] = useState(() => new Date(nowIso));
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -20,7 +20,8 @@ export default function BusinessProfileSubscription({ timezone, nowIso, offerAcc
       <p className="text-xl font-bold" data-testid="biz-profile-subscription-status">{summary.title}</p>
       {summary.until ? <p className="text-sm text-[var(--biz-text-muted)]">{summary.until}</p> : null}
       <BusinessPayControls canPay={canPay} accepted={offerAccepted || accepted} busy={busy} error={error}
-        onAccept={accept} onPay={pay} payLabel={summary.button} buttonVariant="cta" />
+        onAccept={accept} onPay={pay} payLabel={summary.button} buttonVariant="cta" showAcceptedNote
+        receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null} />
     </section>
   );
 }

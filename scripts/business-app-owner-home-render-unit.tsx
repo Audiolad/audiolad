@@ -104,7 +104,8 @@ const stepOf = (html: string, id: string) => {
 };
 // Terms step: accepted already, the offer stays one tap away.
 const termsStep = stepOf(trialHome, "terms");
-assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Условия приняты:", BUSINESS_OFFER_TITLE, "."]);
+assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Условия приняты для всего аккаунта:", `«${BUSINESS_OFFER_TITLE}»`, "."]);
+assert.match(termsStep, /target="_blank"/);
 assert.match(termsStep, /data-done="true"/);
 assert.match(termsStep, /href="\/documents\/b2b-terms"/);
 // Pay step: exactly these lines, in this order.

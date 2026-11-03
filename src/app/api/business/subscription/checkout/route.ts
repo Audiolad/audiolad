@@ -2,7 +2,7 @@ import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { NextResponse } from "next/server";
 
 import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
-import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-checkout";
+import { mapBusinessSubscriptionRpcError, resolveBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import type { OrderRow } from "@/lib/payments/payment-api";
@@ -39,9 +39,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  const customerEmail = user.email?.trim() ?? "";
+  // Optional body { receipt_email }: only for an account without email (guest start).
+  const body = (await request.json().catch(() => null)) as { receipt_email?: unknown } | null;
+  const customerEmail = resolveBusinessReceiptEmail(user.email, body?.receipt_email) ?? "";
   if (!customerEmail) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return NextResponse.json({ error: "receipt_email_required" }, { status: 400 });
   }
   if (!isPaymentsConfigured()) {
     return NextResponse.json({ error: "payments_not_configured" }, { status: 503 });
