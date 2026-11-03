@@ -109,6 +109,6 @@ const privacy = readFileSync(new URL('../src/app/(platform)/privacy/page.tsx', i
 assert(privacy.includes('Последнее обновление: 3 ноября 2026 года'));
 const banner = readFileSync(new URL('../src/components/analytics/AnalyticsConsentBanner.tsx', import.meta.url), 'utf8');
 assert(banner.includes('Мы используем cookies, чтобы собирать статистику и улучшать сайт, а также для нашей рекламы. '));
-assert(banner.includes('Разрешите рекламные cookies – так мы покажем вам только полезное о АудиоЛаде. '));
+assert(banner.includes('Разрешите рекламные cookies – так мы покажем вам только полезное об АудиоЛаде. '));
 assert(banner.includes('#section-8') || banner.includes('section-8'), 'policy link');
 console.log('advertising-consent-unit: storage, choices, subscriptions, VK effects/StrictMode – passed');
