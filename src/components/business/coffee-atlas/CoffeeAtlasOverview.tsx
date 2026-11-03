@@ -36,7 +36,7 @@ export default function CoffeeAtlasOverview() {
               <div className="atlas-cover__actions">
                 <CoffeeAtlasGoalLink
                   href={buildCoffeeAtlasShopPath(first.slug)}
-                  goal="business_atlas_shop_opened"
+                  goal="business_atlas_coffee_shop_opened"
                   className="atlas-btn atlas-btn--gold"
                 >
                   Начать путешествие
@@ -78,7 +78,7 @@ export default function CoffeeAtlasOverview() {
                 <li key={shop.slug} className="atlas-stop" data-atlas-theme={shop.slug}>
                   <CoffeeAtlasGoalLink
                     href={buildCoffeeAtlasShopPath(shop.slug)}
-                    goal="business_atlas_shop_opened"
+                    goal="business_atlas_coffee_shop_opened"
                     className="atlas-stop__link"
                   >
                     <span className="atlas-stop__photo">

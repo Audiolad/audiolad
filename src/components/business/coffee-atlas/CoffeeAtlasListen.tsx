@@ -33,7 +33,7 @@ export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListe
       data-atlas-listen-state="live"
       onClickCapture={(event) => {
         if ((event.target as HTMLElement).closest("[data-atlas-play]")) {
-          sendYandexGoal("business_atlas_listen_clicked");
+          sendYandexGoal("business_atlas_coffee_listen_clicked");
         }
       }}
     >
