@@ -158,8 +158,8 @@ assert.doesNotMatch(returnPage, /activateBusinessTrial/);
 assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /ownerCanPayFromThisBrowser/);
 for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src/app/api/business/subscription/accept/route.ts"]) {
   const source = readFileSync(route, "utf8");
-  assert.match(source, /businessPointSessionAlive/);
-  assert.ok(source.indexOf("businessPointSessionAlive") < source.indexOf(".rpc("), route);
+  assert.match(source, /businessHallDeviceLocked/);
+  assert.ok(source.indexOf("businessHallDeviceLocked()") < source.indexOf(".rpc("), route);
 }
 
 

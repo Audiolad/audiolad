@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Form from "next/form";
 import Link from "next/link";
 
 import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
@@ -158,7 +159,8 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           )
         ) : (
           <>
-            <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
+            {/* next/form: a soft navigation, so the hall player in the layout keeps playing. */}
+            <Form action="/documents" scroll={false} className="mt-3 flex flex-wrap items-end gap-3" data-testid="playback-report-form">
               <label className="flex flex-col text-sm">
                 Дата и время
                 <input
@@ -183,7 +185,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring">
                 Показать
               </button>
-            </form>
+            </Form>
             {result.kind === "invalid_time" ? (
               <p className="mt-3 text-sm">Не удалось разобрать дату и время.</p>
             ) : null}

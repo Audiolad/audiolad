@@ -25,6 +25,8 @@ export type BusinessCabinetServerMode = {
   pointVenueName: string | null;
   /** Unix seconds: the owner unlock on the hall device ends then. */
   ownerUnlockUntil: number | null;
+  /** Hall device with an account session but no fresh password: the browser signs it out. */
+  staleOwnerSession?: boolean;
   /** A signed-in person may look at the cabinet «как видит точка». */
   canPreview: boolean;
 };

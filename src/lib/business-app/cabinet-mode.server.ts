@@ -13,7 +13,7 @@ import {
   type BusinessCabinetPermission,
 } from "@/lib/business-app/cabinet-mode";
 import { BUSINESS_VIEW_COOKIE, parseBusinessEntry } from "@/lib/business-app/live-refresh";
-import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { businessHallDeviceCookie } from "@/lib/business-app/point-session.server";
 import { createClient } from "@/lib/supabase/server";
 
 /** Verified JWT claims of this request (null when signed out). One read per request. */
@@ -35,9 +35,15 @@ export async function loadBusinessOwnerUnlockUntil(): Promise<number | null> {
 
 export type BusinessCabinetModeState = {
   mode: BusinessCabinetMode;
+  /** This browser is the hall device (live device cookie, or one that could not be checked). */
   pointAlive: boolean;
   /** Unix seconds; set only on the hall device while the owner unlock lasts. */
   ownerUnlockUntil: number | null;
+  /**
+   * The hall device still holds an account session without a fresh password: the browser signs it
+   * out at once (BusinessCabinetModeBanner), so no reusable owner credential stays in the hall.
+   */
+  staleOwnerSession: boolean;
 };
 
 /**
@@ -45,12 +51,13 @@ export type BusinessCabinetModeState = {
  * preview choice is a UI cookie and only ever narrows what the cabinet shows.
  */
 export const loadBusinessCabinetMode = cache(async (): Promise<BusinessCabinetModeState> => {
-  const pointAlive = await businessPointSessionAlive();
+  const pointAlive = await businessHallDeviceCookie();
   const ownerUnlockUntil = pointAlive ? await loadBusinessOwnerUnlockUntil() : null;
+  const staleOwnerSession = pointAlive && ownerUnlockUntil === null && typeof (await loadBusinessClaims())?.sub === "string";
   const previewChosen = !pointAlive && parseBusinessEntry((await cookies()).get(BUSINESS_VIEW_COOKIE)?.value) === "venue";
   const canPreview = previewChosen && typeof (await loadBusinessClaims())?.sub === "string";
   const mode = resolveBusinessCabinetMode({ pointAlive, ownerUnlocked: ownerUnlockUntil !== null, previewChosen, canPreview });
-  return { mode, pointAlive, ownerUnlockUntil };
+  return { mode, pointAlive, ownerUnlockUntil, staleOwnerSession };
 });
 
 /**

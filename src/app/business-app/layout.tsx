@@ -78,6 +78,7 @@ export default async function BusinessAppLayout({
     pointCanEdit: cabinet.mode === "preview" ? previewSound?.pointCanEditSettings !== false : pointVenue?.pointCanEdit ?? false,
     pointVenueName: pointVenue?.locationName ?? null,
     ownerUnlockUntil: cabinet.ownerUnlockUntil,
+    staleOwnerSession: cabinet.staleOwnerSession,
     canPreview: domain.status === "authenticated",
   };
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).

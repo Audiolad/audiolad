@@ -84,6 +84,13 @@ export async function POST(request: Request) {
         return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
       }
     }
+    // An account session left on this browser must not turn into the owner cabinet once the device
+    // cookie is gone: sign it out here (this browser only), so the owner logs in again on purpose.
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      return json({ ok: false, error: "Не удалось отключить устройство. Попробуйте ещё раз." });
+    }
     const response = json({ ok: true });
     response.cookies.set(BUSINESS_POINT_COOKIE, "", { ...pointCookieOptions(secure), maxAge: 0 });
     return response;

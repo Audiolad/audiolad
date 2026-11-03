@@ -128,7 +128,28 @@ for (const path of [
 ]) {
   assert.match(read(path), /businessHallDeviceLocked\(\)/, `${path}: owner action guarded on the hall device`);
 }
+// Codex review1 (03.11.2026): fail closed, no reusable owner session in the hall, every owner door guarded.
+const pointSession = read("src/lib/business-app/point-session.server.ts");
+assert.match(pointSession, /if \(error \|\| typeof data !== "boolean"\) return "unknown";/);
+assert.match(pointSession, /return status === "alive" \|\| status === "unknown";/, "an unchecked device cookie counts as the hall device");
+assert.match(server, /const pointAlive = await businessHallDeviceCookie\(\);/);
+assert.match(server, /staleOwnerSession = pointAlive && ownerUnlockUntil === null/);
+const banner = read("src/components/business-app/BusinessCabinetModeBanner.tsx");
+assert.match(banner, /signOut\(\{ scope: "local" \}\)/, "this browser only");
+assert.match(banner, /if \(!staleOwnerSession\) return;/);
+assert.match(banner, /void signOutThisBrowser\(\)\.then\(\(\) => router\.refresh\(\)\)/, "unlock end signs the hall browser out");
+assert.match(route, /await supabase\.auth\.signOut\(\{ scope: "local" \}\);[\s\S]*?response\.cookies\.set\(BUSINESS_POINT_COOKIE, ""/, "disconnect never promotes a kept account session");
+assert.match(read("src/app/api/business/guest-start/route.ts"), /async function handle\(request: Request\) \{\n[\s\S]{0,200}if \(await businessHallDeviceLocked\(\)\)/, "no new venue from the hall device, before any sign-in");
+assert.match(read("src/lib/business-app/spa-pilot.ts"), /loadSpaPilotContext\(\)[^{]*\{\n[^\n]*\n  if \(await businessHallDeviceLocked\(\)\) return null;/);
+assert.match(read("src/lib/business-app/onboarding-preview.server.ts"), /if \(await businessHallDeviceLocked\(\)\) return "no_access";/);
+for (const path of ["src/app/api/business/subscription/checkout/route.ts", "src/app/api/business/subscription/accept/route.ts", "src/lib/business-app/domain.ts"]) {
+  assert.match(read(path), /await businessHallDeviceLocked\(\)/, `${path}: payment follows the unlock, fails closed`);
+  assert.doesNotMatch(read(path), /businessPointSessionAlive/);
+}
+assert.equal((read("src/app/business-app/actions.ts").match(/businessHallDeviceLocked\(\)/g) ?? []).length, 3, "bootstrap, provision, eligibility probe");
 const documents = read("src/app/business-app/documents/page.tsx");
+assert.match(documents, /<Form action="\/documents"/, "report form is a soft navigation: the hall music keeps playing");
+assert.doesNotMatch(documents, /<form method="get"/);
 assert.match(documents, /businessCabinetCan\(\{ mode \}, "stickerDownload"\)/);
 assert.match(documents, /pointVenue\?\.licencePublicId/, "the point QR comes from the device session");
 const unlock = read("src/components/business-app/BusinessOwnerUnlockForm.tsx");

@@ -6,6 +6,19 @@ import { useRouter } from "next/navigation";
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * Account sign-out on this browser only (the owner's phone stays signed in). Same order as the
+ * site sign-out: the analytics identity link is closed first.
+ */
+async function signOutThisBrowser(): Promise<void> {
+  const supabase = createClient();
+  await supabase.rpc("unlink_analytics_identity").then(
+    () => undefined,
+    () => undefined,
+  );
+  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+}
+
 /** «до 18:40» in the device's own clock (the owner stands next to it). */
 function unlockClock(untilSeconds: number): string {
   return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(untilSeconds * 1000));
@@ -25,12 +38,30 @@ export default function BusinessCabinetModeBanner() {
   const router = useRouter();
   const unlockUntil = cabinet.mode === "owner" && cabinet.pointReports ? cabinet.ownerUnlockUntil : null;
   const [locking, setLocking] = useState(false);
+  const staleOwnerSession = cabinet.mode === "point" && cabinet.staleOwnerSession === true;
 
-  // The unlock ends on the server by itself; re-read the page then, so the hall menu comes back.
+  // No reusable owner credential stays on the hall device: an account session without a fresh
+  // password (an old login, or the unlock that just ended) is signed out on this browser only.
+  // Soft refresh, so the hall music keeps playing.
+  useEffect(() => {
+    if (!staleOwnerSession) return;
+    let cancelled = false;
+    void signOutThisBrowser().then(() => {
+      if (!cancelled) router.refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [staleOwnerSession, router]);
+
+  // The unlock ends on the server by itself; then sign this browser out and re-read the page, so
+  // the hall menu comes back.
   useEffect(() => {
     if (!unlockUntil) return;
     const ms = Math.max(1_000, unlockUntil * 1000 - Date.now() + 1_000);
-    const timer = window.setTimeout(() => router.refresh(), Math.min(ms, 2_147_000_000));
+    const timer = window.setTimeout(() => {
+      void signOutThisBrowser().then(() => router.refresh());
+    }, Math.min(ms, 2_147_000_000));
     return () => window.clearTimeout(timer);
   }, [unlockUntil, router]);
 
@@ -65,13 +96,7 @@ export default function BusinessCabinetModeBanner() {
           disabled={locking}
           onClick={async () => {
             setLocking(true);
-            const supabase = createClient();
-            // Same order as the site sign-out: close the analytics identity link first.
-            await supabase.rpc("unlink_analytics_identity").then(
-              () => undefined,
-              () => undefined,
-            );
-            await supabase.auth.signOut({ scope: "local" });
+            await signOutThisBrowser();
             router.replace("/");
             router.refresh();
           }}

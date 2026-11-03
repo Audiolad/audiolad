@@ -198,6 +198,9 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
   zoneId?: string | null;
   audioItemIds?: string[];
 }): Promise<ResolveBusinessAirplayEligibilityResult> {
+  if (await businessHallDeviceLocked()) {
+    return { ok: false, error: "На устройстве в зале это делает владелец после ввода пароля." };
+  }
   const supabase = await createClient();
   const {
     data: { user },
