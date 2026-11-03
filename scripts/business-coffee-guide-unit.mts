@@ -102,7 +102,7 @@ const SET_10_SLUGS = [
   "slogan-dlya-kofeyni", "pitcher-dlya-kofeyni", "kassir-v-kofeynyu",
   "prodvizhenie-kofeyni", "firmennyy-stil-kofeyni",
 ];
-// Set 11 is the pilot of article template v2 (infographic + worksheet + atlas transition).
+// Set 11 is the pilot of article template v2 (infographic + atlas transition).
 const SET_11_SLUGS = [
   "afisha-kofeyni", "kakie-dokumenty-nuzhny-dlya-kofeyni", "stulya-dlya-kofeyni",
   "kofeynya-samoobsluzhivaniya-pod-klyuch", "oborudovanie-dlya-kofeyni-kupit",
@@ -500,13 +500,10 @@ const cardsBanner = read(`${guideDir}/GuideAtlasCardsBanner.tsx`);
 assert.equal((cardsBanner.match(/<Link\b/g) ?? []).length, 1, "one link around the whole banner");
 assert.match(cardsBanner, /10 кофеен – 10 характеров звучания/);
 assert.match(cardsBanner, /-hero\.webp/);
-// Template v2: neutral banner variant without brand names and music tags.
-assert.match(view, /<GuideAtlasCardsBanner neutral=\{Boolean\(article\.infographic\)\} \/>/);
-assert.match(cardsBanner, /10 кофеен – 10 городов мира/);
-assert.match(cardsBanner, /neutral \? `Кофейня №\$\{shop\.number\}`/);
-assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__tags">/);
-assert.match(cardsBanner, /\{neutral \? null : \(\s*<span className="guide-atlas-card__media">/, "v2 cards without shop photos");
-assert.match(view, /<GuideAtlasHeroBanner textOnly=\{Boolean\(article\.infographic\)\} \/>/);
+// Sergey 03.11.2026: every article, template v2 included, shows the same atlas banners with photos.
+assert.match(view, /<GuideAtlasCardsBanner \/>/);
+assert.match(view, /<GuideAtlasHeroBanner \/>/);
+assert.doesNotMatch(cardsBanner, /neutral|guide-atlas-card--text/, "one atlas cards banner for all articles");
 for (const shop of COFFEE_ATLAS_SHOPS) {
   assert.ok(ATLAS_CARD_THEMES[shop.slug], shop.slug);
   assert.ok(existsSync(join(root, "public/business/atlas-kofeen", `${shop.slug}-hero.webp`)), shop.slug);
@@ -516,7 +513,7 @@ const heroBanner = read(`${guideDir}/GuideAtlasHeroBanner.tsx`);
 assert.equal((heroBanner.match(/<Link\b/g) ?? []).length, 1);
 assert.match(heroBanner, /Кофе · люди · города · вдохновение/);
 assert.match(heroBanner, /Почему сюда возвращаются\?/);
-assert.match(heroBanner, /\{textOnly \? null : \(\s*<span className="guide-atlas-hero__cover">/, "v2 hero banner without cover photo");
+assert.doesNotMatch(heroBanner, /textOnly|guide-atlas-hero--text/, "one atlas hero banner for all articles");
 assert.match(heroBanner, /cover\.webp/);
 
 const checklist = read(`${guideDir}/GuideChecklist.tsx`);
@@ -942,18 +939,18 @@ for (const article of allArticles) {
   assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
 }
 // ---------- Article template v2 (pilot set 11, Sergey 03.11.2026) ----------
-// Optional slots: a schematic infographic right after the direct answer and a blank for the
-// reader's own coffee shop right after the table. One shared component each; articles give data.
+// Optional slot: a schematic infographic right after the direct answer; the article gives data.
+// Sergey 03.11.2026: no interactive fill-in blanks (textareas) in articles – the closing steps cover it.
+assert.equal(existsSync(join(root, guideDir, "GuideWorksheet.tsx")), false, "no fill-in blank component");
+assert.doesNotMatch(view, /<textarea|Worksheet/);
 const infographicSource = read("src/components/business/vertical-guides/GuideInfographic.tsx");
 assert.doesNotMatch(infographicSource, /<img|next\/image/, "infographic is real text, not a picture");
-const worksheetStorageKeys = new Set<string>();
 for (const slug of SET_11_SLUGS) {
   const article = allArticles.find((item) => item.slug === slug);
   assert.ok(article?.infographic, `${slug}: template v2 pilot needs an infographic`);
-  assert.ok(article?.worksheet, `${slug}: template v2 pilot needs a worksheet`);
   assert.ok(JSON.stringify(article.partTwo).includes('"href":"/b/atlas-kofeen"'), `${slug}: soft transition to the atlas «10 удивительных кофеен мира»`);
 }
-for (const article of allArticles.filter((item) => item.infographic || item.worksheet)) {
+for (const article of allArticles.filter((item) => item.infographic)) {
   const slug = article.slug;
   const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
   if (article.infographic) {
@@ -975,16 +972,7 @@ for (const article of allArticles.filter((item) => item.infographic || item.work
     assert.ok(at < html.indexOf('class="guide-wrap guide-summary"'), `${slug}: infographic before «Коротко»`);
     assert.ok(html.includes(`aria-describedby="${info.id}-desc"`), `${slug}: infographic text equivalent linked`);
   }
-  if (article.worksheet) {
-    const sheet = article.worksheet;
-    assert.ok(sheet.fields.length >= 3 && sheet.fields.length <= 8, `${slug}: worksheet has 3–8 fields`);
-    assert.equal(new Set(sheet.fields.map((field) => field.id)).size, sheet.fields.length, `${slug}: worksheet field ids unique`);
-    assert.equal(worksheetStorageKeys.has(sheet.storageKey), false, `${slug}: worksheet storage key unique`);
-    assert.notEqual(sheet.storageKey, article.checklist.storageKey, `${slug}: worksheet key differs from checklist`);
-    worksheetStorageKeys.add(sheet.storageKey);
-    const tableAt = html.indexOf(`id="${article.table.id}"`);
-    const sheetAt = html.indexOf('data-guide-worksheet="true"');
-    assert.ok(tableAt > 0 && sheetAt > tableAt && sheetAt < html.indexOf(`id="${article.partTwo[0].id}"`), `${slug}: worksheet right after the table`);
-  }
+  assert.doesNotMatch(html, /<textarea|<form\b|data-guide-worksheet/, `${slug}: no fill-in blank`);
+  assert.ok(html.includes("cover.webp") && html.includes("-hero.webp"), `${slug}: atlas banners keep their photos`);
 }
 console.log("business-coffee-guide: reference and fifty-five set-01…set-11 articles passed");

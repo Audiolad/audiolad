@@ -18,7 +18,6 @@ import { GuideRichText } from "./GuideRichText";
 import GuideSections from "./GuideSections";
 import GuideSteps from "./GuideSteps";
 import GuideTable from "./GuideTable";
-import GuideWorksheet from "./GuideWorksheet";
 
 /**
  * Fixed block order of every vertical guide article (docs/business/coffee-guides/TEMPLATE.md).
@@ -102,15 +101,14 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
 
         <GuideSections sections={[article.partOne[1]]} />
         <GuideTable table={article.table} />
-        {article.worksheet && <GuideWorksheet worksheet={article.worksheet} />}
         <GuideSections sections={[article.partTwo[0]]} />
         <GuideExpertCard slot={article.expertOne} />
         <GuideSections sections={[article.partTwo[1]]} />
-        <GuideAtlasCardsBanner neutral={Boolean(article.infographic)} />
+        <GuideAtlasCardsBanner />
         <GuideSections sections={[article.partTwo[2]]} />
         <GuideExpertCard slot={article.expertTwo} />
         <GuideSteps steps={article.steps} />
-        <GuideAtlasHeroBanner textOnly={Boolean(article.infographic)} />
+        <GuideAtlasHeroBanner />
 
         <section className="guide-wrap guide-block">
           <GuideChecklist
