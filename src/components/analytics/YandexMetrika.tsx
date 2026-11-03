@@ -30,7 +30,9 @@ function YandexMetrikaTracker({ scriptReady }: { scriptReady: boolean }) {
       return;
     }
 
-    reachYandexMetrikaHit(pagePath, searchParams);
+    // Browser URL keeps the public path when a host rewrite serves an internal route
+    // (business hosts: /music -> /business-app/music).
+    reachYandexMetrikaHit(window.location.pathname || pagePath, window.location.search);
   }, [pagePath, scriptReady, searchParams]);
 
   return null;

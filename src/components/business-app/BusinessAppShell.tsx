@@ -9,6 +9,8 @@ import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limi
 
 import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 
+import BusinessAudienceTracker from "./BusinessAudienceTracker";
+
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
 import BusinessLiveRefresh from "@/components/business-app/BusinessLiveRefresh";
@@ -76,6 +78,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
 
   return (
     <div className="business-app-shell" data-access={access.level}>
+      <BusinessAudienceTracker pointDevice={pointReports} />
       <BusinessLiveRefresh enabled={signedIn || pointReports} />
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider pointReports={pointReports}>
