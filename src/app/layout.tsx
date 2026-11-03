@@ -70,8 +70,8 @@ export default async function RootLayout({
   return (
     <html lang="ru" className="bg-platform-surface">
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
-        {/* Advertising consent authority is not present in this checkout. Fail closed. */}
-        <Suspense fallback={null}><VkAdsPixel accountAdvertisingConsent="unknown" /></Suspense>
+        {/* VK loads only after the separate advertising cookie consent is granted. */}
+        <Suspense fallback={null}><VkAdsPixel /></Suspense>
         {isBusinessHost ? children : <BaseProviders>{children}</BaseProviders>}
       </body>
     </html>

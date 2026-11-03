@@ -4,29 +4,22 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { createVkAdsTracker, vkDestinationGoal, vkPixelId } from "@/lib/analytics/vk-ads.mjs";
 
-/** Must come from the existing account consent authority, never analytics localStorage.
- * Unknown deliberately disables the integration until that authority is connected.
- */
-export default function VkAdsPixel({ accountAdvertisingConsent = "unknown" }: {
-  accountAdvertisingConsent?: "granted" | "denied" | "unknown";
-}) {
+import { readAdvertisingConsent } from "@/lib/analytics/advertising-consent.mjs";
+import { useAdvertisingConsent } from "@/lib/analytics/use-advertising-consent";
+
+/** Advertising consent is independent of the analytics choice. */
+export default function VkAdsPixel() {
   const pathname = usePathname();
-  const consent = useRef(accountAdvertisingConsent);
+  const consent = useAdvertisingConsent();
   const tracker = useRef<ReturnType<typeof createVkAdsTracker> | null>(null);
 
   useEffect(() => {
-    consent.current = accountAdvertisingConsent;
     tracker.current ??= createVkAdsTracker({
       pixelId: vkPixelId(process.env.NEXT_PUBLIC_VK_PIXEL_ID),
-      allowed: () => consent.current === "granted",
+      allowed: () => readAdvertisingConsent() === "granted",
       win: window,
       doc: document,
     });
-    tracker.current.page();
-    window.dispatchEvent(new Event("audiolad:vk-business-access-request"));
-  }, [accountAdvertisingConsent, pathname]);
-
-  useEffect(() => {
     const click = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       if (event.target.closest('[data-vk-gift-interest]')) tracker.current?.goal("gift_interest");
@@ -41,10 +34,14 @@ export default function VkAdsPixel({ accountAdvertisingConsent = "unknown" }: {
     document.addEventListener("click", click);
     window.addEventListener("audiolad:vk-business-access", access);
     return () => {
-      consent.current = "unknown";
       document.removeEventListener("click", click);
       window.removeEventListener("audiolad:vk-business-access", access);
     };
   }, []);
+  useEffect(() => {
+    tracker.current?.page();
+    // Listener above is installed before a synchronous access response can arrive.
+    window.dispatchEvent(new Event("audiolad:vk-business-access-request"));
+  }, [consent, pathname]);
   return null;
 }

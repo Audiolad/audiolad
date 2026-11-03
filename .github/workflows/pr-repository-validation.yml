@@ -63,6 +63,9 @@ jobs:
           PGPASSWORD: postgres
         run: |
           pg_isready --host 127.0.0.1 --port 5432 --username supabase_admin --dbname postgres
+          npm run test:advertising-consent
+          npm run test:vk-ads
+          node scripts/yandex-metrika-unit.mjs
           npm run test:password-recovery
           npm run test:auth-network-timeout
           npm run test:practice-embed

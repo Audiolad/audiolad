@@ -16,11 +16,12 @@ async function runBrowserCheck(browserType, name) {
   await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
   await page.evaluate(() => {
     localStorage.removeItem("audiolad_analytics_cookies");
+    localStorage.removeItem("audiolad_advertising_cookies");
   });
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(1000);
 
-  const grant = page.getByRole("button", { name: "Разрешить" });
+  const grant = page.getByRole("button", { name: "Разрешить все", exact: true });
   const deny = page.getByRole("button", { name: "Отклонить" });
 
   if (!(await grant.isVisible())) {
@@ -64,7 +65,10 @@ async function runBrowserCheck(browserType, name) {
   }
 
   await context.clearCookies();
-  await page.evaluate(() => localStorage.removeItem("audiolad_analytics_cookies"));
+  await page.evaluate(() => {
+    localStorage.removeItem("audiolad_analytics_cookies");
+    localStorage.removeItem("audiolad_advertising_cookies");
+  });
   await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);
 

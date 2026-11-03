@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:advertising-consent": "node scripts/advertising-consent-unit.mjs",
     "test:vk-ads": "node scripts/vk-ads-unit.mjs",
     "test:business-guest-start": "node --import tsx scripts/business-guest-start-unit.mts",
     "test:business-guest-principal": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-guest-principal-unit.mts",

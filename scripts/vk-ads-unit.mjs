@@ -58,3 +58,36 @@ for (const slug of shops) assert.equal(vkRoute('audiolad.ru', `/b/atlas-kofeen/$
 for (const path of ['/auth/sign-in', '/auth/recovery', '/profile', '/embed/test', '/vk']) assert.equal(vkRoute('audiolad.ru', path), null);
 for (const path of ['/point', '/player', '/profile', '/documents', '/locations/private-id']) assert.equal(vkRoute('coffee.audiolad.ru', path), null);
 console.log('VK Ads: consent, routes, SPA dedupe, goals, exclusions, no PII – passed');
+for (const hostname of ['audiolad.ru', 'www.audiolad.ru', 'coffee.audiolad.ru', 'business.audiolad.ru']) {
+  for (const prefix of ['', '/business-app']) {
+    for (const route of ['/documents', '/point', '/player', '/coffee-handoff']) {
+      for (const suffix of ['', '/', '/private-token']) {
+        const pathname = `${prefix}${route}${suffix}`;
+        assert.equal(vkRoute(hostname, pathname), null, `${hostname}${pathname}`);
+        const blockedWin = { location: new URL(`https://${hostname}${pathname}`) };
+        const blocked = createVkAdsTracker({ pixelId: '3811226', allowed: () => true, win: blockedWin, doc: {
+          createElement: () => assert.fail('excluded route loaded SDK'),
+        } });
+        blocked.page(); blocked.goal('gift_interest'); blocked.access('paid');
+        assert.equal(blockedWin._tmr, undefined, 'excluded route never queues');
+      }
+    }
+  }
+}
+for (const state of ['unknown', 'denied', 'granted']) {
+  const freshWin = { location: new URL('https://coffee.audiolad.ru/music') };
+  const freshScripts = [];
+  const freshDoc = {
+    getElementById: () => freshScripts[0], querySelector: () => null,
+    createElement: () => ({}), head: { appendChild: script => freshScripts.push(script) },
+  };
+  let choice = state;
+  const fresh = createVkAdsTracker({ pixelId: '3811226', allowed: () => choice === 'granted', win: freshWin, doc: freshDoc });
+  fresh.page(); fresh.goal('gift_interest');
+  assert.equal(freshScripts.length, state === 'granted' ? 1 : 0);
+  assert.equal(Boolean(freshWin._tmr), state === 'granted');
+  const before = freshWin._tmr?.length;
+  choice = 'denied'; fresh.page(); fresh.goal('gift_interest'); fresh.access('paid');
+  assert.equal(freshWin._tmr?.length, before);
+}
+console.log('VK Ads: all sensitive route prefixes and explicit consent states – passed');

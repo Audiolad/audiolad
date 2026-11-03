@@ -86,7 +86,7 @@ function testComponentContract() {
   assert(component.includes("useAnalyticsConsentGranted"), "metrika gated by granted");
   assert(component.includes("shouldEnableYandexMetrika"), "admin/dev guard wired");
   assert(component.includes("searchParams"), "spa search params tracked safely");
-  assert(banner.includes('writeAnalyticsConsent("granted")'), "banner grant action");
+  assert(banner.includes('analytics: writeAnalyticsConsent'), "banner grant action");
   assert(
     banner.includes("shouldShowYandexAnalyticsConsentBanner"),
     "MAX host suppresses Yandex consent banner",

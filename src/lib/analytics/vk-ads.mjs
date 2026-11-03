@@ -12,6 +12,8 @@ export function vkPixelId(value) {
 /** @param {string} hostname @param {string} pathname */
 export function vkRoute(hostname, pathname) {
   const path = pathname.replace(/\/$/, '') || '/';
+  const publicPath = path.replace(/^\/business-app(?=\/|$)/, '') || '/';
+  if (/^\/(?:documents|point|player|coffee-handoff)(?:\/|$)/.test(publicPath)) return null;
   if (hostname === 'audiolad.ru' || hostname === 'www.audiolad.ru') {
     if (path === '/') return { group: 'home', path };
     if (path === '/b/atlas-kofeen') return { group: 'atlas_home', path };
@@ -20,7 +22,6 @@ export function vkRoute(hostname, pathname) {
     if (/^\/(?:articles|listen)\/[a-z0-9/-]+$/.test(path)) return { group: 'seo', path };
   }
   if (hostname === 'coffee.audiolad.ru' || hostname === 'business.audiolad.ru') {
-    const publicPath = path.replace(/^\/business-app(?=\/|$)/, '') || '/';
     if (['/', '/cabinet', '/guest/coffee', '/music', '/workspace'].includes(publicPath)) {
       return { group: publicPath === '/music' || publicPath === '/guest/coffee' ? 'coffee_music' : 'coffee_cabinet', path: publicPath };
     }
