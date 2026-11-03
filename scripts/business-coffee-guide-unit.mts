@@ -922,4 +922,44 @@ for (const article of allArticles) {
   assert.ok(m.explanatoryShare >= TONE.explanatoryShareMin, `${article.slug}: explanatory share ${m.explanatoryShare}`);
   assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
 }
+// ---------- Article template v2 (pilot set 11, Sergey 03.11.2026) ----------
+// Optional slots: a schematic infographic right after the direct answer and a blank for the
+// reader's own coffee shop right after the table. One shared component each; articles give data.
+const infographicSource = read("src/components/business/vertical-guides/GuideInfographic.tsx");
+assert.doesNotMatch(infographicSource, /<img|next\/image/, "infographic is real text, not a picture");
+const worksheetStorageKeys = new Set<string>();
+for (const article of allArticles.filter((item) => item.infographic || item.worksheet)) {
+  const slug = article.slug;
+  const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
+  if (article.infographic) {
+    const info = article.infographic;
+    assert.ok(["steps", "structure", "comparison"].includes(info.kind), `${slug}: infographic kind`);
+    assert.ok(info.nodes.length >= 3 && info.nodes.length <= 5, `${slug}: infographic has 3–5 nodes`);
+    assert.equal(new Set(info.nodes.map((node) => node.title)).size, info.nodes.length, `${slug}: infographic node titles unique`);
+    if (info.kind === "structure") assert.ok(info.center, `${slug}: structure names the whole`);
+    for (const node of info.nodes) {
+      assert.ok(node.title.length <= 40, `${slug}: short node title for a 360 px phone: ${node.title}`);
+      assert.ok(node.text.length <= 120, `${slug}: short node text: ${node.text}`);
+    }
+    assert.ok(info.description.length >= 60, `${slug}: infographic text equivalent`);
+    for (const value of [info.title, info.center ?? "", info.description, info.caption, ...info.nodes.flatMap((node) => [node.title, node.text])]) {
+      assert.doesNotMatch(value, /[A-Za-z\u2014]|--|(?:^|[^\p{L}])точк[\p{L}]*/iu, `${slug}: infographic text`);
+    }
+    const at = html.indexOf(`data-guide-infographic="${info.kind}"`);
+    assert.ok(at > html.indexOf('class="guide-wrap guide-prose guide-intro"'), `${slug}: infographic after the direct answer`);
+    assert.ok(at < html.indexOf('class="guide-wrap guide-summary"'), `${slug}: infographic before «Коротко»`);
+    assert.ok(html.includes(`aria-describedby="${info.id}-desc"`), `${slug}: infographic text equivalent linked`);
+  }
+  if (article.worksheet) {
+    const sheet = article.worksheet;
+    assert.ok(sheet.fields.length >= 3 && sheet.fields.length <= 8, `${slug}: worksheet has 3–8 fields`);
+    assert.equal(new Set(sheet.fields.map((field) => field.id)).size, sheet.fields.length, `${slug}: worksheet field ids unique`);
+    assert.equal(worksheetStorageKeys.has(sheet.storageKey), false, `${slug}: worksheet storage key unique`);
+    assert.notEqual(sheet.storageKey, article.checklist.storageKey, `${slug}: worksheet key differs from checklist`);
+    worksheetStorageKeys.add(sheet.storageKey);
+    const tableAt = html.indexOf(`id="${article.table.id}"`);
+    const sheetAt = html.indexOf('data-guide-worksheet="true"');
+    assert.ok(tableAt > 0 && sheetAt > tableAt && sheetAt < html.indexOf(`id="${article.partTwo[0].id}"`), `${slug}: worksheet right after the table`);
+  }
+}
 console.log("business-coffee-guide: reference and fifty set-01…set-10 articles passed");

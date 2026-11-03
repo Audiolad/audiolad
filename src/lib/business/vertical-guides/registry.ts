@@ -96,7 +96,7 @@ function articleParagraphBlocks(article: VerticalGuideArticle): GuideParagraph[]
       blocks.push(...subsection.paragraphs);
     }
   }
-  blocks.push(...article.table.intro, ...article.table.after);
+  blocks.push(...article.table.intro, ...article.table.after, ...(article.worksheet?.intro ?? []));
   for (const slot of [article.expertOne, article.expertTwo]) {
     blocks.push(...slot.lead, ...slot.after);
   }
@@ -135,6 +135,22 @@ export function collectArticleText(article: VerticalGuideArticle): string[] {
     ...article.faq.flatMap((item) => [item.question, item.answer]),
     article.finalQuestion,
     ...article.readMore.map((link) => link.label),
+    ...(article.infographic
+      ? [
+          article.infographic.title,
+          article.infographic.center ?? "",
+          article.infographic.description,
+          article.infographic.caption,
+          ...article.infographic.nodes.flatMap((node) => [node.title, node.text]),
+        ].filter(Boolean)
+      : []),
+    ...(article.worksheet
+      ? [
+          article.worksheet.heading,
+          article.worksheet.note,
+          ...article.worksheet.fields.flatMap((field) => [field.label, field.hint]),
+        ]
+      : []),
   ];
   walkParagraphs(articleParagraphBlocks(article), (part) => {
     parts.push(typeof part === "string" ? part : part.label);

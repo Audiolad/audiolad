@@ -12,11 +12,13 @@ import GuideFaq from "./GuideFaq";
 import GuideFinalCups from "./GuideFinalCups";
 import GuideFooter from "./GuideFooter";
 import GuideFourCups from "./GuideFourCups";
+import GuideInfographic from "./GuideInfographic";
 import GuideReadMore from "./GuideReadMore";
 import { GuideRichText } from "./GuideRichText";
 import GuideSections from "./GuideSections";
 import GuideSteps from "./GuideSteps";
 import GuideTable from "./GuideTable";
+import GuideWorksheet from "./GuideWorksheet";
 
 /**
  * Fixed block order of every vertical guide article (docs/business/coffee-guides/TEMPLATE.md).
@@ -77,6 +79,9 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
           ))}
         </div>
 
+        {/* Template v2: the scheme follows the direct answer, before «Коротко». */}
+        {article.infographic && <GuideInfographic infographic={article.infographic} />}
+
         <aside className="guide-wrap guide-summary" aria-labelledby="guide-summary-title">
           <p id="guide-summary-title" className="guide-summary__title">
             Коротко
@@ -97,6 +102,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
 
         <GuideSections sections={[article.partOne[1]]} />
         <GuideTable table={article.table} />
+        {article.worksheet && <GuideWorksheet worksheet={article.worksheet} />}
         <GuideSections sections={[article.partTwo[0]]} />
         <GuideExpertCard slot={article.expertOne} />
         <GuideSections sections={[article.partTwo[1]]} />
