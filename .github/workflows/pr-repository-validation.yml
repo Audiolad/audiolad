@@ -139,6 +139,7 @@ jobs:
           npm run test:admin-business-nav
           npm run test:admin-business-trials
           npm run test:business-trial-activity
+          npm run test:business-trial-attribution
           npm run test:application-email-outbox-timer
           npm run test:next-step-product-picker
           # Dummy public Supabase config so `/` renders in the head-render check (validation build only).

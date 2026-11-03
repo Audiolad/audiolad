@@ -3,15 +3,19 @@ import "server-only";
 import {
   buildBusinessTrialStats,
   earliestBusinessTrialDay,
+  businessTrialFunnelFrom,
   latestIso,
   type BusinessTrialActivityDay,
   type BusinessTrialFacts,
   type BusinessTrialGrantInput,
+  type BusinessTrialOrigin,
   type BusinessTrialStats,
 } from "@/lib/admin/business-trials";
 import { BUSINESS_NEW_CLIENT_GRANT_KIND } from "@/lib/access-grants/policy";
 import { businessTrialExcludedOrgIds } from "@/lib/admin/business-trials-excluded";
 import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
+import { businessTrialAttributionConfig } from "@/lib/business-trial-attribution/config";
+import { loadMaxPotokFunnel } from "@/lib/admin/max-potok-funnel.server";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { selectInPaged, type BusinessTrialsDb, type SelectInOptions } from "@/lib/admin/business-trials-select";
@@ -40,12 +44,35 @@ function selectIn(
   return selectInPaged(db as unknown as BusinessTrialsDb, table, columns, column, values, options);
 }
 
+const ATTRIBUTION_COLUMNS =
+  "attributed_at, entry_channel, referrer_domain, utm_source, utm_medium, utm_campaign, geo_country, geo_region, geo_city, device_class, os_family, browser_family";
+
+export function businessTrialOriginFromRow(row: Row): BusinessTrialOrigin {
+  const channel = row.entry_channel === "max" || row.entry_channel === "tg" ? row.entry_channel : null;
+  const device = row.device_class === "phone" || row.device_class === "tablet" || row.device_class === "computer" ? row.device_class : null;
+  return {
+    channel,
+    referrerDomain: str(row.referrer_domain),
+    utmSource: str(row.utm_source),
+    utmMedium: str(row.utm_medium),
+    utmCampaign: str(row.utm_campaign),
+    country: str(row.geo_country),
+    region: str(row.geo_region),
+    city: str(row.geo_city),
+    deviceClass: device,
+    osFamily: str(row.os_family),
+    browserFamily: str(row.browser_family),
+  };
+}
+
 export async function loadBusinessTrialStats(now: Date = new Date()): Promise<BusinessTrialStats> {
   const db = createServiceRoleClient();
   // PR 2 columns exist only after migration 20270213120000: read them only with the flag on.
   const config = businessTrialActivityConfig(process.env);
   const activity = { enabled: config.enabled, activeMinutes: config.activeMinutes };
   const excludedOrgIds = businessTrialExcludedOrgIds(process.env);
+  // PR 3 columns exist only after migration 20270214120000: read them only with that flag on.
+  const attributionEnabled = businessTrialAttributionConfig(process.env).enabled;
 
   const grantRows = await fetchAllPages<Row>((from, to) =>
     db
@@ -79,10 +106,20 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     return value;
   };
   const userIds = [...new Set(grants.map((grant) => grant.userId))];
-  if (userIds.length === 0) return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds });
+  // Bot counts use the funnel window, not the first start, and load even before any start.
+  const funnelFrom = businessTrialFunnelFrom(now);
+  if (userIds.length === 0) {
+    const maxPotokOnly = attributionEnabled ? await loadMaxPotokFunnel(funnelFrom) : null;
+    return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds, attributionEnabled, maxPotok: maxPotokOnly });
+  }
 
   const kindFilter = { kind: BUSINESS_NEW_CLIENT_GRANT_KIND };
-  const [paidByUser, paidByHash, events, guestStarts, members, playback] = await Promise.all([
+  const guestStartColumns = [
+    "user_id, organization_id, status",
+    config.enabled ? ", start_host" : "",
+    attributionEnabled ? `, ${ATTRIBUTION_COLUMNS}` : "",
+  ].join("");
+  const [paidByUser, paidByHash, events, guestStarts, members, playback, maxPotok] = await Promise.all([
     selectIn(db, "access_paid_periods", "user_id, paid_until", "user_id", userIds, { eq: kindFilter, order: ["email_hash"] }),
     selectIn(db, "access_paid_periods", "email_hash, paid_until", "email_hash", [...userByHash.keys()], { eq: kindFilter, order: ["email_hash"] }),
     selectIn(db, "access_grant_events", "user_id, event_name", "user_id", userIds, {
@@ -92,13 +129,14 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     selectIn(
       db,
       "business_guest_starts",
-      config.enabled ? "user_id, organization_id, status, start_host" : "user_id, organization_id, status",
+      guestStartColumns,
       "user_id",
       userIds,
       { eq: { status: "ready" }, order: ["id"] },
     ),
     selectIn(db, "business_organization_members", "user_id, organization_id, created_at", "user_id", userIds, { eq: { role: "owner" }, order: ["id"] }),
     selectIn(db, "business_workspace_playback", "user_id, updated_at", "user_id", userIds, { order: ["user_id", "space_id"] }),
+    attributionEnabled ? loadMaxPotokFunnel(funnelFrom) : Promise.resolve(null),
   ]);
 
   for (const row of paidByUser) {
@@ -128,6 +166,7 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     factsOf(userId).guestStart = true;
     const host = row.start_host;
     if (host === "coffee" || host === "business") factsOf(userId).startHost = host;
+    if (attributionEnabled && str(row.attributed_at)) factsOf(userId).origin = businessTrialOriginFromRow(row);
     const orgId = str(row.organization_id);
     if (orgId) orgByUser.set(userId, orgId);
   }
@@ -188,5 +227,5 @@ export async function loadBusinessTrialStats(now: Date = new Date()): Promise<Bu
     }
   }
 
-  return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds });
+  return buildBusinessTrialStats({ now, grants, facts, activity, excludedOrgIds, attributionEnabled, maxPotok });
 }

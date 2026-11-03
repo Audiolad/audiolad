@@ -98,7 +98,8 @@ assert.equal(statsOff.totals.activeEnough, null);
 assert.ok(statsOff.rows.every((row) => row.activity === null && row.startHost === null));
 const htmlOff = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: statsOff }));
 for (const header of ["Минуты музыки", "Дни с музыкой", "Заходы в кабинет"]) assert.ok(htmlOff.includes(header), header);
-assert.equal(count(htmlOff, `>${BUSINESS_TRIAL_NO_DATA}<`), 6, "3 columns x 2 rows show «нет данных»");
+// 3 activity + 2 attribution columns x 2 rows, plus 4 stages x 3 channels of the funnel (attribution off).
+assert.equal(count(htmlOff, `>${BUSINESS_TRIAL_NO_DATA}<`), 3 * 2 + 2 * 2 + 4 * 3, "columns x rows show «нет данных»");
 assert.ok(htmlOff.includes(`Слушали не меньше 60 минут: ${BUSINESS_TRIAL_NO_DATA}.`));
 assert.ok(htmlOff.includes("data-trial-activity-off"));
 assert.ok(!htmlOff.includes("старт: coffee"), "host hidden while off");
@@ -109,7 +110,8 @@ const guestRow = statsOn.rows.find((row) => row.userId === grants[0].userId)!;
 assert.deepEqual(guestRow.activity, { listenedMinutes: 65, musicDays: 2, cabinetVisits: 3 });
 assert.equal(guestRow.startHost, "coffee");
 const htmlOn = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: statsOn }));
-assert.equal(count(htmlOn, `>${BUSINESS_TRIAL_NO_DATA}<`), 0);
+// Activity columns filled; only the attribution columns and funnel (attribution off here) stay empty.
+assert.equal(count(htmlOn, `>${BUSINESS_TRIAL_NO_DATA}<`), 2 * 2 + 4 * 3);
 assert.ok(htmlOn.includes("Слушали не меньше 60 минут: 1."));
 assert.ok(htmlOn.includes("старт: coffee"));
 assert.ok(!htmlOn.includes("data-trial-activity-off"));
@@ -138,7 +140,7 @@ assert.ok(/!error && report\?\.state === "playing" && report\.playingConfirmed/.
 assert.ok(read("src/app/api/business/guest-start/route.ts").includes("recordBusinessGuestStartHost(input.userId, businessStartHost("));
 const queries = read("src/lib/admin/business-trials-queries.ts");
 assert.ok(!/\.(insert|update|upsert|delete|rpc)\(/.test(queries));
-assert.ok(/config\.enabled \? "user_id, organization_id, status, start_host"/.test(queries));
+assert.ok(/config\.enabled \? ", start_host" : ""/.test(queries));
 assert.ok(/config\.enabled && earliestDay\s*\?\s*selectIn\(db, "business_trial_activity_days"/.test(queries));
 
 // Migration: not applied, service_role only, no personal data, rollback alongside.

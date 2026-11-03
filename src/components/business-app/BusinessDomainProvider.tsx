@@ -6,6 +6,9 @@ import type { BusinessOwnerHomeContext } from "@/lib/business-app/domain";
 
 const GuestStartContext = createContext(false);
 
+/** AUDIOLAD_BUSINESS_TRIAL_ATTRIBUTION_ENABLED (253821e0): off = nothing captured or sent. */
+const AttributionContext = createContext(false);
+
 const BusinessHostnameContext = createContext("");
 
 const BusinessDomainContext = createContext<BusinessOwnerHomeContext>({
@@ -16,17 +19,21 @@ export function BusinessDomainProvider({
   value,
   hostname = "",
   guestStartEnabled = false,
+  attributionEnabled = false,
   children,
 }: {
   value: BusinessOwnerHomeContext;
   hostname?: string;
   guestStartEnabled?: boolean;
+  attributionEnabled?: boolean;
   children: ReactNode;
 }) {
   return (
     <BusinessHostnameContext.Provider value={hostname}>
       <BusinessDomainContext.Provider value={value}>
-        <GuestStartContext.Provider value={guestStartEnabled}>{children}</GuestStartContext.Provider>
+        <GuestStartContext.Provider value={guestStartEnabled}>
+          <AttributionContext.Provider value={attributionEnabled}>{children}</AttributionContext.Provider>
+        </GuestStartContext.Provider>
       </BusinessDomainContext.Provider>
     </BusinessHostnameContext.Provider>
   );
@@ -42,4 +49,8 @@ export function useBusinessHostname(): string {
 
 export function useGuestStartEnabled(): boolean {
   return useContext(GuestStartContext);
+}
+
+export function useAttributionEnabled(): boolean {
+  return useContext(AttributionContext);
 }

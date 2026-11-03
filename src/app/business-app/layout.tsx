@@ -5,6 +5,8 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import BusinessAppShell from "@/components/business-app/BusinessAppShell";
+import BusinessAttributionCapture from "@/components/business-app/BusinessAttributionCapture";
+import { businessTrialAttributionConfig } from "@/lib/business-trial-attribution/config";
 import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
 import "@/components/business-app/theme/business-theme.css";
 import "@/components/business-app/business-app.css";
@@ -59,9 +61,12 @@ export default async function BusinessAppLayout({
   // Header switcher side (UI only) so a reload opens the same side without a flash.
   const initialEntry = parseBusinessEntry((await cookies()).get(BUSINESS_ENTRY_COOKIE)?.value);
 
+  const attributionEnabled = businessTrialAttributionConfig(process.env).enabled;
+
   return (
     <div className="business-app-root" data-biz-theme={theme}>
-      <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available}>
+      <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
+        {attributionEnabled ? <BusinessAttributionCapture /> : null}
         <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>

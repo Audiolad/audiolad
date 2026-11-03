@@ -61,3 +61,7 @@ next-env.d.ts
 /.article-recrawl-manifest.json
 /.article-recrawl-manifest.json.prev
 /.article-recrawl-manifest.json.tmp-*
+
+# DB-IP Lite GeoIP database: downloaded on the server, never committed (task 253821e0)
+*.mmdb
+*.mmdb.gz
