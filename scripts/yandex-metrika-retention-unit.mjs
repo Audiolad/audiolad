@@ -239,6 +239,8 @@ assert.equal(sendYandexGoal("business_cabinet_signed_in"), true);
   assert.ok(tracker.includes("isBusinessNoAnalyticsRoute(window.location.pathname || pathname)"), "excluded business routes are guarded on SPA navigation");
   assert.ok(tracker.includes("if (metrikaLoadedInDocument()) window.location.reload();"), "loaded counter is dropped by a full document reload");
   assert.ok(tracker.includes('document.getElementById("yandex-metrika-tag")'), "a still-loading tag also counts as loaded");
+  assert.ok(tracker.includes("readSentGoals().has(goal)"), "per-tab dedupe survives the privacy reload");
+  assert.ok(tracker.includes("rememberSentGoal(goal)") && !tracker.includes("rememberSentGoal(key)"), "only goal names reach sessionStorage");
 }
 
 console.log("yandex-metrika-retention-unit: ok");

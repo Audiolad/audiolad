@@ -23,6 +23,29 @@ const serverReady = () => false;
 
 const PRIVACY_HREF = "https://audiolad.ru/privacy#section-8";
 
+// Per-tab flags survive the privacy reload below. Only goal names are stored, never IDs or dates.
+const SENT_GOALS_KEY = "audiolad_ym_business_goals_sent";
+
+function readSentGoals(): Set<string> {
+  try {
+    const raw = window.sessionStorage.getItem(SENT_GOALS_KEY);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.filter((v): v is string => typeof v === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberSentGoal(goal: string): void {
+  try {
+    const goals = readSentGoals();
+    goals.add(goal);
+    window.sessionStorage.setItem(SENT_GOALS_KEY, JSON.stringify([...goals]));
+  } catch {
+    // Storage unavailable: in-memory dedupe still applies for this document.
+  }
+}
+
 /** Metrika has no stop API: once tag.js is in this document, its clickmap/link tracking stays on. */
 function metrikaLoadedInDocument(): boolean {
   return isYandexMetrikaReady() || Boolean(document.getElementById("yandex-metrika-tag"));
@@ -34,7 +57,8 @@ export default function BusinessAudienceTracker({ pointDevice }: { pointDevice: 
   const access = useBusinessChromeAccess();
   const consent = useAnalyticsConsentGranted();
   const ready = useSyncExternalStore(subscribeReady, isYandexMetrikaReady, serverReady);
-  // Memory only: account IDs and period stamps never go into Metrika or browser storage.
+  // Memory only: account IDs and period stamps never go into Metrika or browser storage;
+  // sessionStorage keeps just the goal names so a tab sends each goal once.
   const sent = useRef(new Set<string>());
   const userId = domain.status === "authenticated" ? domain.owner.userId : null;
   const pathname = usePathname();
@@ -51,7 +75,11 @@ export default function BusinessAudienceTracker({ pointDevice }: { pointDevice: 
     if (!userId || pointDevice || !consent || !ready) return;
     const once = (goal: string, period = "") => {
       const key = `${userId}:${goal}:${period}`;
-      if (!sent.current.has(key) && sendYandexGoal(goal)) sent.current.add(key);
+      if (sent.current.has(key) || readSentGoals().has(goal)) return;
+      if (sendYandexGoal(goal)) {
+        sent.current.add(key);
+        rememberSentGoal(goal);
+      }
     };
     once("business_cabinet_signed_in");
     if (access.endsAt) {
