@@ -1,7 +1,8 @@
 /**
  * Cabinet entry point of the venue QR sticker (task 90d24628).
  * Owners and managers download their own venue's sticker; anyone else gets 404.
- * The block is in «Управление кофейней» and in «Документы», only with the licence flag on.
+ * The block lives only in «Документы» (moved out of «Управление кофейней», 03.11.2026), only with the licence flag on.
+ * Each file has «Скачать …» and «Посмотреть» (an in-page preview of the same SVG).
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -21,6 +22,7 @@ import {
   type VenueStickerReader,
 } from "../src/lib/business-app/venue-licence/sticker-access";
 import { venueStickerHref, VENUE_STICKER_API_PATH } from "../src/lib/business-app/venue-licence/sticker-links";
+import { VENUE_STICKER_ITEMS, VENUE_STICKER_PREVIEW_LABEL } from "../src/components/business-app/venue-licence/VenueStickerItem";
 
 // Fictional ids only.
 const OWNER = "11111111-1111-4111-8111-111111111111";
@@ -121,7 +123,8 @@ async function main() {
     }
 }
 
-  const card = renderToStaticMarkup(<VenueLicenceStickerCard locationId={LOC_A} publicId={PUBLIC_A} placement="documents" />);
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  const card = renderToStaticMarkup(<VenueLicenceStickerCard locationId={LOC_A} publicId={PUBLIC_A} />);
   checkCopy(card, "card");
   assert.ok(card.includes(`>${VENUE_STICKER_CARD_TITLE}</h2>`));
   assert.equal(VENUE_STICKER_CARD_TITLE, "QR-наклейка с подтверждением прав на музыку");
@@ -129,49 +132,56 @@ async function main() {
   assert.ok(card.includes(`href="${venueLicencePublicUrl(PUBLIC_A)}" target="_blank" rel="noopener noreferrer"`));
   assert.match(card, />Открыть страницу проверки</);
   assert.match(card, />Скачать наклейку 80×80 мм</);
-  assert.match(card, />Скачать тент А6</);
+  assert.match(card, />Скачать настольную табличку А6</);
+  assert.match(card, /поставьте табличку на стол/);
+  assert.equal(/тент/i.test(card), false, "«тент» is gone from the visible copy");
+  assert.equal(VENUE_STICKER_ITEMS.a6.download, "Скачать настольную табличку А6");
+  assert.equal(VENUE_STICKER_ITEMS.square80.download, "Скачать наклейку 80×80 мм");
+  // «Посмотреть» next to each download: a button (no navigation, no new tab), the download stays the main green action.
+  for (const format of ["square80", "a6"] as const) {
+    const row = card.slice(card.indexOf(`data-testid="biz-venue-sticker-row-${format}"`));
+    const rowHtml = row.slice(0, row.indexOf("</button>") + 9);
+    assert.match(rowHtml, new RegExp(`<a href="[^"]+" download="[^"]+" class="business-app-btn business-app-btn-cta[^"]*" data-testid="biz-venue-sticker-${format}"`));
+    assert.match(rowHtml, new RegExp(`<button type="button" class="business-app-btn business-app-btn-secondary[^"]*" aria-haspopup="dialog"[^>]*data-testid="biz-venue-sticker-preview-${format}"[^>]*>${VENUE_STICKER_PREVIEW_LABEL}</button>`));
+  }
+  assert.equal(card.match(new RegExp(`>${VENUE_STICKER_PREVIEW_LABEL}<`, "g"))?.length, 2);
+  assert.equal(card.includes('role="dialog"'), false, "the preview opens only after a tap");
+  const item = read("src/components/business-app/venue-licence/VenueStickerItem.tsx");
+  assert.match(item, /<img\s+src=\{href\}/, "the preview shows the same SVG the download returns");
+  assert.match(item, /createPortal\(/);
+  assert.match(item, /event\.key === "Escape"/);
+  assert.doesNotMatch(item, /window\.open|target="_blank"|router\.push|location\.href/, "no new tab and no navigation: the player keeps playing");
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "square80").replaceAll("&", "&amp;")}"`));
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "a6").replaceAll("&", "&amp;")}"`));
-  assert.match(card, /data-placement="documents"/);
 
   const router = {
     back() {}, forward() {}, refresh() {}, push() {}, replace() {}, prefetch() {},
   } as unknown as React.ContextType<typeof AppRouterContext>;
-  function panel(licenceSticker: { publicId: string } | null) {
+  function panel() {
     return renderToStaticMarkup(
       <AppRouterContext.Provider value={router}>
-        <VenueControlPanel locationId={LOC_A} locationName="Образец кофейни" pointCanEdit licenceSticker={licenceSticker} />
+        <VenueControlPanel locationId={LOC_A} locationName="Образец кофейни" pointCanEdit />
       </AppRouterContext.Provider>,
     );
 }
-  const withSticker = panel({ publicId: PUBLIC_A });
-  const stickerInPanel = withSticker.slice(withSticker.lastIndexOf("<section", withSticker.indexOf('data-testid="biz-venue-sticker"')));
-  assert.match(stickerInPanel.slice(0, 120), /^<section class="business-app-card[^"]*" data-testid="biz-venue-sticker"/);
-  checkCopy(stickerInPanel.slice(0, stickerInPanel.indexOf("</section>")), "panel");
-  assert.match(withSticker, /Музыка в зале/);
-  assert.ok(withSticker.includes(VENUE_STICKER_CARD_TITLE));
-  assert.match(withSticker, /data-placement="venue"/);
-  assert.ok(
-    withSticker.indexOf('data-testid="biz-venue-control"') < withSticker.indexOf('data-testid="biz-venue-sticker"'),
-    "the sticker sits inside «Управление кофейней»",
-  );
-  const withoutSticker = panel(null);
-  assert.equal(withoutSticker.includes(VENUE_STICKER_CARD_TITLE), false, "flag off: no block in «Управление кофейней»");
-  assert.equal(withoutSticker.includes(VENUE_STICKER_API_PATH), false);
+  const panelHtml = panel();
+  assert.match(panelHtml, /Музыка в зале/);
+  assert.equal(panelHtml.includes(VENUE_STICKER_CARD_TITLE), false, "no QR block in «Управление кофейней»");
+  assert.equal(panelHtml.includes(VENUE_STICKER_API_PATH), false);
+  assert.equal(panelHtml.includes('data-testid="biz-venue-sticker"'), false);
 
-  // Pages: both places render the same component only with data from loadOwnVenueSticker,
+  // Pages: only «Документы» renders the block, with data from loadOwnVenueSticker,
   // and that loader checks the flag before it opens a session.
-  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const loader = read("src/lib/business-app/venue-licence/sticker-access.server.ts");
   assert.match(loader, /if \(!locationId \|\| !isVenueLicencePublicEnabled\(\)\) return null;/);
   assert.ok(loader.indexOf("isVenueLicencePublicEnabled()") < loader.indexOf("createClient()"));
   assert.doesNotMatch(loader, /createServiceRoleClient/, "the cabinet reads with the caller's session, not the service role");
   const settings = read("src/app/business-app/settings/page.tsx");
-  assert.match(settings, /loadOwnVenueSticker\(locationId\)/);
-  assert.match(settings, /licenceSticker=\{sticker \? \{ publicId: sticker\.publicId \} : null\}/);
+  assert.doesNotMatch(settings, /loadOwnVenueSticker|VenueLicenceStickerCard|licenceSticker/, "settings no longer loads or shows the sticker");
+  assert.doesNotMatch(read("src/components/business-app/VenueControlPanel.tsx"), /VenueLicenceStickerCard|licenceSticker/);
   const documents = read("src/app/business-app/documents/page.tsx");
   assert.match(documents, /loadOwnVenueSticker\(locationId\)/);
-  assert.match(documents, /\{sticker \? \(\s*<VenueLicenceStickerCard locationId=\{sticker\.locationId\} publicId=\{sticker\.publicId\} placement="documents" \/>/);
+  assert.match(documents, /\{sticker \? \(\s*<VenueLicenceStickerCard locationId=\{sticker\.locationId\} publicId=\{sticker\.publicId\} \/>/);
   const route = read("src/app/api/business/venue-licence/sticker/route.ts");
   assert.match(route, /if \(!enabled\) return new NextResponse\(null, \{ status: 404/);
   assert.match(route, /Content-Disposition/);

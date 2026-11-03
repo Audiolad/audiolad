@@ -31,7 +31,7 @@ function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** The venue's own QR sticker, as in «Управление кофейней». Not on a device in the hall. */
+/** The venue's own QR sticker. It lives only here, not in «Управление кофейней». Not on a device in the hall. */
 async function loadDocumentsSticker() {
   if (await businessPointSessionAlive()) return null;
   const domain = await loadBusinessOwnerHomeContext();
@@ -97,7 +97,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
       </section>
 
       {sticker ? (
-        <VenueLicenceStickerCard locationId={sticker.locationId} publicId={sticker.publicId} placement="documents" />
+        <VenueLicenceStickerCard locationId={sticker.locationId} publicId={sticker.publicId} />
       ) : null}
 
       <section className="business-app-card" data-testid="playback-report">
