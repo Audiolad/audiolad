@@ -8,7 +8,7 @@
 - `BaseProviders` подключает Яндекс Метрику и `AnalyticsConsentBanner` только на основном сайте. Business host обходит этот провайдер в root layout. Теперь единственный `VkAdsPixel` расположен в root layout и охватывает оба сайта, независимо от Метрики.
 - `analytics-consent.ts` хранит локальное согласие браузера, баннер явно описывает **Яндекс Метрику**. `privacy/page.tsx`, раздел 8, также описывает Метрику. Email marketing consent – отдельная цель. Business legal consents и принятие оферты не являются разрешением на VK tracking. Источник утверждённого рекламного согласия ACCOUNT-level в checkout не найден.
 - Поэтому root передаёт `accountAdvertisingConsent="unknown"`: **даже при наличии ID и разрешённой Метрике VK не загружается**. Это отдельный блокер согласия, не только отсутствие доступа к VK. Необходим существующий авторитетный источник состояния аккаунта (включая отзыв и выход). Не создавать новое согласие, localStorage-флаг, тексты или таблицы; подключить утверждённый механизм, когда будет указан его API/PR. Одной настройки ID недостаточно.
-- Нет npm, gh и node_modules. Локальная документация `node_modules/next/dist/docs/` отсутствует; зависимости не устанавливались. Существующие паттерны Next App Router (`usePathname`, `Suspense`) сохранены.
+- Зависимости в среде автора не устанавливались; lint/typecheck/build проверяются в CI. Существующие паттерны Next App Router (`usePathname`, `Suspense`) сохранены.
 
 ## Настройка
 
@@ -88,6 +88,4 @@ API: [официальная справка Mail.ru JS API](https://top.mail.ru/
 
 ## Передача результата
 
-Изменены восемь файлов: `package.json`, `src/app/layout.tsx`, `src/components/analytics/VkAdsPixel.tsx`, `src/lib/analytics/vk-ads.mjs`, `src/components/business-app/BusinessAccessLine.tsx`, `src/components/business-app/BusinessGuestStartCta.tsx`, `scripts/vk-ads-unit.mjs`, этот отчёт.
-
-Исходная рабочая `.git` read-only: git add/commit там запрещены файловой системой. Проверенный коммит создан на той же ветке в локальной копии Git `/tmp/audiolad-task-511c4b4b-review`, работающей с текущими файлами. Shell push не прошёл (DNS github.com); gh отсутствует. GitHub-коннектор прочитал исходный commit и подтвердил отсутствие task branch, но создание ветки вернуло `MCP tool call requires approval, but approval policy is never`. Поэтому удалённая ветка и Draft PR не созданы. Полный diff сохранён в `/tmp/task-511c4b4b.patch`, заготовка PR – `/tmp/task-511c4b4b-pr.md`. Следующая сессия: перенести проверенный diff в доступную для записи рабочую копию требуемой ветки, выполнить проверки, опубликовать только `ai-company/task-511c4b4b` и создать Draft PR; затем устранить перечисленные функциональные блокеры. Никаких изменений production или issues не выполнялось.
+Изменены восемь файлов: `package.json`, `src/app/layout.tsx`, `src/components/analytics/VkAdsPixel.tsx`, `src/lib/analytics/vk-ads.mjs`, `src/components/business-app/BusinessAccessLine.tsx`, `src/components/business-app/BusinessGuestStartCta.tsx`, `scripts/vk-ads-unit.mjs`, этот отчёт. Ветка `ai-company/task-511c4b4b`, Draft PR. Merge/deploy не выполнялись; production и issues не изменялись.
