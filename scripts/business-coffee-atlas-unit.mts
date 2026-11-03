@@ -339,7 +339,7 @@ assert.equal(headerSource.match(/COFFEE_ATLAS_PDF_PATH/g)?.length ?? 0, 1, "head
 assert.equal(headerSource.match(/Скачать PDF-атлас/g)?.length ?? 0, 1, "header: one «Скачать PDF-атлас» pill");
 assert.match(
   headerSource,
-  /href=\{COFFEE_ATLAS_PDF_PATH\}[\s\S]{0,120}goal="business_atlas_pdf_downloaded"[\s\S]{0,120}download=\{COFFEE_ATLAS_PDF_DOWNLOAD_NAME\}[\s\S]{0,80}className="atlas-header__pdf"/,
+  /href=\{COFFEE_ATLAS_PDF_PATH\}[\s\S]{0,120}goal="business_atlas_coffee_pdf_downloaded"[\s\S]{0,120}download=\{COFFEE_ATLAS_PDF_DOWNLOAD_NAME\}[\s\S]{0,80}className="atlas-header__pdf"/,
   "header pill downloads the PDF",
 );
 assert.ok(
@@ -347,7 +347,7 @@ assert.ok(
   "header pill sits next to the «АудиоЛад Бизнес» link",
 );
 assert.doesNotMatch(chrome, /CoffeeAtlasPdfActions/, "no shared PDF button group left");
-const PDF_BUTTON = /COFFEE_ATLAS_PDF_PATH|\.pdf\b|business_atlas_pdf_|Открыть PDF|Скачать PDF|PDF-атласе|Подарок:/;
+const PDF_BUTTON = /COFFEE_ATLAS_PDF_PATH|\.pdf\b|business_atlas_coffee_pdf_|Открыть PDF|Скачать PDF|PDF-атласе|Подарок:/;
 for (const [name, source] of [
   ["overview", overview],
   ["shop", shopView],

@@ -27,11 +27,11 @@ export const YANDEX_METRIKA_CORE_GOALS = [
 
 /** Coffee atlas, SEO funnel exits and server-confirmed Business access states. */
 export const YANDEX_METRIKA_BUSINESS_ATLAS_GOALS = [
-  "business_atlas_pdf_opened",
-  "business_atlas_pdf_downloaded",
-  "business_atlas_cta_clicked",
-  "business_atlas_shop_opened",
-  "business_atlas_listen_clicked",
+  "business_atlas_coffee_pdf_opened",
+  "business_atlas_coffee_pdf_downloaded",
+  "business_atlas_coffee_cta_clicked",
+  "business_atlas_coffee_shop_opened",
+  "business_atlas_coffee_listen_clicked",
   "business_four_cups_clicked",
   "business_cabinet_signed_in",
   "business_trial_access_confirmed",

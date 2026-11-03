@@ -35,7 +35,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
               guests read and listen on the web; the PDF also arrives in the MAX mailing. */}
           <CoffeeAtlasGoalLink
             href={COFFEE_ATLAS_PDF_PATH}
-            goal="business_atlas_pdf_downloaded"
+            goal="business_atlas_coffee_pdf_downloaded"
             download={COFFEE_ATLAS_PDF_DOWNLOAD_NAME}
             className="atlas-header__pdf"
           >
@@ -62,7 +62,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
             <li key={shop.slug}>
               <CoffeeAtlasGoalLink
                 href={buildCoffeeAtlasShopPath(shop.slug)}
-                goal="business_atlas_shop_opened"
+                goal="business_atlas_coffee_shop_opened"
                 className="atlas-switcher__item"
                 ariaCurrent={currentSlug === shop.slug ? "page" : undefined}
               >
@@ -79,7 +79,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
 
 export function CoffeeAtlasCtaButton({ className = "atlas-btn atlas-btn--primary" }: { className?: string }) {
   return (
-    <CoffeeAtlasGoalLink href={COFFEE_ATLAS_CTA_HREF} goal="business_atlas_cta_clicked" className={className}>
+    <CoffeeAtlasGoalLink href={COFFEE_ATLAS_CTA_HREF} goal="business_atlas_coffee_cta_clicked" className={className}>
       {COFFEE_ATLAS_CTA_LABEL}
     </CoffeeAtlasGoalLink>
   );
