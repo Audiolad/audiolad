@@ -174,13 +174,15 @@ export default function BusinessHomeAccessCard() {
   );
 }
 
-function BusinessPayControls({
+export function BusinessPayControls({
   canPay,
   accepted,
   busy,
   error,
   onAccept,
   onPay,
+  payLabel = "Оплатить",
+  buttonVariant = "primary",
 }: {
   canPay: boolean;
   accepted: boolean;
@@ -188,6 +190,8 @@ function BusinessPayControls({
   error: PayError | null;
   onAccept: () => void;
   onPay: () => void;
+  payLabel?: string;
+  buttonVariant?: "primary" | "cta";
 }) {
   if (!canPay) return null;
   return (
@@ -198,12 +202,12 @@ function BusinessPayControls({
       {accepted ? (
         <button
           type="button"
-          className="business-app-btn business-app-btn-primary business-app-focus-ring"
+          className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
           onClick={onPay}
           disabled={busy}
           data-testid="biz-home-pay-button"
         >
-          Оплатить
+          {payLabel}
         </button>
       ) : (
         <>
@@ -214,7 +218,7 @@ function BusinessPayControls({
           </p>
           <button
             type="button"
-            className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
             onClick={onAccept}
             disabled={busy}
             data-testid="biz-home-accept"

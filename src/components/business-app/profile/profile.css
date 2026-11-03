@@ -1,0 +1,21 @@
+.business-profile-form label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--biz-text-muted);
+}
+.business-profile-form input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--biz-border, #d1d5db);
+  border-radius: 0.75rem;
+  background: var(--biz-surface, white);
+  color: var(--biz-text);
+  font: inherit;
+}
+.business-profile-form input:focus-visible {
+  outline: 2px solid var(--biz-primary, #26764b);
+  outline-offset: 2px;
+}
+.business-profile-form input:disabled { opacity: 0.65; }
