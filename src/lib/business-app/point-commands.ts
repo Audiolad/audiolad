@@ -22,3 +22,33 @@ export function pointCommandAction(
   if (type === "pause") return playing ? "toggle" : "none";
   return playing ? "none" : "toggle";
 }
+
+export type PointCommandRunner = {
+  status(): string;
+  toggle(): Promise<void>;
+  next(): Promise<void>;
+  stopped(): boolean;
+};
+
+/**
+ * Runs one claimed batch in order. Consecutive "next" commands start back to back without
+ * awaiting each transition, so the player supersedes the earlier ones like rapid presses
+ * (one fade-out, only the last chosen track loads). Pause / resume wait for them first.
+ */
+export async function runPointCommands(types: readonly unknown[], run: PointCommandRunner): Promise<void> {
+  let switching: Promise<void> | null = null;
+  for (const type of types) {
+    if (run.stopped() || !isPointCommandType(type)) continue;
+    if (type === "next_track") {
+      switching = run.next();
+      continue;
+    }
+    if (switching) {
+      await switching;
+      switching = null;
+    }
+    if (run.stopped()) continue;
+    if (pointCommandAction(run.status(), type) === "toggle") await run.toggle();
+  }
+  if (switching) await switching;
+}

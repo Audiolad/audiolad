@@ -226,6 +226,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     ctlRef.current = ctl;
     const onTime = () => {
       meter.sample(audio.currentTime, !audio.paused && !audio.ended);
+      // Skip fade-out: the time is the previous track's, the bar already shows the chosen one.
+      if (ctl.fadingOutPrevious) return;
       setClock({
         current: audio.currentTime,
         duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0,
@@ -392,6 +394,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const seekGuest = (ratio: number) => {
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    if (ctlRef.current?.fadingOutPrevious) return;
     audio.currentTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
   };
 
