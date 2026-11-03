@@ -233,7 +233,8 @@ function modalStackBehaviour() {
     addEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.add(l),
     removeEventListener: (_t: "keydown", l: (e: Key) => void) => void listeners.delete(l),
   } satisfies ModalDocument;
-  const focusable = (name: string) => ({ name, focus() { doc.activeElement = this; } });
+  // Fake focusable: focusing a removed (disconnected) node does nothing, as in a real DOM.
+  const focusable = (name: string) => ({ name, isConnected: true, focus() { if (this.isConnected) doc.activeElement = this; } });
   const host = { children: [] as Array<{ name: string; inert: boolean }> };
   const node = (name: string) => {
     const el = { name, inert: false, parentElement: host };
@@ -247,9 +248,10 @@ function modalStackBehaviour() {
     return prevented;
   };
   const dialog = (name: string, closed: string[]) => {
-    const overlay = node(name);
     const a = focusable(`${name}-a`);
     const b = focusable(`${name}-b`);
+    const overlay = { ...node(name), contains: (n: unknown) => n === a || n === b };
+    host.children[host.children.length - 1] = overlay;
     const card = { contains: (n: unknown) => n === a || n === b, querySelectorAll: () => [a, b] };
     const entry: ModalEntry = { overlay: () => overlay, card: () => card, close: () => closed.push(name), previous: doc.activeElement as { focus(): void } | null };
     return { overlay, a, b, entry };
@@ -267,7 +269,7 @@ function modalStackBehaviour() {
   assert.equal(doc.activeElement, A.b, "Shift+Tab from first wraps to last");
   assert.equal(press("Tab"), true);
   assert.equal(doc.activeElement, A.a, "Tab from last wraps to first");
-  // Overlapping: B on top of A.
+  // Overlapping: B opened from inside A (A's button has focus).
   const B = dialog("B", closed);
   openModal(doc, B.entry);
   B.a.focus();
@@ -277,6 +279,8 @@ function modalStackBehaviour() {
   assert.deepEqual(closed, ["B"], "Escape closes only the top dialog");
   // Close the lower one first: state must stay locked while B is open.
   closeModal(doc, A.entry);
+  A.a.isConnected = false;
+  A.b.isConnected = false;
   assert.equal(doc.body.style.overflow, "hidden");
   assert.equal(app.inert, true);
   assert.equal(doc.activeElement, B.a, "closing a lower dialog does not steal focus");
@@ -284,7 +288,7 @@ function modalStackBehaviour() {
   assert.equal(doc.body.style.overflow, "auto", "scroll restored after the last dialog");
   assert.equal(app.inert, false, "background restored after the last dialog");
   assert.equal(listeners.size, 0);
-  assert.equal(doc.activeElement, A.a, "focus returns to B's opener");
+  assert.equal(doc.activeElement, opener, "A is gone, so focus returns to the original page opener");
   // StrictMode: open, cleanup, open again, close.
   opener.focus();
   const C = dialog("C", closed);

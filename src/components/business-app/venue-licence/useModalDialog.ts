@@ -13,9 +13,9 @@ import { useEffect, useRef, type RefObject } from "react";
  * first dialog opens and restored only after the last one closes.
  */
 
-type FocusTarget = { focus?: () => void };
+type FocusTarget = { focus?: () => void; isConnected?: boolean };
 type InertNode = { inert: boolean };
-type OverlayNode = { parentElement: { children: ArrayLike<unknown> } | null };
+type OverlayNode = { parentElement: { children: ArrayLike<unknown> } | null; contains?(node: unknown): boolean };
 type CardNode = {
   contains(node: unknown): boolean;
   querySelectorAll(selector: string): ArrayLike<FocusTarget>;
@@ -118,13 +118,18 @@ export function closeModal(doc: ModalDocument, entry: ModalEntry): void {
   const index = stack.entries.indexOf(entry);
   if (index === -1) return;
   const wasTop = index === stack.entries.length - 1;
+  // A dialog opened from inside this one must not restore focus into it once
+  // it is gone: hand over this dialog's own opener instead.
+  const above = stack.entries[index + 1];
+  const removedOverlay = entry.overlay();
+  if (above && above.previous && removedOverlay?.contains?.(above.previous)) above.previous = entry.previous;
   stack.entries.splice(index, 1);
   applyInert(stack);
   if (stack.entries.length === 0) {
     doc.removeEventListener("keydown", stack.onKey);
     doc.body.style.overflow = stack.overflow;
   }
-  if (wasTop) entry.previous?.focus?.();
+  if (wasTop && entry.previous && entry.previous.isConnected !== false) entry.previous.focus?.();
 }
 
 export function useModalDialog(
