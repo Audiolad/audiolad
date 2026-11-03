@@ -15,7 +15,8 @@ for (const [days, word] of [[1, "день"], [2, "дня"], [5, "дней"], [11
 assert.equal(businessProfileSubscription({ mode: "paid", endsAt: end(22) }, "Europe/Moscow", now).title, "Музыка оплачена ещё на 22 дня");
 assert.equal(businessProfileSubscription({ mode: "paid", endsAt: end(1) }, "Europe/Moscow", now).button, "Продлить");
 assert.equal(businessProfileSubscription({ mode: "trial", endsAt: "2026-11-03T18:00:00Z" }, "Europe/Moscow", now).title, "Бесплатный доступ – сегодня последний день");
-assert.equal(businessProfileSubscription({ mode: "paid", endsAt: now.toISOString() }, "Europe/Moscow", now).title, "Музыка оплачена – сегодня последний день");
+assert.equal(businessProfileSubscription({ mode: "paid", endsAt: "2026-11-03T20:00:00Z" }, "Europe/Moscow", now).title, "Музыка оплачена – сегодня последний день");
+assert.equal(businessProfileSubscription({ mode: "paid", endsAt: now.toISOString() }, "Europe/Moscow", now).button, "Оплатить", "access ends exactly at endsAt");
 for (const mode of ["grace", "offer", "none", "trial", "paid"] as const) {
   assert.deepEqual(businessProfileSubscription({ mode, endsAt: end(-1) }, "Europe/Moscow", now), {
     title: "Оплатите, чтобы музыка продолжала играть.", until: null, button: "Оплатить",
@@ -62,6 +63,15 @@ const sql = readFileSync("supabase/migrations/20270216120000_business_profile_or
 assert.match(sql, /is_business_organization_owner\(p_organization_id, v_user_id\)/);
 assert.match(sql, /FROM PUBLIC, anon/);
 assert.doesNotMatch(sql, /GRANT UPDATE|CREATE POLICY/);
+for (const cf of ["\\u202A-\\u202E", "\\u200B-\\u200F", "\\u2066-\\u206F", "\\uFEFF", "\\u00AD", "[:cntrl:]"]) assert.ok(sql.includes(cf), `SQL must reject ${cf}`);
+{
+  // Every Cf code point in the BMP+astral must be inside the SQL class mirrored from TypeScript.
+  const ranges = [...sql.matchAll(/\\(?:u([0-9A-F]{4})|U([0-9A-F]{8}))(?:-\\(?:u([0-9A-F]{4})|U([0-9A-F]{8})))?/g)].map((m) => { const a = parseInt(m[1] ?? m[2], 16); const b = m[3] ?? m[4]; return [a, b ? parseInt(b, 16) : a]; });
+  for (let cp = 0; cp <= 0x10ffff; cp++) {
+    if (cp >= 0xd800 && cp <= 0xdfff) continue;
+    if (/\p{Cf}/u.test(String.fromCodePoint(cp))) assert.ok(ranges.some(([a, b]) => cp >= a && cp <= b), `SQL misses Cf U+${cp.toString(16)}`);
+  }
+}
 console.log("business-app-profile-unit: OK");
 
 // Render the exact shared controls to verify the terms gate and the sole green action.

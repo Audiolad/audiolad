@@ -16,7 +16,7 @@ export function businessProfileSubscription(access: BusinessChromeAccess, timeZo
   const ended = { title: "Оплатите, чтобы музыка продолжала играть.", until: null, button: "Оплатить" } as const;
   if (!access.endsAt || (access.mode !== "trial" && access.mode !== "paid")) return ended;
   const end = new Date(access.endsAt);
-  if (!Number.isFinite(end.getTime()) || end.getTime() < now.getTime()) return ended;
+  if (!Number.isFinite(end.getTime()) || end.getTime() <= now.getTime()) return ended;
   // Bad legacy timezone values should not break the whole profile.
   let zone = timeZone;
   try { new Intl.DateTimeFormat("ru-RU", { timeZone: zone }); } catch { zone = "Europe/Moscow"; }

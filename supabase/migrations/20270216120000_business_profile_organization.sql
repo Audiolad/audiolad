@@ -22,7 +22,9 @@ BEGIN
     RAISE EXCEPTION 'not_organization_owner' USING ERRCODE = '42501';
   END IF;
   IF char_length(v_name) < 1 OR char_length(v_name) > 120
-     OR coalesce(p_name, '') ~ '[<>[:cntrl:]]' THEN
+     OR coalesce(p_name, '') ~ '[<>[:cntrl:]]'
+     -- Unicode Cf (format) characters, e.g. bidi overrides U+202E; mirrors \p{Cf} in TypeScript.
+     OR coalesce(p_name, '') ~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' THEN
     RAISE EXCEPTION 'invalid_organization_name' USING ERRCODE = '22023';
   END IF;
   UPDATE public.business_organizations SET name = v_name WHERE id = p_organization_id;
