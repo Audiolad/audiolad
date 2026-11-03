@@ -435,6 +435,9 @@ assert.doesNotMatch(view, /publishedAt|updatedAt|<time\b/);
 const footerSource = read(`${guideDir}/GuideFooter.tsx`);
 assert.doesNotMatch(footerSource, /href: "\/(?:privacy|requisites)"/, "footer carries no page with personal data");
 assert.doesNotMatch(footerSource, /ИНН|ОГРНИП|паспорт/);
+// Template v2 (set 11 pilot): no music items in the footer of articles with an infographic.
+assert.match(view, /<GuideFooter withoutMusic=\{Boolean\(article\.infographic\)\} \/>/, "v2 articles hide footer music links");
+assert.match(footerSource, /GUIDE_FOOTER_MUSIC_HREFS: readonly string\[\] = \["\/b", "\/b\/prava"\]/);
 
 const componentFiles = readdirSync(join(root, guideDir)).filter((file) => file.endsWith(".tsx"));
 for (const file of componentFiles) {

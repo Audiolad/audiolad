@@ -127,7 +127,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
         <GuideReadMore links={article.readMore} />
       </main>
 
-      <GuideFooter />
+      <GuideFooter withoutMusic={Boolean(article.infographic)} />
     </article>
   );
 }
