@@ -23,7 +23,9 @@ export function businessProfileSubscription(access: BusinessChromeAccess, timeZo
   const days = businessCalendarDaysLeft(end, now, zone);
   const prefix = access.mode === "paid" ? "Музыка оплачена" : "Бесплатный доступ";
   return {
-    title: days === 0 ? `${prefix} – сегодня последний день` : `${prefix} ещё ${days} ${ruDaysWord(days)}`,
+    title: days === 0
+      ? `${prefix} – сегодня последний день`
+      : `${prefix} ещё ${access.mode === "paid" ? "на " : ""}${days} ${ruDaysWord(days)}`,
     until: `до ${new Intl.DateTimeFormat("ru-RU", { timeZone: zone, day: "numeric", month: "long" }).format(end)}`,
     button: access.mode === "paid" ? "Продлить" : "Оплатить заранее",
   };

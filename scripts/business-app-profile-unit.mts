@@ -12,7 +12,7 @@ for (const [days, word] of [[1, "день"], [2, "дня"], [5, "дней"], [11
   assert.equal(summary.title, `Бесплатный доступ ещё ${days} ${word}`);
   assert.equal(summary.button, "Оплатить заранее");
 }
-assert.equal(businessProfileSubscription({ mode: "paid", endsAt: end(22) }, "Europe/Moscow", now).title, "Музыка оплачена ещё 22 дня");
+assert.equal(businessProfileSubscription({ mode: "paid", endsAt: end(22) }, "Europe/Moscow", now).title, "Музыка оплачена ещё на 22 дня");
 assert.equal(businessProfileSubscription({ mode: "paid", endsAt: end(1) }, "Europe/Moscow", now).button, "Продлить");
 assert.equal(businessProfileSubscription({ mode: "trial", endsAt: "2026-11-03T18:00:00Z" }, "Europe/Moscow", now).title, "Бесплатный доступ – сегодня последний день");
 assert.equal(businessProfileSubscription({ mode: "paid", endsAt: now.toISOString() }, "Europe/Moscow", now).title, "Музыка оплачена – сегодня последний день");
@@ -58,7 +58,7 @@ assert.match(subscription, /onAccept=\{accept\}/);
 const controls = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
 assert.match(controls, /businessGiftPriceNote\(\)/);
 assert.doesNotMatch(subscription, /отсроч|799|checkout|window\.location/u);
-const sql = readFileSync("supabase/migrations/20270206120000_business_profile_organization.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20270216120000_business_profile_organization.sql", "utf8");
 assert.match(sql, /is_business_organization_owner\(p_organization_id, v_user_id\)/);
 assert.match(sql, /FROM PUBLIC, anon/);
 assert.doesNotMatch(sql, /GRANT UPDATE|CREATE POLICY/);

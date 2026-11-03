@@ -2408,7 +2408,7 @@ Applied only to isolated synthetic test clusters (local/CI), never to a real dat
 
 ### Business profile personalization (biz-profile-edit)
 
-NEEDS MIGRATION/RLS: `20270206120000_business_profile_organization.sql` is prepared,
+NEEDS MIGRATION/RLS: `20270216120000_business_profile_organization.sql` is prepared,
 not applied by this task. It adds only `rename_business_organization(uuid, text)`:
 SECURITY DEFINER with fixed search_path, auth.uid(), existing
 `is_business_organization_owner`, support-mode guard, explicit authenticated EXECUTE.
