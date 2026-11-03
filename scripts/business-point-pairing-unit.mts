@@ -128,8 +128,12 @@ const qr = readFileSync(new URL("../src/components/business-app/PointQrCode.tsx"
 assert.match(qr, /from "qrcode-generator"/);
 assert.doesNotMatch(qr, /https?:\/\//, "QR is drawn locally");
 const home = readFileSync(new URL("../src/components/business-app/BusinessHomePage.tsx", import.meta.url), "utf8");
-assert.match(home, /Подключить устройство в зале/);
-for (const source of [page, card, home]) {
+// Главная «С чего начать» (03.11.2026): one step that opens the pairing card on «Настройка».
+const steps = readFileSync(new URL("../src/lib/business-app/home-checklist.ts", import.meta.url), "utf8");
+assert.match(steps, /Подключите устройство в зале/);
+assert.match(steps, /BUSINESS_HOME_DEVICE_HREF = "\/preferences#device"/);
+assert.match(card, /POINT_PAIRING_ANCHOR_ID = "device"/);
+for (const source of [page, card, home, steps]) {
   assert.doesNotMatch(source, /\u2014/, "en dash only");
 }
 

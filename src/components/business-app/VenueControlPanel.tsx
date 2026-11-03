@@ -133,10 +133,10 @@ export default function VenueControlPanel({
   return (
     <section className="business-app-card space-y-4" data-testid="biz-venue-control" aria-labelledby="venue-control-title">
       <h2 id="venue-control-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
-        Управление кофейней
+        Музыка в зале
       </h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Пауза, продолжение, следующий трек и отправка атмосферы спрашивают подтверждение и уходят в кофейню. Слушать у себя это не включает.
+        Пауза, продолжение, следующий трек и новое звучание уходят в зал после подтверждения. Вкладка «Музыка» играет только у вас.
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-pause" onClick={() => send("pause")}>
@@ -174,7 +174,7 @@ export default function VenueControlPanel({
         Сохранить название
       </button>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        В зале новое звучание начнётся со следующего трека. Перед отправкой кабинет спросит подтверждение.
+        В зале новое звучание начнётся со следующего трека.
       </p>
       {soundSlot ? (
         <button
