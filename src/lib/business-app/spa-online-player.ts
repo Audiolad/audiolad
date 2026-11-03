@@ -17,6 +17,14 @@ export type OnlineAudio = {
   pause(): void;
   removeAttribute(name: "src"): void;
   load(): void;
+  /**
+   * Soft user pause (player-fade.ts): keeps sounding while it fades out, then pauses.
+   * Omitted: `pause()` at once. `pause()` itself always stops at once (track switch,
+   * rights deadline, revoke).
+   */
+  fadeOut?(): Promise<boolean>;
+  /** Start at full chosen volume, no fade-in (natural advance after a track ended). */
+  playInstant?(): Promise<void>;
 };
 
 export type OnlineSignResult = { ok: true; data: { url: string } } | { ok: false; reason: string };
@@ -114,6 +122,27 @@ export class SpaOnlinePlayer {
     }, Math.min(ms, 2 ** 31 - 1));
   }
 
+  /**
+   * Soft pause keeps sounding for the fade-out: if playable_until passes meanwhile, stop
+   * the audio at once (hard pause, no auto-advance – the user paused). Re-reads the
+   * current manifest entry like armDeadline. A play / track switch bumps `op` and
+   * clears the timer.
+   */
+  private armFadeGuard(id: string, op: number) {
+    this.clearDeadline();
+    const item = this.fresh(id);
+    if (!item?.playableUntil) return;
+    const ms = Math.max(0, item.playableUntil.getTime() - this.now());
+    const set = this.d.setTimer ?? ((fn, t) => setTimeout(fn, t));
+    this.deadlineTimer = set(() => {
+      this.deadlineTimer = null;
+      if (op !== this.op || this.disposed) return;
+      const cur = this.fresh(id);
+      if (cur && !this.expired(cur)) return this.armFadeGuard(id, op);
+      this.d.audio.pause();
+    }, Math.min(ms, 2 ** 31 - 1));
+  }
+
   /** `resume`: continue with another track only if playback was active (never override a pause). */
   private async onDeadline(resume: boolean): Promise<void> {
     this.op++;
@@ -150,7 +179,8 @@ export class SpaOnlinePlayer {
     this.set("no_access");
   }
 
-  async playIndex(i: number): Promise<void> {
+  /** `instant`: natural advance after "ended" – the next track starts without a fade-in. */
+  async playIndex(i: number, instant = false): Promise<void> {
     if (this.disposed || this.status === "no_access") return;
     if (i < 0 || i >= this.items.length) return;
     const op = ++this.op;
@@ -175,7 +205,8 @@ export class SpaOnlinePlayer {
     if (!fresh || this.expired(fresh)) return this.onDeadline(false);
     this.d.audio.src = r.data.url;
     try {
-      await this.d.audio.play();
+      if (instant && this.d.audio.playInstant) await this.d.audio.playInstant();
+      else await this.d.audio.play();
       if (op !== this.op || this.disposed) return;
       this.failures = 0;
       return this.afterPlay(item.audioItemId, op);
@@ -191,7 +222,14 @@ export class SpaOnlinePlayer {
     if (this.status === "playing" || this.status === "loading") {
       this.op++;
       this.clearDeadline();
-      this.d.audio.pause();
+      // Soft pause where available: the status is "paused" at once (UI, remote commands),
+      // the music fades out for PLAYER_FADE_MS and then the element pauses.
+      const cur = this.current;
+      if (this.d.audio.fadeOut && !this.expired(cur)) {
+        void this.d.audio.fadeOut();
+        // Rights window: the fade-out is still audible, so playable_until still applies.
+        if (cur) this.armFadeGuard(cur.audioItemId, this.op);
+      } else this.d.audio.pause();
       return this.set("paused");
     }
     if (this.status === "paused" && this.d.audio.src && this.current && !this.expired(this.current)) {
@@ -211,13 +249,17 @@ export class SpaOnlinePlayer {
   }
 
   next(): Promise<void> {
+    return this.advance(false);
+  }
+
+  private advance(instant: boolean): Promise<void> {
     if (this.items.length === 0) return Promise.resolve();
     const fallback = this.index < 0 || this.index >= this.items.length - 1 ? 0 : this.index + 1;
     const custom = this.d.nextIndex?.(this.index, this.items.length);
     const target = typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
       ? custom
       : fallback;
-    return this.playIndex(target);
+    return this.playIndex(target, instant);
   }
 
   previous(): Promise<void> {
@@ -234,7 +276,7 @@ export class SpaOnlinePlayer {
   onEnded(): Promise<void> {
     if (this.status !== "playing") return Promise.resolve();
     this.retryTrackId = null;
-    return this.next();
+    return this.advance(true);
   }
 
   /** <audio> "error" while playing (e.g. signed URL expired mid-stream): re-sign and retry once per track. */
@@ -266,6 +308,7 @@ export class SpaOnlinePlayer {
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
       if (this.expired(items[idx])) return this.onDeadline(wasActive);
       if (this.status === "playing") this.armDeadline(currentId as string, this.op);
+      else if (this.status === "paused" && this.deadlineTimer !== null) this.armFadeGuard(currentId as string, this.op);
       this.d.onChange();
       return;
     }
