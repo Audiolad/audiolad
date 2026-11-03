@@ -17,7 +17,7 @@ assert.match(player, /nextDisabled={pointReports && !pointCanEdit}/);
 // sound/permission without waiting for the next poll or gating owner execution.
 assert.match(player, /seek: pointReports && !pointCanEdit \? \(\) => {} : seek/);
 assert.match(player, /onSeek={pointReports && !pointCanEdit \? undefined : seek}/);
-assert.match(player, /if \(json.commands.length > 0\) refreshPointSoundRef.current\(\);\s*for \(const row of json.commands\)/);
+assert.match(player, /if \(json.commands.length > 0\) refreshPointSoundRef.current\(\);\s*await runPointCommands\(json.commands.map/);
 assert.match(player, /refreshPointSoundRef.current = refresh/);
 assert.match(player, /const refresh = \(\) => { void tick\(\); }/);
 assert.match(player, /if \(inFlight\) {\s*refreshPending = true;\s*return;/);
