@@ -21,7 +21,7 @@ assert.equal(win._tmr[0].url, 'https://audiolad.ru/b/atlas-kofeen');
 assert.equal(win._tmr[0].referrer, '');
 win.location = new URL('https://audiolad.ru/b/atlas-kofeen/caffe-florian?phone=secret');
 tracker.page(); tracker.page();
-assert.equal(win._tmr.filter(e => e.goal === 'atlas_page').length, 1);
+assert.equal(win._tmr.filter(e => e.goal === 'atlas_coffee_page').length, 1);
 win.location = new URL('https://audiolad.ru/b/atlas-kofeen'); tracker.page();
 assert.equal(win._tmr.filter(e => e.type === 'pageView').length, 3, 'back navigation counts');
 tracker.access('trial'); tracker.access('trial'); tracker.access('paid'); tracker.access('paid');
@@ -54,7 +54,7 @@ for (const state of [true, false]) {
 assert.equal(scripts.length, 1);
 const shops = [...readFileSync(new URL('../src/lib/business/coffee-atlas/shops.ts', import.meta.url), 'utf8').matchAll(/slug: "([a-z0-9-]+)"/g)].map(match => match[1]);
 assert.equal(shops.length, 10);
-for (const slug of shops) assert.equal(vkRoute('audiolad.ru', `/b/atlas-kofeen/${slug}`).group, 'atlas_page');
+for (const slug of shops) assert.equal(vkRoute('audiolad.ru', `/b/atlas-kofeen/${slug}`).group, 'atlas_coffee_page');
 for (const path of ['/auth/sign-in', '/auth/recovery', '/profile', '/embed/test', '/vk']) assert.equal(vkRoute('audiolad.ru', path), null);
 for (const path of ['/point', '/player', '/profile', '/documents', '/locations/private-id']) assert.equal(vkRoute('coffee.audiolad.ru', path), null);
 console.log('VK Ads: consent, routes, SPA dedupe, goals, exclusions, no PII – passed');

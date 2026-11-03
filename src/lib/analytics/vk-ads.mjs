@@ -1,6 +1,6 @@
 /** Shared VK Ads adapter. No user, order, venue IDs or arbitrary payloads accepted. */
 export const VK_ADS_GOALS = Object.freeze([
-  'atlas_home', 'atlas_page', 'go_to_music', 'go_to_funnel', 'go_to_cabinet',
+  'atlas_coffee_home', 'atlas_coffee_page', 'go_to_music', 'go_to_funnel', 'go_to_cabinet',
   'gift_interest', 'gift_started', 'subscription_active', 'payment_success',
 ]);
 
@@ -35,8 +35,8 @@ export function vkRoute(hostname, pathname) {
   if (VK_EXCLUDED_ROUTE.test(publicPath)) return null;
   if (hostname === 'audiolad.ru' || hostname === 'www.audiolad.ru') {
     if (path === '/') return { group: 'home', path };
-    if (path === '/b/atlas-kofeen') return { group: 'atlas_home', path };
-    if (/^\/b\/atlas-kofeen\/[a-z0-9-]+$/.test(path)) return { group: 'atlas_page', path };
+    if (path === '/b/atlas-kofeen') return { group: 'atlas_coffee_home', path };
+    if (/^\/b\/atlas-kofeen\/[a-z0-9-]+$/.test(path)) return { group: 'atlas_coffee_page', path };
     if (/^\/b\/coffee(?:\/[a-z0-9-]+)?$/.test(path)) return { group: 'coffee_seo', path };
     if (/^\/(?:articles|listen)\/[a-z0-9/-]+$/.test(path)) return { group: 'seo', path };
   }
@@ -92,7 +92,7 @@ export function createVkAdsTracker({ pixelId, allowed, win, doc }) {
       // No vendor base snippet: this is the sole initial AND SPA pageView producer.
       if (!push({ type: 'pageView', url: key, referrer: '', params: { route_group: route.group } })) return;
       lastPage = key;
-      if (route.group === 'atlas_home' || route.group === 'atlas_page') goal(route.group);
+      if (route.group === 'atlas_coffee_home' || route.group === 'atlas_coffee_page') goal(route.group);
       if (!doc.getElementById('audiolad-vk-ads') && !doc.querySelector('script[src="https://top-fwz1.mail.ru/js/code.js"]')) {
         const script = doc.createElement('script');
         script.id = 'audiolad-vk-ads';

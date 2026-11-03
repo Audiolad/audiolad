@@ -21,8 +21,8 @@
 | Поверхность / действие | Событие / условие |
 |---|---|
 | `audiolad.ru/` | `pageView`, `route_group=home` |
-| `/b/atlas-kofeen` | `pageView`, `atlas_home` |
-| `/b/atlas-kofeen/<slug>` – десять карточек из `coffee-atlas/shops.ts` | `pageView`, `atlas_page`; отдельные аудитории карточек по URL |
+| `/b/atlas-kofeen` | `pageView`, `atlas_coffee_home` |
+| `/b/atlas-kofeen/<slug>` – десять карточек из `coffee-atlas/shops.ts` | `pageView`, `atlas_coffee_page`; отдельные аудитории карточек по URL |
 | `/b/coffee`, `/b/coffee/<slug>` | `pageView`, `route_group=coffee_seo` |
 | `/articles/<slug>`, `/listen/<segments>` | `pageView`, `route_group=seo` |
 | `coffee.audiolad.ru/`, `/cabinet`, `/workspace` | `pageView`, `route_group=coffee_cabinet` |
@@ -58,7 +58,7 @@
 
 | Аудитория | Включить | Исключить |
 |---|---|---|
-| Посетители Атласа – 30 дней | `atlas_home OR atlas_page` | `gift_started`, `subscription_active`, подтверждённый `payment_success` |
+| Посетители Атласа – 30 дней | `atlas_coffee_home OR atlas_coffee_page` | `gift_started`, `subscription_active`, подтверждённый `payment_success` |
 | Каждая кофейня – 30 дней | URL содержит точный `/b/atlas-kofeen/<slug>` | Те же исключения |
 | SEO / главная – 30 дней | URL соответствующих разрешённых страниц | Те же исключения |
 | Тёплый интерес – 14 дней | `go_to_music OR go_to_funnel OR go_to_cabinet` | Те же исключения |
