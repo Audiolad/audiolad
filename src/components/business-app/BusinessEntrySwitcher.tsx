@@ -24,7 +24,8 @@ type EntryOption = {
   placeholder?: boolean;
   testId: string;
   selected: boolean;
-  onSelect: () => void;
+  /** `true` – focus moved elsewhere (the profile name field); do not return it to the trigger. */
+  onSelect: () => boolean | void;
 };
 
 /**
@@ -92,10 +93,11 @@ export default function BusinessEntrySwitcher() {
    * No name yet: the row reads «Ваше имя» and opens «Профиль» with the name field focused,
    * so the owner sees where to set it. The person side is chosen too.
    */
-  const openNameField = () => {
+  const openNameField = (): true => {
     setEntry("person");
-    if (pathname === "/profile" && focusBusinessOwnerNameField()) return;
+    if (pathname === "/profile" && focusBusinessOwnerNameField()) return true;
     router.push(BUSINESS_PROFILE_NAME_HREF);
+    return true;
   };
 
   const options: EntryOption[] = [
@@ -112,10 +114,7 @@ export default function BusinessEntrySwitcher() {
           return;
         }
         setHint(null);
-        if (!person) {
-          openNameField();
-          return;
-        }
+        if (!person) return openNameField();
         switchTo("person");
       },
     },
@@ -141,8 +140,9 @@ export default function BusinessEntrySwitcher() {
   const choose = (index: number) => {
     const option = options[index];
     if (!option) return;
-    option.onSelect();
-    close(true);
+    // The name field keeps the focus: returning it to the trigger would stop typing.
+    const focusMoved = option.onSelect() === true;
+    close(!focusMoved);
   };
 
   const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

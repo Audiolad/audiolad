@@ -79,7 +79,10 @@ const switcher = readFileSync("src/components/business-app/BusinessEntrySwitcher
 assert.match(switcher, /label: person \|\| BUSINESS_OWNER_NAME_PLACEHOLDER/);
 assert.doesNotMatch(switcher, /label: person \|\| "–"/);
 assert.match(switcher, /router\.push\(BUSINESS_PROFILE_NAME_HREF\)/);
-assert.match(switcher, /if \(!person\) \{\s*openNameField\(\);/);
+assert.match(switcher, /if \(!person\) return openNameField\(\);/);
+// On /profile the name field keeps the focus: the menu must not hand it back to the trigger.
+assert.match(switcher, /const focusMoved = option\.onSelect\(\) === true;\s*close\(!focusMoved\);/);
+assert.match(switcher, /focusBusinessOwnerNameField\(\)\) return true;/);
 const subscription = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.match(subscription, /useBusinessHomePay\(\)/);
 assert.match(subscription, /BusinessPayControls/);

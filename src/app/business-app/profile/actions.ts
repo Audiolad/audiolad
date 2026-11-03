@@ -55,8 +55,11 @@ export async function saveBusinessProfile(input: { ownerName: string; venueName:
     const { data, error } = await supabase.rpc("rename_business_location", {
       p_location_id: location.id, p_name: venueName,
     });
+    if (error?.code === "42501") {
+      return { ok: false, error: "Название кофейни может изменить только владелец." } as const;
+    }
     if (error || !(data as { ok?: boolean } | null)?.ok) {
-      return { ok: false, error: "Не удалось сохранить название кофейни. Изменять его может только владелец." } as const;
+      return { ok: false, error: "Не удалось сохранить название кофейни. Попробуйте ещё раз." } as const;
     }
     await syncSingleVenueOrganizationName(supabase, {
       organizationId: location.organizationId,
