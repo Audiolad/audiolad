@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { createVkAdsTracker, vkBusinessReloadRoute, vkDestinationGoal, vkPixelId, vkSdkInDocument } from "@/lib/analytics/vk-ads.mjs";
+import { createVkAdsTracker, vkDestinationGoal, vkPixelId } from "@/lib/analytics/vk-ads.mjs";
 
 import { readAdvertisingConsent } from "@/lib/analytics/advertising-consent.mjs";
 import { useAdvertisingConsent } from "@/lib/analytics/use-advertising-consent";
@@ -38,13 +38,9 @@ export default function VkAdsPixel() {
       window.removeEventListener("audiolad:vk-business-access", access);
     };
   }, []);
-  // Privacy boundary: the VK SDK cannot be unloaded, so entering /documents, /point, /player or
-  // /coffee-handoff on business hosts by SPA navigation after it loaded reloads the document.
-  // A fresh load there starts without the SDK. Independent of the analytics choice.
-  useEffect(() => {
-    if (!vkBusinessReloadRoute(window.location.hostname, window.location.pathname || pathname)) return;
-    if (vkSdkInDocument(document)) window.location.reload();
-  }, [pathname]);
+  // Never reload on in-app navigation: cabinet music must keep playing (Sergey, 03.11.2026).
+  // On /documents, /point, /player, /coffee-handoff vkRoute() returns null, so no page view or
+  // goal is sent there; an already loaded SDK stays idle. A direct entry never loads it.
   useEffect(() => {
     tracker.current?.page();
     // Listener above is installed before a synchronous access response can arrive.

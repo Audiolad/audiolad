@@ -5,9 +5,7 @@ import AnalyticsConsentBanner from "@/components/analytics/AnalyticsConsentBanne
 import YandexMetrika from "@/components/analytics/YandexMetrika";
 import { useBusinessDomain } from "./BusinessDomainProvider";
 import { useBusinessChromeAccess } from "./BusinessAccessLine";
-import { usePathname } from "next/navigation";
 import { useAnalyticsConsentGranted } from "@/lib/analytics/use-analytics-consent";
-import { isBusinessNoAnalyticsRoute } from "@/lib/analytics/yandex-metrika-environment";
 import {
   isYandexMetrikaReady,
   sendYandexGoal,
@@ -23,7 +21,7 @@ const serverReady = () => false;
 
 const PRIVACY_HREF = "https://audiolad.ru/privacy#section-8";
 
-// Per-tab flags survive the privacy reload below. Only goal names are stored, never IDs or dates.
+// Per-tab flags survive reloads. Only goal names are stored, never IDs or dates.
 const SENT_GOALS_KEY = "audiolad_ym_business_goals_sent";
 
 function readSentGoals(): Set<string> {
@@ -46,11 +44,6 @@ function rememberSentGoal(goal: string): void {
   }
 }
 
-/** Metrika has no stop API: once tag.js is in this document, its clickmap/link tracking stays on. */
-function metrikaLoadedInDocument(): boolean {
-  return isYandexMetrikaReady() || Boolean(document.getElementById("yandex-metrika-tag"));
-}
-
 /** Reuses the existing counter and consent gate. No account consent is inferred from login. */
 export default function BusinessAudienceTracker({ pointDevice }: { pointDevice: boolean }) {
   const domain = useBusinessDomain();
@@ -61,16 +54,10 @@ export default function BusinessAudienceTracker({ pointDevice }: { pointDevice: 
   // sessionStorage keeps just the goal names so a tab sends each goal once.
   const sent = useRef(new Set<string>());
   const userId = domain.status === "authenticated" ? domain.owner.userId : null;
-  const pathname = usePathname();
 
-  // Privacy boundary: entering /documents, /point, /player or /coffee-handoff by SPA navigation
-  // after Metrika loaded reloads the document, so these screens never run with an active counter.
-  // A fresh load there starts without Metrika; the next allowed page loads it with its own first hit.
-  useEffect(() => {
-    if (!isBusinessNoAnalyticsRoute(window.location.pathname || pathname)) return;
-    if (metrikaLoadedInDocument()) window.location.reload();
-  }, [pathname]);
-
+  // Never reload on in-app navigation: cabinet music must keep playing (Sergey, 03.11.2026).
+  // On /documents, /point, /player, /coffee-handoff canUseYandexMetrika() blocks hits and
+  // sendYandexGoal() blocks goals; an already loaded counter stays idle. Direct entry never loads it.
   useEffect(() => {
     if (!userId || pointDevice || !consent || !ready) return;
     const once = (goal: string, period = "") => {
