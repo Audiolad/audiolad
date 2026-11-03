@@ -341,7 +341,7 @@ console.log("business-app-client-documents-unit OK");
   assert.match(INSPECTOR_CONTACT.maxHref, /^https:\/\/max\.ru\/u\//);
   assert.ok(readFileSync("src/components/school/SchoolFaqScreen.tsx", "utf8").includes(INSPECTOR_CONTACT.maxHref), "MAX link is the confirmed one");
   assert.deepEqual([...INSPECTOR_CARD_LINES], [
-    "Покажите проверяющему документы ниже – кнопка «Посмотреть» откроет их на телефоне.",
+    "Покажите проверяющему QR-код – кнопка выше откроет его на весь экран телефона. Документы ниже можно открыть кнопкой «Посмотреть».",
     "Ничего не подписывайте и не оплачивайте до разговора с Сергеем.",
   ]);
   for (const text of [INSPECTOR_CARD_TITLE, ...INSPECTOR_CARD_LINES, card]) assert.doesNotMatch(text, /\u2014/);
