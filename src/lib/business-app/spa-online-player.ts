@@ -1,5 +1,8 @@
 /**
- * Business SPA pilot (0e05333f), stage 1 — ONLINE player (Sergey 2026-10-13 19:16 MSK).
+ * Business SPA pilot (0e05333f), stage 1 – ONLINE player (Sergey 2026-10-13 19:16 MSK).
+ *
+ * Manual switches fade the old source out before pause / load / replacement: cutting
+ * an audible waveform there causes a click. Natural advance still starts instantly.
  *
  * Plays the current ELIGIBLE manifest track by track from short-lived signed URLs.
  * No offline cache: nothing is downloaded or stored on the device. Every track start
@@ -19,10 +22,12 @@ export type OnlineAudio = {
   load(): void;
   /**
    * Soft user pause (player-fade.ts): keeps sounding while it fades out, then pauses.
-   * Omitted: `pause()` at once. `pause()` itself always stops at once (track switch,
-   * rights deadline, revoke).
+   * Omitted: `pause()` at once. `pause()` itself always stops at once (rights deadline,
+   * revoke); manual switches use the separate fade below.
    */
   fadeOut?(): Promise<boolean>;
+  /** Manual switch: fade to zero, pause, and hold silence through source replacement. */
+  fadeOutForSwitch?(): Promise<boolean>;
   /** Start at full chosen volume, no fade-in (natural advance after a track ended). */
   playInstant?(): Promise<void>;
 };
@@ -63,6 +68,9 @@ export class SpaOnlinePlayer {
   private retryTrackId: string | null = null;
   private deadlineTimer: unknown = null;
   private disposed = false;
+  /** Source still sounding, which may differ from the immediately selected UI row. */
+  private soundingId: string | null = null;
+  private switching = false;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -165,6 +173,8 @@ export class SpaOnlinePlayer {
 
   private stopAudio() {
     this.clearDeadline();
+    this.switching = false;
+    this.soundingId = null;
     this.d.audio.pause();
     this.d.audio.removeAttribute("src");
     this.d.audio.load();
@@ -191,8 +201,17 @@ export class SpaOnlinePlayer {
       this.retryTrackId = item.audioItemId;
       this.errorRetries = 0;
     }
-    this.stopAudio();
+    this.clearDeadline();
     this.set("loading");
+    if (!instant && this.d.audio.fadeOutForSwitch) {
+      this.switching = true;
+      const fade = this.d.audio.fadeOutForSwitch();
+      // A deadline hard-stops the old source, settling the fade; the user choice continues.
+      if (this.soundingId) this.armFadeGuard(this.soundingId, op);
+      await fade;
+      if (op !== this.op || this.disposed) return;
+    }
+    this.stopAudio();
     const r = await this.d.sign(item.audioItemId);
     if (op !== this.op || this.disposed) return;
     if (!r.ok) {
@@ -204,6 +223,7 @@ export class SpaOnlinePlayer {
     const fresh = this.fresh(item.audioItemId);
     if (!fresh || this.expired(fresh)) return this.onDeadline(false);
     this.d.audio.src = r.data.url;
+    this.soundingId = item.audioItemId;
     try {
       if (instant && this.d.audio.playInstant) await this.d.audio.playInstant();
       else await this.d.audio.play();
@@ -222,6 +242,21 @@ export class SpaOnlinePlayer {
     if (this.status === "playing" || this.status === "loading") {
       this.op++;
       this.clearDeadline();
+      if (this.switching) {
+        // Pause pressed during a skip fade-out: keep fading the old source to silence
+        // (no cut, no click), then drop it. The chosen track starts on the next play.
+        const op = this.op;
+        const old = this.soundingId;
+        this.switching = false;
+        if (this.d.audio.fadeOut) {
+          const fade = this.d.audio.fadeOut();
+          if (old) this.armFadeGuard(old, op);
+          void fade.then(() => {
+            if (op === this.op && !this.disposed) this.stopAudio();
+          });
+        } else this.stopAudio();
+        return this.set("paused");
+      }
       // Soft pause where available: the status is "paused" at once (UI, remote commands),
       // the music fades out for PLAYER_FADE_MS and then the element pauses.
       const cur = this.current;
@@ -232,7 +267,13 @@ export class SpaOnlinePlayer {
       } else this.d.audio.pause();
       return this.set("paused");
     }
-    if (this.status === "paused" && this.d.audio.src && this.current && !this.expired(this.current)) {
+    if (
+      this.status === "paused" &&
+      this.d.audio.src &&
+      this.current &&
+      this.soundingId === this.current.audioItemId &&
+      !this.expired(this.current)
+    ) {
       const op = ++this.op;
       const item = this.current;
       try {
@@ -289,6 +330,7 @@ export class SpaOnlinePlayer {
       this.set("error", "Ошибка воспроизведения. Проверьте интернет и нажмите «Играть».");
       return Promise.resolve();
     }
+    this.stopAudio();
     return this.playIndex(Math.max(this.index, 0));
   }
 
@@ -302,13 +344,18 @@ export class SpaOnlinePlayer {
     const currentId = this.current?.audioItemId ?? null;
     const wasActive = this.status === "playing" || this.status === "loading";
     this.items = items;
+    if (this.switching && this.soundingId) {
+      const old = this.fresh(this.soundingId);
+      if (!old || this.expired(old)) this.d.audio.pause();
+      else this.armFadeGuard(this.soundingId, this.op);
+    }
     const idx = currentId ? items.findIndex((i) => i.audioItemId === currentId) : -1;
     if (idx >= 0) {
       this.index = idx;
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
       if (this.expired(items[idx])) return this.onDeadline(wasActive);
       if (this.status === "playing") this.armDeadline(currentId as string, this.op);
-      else if (this.status === "paused" && this.deadlineTimer !== null) this.armFadeGuard(currentId as string, this.op);
+      else if (!this.switching && this.status === "paused" && this.deadlineTimer !== null) this.armFadeGuard(currentId as string, this.op);
       this.d.onChange();
       return;
     }

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   FadingAudio,
   PLAYER_FADE_MS,
+  PLAYER_SKIP_FADE_OUT_MS,
   mediaVolumeWritable,
   playerFadeGain,
 } from "../src/lib/business-app/player-fade";
@@ -16,6 +17,7 @@ type Media = {
   currentTime: number;
   volume: number;
   paused: boolean;
+  events: { kind: string; volume: number; src: string }[];
   plays: number;
   pauses: number;
   readOnlyVolume?: boolean;
@@ -28,8 +30,11 @@ type Media = {
 
 function media(opts: { readOnlyVolume?: boolean } = {}): Media {
   let vol = 1;
+  let src = "";
   const m: Media = {
-    src: "",
+    get src() { return src; },
+    set src(value: string) { src = value; m.events.push({ kind: "src", volume: vol, src }); },
+    events: [],
     currentTime: 0,
     get volume() { return vol; },
     set volume(v: number) {
@@ -46,9 +51,9 @@ function media(opts: { readOnlyVolume?: boolean } = {}): Media {
       if (m.failPlay) throw new Error("NotAllowedError");
       m.paused = false;
     },
-    pause() { m.pauses++; m.paused = true; },
+    pause() { m.events.push({ kind: "pause", volume: vol, src }); m.pauses++; m.paused = true; },
     removeAttribute() { m.src = ""; },
-    load() {},
+    load() { m.events.push({ kind: "load", volume: vol, src }); },
   };
   return m;
 }
@@ -57,8 +62,11 @@ function clock() {
   let t = 1_000;
   let fn: (() => void) | null = null;
   let active = 0;
+  const timeouts: { at: number; fn: () => void; live: boolean }[] = [];
   return {
     now: () => t,
+    setTimer: (fn: () => void, ms: number) => { const timer = { at: t + ms, fn, live: true }; timeouts.push(timer); return timer; },
+    clearTimer: (timer: unknown) => { (timer as { live: boolean }).live = false; },
     setInterval: (f: () => void) => { fn = f; active++; return active; },
     clearInterval: () => { fn = null; },
     /** Advance wall time in ticks of `step` ms. */
@@ -66,6 +74,7 @@ function clock() {
       for (let done = 0; done < ms; done += step) {
         t += Math.min(step, ms - done);
         fn?.();
+        for (const timer of timeouts) if (timer.live && timer.at <= t) { timer.live = false; timer.fn(); }
       }
     },
     get running() { return fn !== null; },
@@ -78,6 +87,8 @@ function rig(opts: { readOnlyVolume?: boolean; enabled?: boolean | null } = {}) 
   const f = new FadingAudio(m, { now: c.now, setInterval: c.setInterval, clearInterval: c.clearInterval, enabled: opts.enabled ?? null });
   return { m, c, f };
 }
+
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 const near = (a: number, b: number, eps = 0.02) => assert.ok(Math.abs(a - b) <= eps, `${a} ≈ ${b}`);
 
@@ -309,11 +320,11 @@ const item = (n: number): SpaManifestItem => ({
   offlineAllowed: false,
   offlineCacheUntil: null,
 });
-function player() {
-  const { m, c, f } = rig();
+function player(opts: { readOnlyVolume?: boolean; until?: number } = {}) {
+  const { m, c, f } = rig(opts);
   const p = new SpaOnlinePlayer(
-    { audio: f, sign: async (id) => ({ ok: true, data: { url: `https://s/${id}?token=x` } }), onChange() {} },
-    [item(1), item(2), item(3)],
+    { audio: f, sign: async (id) => ({ ok: true, data: { url: `https://s/${id}?token=x` } }), onChange() {}, now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer },
+    [{ ...item(1), playableUntil: opts.until ? new Date(c.now() + opts.until) : null }, item(2), item(3), item(4)],
   );
   return { m, c, f, p };
 }
@@ -367,19 +378,23 @@ function player() {
   await p.onEnded();
   assert.equal(p.current?.title, "T2");
   near(m.volume, 1, 1e-9);
-  await p.next();
+  const next = p.next();
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await next;
   assert.equal(p.current?.title, "T3");
   assert.ok(m.volume < 0.05);
 }
 
-// 18. Track switch while fading out is a hard stop of the old track.
+// 18. Track switch during a pause fade continues down, then fades the new track in.
 {
   const { m, c, p } = player();
   await p.toggle();
   c.advance(PLAYER_FADE_MS);
   await p.toggle();
   c.advance(300);
-  await p.next();
+  const next = p.next();
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await next;
   assert.equal(p.status, "playing");
   assert.equal(p.current?.title, "T2");
   c.advance(PLAYER_FADE_MS);
@@ -458,6 +473,253 @@ function player() {
   f.dispose();
   resolvePlay();
   await pending;
+  assert.equal(c.running, false);
+}
+
+// 23. Skip fade: monotonic 1 s to zero, pause at zero, hold until a normal 2 s fade-in.
+{
+  assert.equal(PLAYER_SKIP_FADE_OUT_MS, 1000);
+  const { m, c, f } = rig();
+  f.setVolume(0.8);
+  await f.playInstant();
+  m.events.length = 0;
+  const fade = f.fadeOutForSwitch();
+  let previous = m.volume;
+  for (let i = 0; i < 25; i++) {
+    c.advance(40);
+    assert.ok(m.volume <= previous);
+    previous = m.volume;
+    if (i < 24) assert.equal(m.paused, false);
+  }
+  assert.equal(await fade, true);
+  assert.equal(m.paused, true);
+  assert.equal(m.volume, 0);
+  assert.ok(m.events.every((e) => e.volume === 0));
+  f.pause(); // stopAudio must preserve silence through source replacement
+  f.removeAttribute("src");
+  f.load();
+  f.src = "new";
+  assert.ok(m.events.every((e) => e.volume === 0));
+  await f.play();
+  c.advance(1000);
+  near(m.volume, 0.2);
+  c.advance(1000);
+  near(m.volume, 0.8);
+}
+
+// 24. Manual next updates the UI at once and replaces the source only at zero gain.
+{
+  const { m, c, f, p } = player();
+  f.setVolume(0.7);
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const src = m.src;
+  m.events.length = 0;
+  const next = p.next();
+  assert.equal(p.status, "loading");
+  assert.equal(p.index, 1);
+  assert.equal(p.current?.title, "T2");
+  c.advance(500);
+  await flush();
+  assert.equal(m.src, src);
+  assert.equal(m.paused, false);
+  assert.ok(m.volume > 0 && m.volume < 0.7);
+  assert.equal(m.events.length, 0);
+  c.advance(500);
+  assert.equal(m.paused, true);
+  assert.equal(m.volume, 0);
+  await next;
+  assert.notEqual(m.src, src);
+  assert.ok(m.events.every((e) => e.volume === 0), JSON.stringify(m.events));
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 0.7);
+}
+
+// 25. Previous and direct selection use the same skip fade.
+for (const select of [(p: SpaOnlinePlayer) => p.previous(), (p: SpaOnlinePlayer) => p.playIndex(2)]) {
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const src = m.src;
+  const pending = select(p);
+  c.advance(500);
+  assert.equal(m.src, src);
+  assert.equal(m.paused, false);
+  c.advance(500);
+  await pending;
+  assert.notEqual(m.src, src);
+  assert.equal(m.volume, 0);
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1);
+}
+
+// 26. Natural end has no fade ramp or running interval.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  m.paused = true;
+  await p.onEnded();
+  assert.equal(p.current?.title, "T2");
+  assert.equal(m.volume, 1);
+  assert.equal(c.running, false);
+}
+
+// 27. Three rapid next presses share the original 1 s ramp; only the last source starts.
+{
+  const { m, c, f, p } = player();
+  f.setVolume(0.6);
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  m.events.length = 0;
+  const first = p.next();
+  c.advance(120);
+  const second = p.next();
+  c.advance(120);
+  const level = m.volume;
+  const third = p.next();
+  assert.equal(m.volume, level);
+  c.advance(760);
+  await Promise.all([first, second, third]);
+  assert.equal(p.current?.title, "T4");
+  const sources = m.events.filter((e) => e.kind === "src" && e.src);
+  assert.equal(sources.length, 1);
+  assert.ok(sources[0].src.includes(item(4).audioItemId));
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 0.6);
+  assert.equal(m.paused, false);
+}
+
+// 28. Next during the new fade-in continues down from its current low level.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const first = p.next();
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await first;
+  c.advance(400);
+  const low = m.volume;
+  const next = p.next();
+  assert.equal(m.volume, low);
+  c.advance(40);
+  assert.ok(m.volume < low);
+  c.advance(200);
+  await next;
+  assert.equal(p.current?.title, "T3");
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1);
+}
+
+// 29. The old rights deadline interrupts a skip immediately; the chosen track still starts.
+{
+  const { m, c, p } = player({ until: 2500 });
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const next = p.next();
+  c.advance(480);
+  assert.equal(m.paused, false);
+  c.advance(20);
+  assert.equal(m.paused, true, "hard stop at the old playable_until");
+  await next;
+  assert.equal(p.current?.title, "T2");
+  assert.equal(p.status, "playing");
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1);
+}
+
+// 30. Read-only iOS volume switches without waiting for a timer.
+{
+  const { m, c, p } = player({ readOnlyVolume: true });
+  await p.toggle();
+  await p.next();
+  assert.equal(p.current?.title, "T2");
+  assert.equal(m.paused, false);
+  assert.equal(c.running, false);
+}
+
+// 31. Pause during a skip cancels the pending choice; the next play can start normally.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const next = p.next();
+  c.advance(300);
+  const src = m.src;
+  m.events.length = 0;
+  await p.toggle();
+  await next;
+  assert.equal(p.status, "paused");
+  assert.equal(m.paused, false, "no cut: the old track keeps fading down");
+  assert.equal(m.src, src);
+  const low = m.volume;
+  c.advance(40);
+  assert.ok(m.volume < low, "continues down from the current level");
+  c.advance(PLAYER_FADE_MS);
+  await flush();
+  assert.equal(m.paused, true);
+  assert.equal(m.src, "", "the old source is dropped after the fade");
+  assert.equal(m.events[0]?.kind, "pause");
+  assert.equal(m.events[0]?.volume, 0, "paused only at zero gain");
+  near(m.volume, 1, 1e-9);
+  const plays = m.plays;
+  c.advance(3000);
+  await flush();
+  assert.equal(m.plays, plays);
+  await p.toggle();
+  assert.equal(p.current?.title, "T2");
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1);
+}
+
+// 33. Pause then play again inside the skip fade-out: the chosen track starts (never the
+// old source resumed), fading in from silence.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  const oldSrc = m.src;
+  const next = p.next();
+  c.advance(200);
+  await p.toggle(); // pause
+  await next;
+  c.advance(200);
+  const resume = p.toggle(); // play again, old track still fading
+  assert.equal(p.status, "loading");
+  c.advance(PLAYER_SKIP_FADE_OUT_MS);
+  await resume;
+  assert.equal(p.status, "playing");
+  assert.equal(p.current?.title, "T2");
+  assert.notEqual(m.src, oldSrc);
+  assert.ok(m.src.includes(item(2).audioItemId));
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 1, 1e-9);
+}
+
+// 32. Skip supersession, changing volume, throttled ticks, refused play and dispose.
+{
+  const { m, c, f } = rig();
+  await f.playInstant();
+  const first = f.fadeOutForSwitch();
+  c.advance(200);
+  const level = f.fadeLevel;
+  f.setVolume(0.5);
+  near(m.volume, 0.5 * playerFadeGain(level));
+  const second = f.fadeOutForSwitch();
+  assert.equal(await first, false);
+  c.advance(1000, 1000);
+  assert.equal(await second, true);
+  assert.equal(m.volume, 0);
+  m.failPlay = true;
+  await assert.rejects(f.play());
+  near(m.volume, 0.5);
+  m.failPlay = false;
+  await f.playInstant();
+  const last = f.fadeOutForSwitch();
+  c.advance(1000, 1000);
+  await last;
+  f.dispose();
+  near(m.volume, 0.5);
   assert.equal(c.running, false);
 }
 

@@ -5,6 +5,9 @@
  * PLAYER_FADE_MS. Pause keeps sounding for PLAYER_FADE_MS while it fades to silence,
  * then the element really pauses and the chosen volume is restored for the next play.
  *
+ * Manual skips fade out over PLAYER_SKIP_FADE_OUT_MS and hold silence through source
+ * replacement: pausing / clearing a source at full gain truncates the waveform (click).
+ *
  * The fade is applied through HTMLMediaElement.volume (volume = chosen × curve(level)).
  * No Web Audio: routing the element through an AudioContext (createMediaElementSource)
  * makes iOS Safari silence the music when the screen locks or the tab goes to the
@@ -17,8 +20,10 @@
  * in a background tab still completes and pauses even when timers are throttled.
  */
 
-/** One constant for fade-in and fade-out (ms). */
+/** Normal fade-in and soft pause fade-out (ms). */
 export const PLAYER_FADE_MS = 2000;
+/** Manual switch fade-out from full level (ms). */
+export const PLAYER_SKIP_FADE_OUT_MS = 1000;
 /** Ramp step. Background tabs may tick less often; the ramp is time based. */
 export const PLAYER_FADE_TICK_MS = 40;
 
@@ -73,8 +78,8 @@ export function mediaVolumeWritable(media: Pick<FadeMedia, "volume">): boolean {
 
 /**
  * Wraps the player's single <audio>. Implements the controller's audio surface:
- * `play()` fades in, `pause()` is a hard stop (track switch, rights deadline, revoke),
- * `fadeOut()` is the soft user pause.
+ * `play()` fades in, `pause()` is a hard stop (rights deadline, revoke),
+ * `fadeOut()` is the soft user pause; `fadeOutForSwitch()` holds silence for a new source.
  */
 export class FadingAudio {
   readonly enabled: boolean;
@@ -90,8 +95,10 @@ export class FadingAudio {
   /** +1 fading in, -1 fading out, 0 still. */
   private dir: -1 | 0 | 1 = 0;
   private last = 0;
+  private outMs: number;
+  private silentHeld = false;
   private timer: unknown = null;
-  /** Bumped by every play / pause / fadeOut: a play() resolving late must not ramp up. */
+  /** Bumped by every play / pause / fade: a play() resolving late must not ramp up. */
   private gen = 0;
   private waiters: ((done: boolean) => void)[] = [];
 
@@ -100,6 +107,7 @@ export class FadingAudio {
     options: FadeOptions = {},
   ) {
     this.fadeMs = Math.max(1, options.fadeMs ?? PLAYER_FADE_MS);
+    this.outMs = this.fadeMs;
     this.tickMs = Math.max(1, options.tickMs ?? PLAYER_FADE_TICK_MS);
     this.nowFn = options.now ?? (() => Date.now());
     this.setTimer = options.setInterval ?? ((fn, ms) => setInterval(fn, ms));
@@ -186,7 +194,7 @@ export class FadingAudio {
       return;
     }
     const now = this.nowFn();
-    const step = Math.max(0, now - this.last) / this.fadeMs;
+    const step = Math.max(0, now - this.last) / (this.dir < 0 ? this.outMs : this.fadeMs);
     this.last = now;
     if (this.dir > 0) {
       this.level = Math.min(1, this.level + step);
@@ -209,9 +217,13 @@ export class FadingAudio {
   private finishFadeOut(): void {
     this.dir = 0;
     this.stopTimer();
-    this.media.pause();
-    this.level = 1;
+    this.level = 0;
     this.apply();
+    this.media.pause();
+    if (!this.silentHeld) {
+      this.level = 1;
+      this.apply();
+    }
     this.settle(true);
   }
 
@@ -221,6 +233,7 @@ export class FadingAudio {
    */
   async play(): Promise<void> {
     const gen = ++this.gen;
+    this.silentHeld = false;
     this.settle(false);
     if (!this.enabled) {
       this.dir = 0;
@@ -249,6 +262,7 @@ export class FadingAudio {
 
   /** Start at the chosen volume at once (natural advance to the next track). */
   async playInstant(): Promise<void> {
+    this.silentHeld = false;
     ++this.gen;
     this.settle(false);
     this.dir = 0;
@@ -258,13 +272,13 @@ export class FadingAudio {
     return this.media.play();
   }
 
-  /** Hard stop now (track switch, rights deadline, revoke). Restores the chosen volume. */
+  /** Hard stop now (rights deadline, revoke). A switch hold stays silent until play / dispose. */
   pause(): void {
     ++this.gen;
     this.dir = 0;
     this.stopTimer();
     this.media.pause();
-    this.level = 1;
+    this.level = this.silentHeld ? 0 : 1;
     this.apply();
     this.settle(false);
   }
@@ -275,6 +289,11 @@ export class FadingAudio {
    * over first. Already paused or fade unavailable (iOS): pauses at once.
    */
   fadeOut(): Promise<boolean> {
+    // Pause pressed during a skip fade-out: the switch is cancelled (its waiter gets
+    // false), the same ramp continues down from the current level.
+    if (this.silentHeld) this.settle(false);
+    this.silentHeld = false;
+    this.outMs = this.fadeMs;
     if (!this.enabled || this.media.paused) {
       this.pause();
       return Promise.resolve(true);
@@ -285,7 +304,23 @@ export class FadingAudio {
     return done;
   }
 
+  /** Fade the old source to zero and keep it silent through pause / load / replacement.
+   * A repeated switch supersedes its waiter but continues the same ramp from here.
+   */
+  fadeOutForSwitch(): Promise<boolean> {
+    ++this.gen;
+    this.settle(false);
+    if (!this.enabled || this.media.paused) return Promise.resolve(true);
+    this.silentHeld = true;
+    this.outMs = PLAYER_SKIP_FADE_OUT_MS;
+    const done = new Promise<boolean>((resolve) => this.waiters.push(resolve));
+    // Keep the tick origin on repeated skips so rapid presses cannot prolong the fade.
+    if (this.dir !== -1) this.ramp(-1);
+    return done;
+  }
+
   dispose(): void {
+    this.silentHeld = false;
     ++this.gen;
     this.stopTimer();
     this.dir = 0;
