@@ -42,6 +42,8 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
   let retryAt = Infinity;
   let failures = 0;
   let revision = 0;
+  let needsConfirmation = false;
+  let conflictKey: string | null = null;
   let stopped = false;
   let disposed = false;
   const missingDeadlineAt = d.now();
@@ -71,6 +73,7 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     // A successful focus/online check just before expiry cannot delay the
     // mandatory server check across the deadline. Failed checks retain backoff.
     if (!inFlight && failures === 0 && lastCheck < deadline) next = Math.min(next, deadline);
+    if (!inFlight && needsConfirmation && failures === 0) next = now;
     if (!inFlight && failures > 0) next = Math.max(next, retryAt);
     // A hung request must not bypass the bounded offline tolerance.
     next = Math.min(next, deadline + ACCESS_TOLERANCE_MS);
@@ -84,15 +87,30 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     if (d.now() >= end() + ACCESS_TOLERANCE_MS) return expire();
     retryAt = d.now() + Math.min(10_000 * 2 ** Math.min(failures++, 3), 60_000);
   };
-  const accept = (next: WorkspacePageModel) => {
+  const validate = (next: WorkspacePageModel) => {
     // A 200/unavailable model represents a backend outage, not confirmed expiry.
     if (next.status === "unavailable") throw new Error("access_unavailable");
     if (next.spaceId !== model.spaceId) throw new Error("access_space_mismatch");
-    if (!workspacePlayerOpen(next)) return expire();
+    if (!workspacePlayerOpen(next)) return;
     const deadline = workspacePlaybackDeadline(next);
     if (!deadline || !Number.isFinite(Date.parse(deadline))) throw new Error("access_invalid_deadline");
-    if (!workspacePlaybackAllowed(deadline, d.now())) return expire();
+  };
+  const conflicts = (next: WorkspacePageModel) => !workspacePlayerOpen(next) ||
+    Date.parse(workspacePlaybackDeadline(next) ?? "") < end() ||
+    !workspacePlaybackAllowed(workspacePlaybackDeadline(next), d.now());
+  const confirm = (next: WorkspacePageModel) => {
+    const key = `${next.status}|${next.spaceEnabled}|${workspacePlaybackDeadline(next)}`;
+    if (needsConfirmation && conflictKey === key) return;
+    needsConfirmation = true;
+    conflictKey = key;
+    revision++;
+    failures = 0;
+    retryAt = Infinity;
+  };
+  const accept = (next: WorkspacePageModel) => {
     model = next;
+    needsConfirmation = false;
+    conflictKey = null;
     failures = 0;
     retryAt = Infinity;
   };
@@ -101,23 +119,42 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     if (inFlight) return inFlight;
     const now = d.now();
     const crossingDeadline = lastCheck < end() && now >= end();
-    if ((failures > 0 && now < retryAt) || (!crossingDeadline && now - lastCheck < ACCESS_MIN_CHECK_MS)) {
+    if ((failures > 0 && now < retryAt) || (!needsConfirmation && !crossingDeadline && now - lastCheck < ACCESS_MIN_CHECK_MS)) {
       arm();
       return Promise.resolve();
     }
     lastCheck = d.now();
     const requestRevision = revision;
-    inFlight = Promise.resolve().then(d.fetchStatus).then((next) => {
+    const confirmsConflict = needsConfirmation;
+    let requestStarted = now;
+    inFlight = Promise.resolve().then(() => {
+      requestStarted = d.now();
+      return d.fetchStatus();
+    }).then((next) => {
       if (disposed || stopped || requestRevision !== revision) return;
+      validate(next);
+      if (conflicts(next)) {
+        // A snapshot taken before expiry/conflict cannot confirm a later loss of
+        // access. Keep the accepted window until a request begun afterwards answers.
+        const elapsed = d.now() >= end();
+        if ((!confirmsConflict && !(elapsed && requestStarted >= end())) ||
+          (elapsed && requestStarted < end())) {
+          confirm(next);
+          return;
+        }
+        if (!workspacePlayerOpen(next) ||
+          !workspacePlaybackAllowed(workspacePlaybackDeadline(next), d.now())) return expire();
+      }
       accept(next);
-      if (!stopped) d.onStatus(next);
+      d.onStatus(next);
     }).catch(() => {
       if (disposed || stopped || requestRevision !== revision) return;
       // 10, 20, 40, then 60 seconds, also respected by focus/online events.
       failed();
     }).finally(() => {
       inFlight = null;
-      arm();
+      if (!disposed && !stopped && needsConfirmation && failures === 0) void refresh();
+      else arm();
     });
     // Also arm the tolerance watchdog while the request is unresolved.
     arm();
@@ -129,11 +166,20 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     allowsPlayback: () => !disposed && !stopped && workspacePlayerOpen(model) && d.now() < end() + ACCESS_TOLERANCE_MS,
     update(next: WorkspacePageModel) {
       if (disposed || stopped) return false;
-      // Navigation/payment updates supersede every decision from an older request.
-      revision++;
       try {
+        validate(next);
+        if (conflicts(next)) {
+          // Navigation can arrive out of order. Deduplicate conflicts and verify
+          // through the status endpoint before either stopping or shortening access.
+          confirm(next);
+          void refresh();
+          return false;
+        }
+        // Preserve the revision guard: payment supersedes older pending outcomes.
+        revision++;
         accept(next);
       } catch {
+        revision++;
         failed();
         arm();
         return false;

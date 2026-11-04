@@ -20,7 +20,7 @@ function model(deadline: number, patch: Partial<WorkspacePageModel> = {}): Works
   };
 }
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
-function setup(initial: WorkspacePageModel) {
+function setup(initial: WorkspacePageModel, onStatus?: (next: WorkspacePageModel) => void) {
   let now = T0;
   let sequence = 0;
   const timers = new Map<number, { at: number; fn: () => void }>();
@@ -41,7 +41,7 @@ function setup(initial: WorkspacePageModel) {
   const access = createAccessDeadline(initial, {
     ...clock,
     fetchStatus: () => { requests++; return fetcher(); },
-    onStatus: (next) => { adopted.push(next); },
+    onStatus: (next) => { adopted.push(next); onStatus?.(next); },
     onExpired: () => { stops++; },
   });
   return {
@@ -125,7 +125,7 @@ for (const stale of ["offer", "paid", "network", "unavailable"] as const) {
   w.access.dispose();
 }
 
-// A navigation model is a fresh server access decision, independently of its catalog.
+// Navigation conflicts require one fresh status round-trip, independently of the catalog.
 for (const patch of [
   { status: "offer" as const },
   { status: "anonymous" as const },
@@ -134,8 +134,14 @@ for (const patch of [
   { playbackUntil: iso(T0) },
 ]) {
   const w = setup(model(T0 + 3_600_000));
-  assert.equal(w.access.update(model(T0 + 3_600_000, { ...patch, tracks: [] })), false);
-  assert.equal(w.stops, 1, "navigation denial stops immediately without waiting for a periodic check");
+  const denied = model(T0 + 3_600_000, { ...patch, tracks: [] });
+  w.respond(denied);
+  assert.equal(w.access.update(denied), false);
+  assert.equal(w.stops, 0, "navigation alone cannot stop playback");
+  assert.equal(w.access.allowsPlayback(), true);
+  await flush();
+  assert.equal(w.requests, 1, "verification bypasses the periodic interval");
+  assert.equal(w.stops, 1, "fresh confirmation stops promptly after one round-trip");
   assert.equal(w.access.allowsPlayback(), false);
   w.access.dispose();
 }
@@ -182,8 +188,145 @@ for (const event of ["focus", "online"] as const) {
   assert.equal(w.access.refresh(), pending);
   assert.equal(w.requests, before);
   assert.equal(w.stops, 0);
+  w.respond(model(deadline, { status: "offer", tracks: [] }));
   resolve(model(deadline, { status: "offer", tracks: [] }));
   await pending;
+  await flush();
+  assert.equal(w.requests, before + 1, "pre-deadline denial needs a fresh check");
+  assert.equal(w.stops, 1);
+  w.access.dispose();
+}
+
+// Renewal between a pre-deadline snapshot and delivery must survive the old response.
+for (const status of ["paid", "offer"] as const) {
+  const deadline = T0 + 120_000;
+  const renewed = model(deadline + 3_600_000);
+  const w = setup(model(deadline));
+  await w.advance(deadline - 5_000);
+  let resolveOld!: (value: WorkspacePageModel) => void;
+  let resolveFresh!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolveOld = done; }));
+  const pending = w.access.refresh();
+  await flush();
+  const before = w.requests;
+  await w.advance(deadline + 1);
+  w.fetchWith(() => new Promise((done) => { resolveFresh = done; }));
+  resolveOld(model(deadline, { status }));
+  await pending;
+  await flush();
+  assert.equal(w.requests, before + 1, "fresh request starts after elapsed snapshot delivery");
+  assert.equal(w.stops, 0, "elapsed pre-deadline snapshot is not confirmed expiry");
+  assert.equal(w.access.allowsPlayback(), true);
+  resolveFresh(renewed);
+  await flush();
+  assert.equal(w.adopted.at(-1)?.playbackUntil, renewed.playbackUntil);
+  w.respond(renewed);
+  await w.advance(deadline + ACCESS_TOLERANCE_MS);
+  assert.equal(w.stops, 0);
+  w.access.dispose();
+}
+
+// Provider ordering: publish renewal, then reject stale navigation before model/manifest adoption.
+for (const stale of [
+  model(T0 - 1),
+  model(T0 + 120_000, { status: "offer", tracks: [] }),
+  model(T0 + 120_000),
+]) {
+  const renewed = model(T0 + 7_200_000);
+  let providerModel = model(T0 + 3_600_000);
+  const w = setup(providerModel, (next) => { providerModel = next; });
+  w.respond(renewed);
+  await w.access.refresh();
+  assert.equal(providerModel, renewed);
+  let resolve!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolve = done; }));
+  // Mirror the provider's synchronous guard, also asserted against its source below.
+  const adoptNavigation = (next: WorkspacePageModel) => {
+    if (!w.access.update(next)) return;
+    providerModel = next;
+  };
+  adoptNavigation(stale);
+  adoptNavigation(stale);
+  await flush();
+  assert.equal(w.requests, 2, "navigation conflict bypasses rate limit and deduplicates");
+  assert.equal(providerModel, renewed, "provider never publishes the stale model to its manifest");
+  assert.equal(w.stops, 0);
+  assert.equal(w.access.allowsPlayback(), true);
+  resolve(renewed);
+  await flush();
+  assert.equal(providerModel, renewed);
+  w.respond(renewed);
+  await w.advance(T0 + 3_600_000 + ACCESS_TOLERANCE_MS);
+  assert.equal(w.stops, 0, "neither scheduler nor provider rolls back the renewed deadline");
+  w.access.dispose();
+}
+
+// Status snapshots cannot silently shorten an accepted future window either.
+{
+  const renewed = model(T0 + 7_200_000);
+  const earlier = model(T0 + 3_600_000);
+  const w = setup(renewed);
+  let resolveOld!: (value: WorkspacePageModel) => void;
+  let resolveFresh!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolveOld = done; }));
+  const pending = w.access.refresh();
+  await flush();
+  w.fetchWith(() => new Promise((done) => { resolveFresh = done; }));
+  resolveOld(earlier);
+  await pending;
+  await flush();
+  assert.equal(w.requests, 2);
+  assert.equal(w.adopted.length, 0, "unverified shortening is never published");
+  assert.equal(w.stops, 0);
+  resolveFresh(renewed);
+  await flush();
+  assert.equal(w.adopted.at(-1), renewed);
+  w.access.dispose();
+}
+
+// A navigation conflict invalidates a status request already in flight, even in the same ms.
+{
+  const renewed = model(T0 + 7_200_000);
+  const w = setup(model(T0 + 3_600_000));
+  w.respond(renewed);
+  await w.access.refresh();
+  await w.advance(T0 + ACCESS_MIN_CHECK_MS);
+  let resolveOld!: (value: WorkspacePageModel) => void;
+  let resolveFresh!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolveOld = done; }));
+  const pending = w.access.refresh();
+  await flush();
+  const denied = model(T0, { status: "offer", tracks: [] });
+  assert.equal(w.access.update(denied), false);
+  w.fetchWith(() => new Promise((done) => { resolveFresh = done; }));
+  resolveOld(denied);
+  await pending;
+  await flush();
+  assert.equal(w.requests, 3);
+  assert.equal(w.stops, 0, "request preceding the conflict cannot confirm it");
+  resolveFresh(denied);
+  await flush();
+  assert.equal(w.stops, 1, "fresh status denial confirms stale navigation denial");
+  w.access.dispose();
+}
+
+// A different navigation conflict arriving during verification requires a newer request.
+{
+  const w = setup(model(T0 + 7_200_000));
+  let resolveOld!: (value: WorkspacePageModel) => void;
+  let resolveFresh!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolveOld = done; }));
+  assert.equal(w.access.update(model(T0 + 3_600_000)), false);
+  await flush();
+  const denied = model(T0, { status: "offer", tracks: [] });
+  assert.equal(w.access.update(denied), false);
+  w.fetchWith(() => new Promise((done) => { resolveFresh = done; }));
+  resolveOld(denied);
+  await flush();
+  assert.equal(w.requests, 2);
+  assert.equal(w.stops, 0, "verification preceding the new conflict is superseded");
+  resolveFresh(denied);
+  await flush();
   assert.equal(w.stops, 1);
   w.access.dispose();
 }
@@ -341,7 +484,7 @@ assert.match(workspace, /player.accessModel/);
 assert.match(workspace, /useLayoutEffect\(\(\) => \{\s*adopt\(initialModel\);/);
 const adoption = player.split("const adopt = useCallback")[1]?.split("const release = useCallback")[0];
 assert.ok(adoption);
-assert.match(adoption, /access\.update\(next\)/);
+assert.match(adoption, /if \(access && !access\.update\(next\)\) return;/);
 assert.ok(adoption.indexOf("access.update(next)") < adoption.indexOf("next.tracks.length === 0"),
   "server access is reconciled before catalog adoption");
 assert.doesNotMatch(player, /accessRef\.current\?\.update\(model\)/,

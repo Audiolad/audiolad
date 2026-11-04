@@ -178,8 +178,9 @@ export function BusinessCabinetPlayerProvider({
 
   const adopt = useCallback((next: WorkspacePageModel) => {
     const current = modelRef.current;
-    // Server navigation models carry access decisions even without a catalog.
-    // Reconcile synchronously so an older in-flight status cannot undo payment.
+    // Navigation may arrive after a newer status response. Reject conflicting
+    // access here (including catalog-less denial) until a fresh status check confirms it.
+    // Extensions still supersede older in-flight status decisions synchronously.
     const access = current?.spaceId === next.spaceId ? accessRef.current : null;
     if (access && !access.update(next)) return;
     if (next.status === "unavailable") return;
