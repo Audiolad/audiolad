@@ -88,7 +88,12 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   let offerAccepted = false;
   if (canPay) {
     // The current edition of the договор-оферта, not any older acceptance.
-    const { data: acceptance } = await supabase.rpc("business_offer_edition_acceptances_for_caller");
+    // A read error is an error, never «not accepted»: otherwise an owner who already
+    // accepted would be asked for the same edition again.
+    const { data: acceptance, error: acceptanceError } = await supabase.rpc("business_offer_edition_acceptances_for_caller");
+    if (acceptanceError) {
+      throw new Error(`business_domain_offer_read_failed:${acceptanceError.message}`);
+    }
     offerAccepted = hasAcceptedCurrentBusinessOffer(acceptance);
   }
   const needsReceiptEmail = canPay && !(user.email?.trim() ?? "");

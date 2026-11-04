@@ -94,3 +94,28 @@ export function hasAcceptedCurrentBusinessOffer(rows: unknown): boolean {
     return r.document_key === BUSINESS_OFFER_DOCUMENT_ID && isCurrentBusinessOfferEdition(r.document_version, r.content_hash);
   });
 }
+
+/** record_business_offer_edition_acceptance raised not_organization_owner (no Business organization yet). */
+export function isNotOrganizationOwnerError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" && message.includes("not_organization_owner");
+}
+
+export type BusinessOfferPaymentGate = "ok" | "offer_acceptance_required" | "unavailable";
+
+/**
+ * Shared payment gate: a business_subscription order is paid only after the current edition
+ * of the договор-оферта is accepted, whichever route starts the payment (cabinet checkout or
+ * /api/payments with an order id). Other order kinds are not affected. A read error is
+ * "unavailable", never "accepted".
+ */
+export async function businessOfferPaymentGate(
+  orderKind: unknown,
+  loadAcceptances: () => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<BusinessOfferPaymentGate> {
+  if (orderKind !== "business_subscription") return "ok";
+  const { data, error } = await loadAcceptances();
+  if (error) return "unavailable";
+  return hasAcceptedCurrentBusinessOffer(data) ? "ok" : "offer_acceptance_required";
+}

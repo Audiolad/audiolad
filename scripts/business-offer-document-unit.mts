@@ -15,8 +15,10 @@ import {
   BUSINESS_OFFER_EDITION,
   BUSINESS_OFFER_HREF,
   BUSINESS_OFFER_TITLE,
+  businessOfferPaymentGate,
   hasAcceptedCurrentBusinessOffer,
   isCurrentBusinessOfferEdition,
+  isNotOrganizationOwnerError,
   isShownCurrentBusinessOfferBody,
 } from "../src/lib/business/offer";
 import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS } from "../src/lib/business/plan";
@@ -120,7 +122,37 @@ assert.match(guestCta, /offerVersion: BUSINESS_OFFER_EDITION\.version, offerHash
 assert.match(readFileSync("src/app/api/business/guest-start/route.ts", "utf8"), /record_business_offer_edition_acceptance/);
 assert.match(readFileSync("src/app/api/business/subscription/accept/route.ts", "utf8"), /accept_business_offer_edition/);
 const checkout = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
-assert.ok(checkout.indexOf("hasAcceptedCurrentBusinessOffer(") < checkout.indexOf('rpc("create_business_subscription_order"'), "offer gate before the order");
-assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /business_offer_edition_acceptances_for_caller/);
+assert.ok(checkout.indexOf("businessOfferPaymentGate(") > 0, "cabinet checkout uses the shared gate");
+assert.ok(checkout.indexOf("businessOfferPaymentGate(") < checkout.indexOf('rpc("create_business_subscription_order"'), "offer gate before the order");
+const domain = readFileSync("src/lib/business-app/domain.ts", "utf8");
+assert.match(domain, /business_offer_edition_acceptances_for_caller/);
+assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read error is never «not accepted»");
+
+// 9. Shared payment gate: an order created directly through the order RPC cannot be paid via
+// /api/payments without the current edition. Other order kinds are untouched.
+{
+  const current = [{ document_key: "business-offer", document_version: BUSINESS_OFFER_EDITION.version, content_hash: sha }];
+  let reads = 0;
+  const load = (data: unknown, error: unknown = null) => async () => { reads++; return { data, error }; };
+  assert.equal(await businessOfferPaymentGate("product_purchase", load([])), "ok");
+  assert.equal(await businessOfferPaymentGate("studio_music_license", load(null, { message: "x" })), "ok");
+  assert.equal(reads, 0, "other kinds do not read acceptances");
+  assert.equal(await businessOfferPaymentGate("business_subscription", load(current)), "ok");
+  assert.equal(await businessOfferPaymentGate("business_subscription", load([])), "offer_acceptance_required");
+  assert.equal(await businessOfferPaymentGate("business_subscription", load([{ document_key: "b2b-terms", document_version: "r8-2026-10-18", content_hash: "0fbbfe610f344920a084e58b5987cce5f4d7033528abc8760aac07b89de7078a" }])), "offer_acceptance_required", "legacy annex alone does not pay");
+  assert.equal(await businessOfferPaymentGate("business_subscription", load(current, { message: "boom" })), "unavailable");
+  assert.equal(await businessOfferPaymentGate(undefined, load([])), "ok");
+  const payments = readFileSync("src/app/api/payments/route.ts", "utf8");
+  assert.match(payments, /quick_offer_id, order_kind"/, "payments read the order kind");
+  const gateAt = payments.indexOf("businessOfferPaymentGate(");
+  assert.ok(gateAt > payments.indexOf("mapOrderStatusToHttpError(orderRow.status)"), "gate after the order lookup");
+  assert.ok(gateAt < payments.indexOf("createTochkaPaymentForOrder({"), "gate before any payment is created");
+  assert.ok(gateAt < payments.indexOf("applyServerQuickOfferAmount({"), "gate before pricing");
+  assert.match(payments, /"offer_acceptance_required", href: BUSINESS_OFFER_HREF \},\s*\{ status: 409 \}/);
+}
+assert.equal(isNotOrganizationOwnerError({ message: "not_organization_owner" }), true);
+assert.equal(isNotOrganizationOwnerError({ message: "offer_document_unknown" }), false);
+assert.equal(isNotOrganizationOwnerError(null), false);
+assert.match(readFileSync("src/app/api/business/guest-start/route.ts", "utf8"), /isNotOrganizationOwnerError\(error\)\) return "not_owner"/);
 
 console.log("business-offer-document-unit: ok");

@@ -298,7 +298,7 @@ const { handleBusinessGuestStart } = await import("../src/lib/business-guest/sta
 const { businessGuestStartConfig } = await import("../src/lib/business-guest/start-config");
 const { guestNetworkKey } = await import("../src/lib/business-guest/network-key");
 const { createServiceRoleClient } = await import("../src/lib/supabase/service-role");
-const { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition } = await import("../src/lib/business/offer");
+const { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition, isNotOrganizationOwnerError } = await import("../src/lib/business/offer");
 const { isUnifiedAgreementEnabled } = await import("../src/lib/author-terms/unified-agreement-flag");
 
 // Same deps as src/app/api/business/guest-start/route.ts; only the cookie session is a supabase-js client here.
@@ -350,7 +350,9 @@ async function guestStart(client: SupabaseClient, ip: string, opts: { origin?: s
         p_user_id: userId, p_document_version: BUSINESS_OFFER_EDITION.version, p_content_hash: BUSINESS_OFFER_EDITION.contentHash,
         p_annex_version: annex.version, p_annex_hash: annex.contentHash, p_source: "guest_start",
       });
-      if (error) throw new Error("guest_start_offer_accept_failed");
+      if (!error) return "recorded";
+      if (isNotOrganizationOwnerError(error)) return "not_owner";
+      throw new Error("guest_start_offer_accept_failed");
     },
     log: () => undefined,
   });
@@ -439,6 +441,15 @@ await scenario("stage 3: guest sees only its own point; server RPCs and tables a
   });
   assert.ok(second.error || (second.data as { ok?: boolean })?.ok === false, "guest gets exactly one point");
   assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${startedId}'`), "1");
+});
+await scenario("stage 1C: registered user without a Business organization keeps the onboarding path", async () => {
+  assert.ok(ownerClient);
+  assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${ownerId}'`), "0");
+  const result = await guestStart(ownerClient as SupabaseClient, "203.0.113.77");
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.equal(psql(`SELECT count(*) FROM public.business_offer_edition_acceptances WHERE user_id = '${ownerId}'`), "0", "nothing to record against yet");
+  assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${ownerId}'`), "0", "no organization is created here");
 });
 await scenario("stage 3: bootstrap refuses a registered (non-anonymous) user", async () => {
   const { error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {

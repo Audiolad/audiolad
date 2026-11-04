@@ -21,6 +21,7 @@ import {
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
 import { getOrderSaleAccrualReady } from "@/lib/author-sales/queries";
 import { applyServerQuickOfferAmount } from "@/lib/quick-offers/apply-offer-amount";
+import { BUSINESS_OFFER_HREF, businessOfferPaymentGate } from "@/lib/business/offer";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at, quick_offer_id",
+      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at, quick_offer_id, order_kind",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -176,6 +177,23 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: statusError.error },
       { status: statusError.status },
+    );
+  }
+
+  // A Business subscription order created directly through the order RPC is paid here
+  // only after the current edition of the договор-оферта is accepted (same gate as the cabinet).
+  const offerGate = await businessOfferPaymentGate(
+    (order as { order_kind?: unknown }).order_kind,
+    () => supabase.rpc("business_offer_edition_acceptances_for_caller"),
+  );
+  if (offerGate === "unavailable") {
+    console.error("create_payment_offer_lookup_error");
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+  if (offerGate === "offer_acceptance_required") {
+    return NextResponse.json(
+      { error: "offer_acceptance_required", href: BUSINESS_OFFER_HREF },
+      { status: 409 },
     );
   }
 
