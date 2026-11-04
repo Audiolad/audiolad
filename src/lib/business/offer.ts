@@ -17,6 +17,8 @@
 export const BUSINESS_OFFER_DOCUMENT_ID = "business-offer";
 
 export const BUSINESS_OFFER_HREF = "/documents/business-offer";
+/** Absolute link for Business surfaces served on audiolad.ru (landing /b, /b/prava, coffee atlas). */
+export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_HREF}`;
 
 export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Бизнес»";
 

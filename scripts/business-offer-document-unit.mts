@@ -166,4 +166,26 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
   assert.equal(offer.isNotOfferPartyError(null), false);
 }
 
+{
+  // Sergey 04.11 (Q8): «Публичная оферта» on Business surfaces leads to the Business offer; main site keeps /offer.
+  const offer = await import("../src/lib/business/offer");
+  assert.equal(offer.BUSINESS_OFFER_URL, "https://business.audiolad.ru/documents/business-offer");
+  const view = readFileSync("src/components/business/BusinessLandingView.tsx", "utf8");
+  assert.doesNotMatch(view, /href="\/offer"/);
+  assert.match(view, /href=\{BUSINESS_OFFER_URL\}>\s*Публичная оферта/);
+  for (const f of ["src/components/business/BusinessLandingView.tsx", "src/app/(platform)/b/prava/page.tsx", "src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx"]) {
+    assert.match(readFileSync(f, "utf8"), /<LegalLinksNav[^>]*offerHref=\{BUSINESS_OFFER_URL\}/, f);
+  }
+  const legal = readFileSync("src/lib/legal/links.ts", "utf8");
+  assert.match(legal, /\{ href: "\/offer", title: "Публичная оферта" \}/, "main listener site keeps the general offer");
+  assert.match(readFileSync("src/components/legal/LegalLinksNav.tsx", "utf8"), /offerHref && link\.href === "\/offer"/);
+  // Sergey 04.11 (Q5): gift copy says «за 30 дней», like the offer.
+  const { BUSINESS_GUEST_START_COPY } = await import("../src/lib/business-guest/copy");
+  const { GUEST_COFFEE_TERMS } = await import("../src/lib/business-app/guest-coffee/copy");
+  for (const t of [BUSINESS_GUEST_START_COPY.terms, GUEST_COFFEE_TERMS]) {
+    assert.match(t, /799\u00a0₽ за 30 дней/);
+    assert.doesNotMatch(t, /в месяц/);
+  }
+}
+
 console.log("business-offer-document-unit: ok");

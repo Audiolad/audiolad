@@ -6,6 +6,7 @@ import BusinessListenStudio from "@/components/business/BusinessListenStudio";
 import BusinessSnapCarousel from "@/components/business/BusinessSnapCarousel";
 import BusinessSocialProofSlot from "@/components/business/BusinessSocialProofSlot";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
+import { BUSINESS_OFFER_URL } from "@/lib/business/offer";
 import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import { BUSINESS_TRIAL_SIGN_UP_HREF, BUSINESS_TRIAL_SIGN_IN_HREF } from "@/lib/access-grants/paths";
 import {
@@ -393,7 +394,7 @@ export default function BusinessLandingView({
                   </Link>
                 </li>
                 <li>
-                  <Link className="business-source-link" href="/offer">
+                  <Link className="business-source-link" href={BUSINESS_OFFER_URL}>
                     Публичная оферта
                   </Link>
                 </li>
@@ -703,7 +704,7 @@ export default function BusinessLandingView({
               <a href={`mailto:${BUSINESS_INQUIRY_EMAIL}`}>{BUSINESS_INQUIRY_EMAIL}</a>
             </p>
           </div>
-          <LegalLinksNav />
+          <LegalLinksNav offerHref={BUSINESS_OFFER_URL} />
         </div>
       </footer>
     </div>

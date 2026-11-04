@@ -226,7 +226,7 @@ assert.equal(guestNetworkKey("unknown", secret), null); assert.equal(guestNetwor
 // Owner 02.11.2026: the pre-trial offer names 7 days only; the 3 grace days stay in the access logic.
 assert.equal(
   BUSINESS_GUEST_START_COPY.terms,
-  "7 дней бесплатно со всеми функциями. Дальше 799\u00a0₽ в месяц за одну точку, если решите продолжить. Без карты и автосписаний. Без регистрации – вход можно привязать позже.",
+  "7 дней бесплатно со всеми функциями. Дальше 799\u00a0₽ за 30 дней за одну точку, если решите продолжить. Без карты и автосписаний. Без регистрации – вход можно привязать позже.",
 );
 assert.doesNotMatch(BUSINESS_GUEST_START_COPY.terms, /льготн|grace|3 дня|10 дней/u);
 console.log("business-guest-start-unit: ok");
