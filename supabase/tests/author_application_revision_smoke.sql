@@ -19,7 +19,9 @@ BEGIN
   IF has_function_privilege('authenticated', 'public.log_author_application_resubmission()', 'EXECUTE')
      OR has_function_privilege('anon', 'public.log_author_application_resubmission()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.guard_author_application_revision_fields()', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.guard_author_application_revision_fields()', 'EXECUTE') THEN
+     OR has_function_privilege('anon', 'public.guard_author_application_revision_fields()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.log_author_application_status_event(uuid,text,text,uuid,text,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.log_author_application_status_event(uuid,text,text,uuid,text,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'privilege: resubmission logger must not be callable by clients';
   END IF;
 
