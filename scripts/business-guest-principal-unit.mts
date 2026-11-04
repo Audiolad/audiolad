@@ -22,23 +22,24 @@ const rows = [
   { email_hash: null, user_id: "guest", kind: "business_new_client", starts_at: start.toISOString(), ends_at: end },
   { email_hash: null, user_id: "other", kind: "business_new_client", starts_at: start.toISOString(), ends_at: end },
 ];
+const paidRows: Array<{ email_hash: string | null; user_id: string; kind: string; paid_until: string }> = [];
 const reads: string[] = [];
 // Minimal structural query fake exercises the real nullable grant/edge decoders.
 const db = {
   from(table: string) {
     reads.push(table);
-    let result = table === "access_grants" ? [...rows] : [];
+    let result: Array<Record<string, unknown>> = table === "access_grants" ? [...rows] : table === "access_paid_periods" ? [...paidRows] : [];
     type Query = {
       select: () => Query;
       in: (column: string, values: string[]) => Query;
-      eq: () => Query;
-      then: (resolve: (value: { data: typeof rows; error: null }) => unknown) => Promise<unknown>;
+      eq: (column: string, value: string) => Query;
+      then: (resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => unknown) => Promise<unknown>;
     };
     const query: Query = {
       select: () => query,
-      in: (column: string, values: string[]) => { result = result.filter((row) => values.includes(String(row[column as keyof typeof row]))); return query; },
-      eq: () => query,
-      then: (resolve: (value: { data: typeof rows; error: null }) => unknown) => Promise.resolve(resolve({ data: result, error: null })),
+      in: (column: string, values: string[]) => { result = result.filter((row) => values.includes(String(row[column]))); return query; },
+      eq: (column: string, value: string) => { result = result.filter((row) => row[column] === value); return query; },
+      then: (resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => unknown) => Promise.resolve(resolve({ data: result, error: null })),
     };
     return query;
   },
@@ -49,7 +50,7 @@ reads.length = 0;
 const periods = await peekAccessPeriodsWith(reader, principal);
 assert.equal(periods.grant?.emailHash, null);
 assert.equal(periods.grant?.userId, "guest");
-assert.deepEqual(reads, ["access_grants"], "guest lookup uses only own user id, no email closure or paid lookup");
+assert.deepEqual(reads, ["access_grants", "access_paid_periods"], "guest lookup uses only own user id, no email closure");
 assert.equal(periods.paidUntil, null);
 const live = resolveCustomerAccess({ now: start, emailConfirmed: true, ...periods });
 assert.equal(live.mode, "trial"); assert.equal(live.player, true); assert.equal(live.playbackUntil, end);
@@ -71,4 +72,15 @@ assert.equal((await handleWorkspaceTrackUrl({ audioItemId }, signing)).ok, true)
 assert.equal(signed, 1, "a guest's live NULL-hash gift passes the workspace signing gate");
 assert.equal((await handleWorkspaceTrackUrl({ audioItemId }, { ...signing, access: async () => "closed" })).ok, false);
 assert.equal(signed, 1, "closed access never signs audio");
+// A subscription settled without an email is stored by account and must keep playback after the gift.
+const paidEnd = new Date(Date.parse(end) + 30 * 24 * 3600 * 1000).toISOString();
+paidRows.push(
+  { email_hash: null, user_id: "guest", kind: "business_new_client", paid_until: paidEnd },
+  { email_hash: null, user_id: "other", kind: "business_new_client", paid_until: new Date(Date.parse(paidEnd) + 86400000).toISOString() },
+);
+const paid = await peekAccessPeriodsWith(reader, principal);
+assert.equal(paid.paidUntil, paidEnd, "guest paid period is read by own user id only");
+const afterGift = resolveCustomerAccess({ now: new Date(Date.parse(end) + BUSINESS_GRACE_MS + 1000), emailConfirmed: true, ...paid });
+assert.equal(afterGift.mode, "paid"); assert.equal(afterGift.player, true);
+assert.deepEqual(await peekChromeAccessWith(reader, principal, new Date(Date.parse(end) + BUSINESS_GRACE_MS + 1000)), { mode: "paid", endsAt: paidEnd });
 console.log("business-guest-principal-unit: ok");

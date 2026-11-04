@@ -6399,6 +6399,11 @@
       "file": "supabase/migrations/20270216120000_business_profile_organization.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.rename_business_organization(uuid, text) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270217120000_business_subscription_guest_fulfilment.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
     }
   ]
 }
