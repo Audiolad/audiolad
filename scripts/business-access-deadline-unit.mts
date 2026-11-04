@@ -469,7 +469,7 @@ for (const autoplayBlocked of [false, true]) {
   assert.equal(ctl.status, autoplayBlocked ? "paused" : "playing");
   if (autoplayBlocked) {
     assert.equal(audio.paused, true);
-    assert.ok(ctl.message);
+    assert.equal(ctl.needsGesture, true, "autoplay refusal asks for the «Включить музыку» tap");
     blocked = false;
   } else {
     await ctl.toggle();

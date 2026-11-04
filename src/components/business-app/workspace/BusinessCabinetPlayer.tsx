@@ -46,6 +46,8 @@ import {
 type View = {
   status: OnlineStatus;
   message: string | null;
+  /** Autoplay refused after a reload/reconnect: show one green «Включить музыку» button. */
+  needsGesture: boolean;
   index: number;
   currentTime: number;
   duration: number;
@@ -103,6 +105,11 @@ export function useCabinetPlayer(): CabinetPlayerApi {
 export function musicPlayerMessage(message: string): string {
   return message.replaceAll("«Играть»", "круглую кнопку");
 }
+
+/** Track URL request timeout: a hung request falls back to the controller's backoff retry. */
+const SIGN_TIMEOUT_MS = 15_000;
+/** The one green button shown when the browser refused autoplay (no tap yet). */
+export const ENABLE_MUSIC_LABEL = "Включить музыку";
 
 const JSON_POST = {
   method: "POST",
@@ -164,6 +171,7 @@ export function BusinessCabinetPlayerProvider({
   const [view, setView] = useState<View>({
     status: "idle",
     message: null,
+    needsGesture: false,
     index: initialPlayback.index,
     currentTime: initialPlayback.positionSec,
     duration: model?.tracks[initialPlayback.index]?.durationSeconds ?? 0,
@@ -286,7 +294,7 @@ export function BusinessCabinetPlayerProvider({
     if (!audio || !ctl) return;
     // During a skip fade-out the element still sounds the previous track: report that one.
     const audible = ctl.audibleItemId;
-    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible));
+    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible), ctl.recovering);
     const report = evidenceRef.current.report(state, audible, Date.now());
     sendSpaLiveReport(
       (live) => postPointReport({ kind: "playback", report: live }),
@@ -320,17 +328,24 @@ export function BusinessCabinetPlayerProvider({
       {
         audio: fader,
         sign: async (audioItemId) => {
+          // A hung request on a flaky network must not freeze recovery: give up after 15 s
+          // and let the controller retry with backoff.
+          const abort = new AbortController();
+          const timeout = window.setTimeout(() => abort.abort(), SIGN_TIMEOUT_MS);
           try {
             const params = new URLSearchParams({ space: modelRef.current?.spaceId ?? "cafe" });
             const res = await fetch(`/api/business/workspace/track-url?${params.toString()}`, {
               ...JSON_POST,
               body: JSON.stringify({ audioItemId }),
+              signal: abort.signal,
             });
             const json = (await res.json()) as { ok?: boolean; data?: { url?: string }; reason?: string };
             if (json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
             return { ok: false, reason: json.reason || "network" };
           } catch {
             return { ok: false, reason: "network" };
+          } finally {
+            window.clearTimeout(timeout);
           }
         },
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
@@ -338,10 +353,13 @@ export function BusinessCabinetPlayerProvider({
         onChange: () => {
           const current = ctlRef.current;
           if (!current) return;
+          // The «Включить музыку» tap must be reachable: never keep it inside a closed bar.
+          if (current.needsGesture) setBarDismissed(false);
           setView((prev) => ({
             ...prev,
             status: current.status,
             message: current.message,
+            needsGesture: current.needsGesture,
             index: current.index < 0 ? prev.index : current.index,
           }));
         },
@@ -358,6 +376,7 @@ export function BusinessCabinetPlayerProvider({
         currentTime: audio.currentTime,
         duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : prev.duration,
       }));
+      ctl.onProgress(audio.currentTime, audio.duration);
       if (audio.paused) return;
       remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true);
     };
@@ -368,6 +387,15 @@ export function BusinessCabinetPlayerProvider({
     };
     const onEnded = () => void ctl.onEnded();
     const onError = () => void ctl.onError();
+    // Network recovery (P0-3): a stall that does not move on, or the connection coming
+    // back, is handled by the controller (backoff retries, resume at the position).
+    const onWaiting = () => ctl.onWaiting();
+    const onOnline = () => void ctl.onOnline();
+    const onVisible = () => { if (document.visibilityState === "visible") void ctl.onOnline(); };
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onWaiting);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", sendReport);
@@ -376,6 +404,10 @@ export function BusinessCabinetPlayerProvider({
     const reportTimer = window.setInterval(sendReport, 15_000);
     return () => {
       window.clearInterval(reportTimer);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onWaiting);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", sendReport);
@@ -885,6 +917,9 @@ export function BusinessCabinetPlayerProvider({
           volume={playback.volume}
           onVolume={setVolume}
           message={view.message ? musicPlayerMessage(view.message) : null}
+          ctaLabel={view.needsGesture ? ENABLE_MUSIC_LABEL : null}
+          onCta={() => void toggle()}
+          ctaTestId="biz-workspace-enable-music"
           messageTestId="biz-workspace-player-message"
           note={saveNote}
           noteTestId="biz-workspace-save-note"
@@ -896,7 +931,7 @@ export function BusinessCabinetPlayerProvider({
           ariaLabel="Плеер кабинета"
         />
       ) : null}
-      {open ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}
+      {open ? <audio ref={audioRef} preload="auto" playsInline data-testid="biz-workspace-audio" /> : null}
     </CabinetContext.Provider>
   );
 }
