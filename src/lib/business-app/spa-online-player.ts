@@ -78,6 +78,8 @@ export class SpaOnlinePlayer {
   private leaving = false;
   /** Track under the soft-fade rights guard (armFadeGuard); null when none is armed. */
   private fadeGuardId: string | null = null;
+  /** Keep the interrupted selection/intent until access is explicitly verified again. */
+  private deniedPlayback: { audioItemId: string | null; resume: boolean } | null = null;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -206,11 +208,34 @@ export class SpaOnlinePlayer {
 
   /** Revoke playback locally (server already refuses URLs). */
   private denied() {
+    if (this.status !== "no_access") {
+      this.deniedPlayback = {
+        audioItemId: this.current?.audioItemId ?? null,
+        resume: this.status === "playing" || this.status === "loading",
+      };
+    }
     this.op++;
     this.stopAudio();
     this.items = [];
     this.index = -1;
     this.set("no_access");
+  }
+
+  /** Only a fresh access confirmation may clear denial; navigation manifests cannot. */
+  async restoreVerifiedAccess(items: SpaManifestItem[]): Promise<void> {
+    if (this.disposed) return;
+    if (this.status !== "no_access") return this.applyManifest(items);
+    const denied = this.deniedPlayback;
+    this.deniedPlayback = null;
+    this.items = items;
+    const index = items.findIndex((item) => item.audioItemId === denied?.audioItemId);
+    this.index = items.length > 0 ? Math.max(0, index) : -1;
+    this.failures = 0;
+    this.errorRetries = 0;
+    this.retryTrackId = null;
+    this.set(items.length > 0 ? "paused" : "idle");
+    // A denied sign already selected the next track. Re-sign it, never reuse a URL.
+    if (denied?.resume && this.index >= 0) await this.playIndex(this.index, true);
   }
 
   /** `instant`: natural advance after "ended" – the next track starts without a fade-in. */

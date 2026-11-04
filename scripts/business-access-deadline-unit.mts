@@ -404,6 +404,109 @@ for (const event of ["periodic", "focus"] as const) {
   w.access.dispose();
 }
 
+// A failed deadline check, denied next-track sign, then verified renewal recovers
+// the SAME controller at the selected queue successor (including autoplay refusal).
+for (const autoplayBlocked of [false, true]) {
+  const deadline = T0 + 120_000;
+  const base = model(deadline);
+  const initial = { ...base, tracks: [base.tracks[0],
+    { ...base.tracks[0], audioItemId: "track-2" },
+    { ...base.tracks[0], audioItemId: "track-3" }] };
+  const renewed = { ...initial, endsAt: iso(deadline + 3_600_000), playbackUntil: iso(deadline + 3_600_000) };
+  const box: { ctl?: SpaOnlinePlayer } = {};
+  let recovery: Promise<void> = Promise.resolve();
+  const w = setup(initial, (next) => {
+    recovery = box.ctl!.restoreVerifiedAccess(workspaceItems(initial.tracks, workspaceAudioDeadline(next)));
+  });
+  let allowed = true;
+  let blocked = false;
+  let plays = 0;
+  const signed: string[] = [];
+  const audio = {
+    src: "", currentTime: 0, paused: true,
+    async play() {
+      plays++;
+      if (blocked) throw new Error("NotAllowedError");
+      this.paused = false;
+    },
+    pause() { this.paused = true; }, load() {},
+    removeAttribute() { this.src = ""; this.currentTime = 0; },
+  };
+  const ctl = box.ctl = new SpaOnlinePlayer({
+    ...w.clock, audio, onChange() {},
+    nextIndex: (current) => current === 0 ? 2 : 0,
+    sign: async (id) => {
+      signed.push(id);
+      return allowed ? { ok: true, data: { url: `https://example.com/${id}` } }
+        : { ok: false, reason: "no_access" };
+    },
+  }, workspaceItems(initial.tracks, workspaceAudioDeadline(initial)));
+  await ctl.toggle();
+  await w.advance(deadline - 1);
+  w.fetchWith(() => Promise.reject(new Error("offline")));
+  await w.advance(deadline);
+  assert.equal(w.stops, 0);
+  allowed = false;
+  await ctl.onEnded();
+  assert.equal(ctl.status, "no_access");
+  assert.equal(audio.paused, true);
+  assert.deepEqual(signed, ["track-1", "track-3"]);
+  // Navigation/model effects alone must never clear a denial or lose the intent.
+  await ctl.applyManifest(workspaceItems(renewed.tracks, workspaceAudioDeadline(renewed)));
+  await ctl.toggle();
+  assert.equal(ctl.status, "no_access");
+  assert.equal(plays, 1);
+  allowed = true;
+  blocked = autoplayBlocked;
+  w.respond(renewed);
+  await w.advance(deadline + ACCESS_MIN_CHECK_MS);
+  await recovery;
+  assert.equal(w.stops, 0);
+  assert.equal(workspaceControllerKey(initial), workspaceControllerKey(renewed));
+  assert.equal(ctl.current?.audioItemId, "track-3", "resume the denied queue successor");
+  assert.deepEqual(signed, ["track-1", "track-3", "track-3"], "renewal re-signs automatically");
+  assert.equal(plays, 2, "no user click is needed to resume");
+  assert.equal(ctl.status, autoplayBlocked ? "paused" : "playing");
+  if (autoplayBlocked) {
+    assert.equal(audio.paused, true);
+    assert.ok(ctl.message);
+    blocked = false;
+  } else {
+    await ctl.toggle();
+    assert.equal(ctl.status, "paused");
+  }
+  await ctl.toggle();
+  assert.equal(ctl.status, "playing", "Play works after verified renewal");
+  assert.equal(audio.paused, false);
+  ctl.dispose();
+  w.access.dispose();
+}
+
+// A user-paused hall stays paused when a denied controller regains access.
+{
+  const initial = model(T0 + 120_000);
+  const w = setup(initial);
+  let plays = 0;
+  const ctl = new SpaOnlinePlayer({
+    ...w.clock, onChange() {},
+    audio: { src: "", currentTime: 0, async play() { plays++; }, pause() {}, load() {},
+      removeAttribute() { this.src = ""; } },
+    sign: async () => ({ ok: true, data: { url: "https://example.com/audio" } }),
+  }, workspaceItems(initial.tracks, workspaceAudioDeadline(initial)));
+  await ctl.toggle();
+  await ctl.toggle();
+  await ctl.applyManifest(null);
+  await ctl.applyManifest(null);
+  await ctl.restoreVerifiedAccess(workspaceItems(initial.tracks, workspaceAudioDeadline(initial)));
+  assert.equal(ctl.status, "paused");
+  assert.equal(plays, 1, "renewal respects the user's pause");
+  await ctl.playIndex(0);
+  assert.equal(ctl.status, "playing");
+  assert.equal(plays, 2);
+  ctl.dispose();
+  w.access.dispose();
+}
+
 // The contract end is not the audio deadline, including when already in grace.
 {
   const endsAt = T0 + 120_000;
@@ -480,6 +583,11 @@ assert.doesNotMatch(player, /workspacePlaybackAllowed\(current\.endsAt/);
 assert.match(player, /workspaceControllerKey\(model\)/);
 assert.match(player, /window.addEventListener\("online", refresh\)/);
 assert.match(player, /document.visibilityState === "visible"/);
+const statusHandler = player.split("onStatus: (next) => {")[1]?.split("onExpired:")[0];
+assert.ok(statusHandler);
+assert.match(statusHandler, /workspacePlaybackAllowed\(workspacePlaybackDeadline\(updated\), Date.now\(\)\)/);
+assert.match(statusHandler, /restoreVerifiedAccess\(items\)/);
+assert.match(statusHandler, /if \(ctl\?\.status === "no_access"\) seekRef.current = 0/);
 assert.match(workspace, /player.accessModel/);
 assert.match(workspace, /useLayoutEffect\(\(\) => \{\s*adopt\(initialModel\);/);
 const adoption = player.split("const adopt = useCallback")[1]?.split("const release = useCallback")[0];

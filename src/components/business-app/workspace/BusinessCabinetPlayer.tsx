@@ -37,6 +37,8 @@ import { createAccessDeadline, fetchWorkspaceAccess, workspaceAudioDeadline, wor
 import { workspaceAtmosphereStartIndex } from "@/lib/business-workspace/shelves";
 import {
   workspaceItems,
+  workspacePlaybackAllowed,
+  workspacePlaybackDeadline,
   workspacePlayerOpen,
   type WorkspacePageModel,
 } from "@/lib/business-workspace/model";
@@ -410,7 +412,14 @@ export function BusinessCabinetPlayerProvider({
           endsAt: next.endsAt, playbackUntil: next.playbackUntil,
           endsAtLabel: next.endsAtLabel, daysLeft: next.daysLeft };
         modelRef.current = updated;
-        void ctlRef.current?.applyManifest(workspaceItems(updated.tracks, workspaceAudioDeadline(updated)));
+        const ctl = ctlRef.current;
+        const items = workspaceItems(updated.tracks, workspaceAudioDeadline(updated));
+        if (workspacePlayerOpen(updated) && workspacePlaybackAllowed(workspacePlaybackDeadline(updated), Date.now())) {
+          if (ctl?.status === "no_access") seekRef.current = 0;
+          void ctl?.restoreVerifiedAccess(items);
+        } else {
+          void ctl?.applyManifest(items);
+        }
         setModel(updated);
       },
       onExpired: () => {
