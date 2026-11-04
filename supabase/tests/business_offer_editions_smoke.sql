@@ -1,6 +1,9 @@
 -- Disposable smoke for 20270217120000_business_offer_editions.sql. Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;
+-- Minimal Auth fixture in CI compile lacks these GoTrue columns (rolled back with the smoke).
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_anonymous boolean NOT NULL DEFAULT false;
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
 
 DO $$
 DECLARE
