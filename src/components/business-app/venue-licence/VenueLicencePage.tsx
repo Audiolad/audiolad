@@ -7,7 +7,7 @@ import {
 import { BUSINESS_BRAND_MARK_SRC, BUSINESS_BRAND_NAME } from "@/lib/business-app/brand-icons";
 import { CLIENT_DOCUMENT_EDITION_LABEL, CLIENT_DOCUMENT_REQUISITES } from "@/lib/business-app/client-documents";
 import { BUSINESS_INQUIRY_EMAIL, BUSINESS_SUPPORT_LEAD, BUSINESS_SUPPORT_TITLE } from "@/lib/business/landing";
-import { BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
+import { BUSINESS_LICENSING_TERMS_TITLE } from "@/lib/business/offer";
 import type { VenueLicenceView } from "@/lib/business-app/venue-licence/present";
 
 const SCOPE =
@@ -69,11 +69,11 @@ export default function VenueLicencePage({ view }: { view: VenueLicenceView }) {
       <section className="business-app-card mt-4" data-testid="venue-basis">
         <h2 className="text-lg font-bold text-[var(--biz-text)]">Основание</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text)]">
-          «{BUSINESS_OFFER_TITLE}». {CLIENT_DOCUMENT_EDITION_LABEL}.
+          «{BUSINESS_LICENSING_TERMS_TITLE}». {CLIENT_DOCUMENT_EDITION_LABEL}.
         </p>
         <p className="mt-3 text-sm leading-6 text-[var(--biz-text)]">{AFTER_ACCESS}</p>
         <p className="mt-3 text-sm">
-          <a href="/documents/b2b-terms">{BUSINESS_OFFER_TITLE}</a>
+          <a href="/documents/b2b-terms">{BUSINESS_LICENSING_TERMS_TITLE}</a>
         </p>
       </section>
 

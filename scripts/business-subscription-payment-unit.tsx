@@ -50,7 +50,7 @@ assert.equal(after.player, false);
 assert.equal(after.playbackUntil, null);
 
 const offer = mapBusinessSubscriptionRpcError("offer_acceptance_required");
-assert.equal(offer.href, "/documents/b2b-terms");
+assert.equal(offer.href, "/documents/business-offer");
 const owner = mapBusinessSubscriptionRpcError("not_organization_owner");
 assert.equal(owner.href, "/onboarding");
 assert.equal(mapBusinessSubscriptionRpcError("support_mode_consent_forbidden").href, null);
@@ -93,7 +93,7 @@ const graceHtml = card(ownerDomain, grace);
 assert.match(graceHtml, /data-mode="grace"/);
 assert.match(graceHtml, /Оплатите, чтобы музыка продолжала играть\./);
 assert.doesNotMatch(graceHtml, /[её]щ[её] \d+ (день|дня|дней)|остановится|льготн/u, "no grace countdown (253821e0)");
-assert.match(graceHtml, /href="\/documents\/b2b-terms"/);
+assert.match(graceHtml, /href="\/documents\/business-offer"/);
 assert.match(graceHtml, /data-testid="biz-home-accept"/);
 assert.doesNotMatch(graceHtml, /data-testid="biz-home-pay-button"/);
 assert.doesNotMatch(graceHtml, /—/);
@@ -101,7 +101,9 @@ assert.doesNotMatch(graceHtml, /—/);
 // Every «Принять условия» says what is accepted, once per account, and links the document in a new tab.
 assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
 assert.match(graceHtml, /один раз для всего аккаунта/);
-assert.match(graceHtml, /<a href="\/documents\/b2b-terms" target="_blank" rel="noopener noreferrer"[^>]*>«Условия лицензирования музыки для бизнеса»<\/a>/);
+assert.match(graceHtml, /<a href="\/documents\/business-offer" target="_blank" rel="noopener noreferrer"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
+assert.match(graceHtml, /data-offer-version="offer-v1-2026-11-04"/);
+assert.match(graceHtml, /редакция 1 от 04\.11\.2026/);
 assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
 
 const accepted = card({ ...ownerDomain, offerAccepted: true }, grace);
@@ -131,6 +133,10 @@ assert.match(checkoutSource, /resolveBusinessReceiptEmail\(user\.email, body\?\.
 assert.match(checkoutSource, /error: "receipt_email_required" \}, \{ status: 400 \}/);
 assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /needsReceiptEmail = canPay && !\(user\.email\?\.trim\(\) \?\? ""\)/);
 assert.match(accepted, /data-testid="biz-home-pay-button"/);
+// Next to «Оплатить» the same offer link and edition, every time.
+assert.match(accepted, /data-testid="biz-home-terms-accepted"/);
+assert.match(accepted, /<a href="\/documents\/business-offer" target="_blank" rel="noopener noreferrer"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
+assert.ok(accepted.indexOf("biz-home-terms-accepted") < accepted.indexOf("biz-home-pay-button"), "offer link before pay");
 assert.match(accepted, /Оплатить/);
 assert.match(accepted, /Автосписания нет/);
 assert.doesNotMatch(accepted, /href="https:\/\/(?!business\.audiolad\.ru)/);
