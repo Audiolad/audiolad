@@ -166,9 +166,20 @@ console.log("business-app-profile shared controls: OK");
     ["Asia/Krasnoyarsk", "Asia/Novosibirsk"], ["Asia/Chita", "Asia/Yakutsk"], ["Asia/Sakhalin", "Asia/Magadan"],
     ["Asia/Anadyr", "Asia/Kamchatka"], ["Europe/Volgograd", "Europe/Moscow"], ["Europe/Ulyanovsk", "Europe/Samara"],
     ["Asia/Barnaul", "Asia/Novosibirsk"], ["Europe/Minsk", "Europe/Moscow"], ["Asia/Almaty", "Asia/Yekaterinburg"],
-    ["Europe/Berlin", "Europe/Kaliningrad"], ["America/New_York", "Europe/Kaliningrad"], ["Pacific/Auckland", "Asia/Kamchatka"],
+    // Foreign browsers (VPN, travel): an hour or more from every Russian zone, or on daylight saving – Moscow.
+    ["Europe/Berlin", "Europe/Moscow"], ["America/New_York", "Europe/Moscow"], ["Pacific/Auckland", "Europe/Moscow"],
+    ["Europe/London", "Europe/Moscow"], ["Asia/Tokyo", "Asia/Yakutsk"],
     ["Asia/Kolkata", "Asia/Yekaterinburg"], ["Not/AZone", "Europe/Moscow"], ["", "Europe/Moscow"], [undefined, "Europe/Moscow"],
   ] as const) assert.equal(tz.venueTimezoneFromBrowserZone(browser, at), expected, String(browser));
+  const july = new Date("2026-07-15T12:00:00Z");
+  for (const [browser, expected] of [
+    ["Europe/Berlin", "Europe/Moscow"], ["America/New_York", "Europe/Moscow"], ["Pacific/Auckland", "Europe/Moscow"],
+    ["Asia/Krasnoyarsk", "Asia/Novosibirsk"], ["Europe/Volgograd", "Europe/Moscow"], ["Asia/Kolkata", "Asia/Yekaterinburg"],
+  ] as const) assert.equal(tz.venueTimezoneFromBrowserZone(browser, july), expected, `${browser} in July`);
+  assert.equal(tz.nearestVenueTimezone(60), "Europe/Moscow", "UTC+1 is an hour from Kaliningrad");
+  assert.equal(tz.nearestVenueTimezone(13 * 60), "Europe/Moscow", "UTC+13 is an hour from Kamchatka");
+  assert.equal(tz.nearestVenueTimezone(5.5 * 60), "Asia/Yekaterinburg", "half-hour tie goes west");
+  assert.equal(tz.nearestVenueTimezone(2.5 * 60), "Europe/Kaliningrad");
   assert.equal(tz.isVenueTimezone("Asia/Krasnoyarsk"), false, "server accepts only the 11 ids");
   assert.equal(tz.isVenueTimezone("europe/moscow"), false);
   assert.equal(typeof tz.detectVenueTimezone(), "string");

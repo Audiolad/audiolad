@@ -38,7 +38,11 @@ export function timezoneOffsetMinutes(timeZone: string, now = new Date()): numbe
   }
 }
 
-/** Nearest venue zone to a UTC offset in minutes (ties go west). Outside Russia clamps to the ends. */
+/**
+ * Nearest venue zone to a UTC offset in minutes (ties go west). A zone an hour or more away from
+ * every Russian zone (Berlin, New York, Auckland – VPN or travel) is not a Russian venue clock:
+ * Moscow then.
+ */
 export function nearestVenueTimezone(offsetMinutes: number): VenueTimezoneId {
   if (!Number.isFinite(offsetMinutes)) return VENUE_TIMEZONE_DEFAULT_ID;
   let best: (typeof VENUE_TIMEZONES)[number] = VENUE_TIMEZONES[1];
@@ -47,7 +51,7 @@ export function nearestVenueTimezone(offsetMinutes: number): VenueTimezoneId {
     const distance = Math.abs(zone.offset * 60 - offsetMinutes);
     if (distance < bestDistance) { best = zone; bestDistance = distance; }
   }
-  return best.id;
+  return bestDistance < 60 ? best.id : VENUE_TIMEZONE_DEFAULT_ID;
 }
 
 /**
@@ -57,8 +61,16 @@ export function nearestVenueTimezone(offsetMinutes: number): VenueTimezoneId {
 export function venueTimezoneFromBrowserZone(browserZone: unknown, now = new Date()): VenueTimezoneId {
   if (isVenueTimezone(browserZone)) return browserZone;
   if (typeof browserZone !== "string" || !browserZone.trim()) return VENUE_TIMEZONE_DEFAULT_ID;
-  const offset = timezoneOffsetMinutes(browserZone.trim(), now);
-  return offset == null ? VENUE_TIMEZONE_DEFAULT_ID : nearestVenueTimezone(offset);
+  const zone = browserZone.trim();
+  const offset = timezoneOffsetMinutes(zone, now);
+  if (offset == null) return VENUE_TIMEZONE_DEFAULT_ID;
+  // Russia has no daylight saving: a zone that shifts between January and July (Berlin in summer
+  // sits on UTC+2 like Kaliningrad) is a foreign browser – Moscow.
+  const year = now.getUTCFullYear();
+  const winter = timezoneOffsetMinutes(zone, new Date(Date.UTC(year, 0, 15)));
+  const summer = timezoneOffsetMinutes(zone, new Date(Date.UTC(year, 6, 15)));
+  if (winter !== summer) return VENUE_TIMEZONE_DEFAULT_ID;
+  return nearestVenueTimezone(offset);
 }
 
 /** Browser only. Never throws. */
