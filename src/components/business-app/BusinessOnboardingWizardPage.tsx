@@ -1,5 +1,6 @@
 "use client";
 
+import { detectVenueTimezone } from "@/lib/business-app/venue-timezones";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -183,7 +184,7 @@ export default function BusinessOnboardingWizardPage({
       locationName: locationName || suggested.locationName,
       businessCategory: type?.category ?? suggested.businessCategory,
       countryCode: "RU",
-      timezone: "Europe/Moscow",
+      timezone: detectVenueTimezone(),
     });
     if (!validation.ok) {
       setError(validation.error);

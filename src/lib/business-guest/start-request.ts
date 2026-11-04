@@ -1,5 +1,6 @@
 import { BUSINESS_GUEST_START_COPY as copy } from "./copy";
 import { GUEST_START_REDIRECTS } from "./redirects";
+import { detectVenueTimezone } from "../business-app/venue-timezones";
 
 /** A start that has not answered by then is treated as lost: the button never stays pending. */
 export const GUEST_START_TIMEOUT_MS = 20_000;
@@ -29,7 +30,7 @@ export async function requestGuestStart(body: Record<string, unknown>, options: 
     return await Promise.race([deadline, (async (): Promise<GuestStartOutcome> => {
       const response = await fetchImpl("/api/business/guest-start", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store",
-        body: JSON.stringify(body), signal: controller.signal,
+        body: JSON.stringify({ timezone: detectVenueTimezone(), ...body }), signal: controller.signal,
       });
       let result: { ok?: unknown; redirect?: unknown; code?: unknown } = {};
       try { result = (await response.json()) ?? {}; } catch { if (timedOut) throw new Error("guest_start_timeout"); }

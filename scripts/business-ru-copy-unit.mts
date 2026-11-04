@@ -12,6 +12,7 @@ const codeConstant = /(?:KEY|HREF|URL|PATH|ID|IDS|EMAIL|STORAGE|EVENT|PREFIX|COO
 const attributes = new Set(["aria-label", "aria-description", "title", "alt", "placeholder", "label"]);
 const allowed = new Set([
   "AudioLad", // Registered brand name, permitted in cabinet copy.
+  "UTC", // Owner-requested zone labels «Москва (UTC+3)» in Профиль (04.11.2026).
   "QR", // Owner-approved block title «QR-наклейка с подтверждением прав на музыку» (90d24628, 30.10.2026).
 ]);
 

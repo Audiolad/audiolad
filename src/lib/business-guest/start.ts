@@ -3,6 +3,7 @@ import { BUSINESS_GIFT_MS } from "../business/plan";
 import type { GuestStartConfig } from "./start-config";
 import { GUEST_START_REGISTERED_REDIRECT } from "./redirects";
 import { isCurrentBusinessOfferEdition } from "../business/offer";
+import { isVenueTimezone, type VenueTimezoneId } from "../business-app/venue-timezones";
 import { sanitizeBusinessTrialAttribution, type BusinessTrialAttribution } from "../business-trial-attribution/attribution";
 
 export type GuestStartUser = { id: string; is_anonymous?: boolean };
@@ -14,7 +15,7 @@ export type GuestStartDeps = {
   reserve: (hash: string, limit: number, windowSeconds: number) => Promise<boolean>;
   ticket: () => Promise<string>;
   signIn: (ticket: string) => Promise<GuestStartUser>;
-  bootstrap: (input: { userId: string; idempotencyHash: string; networkHash: string; giftSeconds: number; venueName: string | null;
+  bootstrap: (input: { userId: string; idempotencyHash: string; networkHash: string; giftSeconds: number; venueName: string | null; timezone?: VenueTimezoneId | null;
     /** Optional, best-effort source of the start (ch, utm_*, referrer domain). Invalid values become null, never a 400. */
     attribution?: BusinessTrialAttribution | null }) => Promise<void>;
   clearTicket: (userId: string) => Promise<void>;
@@ -86,6 +87,7 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
     }
     await deps.bootstrap({ userId: user.id, idempotencyHash, networkHash, giftSeconds: BUSINESS_GIFT_MS / 1000,
       venueName: typeof body.venueName === "string" ? body.venueName.trim() : null,
+      timezone: isVenueTimezone(body.timezone) ? body.timezone : null,
       attribution: sanitizeBusinessTrialAttribution(body.attribution) });
     // Saved with the gift start, so the cabinet does not ask for the same edition again.
     await recordOwnerOffer(deps, user.id);
