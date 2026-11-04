@@ -254,7 +254,9 @@ function MaxProfileAuthorBlock({ profile }: { profile: MaxProfileDto }) {
         {section.reviewComment ? (
           <div className="mt-3 rounded-[16px] border border-[#eadff8] bg-[#faf6ff] px-3 py-3 text-sm leading-5 text-[#4a3d73]">
             <p className="font-medium text-[#7042c5]">Комментарий команды</p>
-            <p className="mt-2">{section.reviewComment}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words">
+              {section.reviewComment}
+            </p>
           </div>
         ) : null}
         {copy.ctaLabel && externalUrl ? (

@@ -32,6 +32,8 @@ export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
   "author_application_approved";
 export const AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE =
   "author_application_submitted_admin";
+export const AUTHOR_APPLICATION_NEEDS_CHANGES_MESSAGE_TYPE =
+  "author_application_needs_changes";
 export const COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE =
   "commercial_application_approved";
 
@@ -86,6 +88,14 @@ export function buildAuthorApplicationSubmittedAdminDedupKey(
   submissionAttempt: string,
 ): string {
   return `author-application:${applicationId.trim()}:submitted:${submissionAttempt.trim()}:admin`;
+}
+
+/** One letter per «Отправить на доработку» press (attempt = reviewed_at). */
+export function buildAuthorApplicationNeedsChangesDedupKey(
+  applicationId: string,
+  revisionAttempt: string,
+): string {
+  return `author-application:${applicationId.trim()}:needs_changes:${revisionAttempt.trim()}`;
 }
 
 export function buildCommercialApplicationApprovedDedupKey(
@@ -174,6 +184,13 @@ function resolveOperationalEmailDedupKey(
     );
   }
 
+  if (messageType === AUTHOR_APPLICATION_NEEDS_CHANGES_MESSAGE_TYPE) {
+    return buildAuthorApplicationNeedsChangesDedupKey(
+      applicationId,
+      submissionAttempt ?? "",
+    );
+  }
+
   if (messageType === AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE) {
     return buildAuthorProductSoldDedupKey(applicationId);
   }
@@ -222,7 +239,10 @@ export type AcquireOperationalEmailDeliveryInput = {
   forceResend?: boolean;
   /** Required for payout profile dedup keys that include version. */
   profileVersion?: number;
-  /** Required for author application submission admin alerts. */
+  /**
+   * Required for author application submission admin alerts and
+   * «на доработку» letters (one letter per attempt).
+   */
   submissionAttempt?: string;
 };
 
@@ -288,7 +308,8 @@ export async function acquireOperationalEmailDelivery(
   }
 
   if (
-    messageType === AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE &&
+    (messageType === AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE ||
+      messageType === AUTHOR_APPLICATION_NEEDS_CHANGES_MESSAGE_TYPE) &&
     !input.submissionAttempt?.trim()
   ) {
     return { ok: false, code: "invalid_input" };

@@ -284,6 +284,10 @@ if (!pending.has("20270218120000")) {
   throw new Error("business offer editions migration was not included in the disposable replay");
 }
 applyFile("post-apply business offer editions smoke", resolve(root, "supabase/tests/business_offer_editions_smoke.sql"));
+if (!pending.has("20270219120000")) {
+  throw new Error("author application revision migration was not included in the disposable replay");
+}
+applyFile("post-apply author application revision smoke", resolve(root, "supabase/tests/author_application_revision_smoke.sql"));
 
 if (!pending.has("20270210180000")) {
   throw new Error("JWT claims trigger guard migration was not included in the disposable replay");

@@ -55,6 +55,11 @@ import {
 
 import AuthorApplicationDirectionPicker from "@/components/become-author/AuthorApplicationDirectionPicker";
 import {
+  AUTHOR_APPLICATION_REVISION_EDIT_PATH,
+  getAuthorApplicationRevisionFieldLabels,
+  type AuthorApplicationRevisionField,
+} from "@/lib/author-applications/revision";
+import {
   becomeAuthorBodyClass,
   becomeAuthorCheckboxCardClass,
   becomeAuthorInputClass,
@@ -72,6 +77,32 @@ const DRAFT_DEBOUNCE_MS = 400;
 const AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
 
+type RevisionHighlight = ReadonlySet<AuthorApplicationRevisionField>;
+
+function RevisionMark({
+  field,
+  highlight,
+  label = "Поправить",
+  className = "ml-2",
+}: {
+  field: AuthorApplicationRevisionField;
+  highlight?: RevisionHighlight | null;
+  label?: string;
+  className?: string;
+}) {
+  if (!highlight?.has(field)) {
+    return null;
+  }
+
+  return (
+    <span
+      className={`${className} inline-flex rounded-full bg-[#fff1d6] px-2 py-0.5 align-middle text-xs font-semibold text-[#8a5a00]`}
+    >
+      {label}
+    </span>
+  );
+}
+
 type AuthorApplicationPanelProps = {
   audience: BecomeAuthorAudience;
   application: AuthorApplicationRow | null;
@@ -80,6 +111,8 @@ type AuthorApplicationPanelProps = {
   showSubmittedBanner: boolean;
   userEmail: string | null;
   inviteLocked?: boolean;
+  /** Sections the team asked to fix («На доработке»). */
+  revisionFields?: AuthorApplicationRevisionField[];
 };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -203,6 +236,9 @@ function AuthorApplicationForm({
   onValuesChange,
   onSubmit,
   onInteractionStart,
+  isResubmission = false,
+  consentAlreadyGiven = false,
+  revisionHighlight = null,
 }: {
   values: AuthorApplicationFormValues;
   errors: AuthorApplicationFormState["errors"];
@@ -216,6 +252,9 @@ function AuthorApplicationForm({
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
+  isResubmission?: boolean;
+  consentAlreadyGiven?: boolean;
+  revisionHighlight?: RevisionHighlight | null;
 }) {
   const contactEmailInputRef = useRef<HTMLInputElement>(null);
 
@@ -297,6 +336,7 @@ function AuthorApplicationForm({
           <label htmlFor="displayName" className={becomeAuthorLabelClass}>
             Как вы хотите представляться?{" "}
             <span className="text-[#b34f63]">*</span>
+            <RevisionMark field="display_name" highlight={revisionHighlight} />
           </label>
           <span className="shrink-0 text-[15px] font-medium tabular-nums text-[#8a7ca9]">
             {values.displayName.length} / {AUTHOR_APPLICATION_LIMITS.displayNameMax}
@@ -325,6 +365,12 @@ function AuthorApplicationForm({
         <FieldError id="displayName-error" message={displayNameError} />
       </div>
 
+      <RevisionMark
+        field="direction"
+        highlight={revisionHighlight}
+        label="Поправить тематику"
+        className="-mb-2"
+      />
       <AuthorApplicationDirectionPicker
         selectedDirections={values.selectedDirections}
         directionOther={values.directionOther}
@@ -340,6 +386,7 @@ function AuthorApplicationForm({
         <label htmlFor="about" className={becomeAuthorLabelClass}>
           Расскажите немного о себе и о том, чем занимаетесь{" "}
           <span className="text-[#b34f63]">*</span>
+          <RevisionMark field="about" highlight={revisionHighlight} />
         </label>
         <textarea
           id="about"
@@ -363,7 +410,10 @@ function AuthorApplicationForm({
         id="author-application-contacts"
         className={`${AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS} space-y-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4`}
       >
-        <p className="text-[17px] font-semibold text-[#25135c]">Контакты для связи</p>
+        <p className="text-[17px] font-semibold text-[#25135c]">
+          Контакты для связи
+          <RevisionMark field="contacts" highlight={revisionHighlight} />
+        </p>
 
         <div>
           <label htmlFor="contactEmail" className={becomeAuthorLabelClass}>
@@ -467,6 +517,7 @@ function AuthorApplicationForm({
       >
         <legend className={becomeAuthorLabelClass}>
           Ваш опыт с материалами <span className="text-[#b34f63]">*</span>
+          <RevisionMark field="readiness" highlight={revisionHighlight} />
         </legend>
 
         <label className={becomeAuthorCheckboxCardClass}>
@@ -520,6 +571,12 @@ function AuthorApplicationForm({
         </span>
       </label>
 
+      {consentAlreadyGiven ? (
+        <p className={`${becomeAuthorBodyClass} text-[#5f538f]`}>
+          Согласие на обработку персональных данных вы уже дали – повторно
+          отмечать его не нужно.
+        </p>
+      ) : (
       <div>
         <label className={becomeAuthorCheckboxCardClass}>
           <input
@@ -550,6 +607,7 @@ function AuthorApplicationForm({
         </label>
         <FieldError id="consent-error" message={errors.consentPersonalData} />
       </div>
+      )}
 
       {hasContactPreview ? (
         <div className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3">
@@ -605,7 +663,9 @@ function AuthorApplicationForm({
             : "Отправляем…"
           : updateContactsOnly
             ? "Сохранить контакты"
-            : "Стать автором"}
+            : isResubmission
+              ? "Отправить заявку повторно"
+              : "Стать автором"}
       </button>
     </form>
   );
@@ -619,10 +679,15 @@ export default function AuthorApplicationPanel({
   showSubmittedBanner,
   userEmail,
   inviteLocked = false,
+  revisionFields = [],
 }: AuthorApplicationPanelProps) {
   const [state, submitAction, isPending] = useActionState(
     submitAuthorApplication,
     INITIAL_STATE,
+  );
+  const revisionHighlight = useMemo<RevisionHighlight>(
+    () => new Set(revisionFields),
+    [revisionFields],
   );
 
   const initialResolution = useMemo(
@@ -932,6 +997,13 @@ export default function AuthorApplicationPanel({
     );
   }
 
+  const isResubmission = status === "needs_changes" && !updateContactsOnly;
+  const consentAlreadyGiven =
+    isResubmission && application?.consent_personal_data === true;
+  const revisionFieldLabels = isResubmission
+    ? getAuthorApplicationRevisionFieldLabels(revisionFields)
+    : [];
+
   if (showForm) {
     return (
       <section
@@ -947,12 +1019,29 @@ export default function AuthorApplicationPanel({
             : "Заполните короткую форму – мы рассмотрим её и свяжемся с вами при необходимости."}
         </p>
 
-        {application?.review_comment && status === "needs_changes" ? (
+        {isResubmission ? (
           <div
-            className={`mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 ${becomeAuthorBodyClass}`}
+            id="author-application-revision"
+            className={`${AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS} mt-4 rounded-[18px] border border-[#f3d9a4] bg-[#fffaf0] px-4 py-3 ${becomeAuthorBodyClass}`}
           >
-            <p className="font-medium text-[#7042c5]">Комментарий команды</p>
-            <p className="mt-2">{application.review_comment}</p>
+            <p className="font-semibold text-[#8a5a00]">Заявка на доработке</p>
+            <p className="mt-1 text-[#5f538f]">
+              Поправьте ответы по комментарию команды и отправьте заявку повторно.
+            </p>
+            {application?.review_comment ? (
+              <>
+                <p className="mt-3 font-medium text-[#7042c5]">Комментарий команды</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-[#25135c]">
+                  {application.review_comment}
+                </p>
+              </>
+            ) : null}
+            {revisionFieldLabels.length > 0 ? (
+              <p className="mt-3 text-[#25135c]">
+                <span className="font-medium">Что поправить:</span>{" "}
+                {revisionFieldLabels.join(", ")}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -970,6 +1059,9 @@ export default function AuthorApplicationPanel({
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}
+            isResubmission={isResubmission}
+            consentAlreadyGiven={consentAlreadyGiven}
+            revisionHighlight={isResubmission ? revisionHighlight : null}
           />
         </div>
       </section>
@@ -999,14 +1091,16 @@ export default function AuthorApplicationPanel({
           className={`mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 ${becomeAuthorBodyClass}`}
         >
           <p className="font-medium text-[#7042c5]">Комментарий команды</p>
-          <p className="mt-2">{application.review_comment}</p>
+          <p className="mt-2 whitespace-pre-wrap break-words">
+            {application.review_comment}
+          </p>
         </div>
       ) : null}
 
       <div className="mt-5 flex flex-col gap-3">
         {status === "needs_changes" ? (
           <Link
-            href="/become-author"
+            href={AUTHOR_APPLICATION_REVISION_EDIT_PATH}
             className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
           >
             Дополнить заявку

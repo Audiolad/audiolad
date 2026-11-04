@@ -8,6 +8,7 @@ import {
   AUTHOR_APPLICATION_COLUMNS,
   formatApplicationContactSummary,
 } from "@/lib/author-applications/queries";
+import { loadAuthorApplicationRevisionFields } from "@/lib/author-applications/revision";
 import { authorApplicationScreenName } from "@/lib/author-applications/screen-name";
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
@@ -45,6 +46,8 @@ export type AdminApplicationListItem = {
   submittedAt: string | null;
   createdAt: string;
   isNew: boolean;
+  /** Came back from «На доработке» and waits for review again. */
+  isResubmitted: boolean;
 };
 
 export type AdminUserListItem = {
@@ -202,7 +205,7 @@ export async function listAdminAuthorApplications(input?: {
   let query = service
     .from("author_applications")
     .select(
-      "id, display_name, author_id, contact_email, contact_details, direction, about, status, submitted_at, created_at",
+      "id, display_name, author_id, contact_email, contact_details, direction, about, status, submitted_at, created_at, review_comment",
     )
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -241,6 +244,32 @@ export async function listAdminAuthorApplications(input?: {
     }
   }
 
+  // Resubmissions are logged by migration 20270219120000; before it, a
+  // submitted row with a team comment can only come from «На доработке».
+  const reviewQueueIds = rows
+    .filter((row) => row.status === "submitted" || row.status === "in_review")
+    .map((row) => row.id as string);
+  const resubmittedIds = new Set<string>();
+  if (reviewQueueIds.length > 0) {
+    const { data: resubmissions, error: resubmissionsError } = await service
+      .from("author_application_status_events")
+      .select("application_id")
+      .in("application_id", reviewQueueIds)
+      .eq("from_status", "needs_changes")
+      .eq("to_status", "submitted");
+    if (resubmissionsError) {
+      console.error(
+        "admin_applications_resubmissions_load_failed",
+        resubmissionsError.message,
+      );
+    }
+    for (const event of resubmissions ?? []) {
+      if (typeof event.application_id === "string") {
+        resubmittedIds.add(event.application_id);
+      }
+    }
+  }
+
   return rows.map((row) => ({
     id: row.id,
     displayName: authorApplicationScreenName({
@@ -261,6 +290,10 @@ export async function listAdminAuthorApplications(input?: {
     submittedAt: row.submitted_at,
     createdAt: row.created_at,
     isNew: row.status === "submitted",
+    isResubmitted:
+      (row.status === "submitted" || row.status === "in_review") &&
+      (resubmittedIds.has(row.id) ||
+        (row.status === "submitted" && Boolean(row.review_comment?.trim()))),
   }));
 }
 
@@ -285,7 +318,14 @@ export async function getAdminAuthorApplication(
     return null;
   }
 
-  const [profileResult, authorResult, applicationEventsResult, accessEventsResult, emailDeliveryResult] =
+  const [
+    profileResult,
+    authorResult,
+    applicationEventsResult,
+    accessEventsResult,
+    emailDeliveryResult,
+    revisionFields,
+  ] =
     await Promise.all([
       service
         .from("profiles")
@@ -318,6 +358,7 @@ export async function getAdminAuthorApplication(
       application.status === "approved"
         ? getOperationalEmailDeliveryForApplication(applicationId)
         : Promise.resolve(null),
+      loadAuthorApplicationRevisionFields(service, applicationId),
     ]);
 
   const emailDelivery = emailDeliveryResult;
@@ -346,6 +387,7 @@ export async function getAdminAuthorApplication(
     applicationEvents: (applicationEventsResult.data ??
       []) as AuthorApplicationStatusEventRow[],
     accessEvents: (accessEventsResult.data ?? []) as AuthorAccessStatusEventRow[],
+    revisionFields,
   };
 }
 

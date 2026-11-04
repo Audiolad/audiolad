@@ -7,7 +7,7 @@ export const ADMIN_APPLICATION_STATUS_OPTIONS: {
 }[] = [
   { value: "submitted", label: "Новая", filterKey: "new" },
   { value: "in_review", label: "На рассмотрении", filterKey: "in_review" },
-  { value: "needs_changes", label: "Нужно связаться", filterKey: "contact_required" },
+  { value: "needs_changes", label: "На доработке", filterKey: "contact_required" },
   { value: "approved", label: "Одобрена", filterKey: "approved" },
   { value: "rejected", label: "Отклонена", filterKey: "rejected" },
   { value: "withdrawn", label: "Отменена", filterKey: "archived" },

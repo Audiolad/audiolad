@@ -72,7 +72,11 @@ export default function AuthorApplicationsList({
                   <td className="px-4 py-4 font-medium text-[#25135c]">
                     <div className="flex items-center gap-2">
                       <span>{application.displayName}</span>
-                      {isNewAuthorApplicationStatus(application.status) ? (
+                      {application.isResubmitted ? (
+                        <span className="rounded-full bg-[#e6f4ec] px-2 py-0.5 text-xs font-semibold text-[#3d8d65]">
+                          После доработки
+                        </span>
+                      ) : isNewAuthorApplicationStatus(application.status) ? (
                         <span className="rounded-full bg-[#ede4fb] px-2 py-0.5 text-xs font-semibold text-[#7042c5]">
                           Новая
                         </span>
@@ -121,7 +125,11 @@ export default function AuthorApplicationsList({
                   {application.contactSummary || "Контакт не указан"}
                 </p>
               </div>
-              {isNewAuthorApplicationStatus(application.status) ? (
+              {application.isResubmitted ? (
+                <span className="shrink-0 rounded-full bg-[#e6f4ec] px-2 py-0.5 text-xs font-semibold text-[#3d8d65]">
+                  После доработки
+                </span>
+              ) : isNewAuthorApplicationStatus(application.status) ? (
                 <span className="shrink-0 rounded-full bg-[#ede4fb] px-2 py-0.5 text-xs font-semibold text-[#7042c5]">
                   Новая
                 </span>
