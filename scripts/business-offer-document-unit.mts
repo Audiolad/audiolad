@@ -18,7 +18,6 @@ import {
   businessOfferPaymentGate,
   hasAcceptedCurrentBusinessOffer,
   isCurrentBusinessOfferEdition,
-  isNotOrganizationOwnerError,
   isShownCurrentBusinessOfferBody,
 } from "../src/lib/business/offer";
 import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS } from "../src/lib/business/plan";
@@ -150,9 +149,12 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
   assert.ok(gateAt < payments.indexOf("applyServerQuickOfferAmount({"), "gate before pricing");
   assert.match(payments, /"offer_acceptance_required", href: BUSINESS_OFFER_HREF \},\s*\{ status: 409 \}/);
 }
-assert.equal(isNotOrganizationOwnerError({ message: "not_organization_owner" }), true);
-assert.equal(isNotOrganizationOwnerError({ message: "offer_document_unknown" }), false);
-assert.equal(isNotOrganizationOwnerError(null), false);
-assert.match(readFileSync("src/app/api/business/guest-start/route.ts", "utf8"), /isNotOrganizationOwnerError\(error\)\) return "not_owner"/);
+{
+  // Gift-start checkbox of a registered account without an organization is stored too.
+  const sql = readFileSync("supabase/migrations/20270217120000_business_offer_editions.sql", "utf8");
+  assert.match(sql, /p_source <> 'guest_start'/);
+  assert.match(sql, /coalesce\(u\.is_anonymous, false\) = false/);
+  assert.doesNotMatch(readFileSync("src/lib/business-guest/start.ts", "utf8"), /not_owner|deferred/);
+}
 
 console.log("business-offer-document-unit: ok");

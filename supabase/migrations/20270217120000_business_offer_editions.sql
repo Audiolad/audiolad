@@ -7,6 +7,9 @@
 -- The owner accepts the account-level договор-оферта «АудиоЛад Бизнес»
 -- (/documents/business-offer) once per edition: at the gift start (checkbox,
 -- server-side via service_role) or in the cabinet («Принять условия»).
+-- The gift-start checkbox is also stored for a registered (non-anonymous)
+-- account that has no Business organization yet, so onboarding does not ask
+-- for the same edition again. Members with another role (manager) cannot accept.
 -- One row per account and edition covers every point of that owner. The same
 -- edition is never asked twice; a new edition needs a new seed row below.
 -- Accepting the offer also records annex 1 («b2b-terms», current flag edition)
@@ -81,8 +84,10 @@ ALTER TABLE public.business_offer_edition_acceptances ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.business_offer_edition_acceptances FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.business_offer_edition_acceptances TO service_role;
 
--- Internal writer. service_role only (guest start runs server-side after the
--- guest bootstrap made the caller an owner). Idempotent: returns the stored row.
+-- Internal writer. service_role only. Idempotent: returns the stored row.
+-- Who may accept: an owner (any source), or, at the gift start only, a registered
+-- non-anonymous account with no Business membership at all (it becomes the owner
+-- at onboarding; the acceptance is account-level).
 CREATE OR REPLACE FUNCTION public.record_business_offer_edition_acceptance(
   p_user_id uuid,
   p_document_version text,
@@ -146,6 +151,16 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.business_organization_members AS m
     WHERE m.user_id = p_user_id AND m.role = 'owner'
+  ) AND (
+    p_source <> 'guest_start'
+    OR EXISTS (
+      SELECT 1 FROM public.business_organization_members AS m
+      WHERE m.user_id = p_user_id
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM auth.users AS u
+      WHERE u.id = p_user_id AND coalesce(u.is_anonymous, false) = false
+    )
   ) THEN
     RAISE EXCEPTION 'not_organization_owner'
       USING ERRCODE = '42501',

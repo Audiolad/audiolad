@@ -19,10 +19,9 @@ export type GuestStartDeps = {
   clearTicket: (userId: string) => Promise<void>;
   /**
    * Records the current договор-оферта edition for the account (idempotent, once per edition).
-   * "not_owner": the account has no Business organization yet, so there is nothing to record
-   * against; the cabinet asks once before the first payment, after onboarding created it.
+   * Account-level: also for a registered account that has no Business organization yet.
    */
-  acceptOffer: (userId: string) => Promise<"recorded" | "not_owner">;
+  acceptOffer: (userId: string) => Promise<void>;
   log: (code: string) => void;
 };
 export type GuestStartRequest = { method: string; headers: Pick<Headers, "get">; text: () => Promise<string> };
@@ -60,12 +59,8 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
     // A failed save is a failed start on every path: the retry records it, so the
     // cabinet never asks again for an edition the owner already ticked.
     let user = await deps.currentUser();
-    if (user && user.is_anonymous !== true) {
-      // A registered account without a Business organization keeps the onboarding path.
-      if (await deps.acceptOffer(user.id) === "not_owner") deps.log("guest_start_offer_deferred_no_owner");
-      return response(200);
-    }
-    if (user && await deps.ready(user.id)) { await recordOwnerOffer(deps, user.id); return response(200); }
+    if (user && user.is_anonymous !== true) { await deps.acceptOffer(user.id); return response(200); }
+    if (user && await deps.ready(user.id)) { await deps.acceptOffer(user.id); return response(200); }
     const networkHash = deps.networkHash();
     if (!networkHash) return response(503, "guest_start_failed");
     if (!await deps.reserve(networkHash, deps.config.networkLimit, deps.config.windowSeconds)) return response(429, "guest_start_limit");
@@ -77,16 +72,11 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
       venueName: typeof body.venueName === "string" ? body.venueName.trim() : null,
       attribution: sanitizeBusinessTrialAttribution(body.attribution) });
     // Saved with the gift start, so the cabinet does not ask for the same edition again.
-    await recordOwnerOffer(deps, user.id);
+    await deps.acceptOffer(user.id);
     try { await deps.clearTicket(user.id); } catch { deps.log("guest_start_ticket_clear_failed"); }
     return response(200);
   } catch {
     deps.log("guest_start_failed");
     return response(503, "guest_start_failed");
   }
-}
-
-/** Guests that went through bootstrap are owners: "not_owner" here is a failed start. */
-async function recordOwnerOffer(deps: GuestStartDeps, userId: string): Promise<void> {
-  if (await deps.acceptOffer(userId) !== "recorded") throw new Error("guest_start_offer_accept_failed");
 }

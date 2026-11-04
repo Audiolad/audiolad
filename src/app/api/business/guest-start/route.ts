@@ -11,7 +11,7 @@ import { recordBusinessGuestStartHost } from "@/lib/business-trial-activity/reco
 import { recordBusinessGuestStartAttribution } from "@/lib/business-trial-attribution/record.server";
 import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
-import { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition, isNotOrganizationOwnerError } from "@/lib/business/offer";
+import { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition } from "@/lib/business/offer";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 
 export const dynamic = "force-dynamic";
@@ -102,9 +102,7 @@ async function handle(request: Request) {
         p_annex_hash: annex.contentHash,
         p_source: "guest_start",
       });
-      if (!error) return "recorded";
-      if (isNotOrganizationOwnerError(error)) return "not_owner";
-      throw new Error("guest_start_offer_accept_failed");
+      if (error) throw new Error("guest_start_offer_accept_failed");
     },
     log: (code) => console.warn(code),
   });

@@ -95,13 +95,6 @@ export function hasAcceptedCurrentBusinessOffer(rows: unknown): boolean {
   });
 }
 
-/** record_business_offer_edition_acceptance raised not_organization_owner (no Business organization yet). */
-export function isNotOrganizationOwnerError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const message = (error as { message?: unknown }).message;
-  return typeof message === "string" && message.includes("not_organization_owner");
-}
-
 export type BusinessOfferPaymentGate = "ok" | "offer_acceptance_required" | "unavailable";
 
 /**

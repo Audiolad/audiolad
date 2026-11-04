@@ -10,6 +10,8 @@ DECLARE
   v_owner uuid := gen_random_uuid();
   v_guest uuid := gen_random_uuid();
   v_manager uuid := gen_random_uuid();
+  v_newcomer uuid := gen_random_uuid();
+  v_lone_guest uuid := gen_random_uuid();
   v_org uuid := gen_random_uuid();
   v_org_guest uuid := gen_random_uuid();
   v_offer_version constant text := 'offer-v1-2026-11-04';
@@ -29,7 +31,9 @@ BEGIN
   INSERT INTO auth.users (id, email) VALUES
     (v_owner, 'offer-owner@example.test'),
     (v_guest, NULL),
-    (v_manager, 'offer-manager@example.test');
+    (v_manager, 'offer-manager@example.test'),
+    (v_newcomer, 'offer-newcomer@example.test');
+  INSERT INTO auth.users (id, email, is_anonymous) VALUES (v_lone_guest, NULL, true);
   INSERT INTO public.business_organizations (id, name) VALUES
     (v_org, 'Кафе оферты'),
     (v_org_guest, 'Кафе гостя');
@@ -68,6 +72,44 @@ BEGIN
       v_manager, v_offer_version, v_offer_hash, v_annex_version, v_annex_hash, 'guest_start'
     );
     RAISE EXCEPTION 'manager accepted the offer';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      IF SQLERRM NOT LIKE '%not_organization_owner%' THEN
+        RAISE;
+      END IF;
+  END;
+
+  -- Registered account without any Business membership: the gift-start checkbox is
+  -- stored (account-level), so onboarding never asks for the same edition again.
+  SELECT r.already_accepted INTO v_accepted
+  FROM public.record_business_offer_edition_acceptance(
+    v_newcomer, v_offer_version, v_offer_hash, v_annex_version, v_annex_hash, 'guest_start'
+  ) AS r;
+  IF v_accepted THEN
+    RAISE EXCEPTION 'first newcomer acceptance looked stored';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.business_offer_edition_acceptances
+  WHERE user_id = v_newcomer AND source = 'guest_start';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'newcomer acceptance rows: %', v_count;
+  END IF;
+  -- The cabinet path still needs an owner; an anonymous account without a point cannot accept.
+  BEGIN
+    PERFORM * FROM public.record_business_offer_edition_acceptance(
+      v_newcomer, v_offer_version, v_offer_hash, v_annex_version, v_annex_hash, 'cabinet'
+    );
+    RAISE EXCEPTION 'non-owner accepted from the cabinet';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      IF SQLERRM NOT LIKE '%not_organization_owner%' THEN
+        RAISE;
+      END IF;
+  END;
+  BEGIN
+    PERFORM * FROM public.record_business_offer_edition_acceptance(
+      v_lone_guest, v_offer_version, v_offer_hash, v_annex_version, v_annex_hash, 'guest_start'
+    );
+    RAISE EXCEPTION 'anonymous account without a point accepted';
   EXCEPTION
     WHEN insufficient_privilege THEN
       IF SQLERRM NOT LIKE '%not_organization_owner%' THEN

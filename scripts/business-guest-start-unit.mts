@@ -40,11 +40,8 @@ function harness() {
       if (fail === "bootstrap") throw Error(); ready = true;
     },
     clearTicket: async () => { calls.clear++; if (fail === "clear") throw Error(); },
-    acceptOffer: async (userId) => {
-      calls.accept++; calls.acceptedBy.push(userId); if (fail === "accept") throw Error();
-      return fail === "not_owner" ? "not_owner" : "recorded";
-    },
-    log: (code) => { calls.logs.push(code); assert.ok(["guest_start_failed", "guest_start_ticket_clear_failed", "guest_start_offer_accept_failed", "guest_start_offer_deferred_no_owner"].includes(code)); },
+    acceptOffer: async (userId) => { calls.accept++; calls.acceptedBy.push(userId); if (fail === "accept") throw Error(); },
+    log: (code) => { calls.logs.push(code); assert.ok(["guest_start_failed", "guest_start_ticket_clear_failed", "guest_start_offer_accept_failed"].includes(code)); },
   };
   return { deps, calls, setUser: (value: GuestStartUser) => { user = value; }, setReady: () => { ready = true; }, setFail: (value: string) => { fail = value; } };
 }
@@ -142,21 +139,13 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   assert.equal(h.calls.accept, 3);
 }
 {
-  // Registered account without a Business organization: the onboarding path stays (200 → cabinet),
-  // nothing to record against yet; the cabinet asks once before the first payment.
-  const h = harness(); h.setUser({ id: "email-user-no-org" }); h.setFail("not_owner");
+  // Registered account (with or without an organization): the checkbox is stored for the
+  // session account and the start goes on to the cabinet / onboarding; nothing is created.
+  const h = harness(); h.setUser({ id: "email-user-no-org" });
   const result = await handleBusinessGuestStart(request(), h.deps);
   assert.equal(result.status, 200); assert.equal(result.body.redirect, "/");
-  assert.equal(h.calls.accept, 1); assert.equal(h.calls.bootstrap, 0); assert.equal(h.calls.reserve, 0);
-  assert.deepEqual(h.calls.logs, ["guest_start_offer_deferred_no_owner"]);
-}
-{
-  // Guests are owners after bootstrap: "not_owner" there is a failed start, never a silent success.
-  const g = harness(); g.setUser({ id: "existing-guest", is_anonymous: true }); g.setReady(); g.setFail("not_owner");
-  assert.equal((await handleBusinessGuestStart(request(), g.deps)).status, 503);
-  const h = harness(); h.setFail("not_owner");
-  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
-  assert.equal(h.calls.bootstrap, 1); assert.equal(h.calls.clear, 0);
+  assert.deepEqual(h.calls.acceptedBy, ["email-user-no-org"]);
+  assert.equal(h.calls.bootstrap, 0); assert.equal(h.calls.reserve, 0); assert.deepEqual(h.calls.logs, []);
 }
 assert.match(BUSINESS_GUEST_START_COPY.offerChanged, /Обновите страницу/);
 for (const failure of ["", "clear"]) {
