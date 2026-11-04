@@ -208,6 +208,14 @@ function testMigrationFiles() {
       new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\(\\) FROM PUBLIC, anon, authenticated;`),
     );
   }
+  const historyGrants = readFileSync(
+    "supabase/migrations/20270220120000_author_application_history_grants.sql",
+    "utf8",
+  );
+  assert.match(
+    historyGrants,
+    /REVOKE ALL ON FUNCTION public\.log_author_application_status_event\(uuid, text, text, uuid, text, text\)\s+FROM PUBLIC, anon, authenticated;/,
+  );
   // The greeting must not use display_name: it is the project name.
   const adminActions = readFileSync(
     "src/app/(platform)/admin/author-applications/actions.ts",
