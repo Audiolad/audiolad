@@ -69,4 +69,11 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   assert.deepEqual(latestVenueProfile("loc-1", OLD, 0).profile, NEW);
 }
 
+// Reopened after revalidation: the page row has the same version this tab saved; the row wins (same data).
+{
+  resetVenueSoundWrites();
+  recordVenueSound("loc-1", NEW, 4);
+  assert.deepEqual(latestVenueProfile("loc-1", NEW, 4), { profile: NEW, known: false });
+}
+
 console.log("business venue sound writes: ok");

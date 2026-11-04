@@ -105,7 +105,19 @@ const at = (html: string, testid: string) => {
   // The venue row first: a refused save never touches the owner's queue.
   assert.match(source, /persisted\.then\(async \(error\) => \{\s*if \(error\) return "failed" as const;/);
   // The layout player rebuilds even if the owner already left the page (no mounted gate here).
-  assert.match(source, /markAtmosphereRestart\(playingNow\);\s*\/\/[^\n]*\n\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
+  // Left the page: the open music page owns the queue request (no second rebuild path).
+  assert.match(source, /if \(!mounted\.current\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
+  assert.match(source, /const rowProfile = saved \? locationSoundProfile\(saved\) : venueProfile\.current;/);
+  assert.match(source, /latestVenueProfile\(locationId, rowProfile, saved\?\.settingsVersion \?\? 0\)/);
+  {
+    const prefs = read("src/components/business-app/workspace/useCafeQueuePreferences.ts");
+    assert.match(prefs, /window\.addEventListener\(ATMOSPHERE_SAVED_EVENT, onAtmosphereSaved\)/);
+    assert.match(prefs, /window\.removeEventListener\(ATMOSPHERE_SAVED_EVENT, onAtmosphereSaved\)/);
+    // The music page cancels its request for the old profile when the profile changes.
+    const workspace = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
+    assert.match(workspace, /cancelled = true;\s*ac\.abort\(\);/);
+    assert.match(workspace, /queue\.profile\.character/);
+  }
   assert.match(source, /serialVenueWrite\(locationId, run\)/);
   assert.match(source, /recordVenueSound\(locationId, nextProfile, result\.settingsVersion\)/);
   // Review fixes: a newer action wins, the profile/marker are published only after the save,

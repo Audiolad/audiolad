@@ -36,6 +36,21 @@ export function markAtmosphereRestart(playing: boolean, store: RestartStore | nu
   }
 }
 
+/**
+ * Same tab: «Пересобрать атмосферу» saved a new profile after the settings page was left.
+ * An open music page re-reads the stored profile, drops its queue request for the old one
+ * and asks for the new queue (the restart marker is already set).
+ */
+export const ATMOSPHERE_SAVED_EVENT = "audiolad-business-atmosphere-saved";
+
+export function announceAtmosphereSaved(): void {
+  try {
+    window.dispatchEvent(new Event(ATMOSPHERE_SAVED_EVENT));
+  } catch {
+    /* no window: nothing is open to update */
+  }
+}
+
 export function clearAtmosphereRestart(store: RestartStore | null = browserStore()): void {
   if (!store) return;
   try {

@@ -24,7 +24,7 @@ import {
   GUEST_COFFEE_DIRECTIONS,
   type GuestCoffeeProfile,
 } from "@/lib/business-app/guest-coffee/catalog";
-import { clearAtmosphereRestart, markAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
+import { announceAtmosphereSaved, clearAtmosphereRestart, markAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import {
   ATMOSPHERE_REBUILD_DONE,
   ATMOSPHERE_REBUILD_DONE_NOTE,
@@ -119,17 +119,23 @@ export default function BusinessPlayerSettings({
    * save never lands after a newer one, even from a builder that was collapsed and reopened.
    */
   const serialWrite = <T,>(run: () => Promise<T>): Promise<T> => (locationId ? serialVenueWrite(locationId, run) : run());
-  const seededVersion = saved?.settingsVersion ?? 0;
-  /** The atmosphere the venue row holds: this instance's seed or a newer save from this tab. */
+  /**
+   * The atmosphere the venue row holds: the current `saved` row (profile and version together)
+   * or a newer save from this tab.
+   */
   const currentVenue = (): { profile: GuestCoffeeProfile; known: boolean } => {
-    if (!locationId) return { profile: venueProfile.current, known: venueKnown.current };
-    const latest = latestVenueProfile(locationId, venueProfile.current, seededVersion);
+    const rowProfile = saved ? locationSoundProfile(saved) : venueProfile.current;
+    if (!locationId) return { profile: rowProfile, known: venueKnown.current };
+    const latest = latestVenueProfile(locationId, rowProfile, saved?.settingsVersion ?? 0);
     return { profile: latest.profile, known: latest.known || venueKnown.current };
   };
 
   useEffect(() => {
     if (saved) {
       const next = locationSoundProfile(saved);
+      // A revalidated venue row is what daypart and hours saves keep from now on.
+      venueProfile.current = next;
+      venueKnown.current = true;
       try {
         coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
@@ -325,7 +331,13 @@ export default function BusinessPlayerSettings({
             if (generation.current !== gen) return "stale" as const;
             storeBuilt();
             markAtmosphereRestart(playingNow);
-            // The cabinet player lives in the layout: it rebuilds even if the owner already left this page.
+            // Left this page: an open music page re-reads the profile and replaces its own
+            // queue request (one request path, so an old response cannot land last); otherwise
+            // the music page applies the marker when it opens. No second rebuild here.
+            if (!mounted.current) {
+              announceAtmosphereSaved();
+              return "deferred" as const;
+            }
             const result = await (player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const));
             if (result === "failed") {
               clearAtmosphereRestart();
