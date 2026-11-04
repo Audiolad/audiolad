@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -43,7 +44,7 @@ export default async function ClientDocumentPage({ params }: Props) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <article className="business-app-card" data-document-id={doc.id} data-document-version={source.version ?? doc.version} data-document-sha256={source.sha256}>
-        <a href="/documents" className="text-sm text-[var(--biz-accent)]">Все документы</a>
+        <Link href="/documents" className="text-sm text-[var(--biz-accent)]">Все документы</Link>
         <h1 className="mt-3 text-[1.45rem] font-bold tracking-tight text-[var(--biz-text)]">{doc.title}</h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="document-edition">
           {CLIENT_DOCUMENT_EDITION_LABEL}
