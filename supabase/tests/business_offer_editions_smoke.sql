@@ -1,4 +1,4 @@
--- Disposable smoke for 20270217120000_business_offer_editions.sql. Rolls back.
+-- Disposable smoke for 20270218120000_business_offer_editions.sql. Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;
 -- Minimal Auth fixture in CI compile lacks these GoTrue columns (rolled back with the smoke).

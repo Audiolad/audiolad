@@ -5,7 +5,7 @@
  * cabinet («Принять условия») before the first payment. One acceptance per account and
  * edition covers every point of that owner; the same edition is never asked twice.
  * Version and hash must match the seed row of business_offer_editions in
- * supabase/migrations/20270217120000_business_offer_editions.sql. A new text needs a new
+ * supabase/migrations/20270218120000_business_offer_editions.sql. A new text needs a new
  * edition (version + hash + seed row); the owner then accepts it once more.
  *
  * The approved Business documents stay unchanged and are annexes of the offer.

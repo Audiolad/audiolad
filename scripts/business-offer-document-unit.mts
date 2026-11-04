@@ -43,7 +43,7 @@ const sha = createHash("sha256").update(file, "utf8").digest("hex");
 assert.equal(BUSINESS_OFFER_SOURCE.sha256, sha, "offer hash is stale");
 assert.equal(BUSINESS_OFFER_EDITION.contentHash, sha, "BUSINESS_OFFER_EDITION hash is stale: new text = new edition");
 assert.equal(BUSINESS_OFFER_SOURCE.version, BUSINESS_OFFER_EDITION.version);
-const migration = readFileSync("supabase/migrations/20270217120000_business_offer_editions.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
 assert.match(migration, new RegExp(`'${BUSINESS_OFFER_EDITION.version.replace(/\./g, "\\.")}',\\s*'${sha}'`), "SQL seed must carry the same edition");
 assert.match(BUSINESS_OFFER_EDITION.label, /^Редакция \d+ от \d{2}\.\d{2}\.\d{4}$/);
 assert.equal(BUSINESS_OFFER_HREF, "/documents/business-offer");
@@ -151,7 +151,7 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
 }
 {
   // Gift-start checkbox of a registered account without an organization is stored too.
-  const sql = readFileSync("supabase/migrations/20270217120000_business_offer_editions.sql", "utf8");
+  const sql = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
   assert.match(sql, /p_source <> 'guest_start'/);
   assert.match(sql, /coalesce\(u\.is_anonymous, false\) = false/);
   assert.doesNotMatch(readFileSync("src/lib/business-guest/start.ts", "utf8"), /not_owner|deferred/);

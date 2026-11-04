@@ -280,7 +280,7 @@ applyFile(
 );
 applyFile("post-apply business guest Auth stage 1 smoke", resolve(root, "supabase/tests/business_guest_auth_stage1_smoke.sql"));
 applyFile("post-apply business guest start stage 3 smoke", resolve(root, "supabase/tests/business_guest_start_stage3_smoke.sql"));
-if (!pending.has("20270217120000")) {
+if (!pending.has("20270218120000")) {
   throw new Error("business offer editions migration was not included in the disposable replay");
 }
 applyFile("post-apply business offer editions smoke", resolve(root, "supabase/tests/business_offer_editions_smoke.sql"));

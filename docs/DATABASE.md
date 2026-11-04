@@ -2408,7 +2408,7 @@ Applied only to isolated synthetic test clusters (local/CI), never to a real dat
 
 ### Business offer editions (Stage 1C)
 
-NEEDS MIGRATION/RLS: `20270217120000_business_offer_editions.sql` is prepared, not
+NEEDS MIGRATION/RLS: `20270218120000_business_offer_editions.sql` is prepared, not
 applied by this task (Sergey's Human Gate, rollback SQL in the file header). Additive:
 `business_offer_editions` (published editions of the договор-оферта, seed
 `offer-v1-2026-11-04`) and `business_offer_edition_acceptances` (one row per owner

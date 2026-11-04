@@ -6401,17 +6401,17 @@
       "statement": "GRANT EXECUTE ON FUNCTION public.rename_business_organization(uuid, text) TO authenticated;"
     },
     {
-      "file": "supabase/migrations/20270217120000_business_offer_editions.sql",
+      "file": "supabase/migrations/20270218120000_business_offer_editions.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.record_business_offer_edition_acceptance(uuid, text, text, text, text, text, text) TO service_role;"
     },
     {
-      "file": "supabase/migrations/20270217120000_business_offer_editions.sql",
+      "file": "supabase/migrations/20270218120000_business_offer_editions.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.accept_business_offer_edition(text, text, text, text, text) TO authenticated, service_role;"
     },
     {
-      "file": "supabase/migrations/20270217120000_business_offer_editions.sql",
+      "file": "supabase/migrations/20270218120000_business_offer_editions.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_offer_edition_acceptances_for_caller() TO authenticated, service_role;"
     }
