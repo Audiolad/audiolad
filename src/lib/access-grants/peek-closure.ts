@@ -68,16 +68,20 @@ export async function peekAccessPeriodsWith(
   start: { userId: string; emailHash: string | null; kind?: "email" | "guest" },
 ): Promise<{ grant: GrantRow | null; paidUntil: string | null }> {
   // No email closure for a guest: user-id lookup only, no identity traversal.
+  // A paid period settled without an email is stored by account, so it is read by account.
   if (start.kind === "guest") {
-    return { grant: earliestGrant(await reader.grants([start.userId], [])), paidUntil: null };
+    const grant = earliestGrant(await reader.grants([start.userId], []));
+    return { grant, paidUntil: latestStamp(await reader.paidStamps(null, start.userId)) };
   }
   const closure = await identityClosure(reader, start);
   const grant = earliestGrant(await reader.grants(closure.userIds, closure.emailHashes));
-  const stamps = await reader.paidStamps(start.emailHash, start.userId);
-  const paidUntil = stamps.length
+  return { grant, paidUntil: latestStamp(await reader.paidStamps(start.emailHash, start.userId)) };
+}
+
+function latestStamp(stamps: string[]): string | null {
+  return stamps.length
     ? stamps.reduce((max, value) => (Date.parse(value) > Date.parse(max) ? value : max))
     : null;
-  return { grant, paidUntil };
 }
 
 export async function peekChromeAccessWith(
