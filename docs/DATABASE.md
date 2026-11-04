@@ -143,6 +143,37 @@ Rollback notes are comments at the top of the migration. They are not executed.
 Smoke: `supabase/tests/business_subscription_payment_smoke.sql`, run by the
 migration compile after the file is applied.
 
+## Business subscription guest fulfilment (prepared, not applied here)
+
+Migration `20270217120000_business_subscription_guest_fulfilment.sql` makes
+`email_hash` optional in `access_paid_periods`, `business_subscription_periods`
+and `access_grant_events`. Paid summaries now have a UUID primary key; the
+unique `(email_hash, kind)` constraint preserves existing email upserts. A
+partial unique `(user_id, kind) WHERE email_hash IS NULL` index isolates guest
+summaries. Guest event uniqueness mirrors the existing email event index.
+No existing paid rows are discarded by the schema change.
+
+Settlement still records exactly one period per order, under the existing
+order/payment row locks and per-kind advisory lock. Its start is the maximum
+of payment time, gift end (resolved with a nullable email hash), and current
+paid end found by user id or email hash. It adds 30 days once. Test periods
+have `opens_access=false` and change neither paid summaries nor renewal events.
+Receipt email is still only sent to the bank, never stored by this change.
+
+Binding email alone leaves the guest summary readable by user id in both
+`peek-reader.server.ts` and `supabase-store.ts`; readers take the maximum end,
+never add periods. The next real renewal uses the legacy email upsert and
+atomically removes the superseded NULL-hash summary for that user/kind after
+including its end in the maximum. It creates no parallel guest/email summary.
+Existing email-row ownership and trial identity resolution remain unchanged;
+period history keeps its original nullable hash. No TS writer change is needed:
+`PaidRow` / `recordPaidRenewal` accept an email hash, while guest settlement
+writes through this SQL RPC with its partial-index conflict target.
+
+Rollback prerequisites and service-role post-checks are in the migration.
+Continue with CI's isolated migration compile and the extended
+`business_subscription_payment_smoke.sql` before any owner-approved deployment.
+
 ## Guest practice ratings (pending owner apply)
 
 Migration `20270121120000_guest_practice_ratings.sql` is additive and is not
