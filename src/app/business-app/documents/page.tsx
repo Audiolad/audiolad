@@ -103,10 +103,9 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           <li data-doc-id={BUSINESS_OFFER_EDITION.documentKey}>
-            <a
+            {/* In-app soft navigation: no new PWA window (launch splash) and the hall player keeps playing. */}
+            <Link
               href={BUSINESS_OFFER_HREF}
-              target="_blank"
-              rel="noopener noreferrer"
               className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
               data-doc-link={BUSINESS_OFFER_EDITION.documentKey}
             >
@@ -116,14 +115,12 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               </div>
               <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{BUSINESS_OFFER_SUMMARY}</p>
               <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
-            </a>
+            </Link>
           </li>
           {CLIENT_DOCUMENTS.map((doc) => (
             <li key={doc.id} data-doc-id={doc.id}>
-              <a
+              <Link
                 href={clientDocumentHref(doc.id)}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
                 data-doc-link={doc.id}
               >
@@ -133,7 +130,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 </div>
                 <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
                 <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

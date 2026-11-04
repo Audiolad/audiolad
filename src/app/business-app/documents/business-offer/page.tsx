@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 
@@ -37,7 +38,7 @@ export default function BusinessOfferPage() {
         data-document-version={BUSINESS_OFFER_SOURCE.version}
         data-document-sha256={BUSINESS_OFFER_SOURCE.sha256}
       >
-        <a href="/documents" className="text-sm text-[var(--biz-accent)]">Все документы</a>
+        <Link href="/documents" className="text-sm text-[var(--biz-accent)]">Все документы</Link>
         <h1 className="mt-3 text-[1.45rem] font-bold tracking-tight text-[var(--biz-text)]">{BUSINESS_OFFER_TITLE}</h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="document-edition">
           {BUSINESS_OFFER_EDITION.label}
@@ -55,9 +56,9 @@ export default function BusinessOfferPage() {
           {annexes.map((annex) => (
             <li key={annex.id} data-testid={`business-offer-annex-${annex.id}`}>
               Приложение {annex.number} –{" "}
-              <a href={annex.href} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2">
+              <Link href={annex.href} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2">
                 «{annex.title}»
-              </a>
+              </Link>
               . {CLIENT_DOCUMENT_EDITION_LABEL}.
             </li>
           ))}
