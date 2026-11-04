@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { BUSINESS_GIFT_MS } from "../business/plan";
 import type { GuestStartConfig } from "./start-config";
+import { isCurrentBusinessOfferEdition } from "../business/offer";
 import { sanitizeBusinessTrialAttribution, type BusinessTrialAttribution } from "../business-trial-attribution/attribution";
 
 export type GuestStartUser = { id: string; is_anonymous?: boolean };
@@ -16,6 +17,8 @@ export type GuestStartDeps = {
     /** Optional, best-effort source of the start (ch, utm_*, referrer domain). Invalid values become null, never a 400. */
     attribution?: BusinessTrialAttribution | null }) => Promise<void>;
   clearTicket: (userId: string) => Promise<void>;
+  /** Records the current договор-оферта edition for the account (idempotent, once per edition). */
+  acceptOffer: (userId: string) => Promise<void>;
   log: (code: string) => void;
 };
 export type GuestStartRequest = { method: string; headers: Pick<Headers, "get">; text: () => Promise<string> };
@@ -45,11 +48,17 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
   } catch { return response(400, "invalid_request"); }
   if (body.accepted !== true || typeof body.idempotencyKey !== "string" || !UUID_V4.test(body.idempotencyKey)) return response(400, "invalid_request");
   if (body.venueName !== undefined && (typeof body.venueName !== "string" || body.venueName.trim().length > 120)) return response(400, "invalid_request");
+  // The checkbox accepts exactly the edition linked next to it. A page opened before a new
+  // edition was published must be refreshed first, so nobody accepts a text they did not see.
+  if (!isCurrentBusinessOfferEdition(body.offerVersion, body.offerHash)) return response(409, "offer_changed");
   const idempotencyHash = createHash("sha256").update(body.idempotencyKey.toLowerCase()).digest("hex");
   try {
+    const acceptQuietly = async (userId: string) => {
+      try { await deps.acceptOffer(userId); } catch { deps.log("guest_start_offer_accept_failed"); }
+    };
     let user = await deps.currentUser();
-    if (user && user.is_anonymous !== true) return response(200);
-    if (user && await deps.ready(user.id)) return response(200);
+    if (user && user.is_anonymous !== true) { await acceptQuietly(user.id); return response(200); }
+    if (user && await deps.ready(user.id)) { await acceptQuietly(user.id); return response(200); }
     const networkHash = deps.networkHash();
     if (!networkHash) return response(503, "guest_start_failed");
     if (!await deps.reserve(networkHash, deps.config.networkLimit, deps.config.windowSeconds)) return response(429, "guest_start_limit");
@@ -60,6 +69,8 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
     await deps.bootstrap({ userId: user.id, idempotencyHash, networkHash, giftSeconds: BUSINESS_GIFT_MS / 1000,
       venueName: typeof body.venueName === "string" ? body.venueName.trim() : null,
       attribution: sanitizeBusinessTrialAttribution(body.attribution) });
+    // Saved with the gift start, so the cabinet does not ask for the same edition again.
+    await deps.acceptOffer(user.id);
     try { await deps.clearTicket(user.id); } catch { deps.log("guest_start_ticket_clear_failed"); }
     return response(200);
   } catch {

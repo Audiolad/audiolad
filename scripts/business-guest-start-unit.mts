@@ -5,17 +5,21 @@ import { businessGuestStartConfig } from "../src/lib/business-guest/start-config
 import { guestNetworkKey } from "../src/lib/business-guest/network-key";
 import { BUSINESS_GIFT_MS } from "../src/lib/business/plan";
 import { BUSINESS_GUEST_START_COPY } from "../src/lib/business-guest/copy";
+import { BUSINESS_OFFER_EDITION } from "../src/lib/business/offer";
 
 const secret = randomBytes(32).toString("hex");
 const config = businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED: "1", AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SECRET: secret, NODE_ENV: "production" });
 const idempotencyKey = "253821e0-0000-4000-8000-000000000003";
-const payload = { accepted: true, idempotencyKey, userId: "untrusted-body-id" };
+const payload = {
+  accepted: true, idempotencyKey, userId: "untrusted-body-id",
+  offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash,
+};
 const baseHeaders = { origin: "https://coffee.audiolad.ru", "sec-fetch-site": "same-origin", "content-type": "application/json" };
 function request(body: unknown = payload, headers: Record<string, string> = baseHeaders, method = "POST") {
   return { method, headers: new Headers(headers), text: async () => JSON.stringify(body) };
 }
 function harness() {
-  const calls = { auth: 0, reserve: 0, ticket: 0, bootstrap: 0, clear: 0, ready: 0 };
+  const calls = { auth: 0, reserve: 0, ticket: 0, bootstrap: 0, clear: 0, ready: 0, accept: 0, acceptedBy: [] as string[] };
   let user: GuestStartUser | null = null;
   let ready = false;
   let fail = "";
@@ -36,7 +40,8 @@ function harness() {
       if (fail === "bootstrap") throw Error(); ready = true;
     },
     clearTicket: async () => { calls.clear++; if (fail === "clear") throw Error(); },
-    log: (code) => assert.ok(["guest_start_failed", "guest_start_ticket_clear_failed"].includes(code)),
+    acceptOffer: async (userId) => { calls.accept++; calls.acceptedBy.push(userId); if (fail === "accept") throw Error(); },
+    log: (code) => assert.ok(["guest_start_failed", "guest_start_ticket_clear_failed", "guest_start_offer_accept_failed"].includes(code)),
   };
   return { deps, calls, setUser: (value: GuestStartUser) => { user = value; }, setReady: () => { ready = true; }, setFail: (value: string) => { fail = value; } };
 }
@@ -59,6 +64,14 @@ await rejected(request({ ...payload, accepted: false }), 400);
 await rejected(request({ ...payload, accepted: "true" }), 400);
 await rejected(request({ ...payload, idempotencyKey: "invalid" }), 400);
 await rejected(request({ ...payload, venueName: "x".repeat(121) }), 400);
+// The checkbox accepts exactly the published offer edition; a stale page must be refreshed.
+await rejected(request({ ...payload, offerVersion: undefined, offerHash: undefined }), 409);
+await rejected(request({ ...payload, offerHash: "0".repeat(64) }), 409);
+await rejected(request({ ...payload, offerVersion: "offer-v0" }), 409);
+{
+  const result = await handleBusinessGuestStart(request({ ...payload, offerHash: "0".repeat(64) }), harness().deps);
+  assert.deepEqual(result.body, { ok: false, code: "offer_changed" });
+}
 await rejected(request(payload, baseHeaders, "GET"), 405);
 await rejected(request(payload, { "content-type": "application/json" }), 403);
 {
@@ -84,6 +97,28 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 200);
   assert.equal(h.calls.auth, 1); assert.equal(h.calls.ticket, 1); assert.equal(h.calls.bootstrap, 2);
 }
+// Gift start saves the acceptance for the session user (never the body id), once per start.
+{
+  const h = harness();
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 200);
+  assert.equal(h.calls.accept, 1); assert.deepEqual(h.calls.acceptedBy, ["auth-user-id"]);
+}
+{
+  // Not saved: the start fails and is retried (bootstrap is idempotent), the cabinet never asks blindly.
+  const h = harness(); h.setFail("accept");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
+  assert.equal(h.calls.clear, 0);
+}
+{
+  // Already started or signed in: the tick is still recorded, best effort.
+  const h = harness(); h.setUser({ id: "email-user" }); h.setFail("accept");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 200);
+  assert.deepEqual(h.calls.acceptedBy, ["email-user"]);
+  const g = harness(); g.setUser({ id: "existing-guest", is_anonymous: true }); g.setReady();
+  assert.equal((await handleBusinessGuestStart(request(), g.deps)).status, 200);
+  assert.deepEqual(g.calls.acceptedBy, ["existing-guest"]);
+}
+assert.match(BUSINESS_GUEST_START_COPY.offerChanged, /Обновите страницу/);
 for (const failure of ["", "clear"]) {
   const h = harness(); h.setFail(failure);
   const result = await handleBusinessGuestStart(request(), h.deps);

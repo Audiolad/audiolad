@@ -11,6 +11,8 @@ import { recordBusinessGuestStartHost } from "@/lib/business-trial-activity/reco
 import { recordBusinessGuestStartAttribution } from "@/lib/business-trial-attribution/record.server";
 import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
+import { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition } from "@/lib/business/offer";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -88,6 +90,19 @@ async function handle(request: Request) {
     clearTicket: async (userId) => {
       const { error } = await createServiceRoleClient().auth.admin.updateUserById(userId, { user_metadata: { business_guest_ticket: null } });
       if (error) throw new Error("guest_start_ticket_clear_failed");
+    },
+    acceptOffer: async (userId) => {
+      // userId comes from the session above, never from the body. Idempotent per edition.
+      const annex = currentBusinessOfferEdition(isUnifiedAgreementEnabled());
+      const { error } = await createServiceRoleClient().rpc("record_business_offer_edition_acceptance", {
+        p_user_id: userId,
+        p_document_version: BUSINESS_OFFER_EDITION.version,
+        p_content_hash: BUSINESS_OFFER_EDITION.contentHash,
+        p_annex_version: annex.version,
+        p_annex_hash: annex.contentHash,
+        p_source: "guest_start",
+      });
+      if (error) throw new Error("guest_start_offer_accept_failed");
     },
     log: (code) => console.warn(code),
   });

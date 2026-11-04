@@ -10,7 +10,7 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, BUSINESS_GIFT_TITLE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
 import { assertNoForbiddenGiftText, visibleLines } from "./business-gift-copy-guard";
 import { formatMoscowDateTime } from "../src/lib/access-grants/policy";
-import { BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
+import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-home-signals";
@@ -104,10 +104,10 @@ const stepOf = (html: string, id: string) => {
 };
 // Terms step: accepted already, the offer stays one tap away.
 const termsStep = stepOf(trialHome, "terms");
-assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Условия приняты для всего аккаунта:", `«${BUSINESS_OFFER_TITLE}»`, "."]);
+assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Принят", BUSINESS_OFFER_TITLE, `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Один раз для всего аккаунта и всех точек.`]);
 assert.match(termsStep, /target="_blank"/);
 assert.match(termsStep, /data-done="true"/);
-assert.match(termsStep, /href="\/documents\/b2b-terms"/);
+assert.match(termsStep, /href="\/documents\/business-offer"/);
 // Pay step: exactly these lines, in this order.
 const trialCard = stepOf(trialHome, "pay");
 assert.match(trialCard, /id="dostup"/);
@@ -118,8 +118,14 @@ assert.deepEqual(visibleLines(trialCard), [
   "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.",
   "В 7 подарочных дней входят все права и лицензия на музыку для вашего заведения.",
   `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`,
+  "Оплата по договору:",
+  BUSINESS_OFFER_TITLE,
+  `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Принят один раз для всего аккаунта.`,
   "Оплатить",
 ]);
+// Every «Оплатить» links exactly the accepted edition.
+assert.match(trialCard, new RegExp(`data-testid="biz-home-pay-offer-link" data-offer-version="${BUSINESS_OFFER_EDITION.version}"`));
+assert.ok(trialCard.indexOf("biz-home-pay-offer-link") < trialCard.indexOf("biz-home-pay-button"));
 assert.equal(trialCard.split(BUSINESS_GIFT_LICENSE_NOTE).length, 2, "licence text once");
 assert.match(trialCard, /data-testid="biz-home-pay-button"[^>]*>Оплатить|class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-home-pay-button"/);
 assertNoForbiddenGiftText(visibleLines(trialHome).join("\n"), "home", [

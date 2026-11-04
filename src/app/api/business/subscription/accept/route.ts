@@ -1,14 +1,37 @@
 import { NextResponse } from "next/server";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
-import { currentBusinessOfferEdition } from "@/lib/business/offer";
+import {
+  BUSINESS_OFFER_EDITION,
+  BUSINESS_OFFER_HREF,
+  currentBusinessOfferEdition,
+  isCurrentBusinessOfferEdition,
+} from "@/lib/business/offer";
 import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-checkout";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 export const dynamic = "force-dynamic";
 
-/** One acceptance per account. The text is the offer already published on this site. */
+async function shownEditionIsCurrent(request: Request): Promise<boolean> {
+  let body: unknown = null;
+  try {
+    body = await request.json();
+  } catch {
+    // An empty body accepts the edition published now (older cabinet pages).
+    return true;
+  }
+  if (!body || typeof body !== "object") return true;
+  const { offerVersion, offerHash } = body as { offerVersion?: unknown; offerHash?: unknown };
+  if (offerVersion === undefined && offerHash === undefined) return true;
+  return isCurrentBusinessOfferEdition(offerVersion, offerHash);
+}
+
+/**
+ * One acceptance per account and offer edition: the договор-оферта shown next to the
+ * button (/documents/business-offer). It also records annex 1 for the payment gate.
+ * The same edition is never asked twice.
+ */
 export async function POST(request: Request) {
   const supabase = await createClientFromRequest(request);
   const {
@@ -20,12 +43,17 @@ export async function POST(request: Request) {
   if (await businessHallDeviceLocked()) {
     return NextResponse.json({ error: "venue_device" }, { status: 403 });
   }
+  if (!(await shownEditionIsCurrent(request))) {
+    return NextResponse.json({ error: "offer_acceptance_required", href: BUSINESS_OFFER_HREF }, { status: 409 });
+  }
 
-  const edition = currentBusinessOfferEdition(isUnifiedAgreementEnabled());
-  const { data, error } = await supabase.rpc("accept_business_offer", {
-    p_document_key: edition.documentKey,
-    p_document_version: edition.version,
-    p_content_hash: edition.contentHash,
+  const annex = currentBusinessOfferEdition(isUnifiedAgreementEnabled());
+  const { data, error } = await supabase.rpc("accept_business_offer_edition", {
+    p_document_key: BUSINESS_OFFER_EDITION.documentKey,
+    p_document_version: BUSINESS_OFFER_EDITION.version,
+    p_content_hash: BUSINESS_OFFER_EDITION.contentHash,
+    p_annex_version: annex.version,
+    p_annex_hash: annex.contentHash,
   });
 
   if (error) {
