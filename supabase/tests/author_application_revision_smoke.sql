@@ -17,7 +17,9 @@ DECLARE
   v_changed_by uuid;
 BEGIN
   IF has_function_privilege('authenticated', 'public.log_author_application_resubmission()', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.log_author_application_resubmission()', 'EXECUTE') THEN
+     OR has_function_privilege('anon', 'public.log_author_application_resubmission()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.guard_author_application_revision_fields()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.guard_author_application_revision_fields()', 'EXECUTE') THEN
     RAISE EXCEPTION 'privilege: resubmission logger must not be callable by clients';
   END IF;
 

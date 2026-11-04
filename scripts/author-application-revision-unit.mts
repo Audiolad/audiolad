@@ -201,6 +201,13 @@ function testMigrationFiles() {
     assert.match(migration, new RegExp(`'${field.key}'`));
   }
   assert.doesNotMatch(migration, /'contacts'/);
+  // Supabase default ACL grants new functions to anon/authenticated.
+  for (const fn of ["log_author_application_resubmission", "guard_author_application_revision_fields"]) {
+    assert.match(
+      migration,
+      new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\(\\) FROM PUBLIC, anon, authenticated;`),
+    );
+  }
   // The greeting must not use display_name: it is the project name.
   const adminActions = readFileSync(
     "src/app/(platform)/admin/author-applications/actions.ts",

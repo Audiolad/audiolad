@@ -62,6 +62,8 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.guard_author_application_revision_fields() FROM PUBLIC, anon, authenticated;
+
 DROP TRIGGER IF EXISTS author_applications_guard_revision_fields
   ON public.author_applications;
 
@@ -96,7 +98,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.log_author_application_resubmission() FROM PUBLIC;
+-- Supabase default privileges grant EXECUTE on new public functions to anon
+-- and authenticated, so revoke from them explicitly (trigger-only functions).
+REVOKE ALL ON FUNCTION public.log_author_application_resubmission() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS author_applications_log_resubmission
   ON public.author_applications;
