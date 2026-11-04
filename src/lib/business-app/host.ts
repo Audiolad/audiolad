@@ -81,6 +81,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/spa": `${BUSINESS_SITE_PATH}/spa`,
   // ba344b7f: one workspace for every business_space. Cafe is the enabled direction.
   "/workspace": `${BUSINESS_SITE_PATH}/workspace`,
+  // Owner coffee test-account reset: wipes this browser's local state, then opens the start.
+  "/test-reset": `${BUSINESS_SITE_PATH}/test-reset`,
   // a8240527: permanent URL from the PDF atlas — keep forever.
   [BUSINESS_GUEST_COFFEE_PUBLIC_PATH]: BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
 };

@@ -6419,6 +6419,16 @@
       "file": "supabase/migrations/20270218120000_business_offer_editions.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_offer_edition_acceptances_for_caller() TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270221120000_business_test_account_reset.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_test_accounts_for_owner(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270221120000_business_test_account_reset.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.reset_business_test_account(uuid, uuid, text[], text, text) TO service_role;"
     }
   ]
 }
