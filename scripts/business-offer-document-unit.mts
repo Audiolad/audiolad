@@ -154,7 +154,16 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
   const sql = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
   assert.match(sql, /p_source <> 'guest_start'/);
   assert.match(sql, /coalesce\(u\.is_anonymous, false\) = false/);
-  assert.doesNotMatch(readFileSync("src/lib/business-guest/start.ts", "utf8"), /not_owner|deferred/);
+  const start = readFileSync("src/lib/business-guest/start.ts", "utf8");
+  assert.doesNotMatch(start, /deferred/);
+  // Only the signed-in (non-anonymous) path may skip, and only for a non-owner member.
+  assert.equal(start.match(/=== "not_party"/g)?.length, 1);
+  assert.match(start, /!== "recorded"\) throw/);
+  const offer = await import("../src/lib/business/offer");
+  assert.equal(offer.isNotOfferPartyError({ code: "42501", message: "not_organization_owner" }), true);
+  assert.equal(offer.isNotOfferPartyError({ code: "42501", message: "support_mode_consent_forbidden" }), false);
+  assert.equal(offer.isNotOfferPartyError({ code: "P0001", message: "not_organization_owner" }), false);
+  assert.equal(offer.isNotOfferPartyError(null), false);
 }
 
 console.log("business-offer-document-unit: ok");

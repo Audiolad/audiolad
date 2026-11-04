@@ -298,7 +298,7 @@ const { handleBusinessGuestStart } = await import("../src/lib/business-guest/sta
 const { businessGuestStartConfig } = await import("../src/lib/business-guest/start-config");
 const { guestNetworkKey } = await import("../src/lib/business-guest/network-key");
 const { createServiceRoleClient } = await import("../src/lib/supabase/service-role");
-const { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition } = await import("../src/lib/business/offer");
+const { BUSINESS_OFFER_EDITION, currentBusinessOfferEdition, isNotOfferPartyError } = await import("../src/lib/business/offer");
 const { isUnifiedAgreementEnabled } = await import("../src/lib/author-terms/unified-agreement-flag");
 
 // Same deps as src/app/api/business/guest-start/route.ts; only the cookie session is a supabase-js client here.
@@ -350,7 +350,9 @@ async function guestStart(client: SupabaseClient, ip: string, opts: { origin?: s
         p_user_id: userId, p_document_version: BUSINESS_OFFER_EDITION.version, p_content_hash: BUSINESS_OFFER_EDITION.contentHash,
         p_annex_version: annex.version, p_annex_hash: annex.contentHash, p_source: "guest_start",
       });
+      if (error && isNotOfferPartyError(error)) return "not_party";
       if (error) throw new Error("guest_start_offer_accept_failed");
+      return "recorded";
     },
     log: () => undefined,
   });
@@ -455,6 +457,21 @@ await scenario("stage 1C: registered user without a Business organization: check
   assert.equal(psql(`SELECT count(*) || '|' || string_agg(document_version || ':' || source, ',') FROM public.business_offer_edition_acceptances WHERE user_id = '${newcomerId}'`),
     `1|${BUSINESS_OFFER_EDITION.version}:guest_start`, "stored once, account-level");
   assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${newcomerId}'`), "0", "no organization is created here");
+});
+await scenario("stage 1C: manager of another owner's organization: start goes on to the cabinet, no consent stored for the Client", async () => {
+  const client = freshClient();
+  const { data, error } = await client.auth.signUp({ email: `stand-${randomBytes(6).toString("hex")}@yandex.ru`, password: randomBytes(18).toString("base64url") });
+  assert.equal(error, null, error?.message);
+  assert.ok(data.session, "stand uses autoconfirm");
+  const managerId = data.session.user.id;
+  const orgId = psql(`SELECT organization_id FROM public.business_organization_members WHERE user_id = '${startedId}' AND role = 'owner'`);
+  assert.match(orgId, /^[0-9a-f-]{36}$/);
+  psql(`INSERT INTO public.business_organization_members (organization_id, user_id, role) VALUES ('${orgId}', '${managerId}', 'manager')`);
+  const result = await guestStart(client, "203.0.113.78");
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.equal(psql(`SELECT count(*) FROM public.business_offer_edition_acceptances WHERE user_id = '${managerId}'`), "0");
+  assert.equal(psql(`SELECT count(*) || '|' || string_agg(role, ',') FROM public.business_organization_members WHERE user_id = '${managerId}'`), "1|manager");
 });
 await scenario("stage 3: bootstrap refuses a registered (non-anonymous) user", async () => {
   const { error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {

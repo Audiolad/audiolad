@@ -112,3 +112,13 @@ export async function businessOfferPaymentGate(
   if (error) return "unavailable";
   return hasAcceptedCurrentBusinessOffer(data) ? "ok" : "offer_acceptance_required";
 }
+
+/**
+ * record_business_offer_edition_acceptance refused because the account is a member of an
+ * organization without being its owner (SQL: not_organization_owner, 42501).
+ */
+export function isNotOfferPartyError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: unknown; message?: unknown };
+  return e.code === "42501" && typeof e.message === "string" && e.message.includes("not_organization_owner");
+}
