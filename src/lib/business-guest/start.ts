@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { BUSINESS_GIFT_MS } from "../business/plan";
 import type { GuestStartConfig } from "./start-config";
+import { GUEST_START_REGISTERED_REDIRECT } from "./redirects";
 import { isCurrentBusinessOfferEdition } from "../business/offer";
 import { sanitizeBusinessTrialAttribution, type BusinessTrialAttribution } from "../business-trial-attribution/attribution";
 
@@ -69,8 +70,11 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
     if (user && user.is_anonymous !== true) {
       // A signed-in staff member of another owner's organization goes on to the cabinet;
       // only the owner (the Client) gives consent, in the cabinet or at their own start.
-      if (await deps.acceptOffer(user.id) === "not_party") deps.log("guest_start_offer_not_party");
-      return response(200);
+      if (await deps.acceptOffer(user.id) === "not_party") { deps.log("guest_start_offer_not_party"); return response(200); }
+      // The account's own gift (P0 04.11): not "/", which loops back to this gift block.
+      const redirect = req.headers.get("origin") === "https://coffee.audiolad.ru"
+        ? GUEST_START_REGISTERED_REDIRECT.coffee : GUEST_START_REGISTERED_REDIRECT.business;
+      return { status: 200, body: { ok: true, redirect }, headers: { "Cache-Control": "no-store" } };
     }
     if (user && await deps.ready(user.id)) { await recordOwnerOffer(deps, user.id); return response(200); }
     const networkHash = deps.networkHash();

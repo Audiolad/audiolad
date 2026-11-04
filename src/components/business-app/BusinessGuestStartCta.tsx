@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
+import { GUEST_START_REDIRECTS } from "@/lib/business-guest/redirects";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
 
@@ -46,7 +47,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
         body: JSON.stringify({ accepted: true, offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash, idempotencyKey: key.current, ...(attributionEnabled ? storedAttribution() : {}) }),
       });
       const result = await response.json();
-      if (response.ok && result.ok === true && result.redirect === "/") {
+      if (response.ok && result.ok === true && typeof result.redirect === "string" && GUEST_START_REDIRECTS.includes(result.redirect)) {
         // A finished start must not pin a later start in this tab to the old guest's key.
         try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
         key.current = null;

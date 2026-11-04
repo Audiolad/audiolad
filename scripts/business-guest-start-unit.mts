@@ -6,6 +6,8 @@ import { guestNetworkKey } from "../src/lib/business-guest/network-key";
 import { BUSINESS_GIFT_MS } from "../src/lib/business/plan";
 import { BUSINESS_GUEST_START_COPY } from "../src/lib/business-guest/copy";
 import { BUSINESS_OFFER_EDITION } from "../src/lib/business/offer";
+import { GUEST_START_REDIRECTS } from "../src/lib/business-guest/redirects";
+import { readFileSync } from "node:fs";
 
 const secret = randomBytes(32).toString("hex");
 const config = businessGuestStartConfig({ AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED: "1", AUDIOLAD_BUSINESS_GUEST_NETWORK_HASH_SECRET: secret, NODE_ENV: "production" });
@@ -81,7 +83,7 @@ await rejected(request(payload, baseHeaders, "GET"), 405);
 await rejected(request(payload, { "content-type": "application/json" }), 403);
 {
   const h = harness(); h.setUser({ id: "email-user" });
-  assert.equal((await handleBusinessGuestStart(request(), h.deps)).body.redirect, "/");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).body.redirect, "/auth/business-return?site=coffee");
   assert.equal(h.calls.auth, 0); assert.equal(h.calls.reserve, 0); assert.equal(h.calls.bootstrap, 0);
 }
 {
@@ -145,10 +147,17 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
 }
 {
   // Registered account (with or without an organization): the checkbox is stored for the
-  // session account and the start goes on to the cabinet / onboarding; nothing is created.
+  // session account and the start goes on to /auth/business-return, which issues the email gift
+  // once and opens onboarding or the workspace. "/" looped back to the gift block (P0 04.11).
   const h = harness(); h.setUser({ id: "email-user-no-org" });
   const result = await handleBusinessGuestStart(request(), h.deps);
-  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/");
+  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/auth/business-return?site=coffee");
+  assert.notEqual(result.body.redirect, "/");
+  assert.ok(GUEST_START_REDIRECTS.includes(result.body.redirect!));
+  const b = harness(); b.setUser({ id: "email-user-business-host" });
+  const onBusiness = await handleBusinessGuestStart(request(payload, { ...baseHeaders, origin: "https://business.audiolad.ru" }), b.deps);
+  assert.equal(onBusiness.status, 200); assert.equal(onBusiness.body.redirect, "https://audiolad.ru/auth/business-return");
+  assert.ok(GUEST_START_REDIRECTS.includes(onBusiness.body.redirect!));
   assert.deepEqual(h.calls.acceptedBy, ["email-user-no-org"]);
   assert.equal(h.calls.bootstrap, 0); assert.equal(h.calls.reserve, 0); assert.deepEqual(h.calls.logs, []);
 }
@@ -230,3 +239,10 @@ assert.equal(
 );
 assert.doesNotMatch(BUSINESS_GUEST_START_COPY.terms, /льготн|grace|3 дня|10 дней/u);
 console.log("business-guest-start-unit: ok");
+{
+  // The CTA follows every redirect the start answers with, and only those.
+  const cta = readFileSync(new URL("../src/components/business-app/BusinessGuestStartCta.tsx", import.meta.url), "utf8");
+  assert.match(cta, /GUEST_START_REDIRECTS\.includes\(result\.redirect\)/);
+  assert.doesNotMatch(cta, /result\.redirect === "\/"/);
+  assert.doesNotMatch(cta, /business-guest\/start"/, "client bundle must not import node:crypto start.ts");
+}
