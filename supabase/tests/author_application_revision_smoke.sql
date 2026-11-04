@@ -45,12 +45,12 @@ BEGIN
   PERFORM public.take_author_application_in_review(v_app, NULL);
   PERFORM public.request_author_application_changes(v_app, 'Поправьте рассказ о себе', NULL);
   UPDATE public.author_applications
-  SET revision_fields = ARRAY['about', 'contacts']
+  SET revision_fields = ARRAY['display_name', 'contact_details']
   WHERE id = v_app;
 
   SELECT status, revision_fields INTO v_status, v_fields
   FROM public.author_applications WHERE id = v_app;
-  IF v_status <> 'needs_changes' OR v_fields IS DISTINCT FROM ARRAY['about', 'contacts'] THEN
+  IF v_status <> 'needs_changes' OR v_fields IS DISTINCT FROM ARRAY['display_name', 'contact_details'] THEN
     RAISE EXCEPTION 'staff revision not stored: % %', v_status, v_fields;
   END IF;
 
@@ -78,9 +78,18 @@ BEGIN
   END;
 
   -- Applicant resubmits: status back to submitted and the history records it.
+  -- The project name (display_name) stays editable while needs_changes.
   UPDATE public.author_applications
-  SET about = 'Новый рассказ о себе', status = 'submitted', submitted_at = now()
+  SET display_name = 'Тихая гавань',
+      about = 'Новый рассказ о себе',
+      status = 'submitted',
+      submitted_at = now()
   WHERE id = v_app;
+
+  IF (SELECT display_name FROM public.author_applications WHERE id = v_app)
+     IS DISTINCT FROM 'Тихая гавань' THEN
+    RAISE EXCEPTION 'project name not updated on resubmission';
+  END IF;
 
   SELECT count(*), max(changed_by::text)::uuid INTO v_count, v_changed_by
   FROM public.author_application_status_events

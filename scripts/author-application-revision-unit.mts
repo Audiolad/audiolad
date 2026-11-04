@@ -41,7 +41,15 @@ const ORIGIN = "https://audiolad.example";
 function testRevisionFields() {
   assert.deepEqual(
     AUTHOR_APPLICATION_REVISION_FIELDS.map((field) => field.key),
-    ["display_name", "direction", "about", "contacts", "readiness"],
+    [
+      "display_name",
+      "direction",
+      "about",
+      "contact_email",
+      "contact_details",
+      "readiness",
+      "school",
+    ],
   );
   assert.equal(isAuthorApplicationRevisionField("about"), true);
   assert.equal(isAuthorApplicationRevisionField("links"), false);
@@ -51,10 +59,13 @@ function testRevisionFields() {
     ["about", "readiness"],
   );
   assert.deepEqual(normalizeAuthorApplicationRevisionFields(null), []);
-  assert.deepEqual(getAuthorApplicationRevisionFieldLabels(["contacts", "display_name"]), [
-    "Как вы представляетесь",
-    "Контакты для связи",
+  assert.deepEqual(getAuthorApplicationRevisionFieldLabels(["contact_details", "display_name"]), [
+    "Название проекта («Как вы хотите представляться?»)",
+    "Телефон, MAX или другой способ связи",
   ]);
+  for (const field of AUTHOR_APPLICATION_REVISION_FIELDS) {
+    assert.ok(!field.label.includes(EM_DASH), field.key);
+  }
   assert.ok(AUTHOR_APPLICATION_REVISION_COMMENT_REQUIRED_MESSAGE.length > 0);
 }
 
@@ -181,6 +192,21 @@ function testMigrationFiles() {
   assert.match(migration, /author_application_revision_fields_forbidden/);
   assert.match(migration, /author_applications_log_resubmission/);
   assert.match(migration, /OLD\.status = 'needs_changes'/);
+  // DB CHECK accepts exactly the app's field keys.
+  assert.match(
+    migration,
+    new RegExp(`cardinality\\(revision_fields\\) <= ${AUTHOR_APPLICATION_REVISION_FIELDS.length}\\b`),
+  );
+  for (const field of AUTHOR_APPLICATION_REVISION_FIELDS) {
+    assert.match(migration, new RegExp(`'${field.key}'`));
+  }
+  assert.doesNotMatch(migration, /'contacts'/);
+  // The greeting must not use display_name: it is the project name.
+  const adminActions = readFileSync(
+    "src/app/(platform)/admin/author-applications/actions.ts",
+    "utf8",
+  );
+  assert.doesNotMatch(adminActions, /applicantName:\s*application\?\.display_name/);
   assert.match(rollback, /NOT a migration/);
   assert.match(rollback, /DROP COLUMN IF EXISTS revision_fields/);
   assert.match(rollback, /DROP TRIGGER IF EXISTS author_applications_log_resubmission/);

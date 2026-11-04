@@ -2456,7 +2456,8 @@ the annex 1 (`b2b-terms`) row into `business_offer_acceptances` when missing, so
 NEEDS MIGRATION/RLS: `20270219120000_author_application_revision.sql` is prepared, not
 applied by this task (Sergey's Human Gate). Additive, no data changes:
 `author_applications.revision_fields text[] NULL` (fields the reviewer asks to fix,
-CHECK on the five known keys), BEFORE UPDATE trigger
+CHECK on the seven known keys: `display_name` (project name), `direction`, `about`,
+`contact_email`, `contact_details`, `readiness`, `school`), BEFORE UPDATE trigger
 `author_applications_guard_revision_fields` (only platform staff or a no-JWT caller may
 change the column) and AFTER UPDATE OF status trigger
 `author_applications_log_resubmission` (SECURITY DEFINER, no client EXECUTE) that writes

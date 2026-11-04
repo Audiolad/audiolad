@@ -307,7 +307,7 @@ export default function AuthorApplicationReviewForm({
 
         <div className="mt-4 space-y-4">
           <InfoRow
-            label="Имя"
+            label="Название проекта"
             value={authorApplicationScreenName({
               status: application.status,
               displayName: application.display_name,

@@ -23,13 +23,15 @@ BEGIN
       CHECK (
         revision_fields IS NULL
         OR (
-          cardinality(revision_fields) <= 5
+          cardinality(revision_fields) <= 7
           AND revision_fields <@ ARRAY[
             'display_name',
             'direction',
             'about',
-            'contacts',
-            'readiness'
+            'contact_email',
+            'contact_details',
+            'readiness',
+            'school'
           ]::text[]
         )
       );

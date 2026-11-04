@@ -8,11 +8,19 @@ import type { AuthorApplicationStatusEventRow } from "./types";
  * (migration 20270219120000). Order here is the order of the applicant form.
  */
 export const AUTHOR_APPLICATION_REVISION_FIELDS = [
-  { key: "display_name", label: "Как вы представляетесь" },
-  { key: "direction", label: "Тематика" },
+  // display_name IS the project / space name: the form asks «Как вы хотите
+  // представляться?» with the hint «Название проекта – …», and approval turns
+  // it into the author space name.
+  {
+    key: "display_name",
+    label: "Название проекта («Как вы хотите представляться?»)",
+  },
+  { key: "direction", label: "Направление («В каком направлении вы работаете?»)" },
   { key: "about", label: "Рассказ о себе" },
-  { key: "contacts", label: "Контакты для связи" },
-  { key: "readiness", label: "Опыт с материалами" },
+  { key: "contact_email", label: "Электронная почта" },
+  { key: "contact_details", label: "Телефон, MAX или другой способ связи" },
+  { key: "readiness", label: "Ваш опыт с материалами" },
+  { key: "school", label: "Интерес к Школе аудиопрактик" },
 ] as const;
 
 export type AuthorApplicationRevisionField =

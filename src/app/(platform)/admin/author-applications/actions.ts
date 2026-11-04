@@ -199,7 +199,7 @@ export async function sendAuthorApplicationToRevision(
 
   const { data: application } = await supabase
     .from("author_applications")
-    .select("contact_email, display_name, reviewed_at")
+    .select("contact_email, reviewed_at")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -214,7 +214,9 @@ export async function sendAuthorApplicationToRevision(
       applicationId,
       revisionAttempt,
       reviewComment,
-      applicantName: application?.display_name ?? null,
+      // display_name is the project name (often the very thing to fix), not
+      // a person – keep the neutral «Здравствуйте!».
+      applicantName: null,
       fieldLabels: getAuthorApplicationRevisionFieldLabels(revisionFields),
     });
 

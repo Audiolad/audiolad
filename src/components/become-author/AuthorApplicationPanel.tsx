@@ -103,6 +103,16 @@ function RevisionMark({
   );
 }
 
+/** Amber frame around a form block the reviewer marked «Поправить». */
+function revisionBlockClass(
+  field: AuthorApplicationRevisionField,
+  highlight?: RevisionHighlight | null,
+): string {
+  return highlight?.has(field)
+    ? " rounded-[18px] bg-[#fffaf0] p-3 ring-2 ring-[#f3c96b] -mx-3"
+    : "";
+}
+
 type AuthorApplicationPanelProps = {
   audience: BecomeAuthorAudience;
   application: AuthorApplicationRow | null;
@@ -331,7 +341,10 @@ function AuthorApplicationForm({
         </div>
       )}
 
-      <div>
+      <div
+        id="author-application-field-display_name"
+        className={revisionBlockClass("display_name", revisionHighlight)}
+      >
         <div className="flex items-baseline justify-between gap-3">
           <label htmlFor="displayName" className={becomeAuthorLabelClass}>
             Как вы хотите представляться?{" "}
@@ -365,11 +378,15 @@ function AuthorApplicationForm({
         <FieldError id="displayName-error" message={displayNameError} />
       </div>
 
+      <div
+        id="author-application-field-direction"
+        className={`space-y-2${revisionBlockClass("direction", revisionHighlight)}`}
+      >
       <RevisionMark
         field="direction"
         highlight={revisionHighlight}
-        label="Поправить тематику"
-        className="-mb-2"
+        label="Поправить направление"
+        className=""
       />
       <AuthorApplicationDirectionPicker
         selectedDirections={values.selectedDirections}
@@ -381,8 +398,12 @@ function AuthorApplicationForm({
         }
         onDirectionOtherChange={(directionOther) => patchValues({ directionOther })}
       />
+      </div>
 
-      <div>
+      <div
+        id="author-application-field-about"
+        className={revisionBlockClass("about", revisionHighlight)}
+      >
         <label htmlFor="about" className={becomeAuthorLabelClass}>
           Расскажите немного о себе и о том, чем занимаетесь{" "}
           <span className="text-[#b34f63]">*</span>
@@ -412,12 +433,15 @@ function AuthorApplicationForm({
       >
         <p className="text-[17px] font-semibold text-[#25135c]">
           Контакты для связи
-          <RevisionMark field="contacts" highlight={revisionHighlight} />
         </p>
 
-        <div>
+        <div
+          id="author-application-field-contact_email"
+          className={revisionBlockClass("contact_email", revisionHighlight)}
+        >
           <label htmlFor="contactEmail" className={becomeAuthorLabelClass}>
             Электронная почта <span className="text-[#b34f63]">*</span>
+            <RevisionMark field="contact_email" highlight={revisionHighlight} />
           </label>
           <input
             ref={contactEmailInputRef}
@@ -486,10 +510,14 @@ function AuthorApplicationForm({
           <FieldError id="inviteCode-error" message={errors.inviteCode} />
         </div>
 
-        <div>
+        <div
+          id="author-application-field-contact_details"
+          className={revisionBlockClass("contact_details", revisionHighlight)}
+        >
           <label htmlFor="contactDetails" className={becomeAuthorLabelClass}>
             Телефон, MAX или другой удобный способ связи{" "}
             <span className="text-[#b34f63]">*</span>
+            <RevisionMark field="contact_details" highlight={revisionHighlight} />
           </label>
           <input
             id="contactDetails"
@@ -512,7 +540,8 @@ function AuthorApplicationForm({
       </div>
 
       <fieldset
-        className="space-y-3"
+        id="author-application-field-readiness"
+        className={`space-y-3${revisionBlockClass("readiness", revisionHighlight)}`}
         aria-describedby={errors.readiness ? "readiness-error" : undefined}
       >
         <legend className={becomeAuthorLabelClass}>
@@ -555,6 +584,15 @@ function AuthorApplicationForm({
         <FieldError id="readiness-error" message={errors.readiness} />
       </fieldset>
 
+      <div
+        id="author-application-field-school"
+        className={revisionBlockClass("school", revisionHighlight)}
+      >
+      <RevisionMark
+        field="school"
+        highlight={revisionHighlight}
+        className="mb-2"
+      />
       <label className={becomeAuthorCheckboxCardClass}>
         <input
           type="checkbox"
@@ -570,6 +608,7 @@ function AuthorApplicationForm({
           Мне интересно обучение в Школе аудиопрактик
         </span>
       </label>
+      </div>
 
       {consentAlreadyGiven ? (
         <p className={`${becomeAuthorBodyClass} text-[#5f538f]`}>
