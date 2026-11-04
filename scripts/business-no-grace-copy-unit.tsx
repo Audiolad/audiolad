@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
+import { businessHallAccessNotice } from "../src/components/business-app/BusinessHallHome";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import * as copy from "../src/lib/access-grants/copy";
 import { businessAccessLine } from "../src/lib/access-grants/access-line";
@@ -91,5 +92,23 @@ assert.doesNotMatch(html, /\u2014/u, "en dash only");
 const line = businessAccessLine(grace);
 assert.equal(line, "Срок закончился – нужна оплата");
 assert.doesNotMatch(line ?? "", /до \d/u, "the access line shows no grace stop date");
+
+// The real hall function ignores the grace end even when layout supplies it.
+for (const graceEndsAt of [grace.graceEndsAt, null, "2099-12-31T23:59:59Z"]) {
+  const notice = businessHallAccessNotice({ ...grace, graceEndsAt });
+  assert.deepEqual(notice, {
+    kind: "grace",
+    text: "Оплаченный период закончился. Сообщите владельцу кофейни.",
+  });
+  assert.ok(notice);
+  assert.doesNotMatch(notice.text, /\d|играет до|\u2014/u);
+  assert.doesNotMatch(notice.text, FORBIDDEN);
+}
+assert.equal(businessHallAccessNotice({ mode: "paid", endsAt: END }), null);
+assert.equal(businessHallAccessNotice(null), null);
+assert.deepEqual(businessHallAccessNotice({ mode: "none", endsAt: END }), {
+  kind: "expired",
+  text: "Доступ к музыке закончился. Сообщите владельцу кофейни.",
+});
 
 console.log(`business-no-grace-copy-unit: ok (${scanned.length} files)`);
