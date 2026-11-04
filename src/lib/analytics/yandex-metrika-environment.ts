@@ -28,7 +28,7 @@ export function isAdminAnalyticsRoute(pathname: string | null | undefined): bool
  * Business cabinet screens that never load Metrika: client documents (legal entity
  * details), the paired venue device and the one-time sign-in handoff.
  */
-const BUSINESS_NO_ANALYTICS_PREFIXES = ["/documents", "/point", "/player", "/coffee-handoff"];
+const BUSINESS_NO_ANALYTICS_PREFIXES = ["/documents", "/point", "/player", "/coffee-handoff", "/test-reset"];
 
 export function isBusinessNoAnalyticsRoute(pathname: string | null | undefined): boolean {
   const normalized = (pathname?.trim() || "/").replace(/^\/business-app(?=\/|$)/, "") || "/";

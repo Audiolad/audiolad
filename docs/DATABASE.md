@@ -2504,3 +2504,24 @@ price, gift duration or webhook behavior is changed.
 
 Continuation: review/apply the new migration separately, then verify saving, greetings,
 terms gating and uninterrupted audio with an authorized test account in a browser.
+
+### Coffee test-account reset («Тестовый аккаунт кофейни»)
+
+NEEDS MIGRATION/RLS: `20270221120000_business_test_account_reset.sql` is prepared, not
+applied (hand-apply after backup is Sergey's gate). Adds
+`business_test_account_allowlist` (sha256 email hash only, no clear-text address,
+inserted on prod by hand) and `business_test_account_resets` (archive: counts and JSON
+copies of every removed row). Functions, service_role only:
+`business_test_accounts_for_owner(actor)` (masked address + live counts) and
+`reset_business_test_account(actor, target, device_hashes, meter_network_hash,
+start_network_hash)`. The reset requires `is_platform_owner(actor)`, an allowlisted,
+non-anonymous, non-staff target and no shared venue. It closes the venue (status
+`closed`/`retired`, revokes tablet sessions), archives and removes memberships, guest
+starts, trial activity days, the gift (`access_grants`, identities, events), the
+`access_paid_periods` summary, offer acceptances and workspace playback, clears the
+30-minute guest meter of the pressing device and its current network, and marks the
+account's business analytics events `is_test`. Orders, payments and
+`business_subscription_periods` are never touched. Audit: `admin_operation_log`
+operation `coffee_test_account_reset` (email hash + counts only). Smoke:
+`supabase/tests/business_test_account_reset_smoke.sql`. Rollback SQL is in the
+migration header.

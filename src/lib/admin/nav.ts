@@ -1,3 +1,4 @@
+import { COFFEE_TEST_ACCOUNT_HREF } from "@/lib/admin/coffee-test-reset/model";
 import { isAdminNavPathActive } from "@/lib/admin/nav-active";
 import {
   snapshotHasPermission,
@@ -113,6 +114,13 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     requiredPermission: "admin_panel.access",
     ownerOnly: true,
     match: (path) => path.startsWith(BUSINESS_TRIALS_HREF),
+  },
+  {
+    href: COFFEE_TEST_ACCOUNT_HREF,
+    label: "Тестовый аккаунт кофейни",
+    requiredPermission: "admin_panel.access",
+    ownerOnly: true,
+    match: (path) => path.startsWith(COFFEE_TEST_ACCOUNT_HREF),
   },
   {
     href: "/admin/school-graduates",

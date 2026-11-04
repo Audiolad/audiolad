@@ -34,6 +34,21 @@ function networkFrom(request: Request | null, h: Headers): string | null {
   return guestCoffeeNetworkHash({ ip, secret: hashSecret() });
 }
 
+/**
+ * Meter network hash of the current request (no cookie, no DB). Used by the owner-only
+ * coffee test-account reset to clear the 30-minute meter of the network the owner is on.
+ */
+export async function currentGuestCoffeeNetworkHash(): Promise<string | null> {
+  return networkFrom(null, await headers());
+}
+
+/** Hashes of the guest meter tokens this browser carries (shared cookie and legacy twin). */
+export async function currentGuestCoffeeDeviceHashes(): Promise<string[]> {
+  const store = await cookies();
+  return [...new Set([store.get(SHARED_GUEST_COFFEE_COOKIE)?.value, store.get(GUEST_COFFEE_COOKIE_NAME)?.value]
+    .filter(isGuestCoffeeToken).map(hashGuestCoffeeToken))];
+}
+
 /** First render: read-only, never creates a row or a cookie. */
 export async function peekGuestCoffeeUsage(): Promise<number | null> {
   try {

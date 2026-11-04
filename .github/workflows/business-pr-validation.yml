@@ -75,6 +75,7 @@ jobs:
           npm run test:business-app-domain-bind
           npm run test:auth-return-path
           npm run test:business-coffee-host
+          npm run test:coffee-test-account-reset
           npm run test:business-coffee-atlas
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas
           npm run test:writer-coffee

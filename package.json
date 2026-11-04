@@ -25,6 +25,7 @@
     "test:supabase-cookie-domain": "npx tsx scripts/supabase-cookie-domain-unit.mts",
     "test:practice-embed": "npx tsx scripts/practice-embed-unit.mts",
     "test:business-coffee-host": "npx tsx scripts/business-coffee-host-unit.mts",
+    "test:coffee-test-account-reset": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/coffee-test-account-reset-unit.tsx",
     "test:business-coffee-atlas": "npx tsx scripts/business-coffee-atlas-unit.mts",
     "test:business-coffee-guide": "npx tsx scripts/business-coffee-guide-unit.mts",
     "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts",
