@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { isVenueTimezone } from "../src/lib/business-app/venue-timezones";
 import { randomBytes } from "node:crypto";
 import { handleBusinessGuestStart, type GuestStartDeps, type GuestStartUser } from "../src/lib/business-guest/start";
 import { businessGuestStartConfig } from "../src/lib/business-guest/start-config";
@@ -21,7 +22,7 @@ function request(body: unknown = payload, headers: Record<string, string> = base
   return { method, headers: new Headers(headers), text: async () => JSON.stringify(body) };
 }
 function harness() {
-  const calls = { auth: 0, reserve: 0, ticket: 0, bootstrap: 0, clear: 0, ready: 0, accept: 0, acceptedBy: [] as string[], logs: [] as string[] };
+  const calls = { auth: 0, reserve: 0, ticket: 0, bootstrap: 0, clear: 0, ready: 0, accept: 0, acceptedBy: [] as string[], logs: [] as string[], timezones: [] as (string | null)[] };
   let user: GuestStartUser | null = null;
   let ready = false;
   let fail = "";
@@ -40,6 +41,7 @@ function harness() {
       assert.match(input.idempotencyHash, /^[a-f0-9]{64}$/);
       assert.notEqual(input.idempotencyHash, idempotencyKey);
       assert.equal(input.giftSeconds, BUSINESS_GIFT_MS / 1000);
+      calls.timezones.push(input.timezone ?? null);
       if (fail === "bootstrap") throw Error(); ready = true;
     },
     clearTicket: async () => { calls.clear++; if (fail === "clear") throw Error(); },
@@ -71,6 +73,12 @@ await rejected(request({ ...payload, accepted: false }), 400);
 await rejected(request({ ...payload, accepted: "true" }), 400);
 await rejected(request({ ...payload, idempotencyKey: "invalid" }), 400);
 await rejected(request({ ...payload, venueName: "x".repeat(121) }), 400);
+// Venue zone from the browser: only one of the 11 ids reaches bootstrap; anything else is dropped (Moscow).
+for (const [sent, expected] of [["Asia/Vladivostok", "Asia/Vladivostok"], ["Asia/Krasnoyarsk", null], ["'; drop", null], [42, null], [undefined, null]] as const) {
+  const h = harness();
+  assert.equal((await handleBusinessGuestStart(request({ ...payload, timezone: sent }), h.deps)).status, 200);
+  assert.deepEqual(h.calls.timezones, [expected], String(sent));
+}
 // The checkbox accepts exactly the published offer edition; a stale page must be refreshed.
 await rejected(request({ ...payload, offerVersion: undefined, offerHash: undefined }), 409);
 await rejected(request({ ...payload, offerHash: "0".repeat(64) }), 409);
@@ -280,7 +288,9 @@ console.log("business-guest-start-unit: ok");
   assert.equal(seen!.url, "/api/business/guest-start");
   assert.equal(seen!.init.method, "POST");
   assert.equal(seen!.init.credentials, "same-origin");
-  assert.deepEqual(JSON.parse(String(seen!.init.body)), { accepted: true, idempotencyKey: "k" });
+  const sent = JSON.parse(String(seen!.init.body));
+  assert.deepEqual({ ...sent, timezone: undefined }, { accepted: true, idempotencyKey: "k", timezone: undefined });
+  assert.equal(isVenueTimezone(sent.timezone), true, "the browser zone mapped to a venue zone goes with the start");
   for (const text of [c.timeout, c.offline, c.retry]) assert.doesNotMatch(text, /—|-/u, "en dash only in user copy");
   console.log("business-guest-start-request-unit: ok");
 }

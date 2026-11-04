@@ -62,7 +62,7 @@ const ZONES: Record<string, string> = {
   "Asia/Irkutsk": "Иркутск (UTC+8)", "Asia/Chita": "Чита (UTC+9)",
   "Asia/Yakutsk": "Якутск (UTC+9)", "Asia/Vladivostok": "Владивосток (UTC+10)",
   "Asia/Magadan": "Магадан (UTC+11)", "Asia/Sakhalin": "Сахалин (UTC+11)",
-  "Asia/Srednekolymsk": "Среднеколымск (UTC+11)", "Asia/Kamchatka": "Камчатка (UTC+12)",
+  "Asia/Srednekolymsk": "Среднеколымск (UTC+11)", "Asia/Kamchatka": "Петропавловск-Камчатский (UTC+12)",
   "Asia/Anadyr": "Анадырь (UTC+12)",
 };
 export const businessKindLabel = (value: string) => Object.hasOwn(KINDS, value) ? KINDS[value] : value;

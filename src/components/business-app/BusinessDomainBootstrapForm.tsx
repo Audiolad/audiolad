@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { bootstrapBusinessOrganizationWithLocation } from "@/app/business-app/actions";
+import { detectVenueTimezone } from "@/lib/business-app/venue-timezones";
 
 export default function BusinessDomainBootstrapForm() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function BusinessDomainBootstrapForm() {
         locationName: String(formData.get("locationName") ?? ""),
         businessCategory: String(formData.get("businessCategory") ?? ""),
         countryCode: String(formData.get("countryCode") ?? "RU"),
-        timezone: String(formData.get("timezone") ?? "Europe/Moscow"),
+        timezone: detectVenueTimezone(),
       });
       if (!result.ok) {
         setError(result.error);
@@ -71,7 +72,6 @@ export default function BusinessDomainBootstrapForm() {
         />
       </div>
       <input type="hidden" name="countryCode" value="RU" />
-      <input type="hidden" name="timezone" value="Europe/Moscow" />
       {error ? (
         <p className="text-sm font-medium text-[var(--biz-danger)]" role="alert">
           Не удалось создать кофейню: {error}

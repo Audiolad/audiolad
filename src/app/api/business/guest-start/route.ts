@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { VENUE_TIMEZONE_DEFAULT } from "@/lib/business-app/venue-timezones";
 import { issueBusinessGuestStartTicket } from "@/lib/auth/business-guest/ticket.server";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
@@ -77,6 +78,13 @@ async function handle(request: Request) {
         p_gift_seconds: input.giftSeconds, p_venue_name: input.venueName,
       });
       if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
+      // First setup only (created = true): the venue gets the browser's zone mapped to one of the
+      // 11 Russian zones. The SQL default stays Moscow; an existing venue is never touched here.
+      if (data[0].created === true && input.timezone && input.timezone !== VENUE_TIMEZONE_DEFAULT) {
+        const { error: tzError } = await createServiceRoleClient().from("business_locations")
+          .update({ timezone: input.timezone }).eq("id", data[0].location_id).eq("organization_id", data[0].organization_id);
+        if (tzError) console.warn("guest_start_timezone_failed");
+      }
       // Gift-week stats (flag OFF by default): coffee or business host only, never the raw Host.
       await recordBusinessGuestStartHost(input.userId, businessStartHost(hostnameFromHeaders(request.headers)));
       // Gift-week source (flag OFF by default): city from the IP in memory, device family from the

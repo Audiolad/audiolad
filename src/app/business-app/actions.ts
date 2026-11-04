@@ -1,5 +1,6 @@
 "use server";
 
+import { VENUE_TIMEZONE_DEFAULT, isVenueTimezone } from "@/lib/business-app/venue-timezones";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -36,7 +37,9 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
   }
 
   const countryCode = (input.countryCode ?? "RU").trim().toUpperCase();
-  const timezone = (input.timezone ?? "Europe/Moscow").trim();
+  // Only the 11 Russian venue zones; anything else starts on Moscow and the owner picks in Профиль.
+  const requestedZone = (input.timezone ?? "").trim();
+  const timezone = isVenueTimezone(requestedZone) ? requestedZone : VENUE_TIMEZONE_DEFAULT;
 
   const { data, error } = await supabase.rpc(
     "create_business_organization_with_location",

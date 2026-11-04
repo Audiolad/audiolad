@@ -144,3 +144,54 @@ const receiptError = renderToStaticMarkup(h(BusinessPayControls, { ...controlsPr
 assert.match(receiptError, /Укажите почту для чека/);
 assert.doesNotMatch(receiptError, /Не удалось перейти к оплате/);
 console.log("business-app-profile shared controls: OK");
+
+// Venue timezone: 11 Russian zones, browser auto-detect, owner-only save, no silent changes.
+{
+  const tz = await import("../src/lib/business-app/venue-timezones");
+  assert.deepEqual(tz.VENUE_TIMEZONES.map((z) => z.id), [
+    "Europe/Kaliningrad", "Europe/Moscow", "Europe/Samara", "Asia/Yekaterinburg", "Asia/Omsk", "Asia/Novosibirsk",
+    "Asia/Irkutsk", "Asia/Yakutsk", "Asia/Vladivostok", "Asia/Magadan", "Asia/Kamchatka",
+  ]);
+  assert.deepEqual(tz.VENUE_TIMEZONES.map((z) => z.label), [
+    "Калининград (UTC+2)", "Москва (UTC+3)", "Самара (UTC+4)", "Екатеринбург (UTC+5)", "Омск (UTC+6)", "Новосибирск (UTC+7)",
+    "Иркутск (UTC+8)", "Якутск (UTC+9)", "Владивосток (UTC+10)", "Магадан (UTC+11)", "Петропавловск-Камчатский (UTC+12)",
+  ]);
+  const at = new Date("2026-11-04T12:00:00Z");
+  for (const zone of tz.VENUE_TIMEZONES) {
+    assert.equal(tz.timezoneOffsetMinutes(zone.id, at), zone.offset * 60, zone.id);
+    assert.equal(tz.venueTimezoneFromBrowserZone(zone.id, at), zone.id);
+    assert.equal(businessTimezoneLabel(zone.id), zone.label, "read-only label matches the dropdown");
+  }
+  for (const [browser, expected] of [
+    ["Asia/Krasnoyarsk", "Asia/Novosibirsk"], ["Asia/Chita", "Asia/Yakutsk"], ["Asia/Sakhalin", "Asia/Magadan"],
+    ["Asia/Anadyr", "Asia/Kamchatka"], ["Europe/Volgograd", "Europe/Moscow"], ["Europe/Ulyanovsk", "Europe/Samara"],
+    ["Asia/Barnaul", "Asia/Novosibirsk"], ["Europe/Minsk", "Europe/Moscow"], ["Asia/Almaty", "Asia/Yekaterinburg"],
+    ["Europe/Berlin", "Europe/Kaliningrad"], ["America/New_York", "Europe/Kaliningrad"], ["Pacific/Auckland", "Asia/Kamchatka"],
+    ["Asia/Kolkata", "Asia/Yekaterinburg"], ["Not/AZone", "Europe/Moscow"], ["", "Europe/Moscow"], [undefined, "Europe/Moscow"],
+  ] as const) assert.equal(tz.venueTimezoneFromBrowserZone(browser, at), expected, String(browser));
+  assert.equal(tz.isVenueTimezone("Asia/Krasnoyarsk"), false, "server accepts only the 11 ids");
+  assert.equal(tz.isVenueTimezone("europe/moscow"), false);
+  assert.equal(typeof tz.detectVenueTimezone(), "string");
+
+  const action = readFileSync(new URL("../src/app/business-app/profile/actions.ts", import.meta.url), "utf8");
+  const save = action.slice(action.indexOf("export async function saveBusinessTimezone"));
+  assert.match(save, /isVenueTimezone\(timezone\)/);
+  assert.match(save, /businessHallDeviceLocked\(\)/, "not from the hall («Точка») device");
+  assert.match(save, /role !== "owner"/, "owner only");
+  assert.ok(save.indexOf('role !== "owner"') < save.indexOf("createServiceRoleClient()"), "owner check before the write");
+  assert.match(save, /\.update\(\{ timezone \}\)/, "only the timezone column");
+
+  const page = readFileSync(new URL("../src/app/business-app/profile/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /membership\?\.role === "owner" \? \(\s*<BusinessTimezoneForm/);
+  const form = readFileSync(new URL("../src/components/business-app/profile/BusinessTimezoneForm.tsx", import.meta.url), "utf8");
+  assert.match(form, /business-app-btn-cta/, "green «Сохранить» like the name form");
+  assert.match(form, /POINT_SOUND_CHANGED_EVENT/, "the cabinet player re-reads the zone");
+  assert.doesNotMatch(form + page, /—/, "en dash only");
+
+  const route = readFileSync(new URL("../src/app/api/business/guest-start/route.ts", import.meta.url), "utf8");
+  assert.match(route, /data\[0\]\.created === true && input\.timezone/, "auto-detect only for a newly created venue");
+  const hook = readFileSync(new URL("../src/components/business-app/workspace/useCafeQueuePreferences.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(hook, /getHours\(\)/, "opening hours follow the venue zone, not the phone clock");
+  assert.match(hook, /venueMinuteOfDay\(venueZone, clockAt\)/);
+}
+console.log("venue timezone ok");

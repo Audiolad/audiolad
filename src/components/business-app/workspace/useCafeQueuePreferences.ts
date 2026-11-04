@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { venueMinuteOfDay } from "@/lib/business-app/point-sound";
 import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 import { ATMOSPHERE_SAVED_EVENT } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 
@@ -48,11 +49,15 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
   const [feedback, setFeedback] = useState<CafeQueueFeedback[]>([]);
   const [profile, setProfile] = useState(seed?.profile ?? GUEST_COFFEE_DEFAULT_PROFILE);
   const [hours, setHours] = useState(seed?.hours ?? CAFE_DAYPART_HOURS_DEFAULT);
-  const [minuteOfDay, setMinuteOfDay] = useState<number | null>(null);
+  const [clockAt, setClockAt] = useState<Date | null>(null);
   const [ready, setReady] = useState(false);
   /** Bumped by «Пересобрать атмосферу» saves: the music page asks for a new queue even for unchanged choices. */
   const [atmosphereRevision, setAtmosphereRevision] = useState(0);
   const seedRef = useRef(seed);
+  // Opening hours are venue hours: read the clock in the venue zone, not the phone's zone.
+  // A zone saved in Профиль arrives with the refreshed domain and re-places the windows at once.
+  const venueZone = (domain.status === "authenticated" ? domain.location?.timezone : null) || "Europe/Moscow";
+  const minuteOfDay = clockAt ? venueMinuteOfDay(venueZone, clockAt) : null;
 
   useEffect(() => {
     const seeded = seedRef.current;
@@ -103,13 +108,11 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
         setHours(CAFE_DAYPART_HOURS_DEFAULT);
       }
     }
-    const now = new Date();
-    setMinuteOfDay(now.getHours() * 60 + now.getMinutes());
+    setClockAt(new Date());
     setReady(true);
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      const clock = new Date();
-      setMinuteOfDay(clock.getHours() * 60 + clock.getMinutes());
+      setClockAt(new Date());
       try {
         setProfile(parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
       } catch {

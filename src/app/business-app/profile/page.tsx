@@ -11,6 +11,7 @@ import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
+import BusinessTimezoneForm from "@/components/business-app/profile/BusinessTimezoneForm";
 import BusinessProfileSubscription from "@/components/business-app/profile/BusinessProfileSubscription";
 import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
@@ -79,7 +80,7 @@ export default async function BusinessProfilePage() {
                     <dd className="font-semibold text-[var(--biz-text)]">{businessKindLabel(domain.location.businessCategory)}</dd>
                   </div>
                 ) : null}
-                {domain.location.timezone ? (
+                {domain.location.timezone && membership?.role !== "owner" ? (
                   <div>
                     <dt className="text-[var(--biz-text-muted)]">Часовой пояс</dt>
                     <dd className="font-semibold text-[var(--biz-text)]">{businessTimezoneLabel(domain.location.timezone)}</dd>
@@ -93,6 +94,10 @@ export default async function BusinessProfilePage() {
               </div>
             )}
           </dl>
+          {domain.location && membership?.role === "owner" ? (
+            <BusinessTimezoneForm timezone={domain.location.timezone || "Europe/Moscow"}
+              currentLabel={businessTimezoneLabel(domain.location.timezone || "Europe/Moscow")} />
+          ) : null}
           {domain.location ? null : (
             <p>
               <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href="/onboarding">

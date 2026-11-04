@@ -3,7 +3,8 @@
   font-size: 0.875rem;
   color: var(--biz-text-muted);
 }
-.business-profile-form input {
+.business-profile-form input,
+.business-profile-form select {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -14,9 +15,11 @@
   color: var(--biz-text);
   font: inherit;
 }
-.business-profile-form input:focus-visible {
+.business-profile-form input:focus-visible,
+.business-profile-form select:focus-visible {
   outline: 2px solid var(--biz-primary, #26764b);
   outline-offset: 2px;
 }
-.business-profile-form input:disabled { opacity: 0.65; }
+.business-profile-form input:disabled,
+.business-profile-form select:disabled { opacity: 0.65; }
 .business-profile-form input { scroll-margin-top: 6rem; scroll-margin-bottom: 6rem; }
