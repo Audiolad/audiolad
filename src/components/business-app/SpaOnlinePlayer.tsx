@@ -52,7 +52,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       const c = ctlRef.current;
       // Sample the element itself so a track that was already playing is confirmed too.
       evidence.onTimeUpdate(audio.currentTime, Date.now(), audio.paused || audio.ended);
-      const state: SpaPlaybackState = deriveSpaPlaybackState(c?.status, audio, Boolean(c?.current));
+      const state: SpaPlaybackState = deriveSpaPlaybackState(c?.status, audio, Boolean(c?.current), c?.recovering === true);
       sendSpaLiveReport(sendPlayback,
         evidence.report(state, c?.current?.audioItemId ?? null, Date.now()));
     };

@@ -9,6 +9,14 @@
  * asks the server for a fresh signed URL (server re-checks pilot access + manifest), so a
  * user without access never receives audio. The offline engine (spa-player-engine.ts)
  * stays in the repo with its tests for the next stage and is not used here.
+ *
+ * Network recovery (P0-3): transient failures (sign network errors, <audio> errors, a stall
+ * that does not recover) never end in a dead state while the hall is meant to play. The
+ * player retries with backoff (1, 2, 4 … 30 s, ±25 % jitter), retries at once on `online` /
+ * visible, and resumes the same track at its last position when the outage was shorter than
+ * RECOVERY_RESUME_WINDOW_MS (otherwise it moves on to the next track). The next track's
+ * signed URL is requested shortly before the boundary and used only while fresh. A browser
+ * autoplay refusal is NOT retried: `needsGesture` asks the UI for one «Включить музыку» tap.
  */
 
 import type { SpaManifestItem } from "./spa-manifest";
@@ -50,7 +58,32 @@ export type OnlineDeps = {
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (t: unknown) => void;
+  /** Jitter source for retry backoff (tests). Default Math.random. */
+  random?: () => number;
+  /** Browser connectivity hint (tests). Default navigator.onLine, true when unknown. */
+  isOnline?: () => boolean;
 };
+
+export const RECOVERY_BASE_MS = 1_000;
+export const RECOVERY_MAX_MS = 30_000;
+/** "waiting"/"stalled" without progress for this long is treated as a failure. */
+export const RECOVERY_STALL_MS = 10_000;
+/** Outage shorter than this: resume the same track at its position; longer: next track. */
+export const RECOVERY_RESUME_WINDOW_MS = 3 * 60_000;
+/** Pre-sign the next track this many seconds before the current one ends. */
+export const PRESIGN_LEAD_SEC = 45;
+/** Pre-signed URLs are used only while younger than this (server TTL is 1 hour). */
+export const PRESIGN_MAX_AGE_MS = 30 * 60_000;
+/** Audio errors on one track while the browser is online before the track is skipped. */
+export const RECOVERY_SKIP_AFTER_ERRORS = 4;
+export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
+
+/** Browser autoplay policy refusal: only a user gesture helps, retries would loop. */
+export function isAutoplayRefusal(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { name?: unknown; message?: unknown };
+  return e.name === "NotAllowedError" || (typeof e.message === "string" && /NotAllowedError/.test(e.message));
+}
 
 /** Sign errors after which the track is skipped (removed / expired), not retried. */
 const SKIP_REASONS = new Set(["not_in_manifest", "expired", "invalid_request"]);
@@ -80,6 +113,17 @@ export class SpaOnlinePlayer {
   private fadeGuardId: string | null = null;
   /** Keep the interrupted selection/intent until access is explicitly verified again. */
   private deniedPlayback: { audioItemId: string | null; resume: boolean } | null = null;
+  /** Autoplay refused: the UI shows «Включить музыку»; a tap calls toggle() in the gesture. */
+  needsGesture = false;
+  private retryTimer: unknown = null;
+  private retryAttempt = 0;
+  /** Where to continue after a transient failure (same track, position, outage start). */
+  private resumePoint: { audioItemId: string; positionSec: number; since: number } | null = null;
+  private stallTimer: unknown = null;
+  private stallAt = 0;
+  private lastPosition = 0;
+  private presignedFor: string | null = null;
+  private presigned: { audioItemId: string; url: string; at: number } | null = null;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -113,6 +157,34 @@ export class SpaOnlinePlayer {
 
   private now(): number {
     return this.d.now ? this.d.now() : Date.now();
+  }
+
+  private timer(fn: () => void, ms: number): unknown {
+    return (this.d.setTimer ?? ((f, t) => setTimeout(f, t)))(fn, ms);
+  }
+
+  private cancel(t: unknown) {
+    (this.d.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>)))(t);
+  }
+
+  private clearRetry() {
+    if (this.retryTimer !== null) this.cancel(this.retryTimer);
+    this.retryTimer = null;
+  }
+
+  private clearStall() {
+    if (this.stallTimer !== null) this.cancel(this.stallTimer);
+    this.stallTimer = null;
+  }
+
+  private online(): boolean {
+    if (this.d.isOnline) return this.d.isOnline();
+    return typeof navigator === "undefined" || navigator.onLine !== false;
+  }
+
+  /** A reconnect is scheduled (status "loading" with the neutral reconnect line). */
+  get recovering(): boolean {
+    return this.retryTimer !== null;
   }
 
   private clearDeadline() {
@@ -192,11 +264,125 @@ export class SpaOnlinePlayer {
   private afterPlay(id: string, op: number): Promise<void> | void {
     const cur = this.fresh(id);
     if (!cur || this.expired(cur)) return this.onDeadline(true);
+    this.needsGesture = false;
+    this.retryAttempt = 0;
+    const resume = this.resumePoint;
+    this.resumePoint = null;
+    if (resume?.audioItemId === id && resume.positionSec > 0.5 &&
+      Math.abs(this.d.audio.currentTime - resume.positionSec) > 2) {
+      try { this.d.audio.currentTime = resume.positionSec; } catch { /* not seekable yet */ }
+    }
     this.armDeadline(id, op);
     this.set("playing");
   }
 
+  /**
+   * Transient failure while the hall is meant to play: stop the broken source, remember the
+   * position and retry with backoff. Never a dead "error" state; access is re-checked by the
+   * server on every re-sign.
+   */
+  private recover(): void {
+    if (this.disposed) return;
+    const item = this.current;
+    if (!item) {
+      this.op++;
+      this.stopAudio();
+      return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
+    }
+    if (this.resumePoint?.audioItemId !== item.audioItemId) {
+      const sounding = this.soundingId === item.audioItemId ? this.d.audio.currentTime : 0;
+      this.resumePoint = {
+        audioItemId: item.audioItemId,
+        positionSec: Math.max(Number.isFinite(sounding) ? sounding : 0, this.lastPosition),
+        since: this.now(),
+      };
+    }
+    const op = ++this.op;
+    this.stopAudio();
+    const n = this.retryAttempt++;
+    const base = Math.min(RECOVERY_BASE_MS * 2 ** Math.min(n, 10), RECOVERY_MAX_MS);
+    const delay = Math.round(base * (0.75 + 0.5 * (this.d.random ?? Math.random)()));
+    this.retryTimer = this.timer(() => {
+      this.retryTimer = null;
+      if (op !== this.op || this.disposed) return;
+      void this.retryNow();
+    }, delay);
+    this.set("loading", RECONNECTING_MESSAGE);
+  }
+
+  /** Continue after an outage: same track at its position, or the next one after a long gap. */
+  private retryNow(): Promise<void> {
+    this.clearRetry();
+    const resume = this.resumePoint;
+    const i = resume ? this.items.findIndex((x) => x.audioItemId === resume.audioItemId) : -1;
+    if (resume && i >= 0 && this.now() - resume.since <= RECOVERY_RESUME_WINDOW_MS) {
+      return this.playIndex(i);
+    }
+    this.resumePoint = null;
+    if (this.items.length === 0) return Promise.resolve();
+    if (i >= 0) this.index = i;
+    return this.advance(false);
+  }
+
+  /** `online` / page visible again: retry a pending reconnect now (backoff reset). */
+  onOnline(): Promise<void> {
+    if (this.disposed || this.status === "no_access") return Promise.resolve();
+    if (this.retryTimer !== null) {
+      this.retryAttempt = 0;
+      return this.retryNow();
+    }
+    if (this.status === "playing" && this.stallTimer !== null) {
+      this.clearStall();
+      this.retryAttempt = 0;
+      this.recover();
+      return this.retryNow();
+    }
+    return Promise.resolve();
+  }
+
+  /** <audio> "waiting"/"stalled" while playing: give it RECOVERY_STALL_MS to continue. */
+  onWaiting(): void {
+    if (this.disposed || this.status !== "playing" || this.stallTimer !== null) return;
+    const op = this.op;
+    this.stallAt = this.d.audio.currentTime;
+    this.stallTimer = this.timer(() => {
+      this.stallTimer = null;
+      if (op !== this.op || this.disposed || this.status !== "playing") return;
+      this.recover();
+    }, RECOVERY_STALL_MS);
+  }
+
+  /**
+   * <audio> "timeupdate"/"playing": remembers the position, ends a stall watch when the
+   * playhead moves, and pre-signs the next track shortly before the boundary.
+   */
+  onProgress(positionSec: number, durationSec: number): void {
+    if (this.disposed || this.status !== "playing" || this.fadingOutPrevious) return;
+    if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
+    if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
+    const cur = this.current;
+    if (!cur || !Number.isFinite(durationSec) || durationSec <= 0) return;
+    if (durationSec - positionSec > PRESIGN_LEAD_SEC || this.presignedFor === cur.audioItemId) return;
+    this.presignedFor = cur.audioItemId;
+    const target = this.nextTarget();
+    const next = target >= 0 ? this.items[target] : null;
+    if (!next || next.audioItemId === cur.audioItemId) return;
+    void this.d.sign(next.audioItemId).then((r) => {
+      if (this.disposed || !r.ok) return;
+      this.presigned = { audioItemId: next.audioItemId, url: r.data.url, at: this.now() };
+    }, () => { /* the boundary signs again */ });
+  }
+
+  private takePresigned(id: string): string | null {
+    const p = this.presigned;
+    this.presigned = null;
+    if (!p || p.audioItemId !== id || this.now() - p.at > PRESIGN_MAX_AGE_MS) return null;
+    return p.url;
+  }
+
   private stopAudio() {
+    this.clearRetry();
+    this.clearStall();
     this.clearDeadline();
     this.switching = false;
     this.leaving = false;
@@ -216,6 +402,8 @@ export class SpaOnlinePlayer {
     }
     this.op++;
     this.stopAudio();
+    this.resumePoint = null;
+    this.needsGesture = false;
     this.items = [];
     this.index = -1;
     this.set("no_access");
@@ -243,15 +431,19 @@ export class SpaOnlinePlayer {
     if (this.disposed || this.status === "no_access") return;
     if (i < 0 || i >= this.items.length) return;
     const op = ++this.op;
+    this.clearRetry();
+    this.clearStall();
     const item = this.items[i];
     if (this.expired(item)) return this.onDeadline(false);
+    if (this.resumePoint && this.resumePoint.audioItemId !== item.audioItemId) this.resumePoint = null;
+    if (this.index !== i || this.current?.audioItemId !== item.audioItemId) this.lastPosition = 0;
     this.index = i;
     if (this.retryTrackId !== item.audioItemId) {
       this.retryTrackId = item.audioItemId;
       this.errorRetries = 0;
     }
     this.clearDeadline();
-    this.set("loading");
+    this.set("loading", this.resumePoint ? RECONNECTING_MESSAGE : null);
     if (!instant && this.d.audio.fadeOutForSwitch) {
       this.switching = true;
       this.leaving = true;
@@ -262,29 +454,53 @@ export class SpaOnlinePlayer {
       if (op !== this.op || this.disposed) return;
     }
     this.stopAudio();
-    const r = await this.d.sign(item.audioItemId);
+    const pre = this.takePresigned(item.audioItemId);
+    let r: OnlineSignResult;
+    try {
+      r = pre ? { ok: true, data: { url: pre } } : await this.d.sign(item.audioItemId);
+    } catch {
+      r = { ok: false, reason: "network" };
+    }
     if (op !== this.op || this.disposed) return;
     if (!r.ok) {
       if (r.reason === "no_access") return this.denied();
-      this.failures++;
-      if (SKIP_REASONS.has(r.reason) && this.failures < this.items.length) return this.next();
-      return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
+      if (SKIP_REASONS.has(r.reason)) {
+        this.failures++;
+        if (this.failures < this.items.length) return this.next();
+        return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
+      }
+      // Network / server hiccup: retry the same track with backoff, never a dead stop.
+      return this.recover();
     }
     const fresh = this.fresh(item.audioItemId);
     if (!fresh || this.expired(fresh)) return this.onDeadline(false);
     this.d.audio.src = r.data.url;
     this.soundingId = item.audioItemId;
+    this.presignedFor = null;
+    const seek = this.resumePoint?.audioItemId === item.audioItemId ? this.resumePoint.positionSec : 0;
+    if (seek > 0.5) {
+      try { this.d.audio.currentTime = seek; } catch { /* applied again after play() */ }
+    }
     try {
       if (instant && this.d.audio.playInstant) await this.d.audio.playInstant();
       else await this.d.audio.play();
       if (op !== this.op || this.disposed) return;
       this.failures = 0;
       return this.afterPlay(item.audioItemId, op);
-    } catch {
+    } catch (error) {
       if (op !== this.op || this.disposed) return;
-      // Autoplay policy (no user gesture yet) or a network/decode error.
-      this.set("paused", "Нажмите «Играть», чтобы продолжить.");
+      if (isAutoplayRefusal(error)) return this.askGesture();
+      // The source failed to load (offline, expired URL): reconnect with backoff.
+      return this.recover();
     }
+  }
+
+  /** Autoplay refused: keep the loaded source; one user tap (toggle) resumes it. No retries. */
+  private askGesture() {
+    this.clearRetry();
+    this.retryAttempt = 0;
+    this.needsGesture = true;
+    this.set("paused");
   }
 
   async toggle(): Promise<void> {
@@ -292,6 +508,14 @@ export class SpaOnlinePlayer {
     if (this.status === "playing" || this.status === "loading") {
       this.op++;
       this.clearDeadline();
+      this.clearRetry();
+      this.clearStall();
+      if (!this.d.audio.src) {
+        // Paused while reconnecting: nothing is sounding; the next Play re-signs.
+        this.leaving = false;
+        this.switching = false;
+        return this.set("paused");
+      }
       if (this.switching) {
         // Pause pressed during a skip fade-out: keep fading the old source to silence
         // (no cut, no click), then drop it. The chosen track starts on the next play.
@@ -331,9 +555,11 @@ export class SpaOnlinePlayer {
         await this.d.audio.play();
         if (op !== this.op || this.disposed) return;
         return this.afterPlay(item.audioItemId, op);
-      } catch {
+      } catch (error) {
+        if (op !== this.op || this.disposed) return;
+        if (isAutoplayRefusal(error)) return this.askGesture();
         // URL may have expired while paused: fetch a fresh one (re-checks access).
-        if (op === this.op && !this.disposed) await this.playIndex(Math.max(this.index, 0));
+        await this.playIndex(Math.max(this.index, 0));
       }
       return;
     }
@@ -344,14 +570,18 @@ export class SpaOnlinePlayer {
     return this.advance(false);
   }
 
-  private advance(instant: boolean): Promise<void> {
-    if (this.items.length === 0) return Promise.resolve();
+  private nextTarget(): number {
+    if (this.items.length === 0) return -1;
     const fallback = this.index < 0 || this.index >= this.items.length - 1 ? 0 : this.index + 1;
     const custom = this.d.nextIndex?.(this.index, this.items.length);
-    const target = typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
+    return typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
       ? custom
       : fallback;
-    return this.playIndex(target, instant);
+  }
+
+  private advance(instant: boolean): Promise<void> {
+    if (this.items.length === 0) return Promise.resolve();
+    return this.playIndex(this.nextTarget(), instant);
   }
 
   previous(): Promise<void> {
@@ -371,18 +601,25 @@ export class SpaOnlinePlayer {
     return this.advance(true);
   }
 
-  /** <audio> "error" while playing (e.g. signed URL expired mid-stream): re-sign and retry once per track. */
+  /**
+   * <audio> "error" while playing/loading (offline, signed URL expired mid-stream): reconnect
+   * with backoff and resume at the position. A track that keeps failing while the browser is
+   * online (broken file) is skipped; the hall never ends in a dead state.
+   */
   onError(): Promise<void> {
-    if (this.status !== "playing" && this.status !== "loading") return Promise.resolve();
+    if (this.disposed || (this.status !== "playing" && this.status !== "loading")) return Promise.resolve();
+    // Already waiting for a reconnect, or no source loaded (src removed by a switch).
+    if (this.retryTimer !== null || !this.d.audio.src) return Promise.resolve();
     this.errorRetries++;
-    if (this.errorRetries > 2) {
+    if (this.errorRetries >= RECOVERY_SKIP_AFTER_ERRORS && this.online() && this.items.length > 1) {
+      this.errorRetries = 0;
+      this.resumePoint = null;
       this.op++;
       this.stopAudio();
-      this.set("error", "Ошибка воспроизведения. Проверьте интернет и нажмите «Играть».");
-      return Promise.resolve();
+      return this.advance(false);
     }
-    this.stopAudio();
-    return this.playIndex(Math.max(this.index, 0));
+    this.recover();
+    return Promise.resolve();
   }
 
   /**
@@ -434,6 +671,9 @@ export class SpaOnlinePlayer {
   dispose() {
     this.disposed = true;
     this.op++;
+    this.clearRetry();
+    this.clearStall();
+    this.presigned = null;
     this.clearDeadline();
     this.d.audio.pause();
   }
