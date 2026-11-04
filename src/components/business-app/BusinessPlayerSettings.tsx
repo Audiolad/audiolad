@@ -473,11 +473,11 @@ export default function BusinessPlayerSettings({
               return persist(venueOwner ? () => currentVenue().profile : profile, queue.prefs.daypartMode, next);
             };
             if (pointDevice || !locationId) return save();
-            return new Promise((resolve) => {
+            return new Promise<string | null | false>((resolve) => {
               setConfirm({
                 text: VENUE_SOUND_CONFIRM,
                 run: () => { void save().then(resolve); },
-                cancel: () => resolve(null),
+                cancel: () => resolve(false),
               });
             });
           }}
