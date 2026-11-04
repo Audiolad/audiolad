@@ -76,16 +76,22 @@ function getPathnameFromNext(next: string): string {
   return pathname;
 }
 
-function isUnsafeNextPath(trimmed: string): boolean {
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+const NEXT_PATH_BASE_ORIGIN = "https://audiolad.invalid";
+
+function isUnsafeNextPath(value: string): boolean {
+  if (/[\p{Cc}\p{White_Space}\uFEFF]/u.test(value)) {
     return true;
   }
 
-  if (trimmed.includes("\\")) {
+  if (!value.startsWith("/") || value.startsWith("//")) {
     return true;
   }
 
-  const lower = trimmed.toLowerCase();
+  if (value.includes("\\")) {
+    return true;
+  }
+
+  const lower = value.toLowerCase();
 
   if (DISALLOWED_NEXT_SCHEMES.some((scheme) => lower.startsWith(scheme))) {
     return true;
@@ -95,25 +101,18 @@ function isUnsafeNextPath(trimmed: string): boolean {
     return true;
   }
 
-  let decoded = trimmed;
+  return isAuthEntryRoute(getPathnameFromNext(value));
+}
 
-  try {
-    decoded = decodeURIComponent(trimmed);
-  } catch {
-    return true;
-  }
-
-  if (decoded.startsWith("//")) {
-    return true;
-  }
-
-  const pathname = getPathnameFromNext(decoded);
-
-  if (!pathname.startsWith("/") || pathname.startsWith("//")) {
-    return true;
-  }
-
-  return isAuthEntryRoute(pathname);
+function decodeValidEscapes(value: string): string {
+  return value.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      // Keep invalid multi-byte text literal, but still expose ASCII escapes to the next check.
+      return run.replace(/%([0-7][0-9a-f])/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+    }
+  });
 }
 
 export function resolveValidatedNextPath(
@@ -123,20 +122,46 @@ export function resolveValidatedNextPath(
     return null;
   }
 
-  const trimmed = next.trim();
+  let value = next;
+  let normalized: string | null = null;
+  let layer = 0;
 
-  if (isUnsafeNextPath(trimmed)) {
+  try {
+    // Validate every decoding layer, while preserving the original URL encoding.
+    while (true) {
+      if (isUnsafeNextPath(value)) {
+        return null;
+      }
+
+      const parsed = new URL(value, NEXT_PATH_BASE_ORIGIN);
+      const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      if (parsed.origin !== NEXT_PATH_BASE_ORIGIN || isUnsafeNextPath(path)) {
+        return null;
+      }
+      normalized ??= path;
+
+      // The submitted value must be well-formed; deeper layers may hold literal "%" text.
+      const decoded = layer === 0 ? decodeURIComponent(value) : decodeValidEscapes(value);
+      layer += 1;
+      if (decoded === value) {
+        return normalized;
+      }
+      value = decoded;
+    }
+  } catch {
     return null;
   }
-
-  return trimmed;
 }
 
 export function getSafeNextPath(
   next: string | null | undefined,
   fallback: string = DEFAULT_AUTHENTICATED_REDIRECT,
 ): string {
-  return resolveValidatedNextPath(next) ?? fallback;
+  return (
+    resolveValidatedNextPath(next) ??
+    resolveValidatedNextPath(fallback) ??
+    DEFAULT_AUTHENTICATED_REDIRECT
+  );
 }
 
 export function buildAuthRouteHref(
