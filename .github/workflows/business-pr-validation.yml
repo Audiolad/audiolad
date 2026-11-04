@@ -73,6 +73,7 @@ jobs:
           node scripts/yandex-metrika-unit.mjs
           npx tsx scripts/business-landing-unit.mts
           npm run test:business-app-domain-bind
+          npm run test:auth-return-path
           npm run test:business-coffee-host
           npm run test:business-coffee-atlas
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas

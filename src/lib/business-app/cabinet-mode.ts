@@ -14,6 +14,8 @@
  * membership checks) stay as they are; this table only narrows what the cabinet allows.
  */
 
+import { resolveValidatedNextPath } from "@/lib/auth/routes";
+
 export type BusinessCabinetMode = "owner" | "preview" | "point";
 
 /** Which column of the table a mode reads. Preview and point read the same one. */
@@ -179,9 +181,8 @@ export function businessPointReports(facts: Pick<BusinessCabinetModeFacts, "poin
 /** Same-site relative path only (no scheme, no //host, no backslash). Anything else gives "/". */
 export function safeBusinessNextPath(value: unknown): string {
   if (typeof value !== "string") return "/";
-  const next = value.trim();
-  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") || /[\u0000-\u001f]/.test(next)) return "/";
-  if (next.length > 512) return "/";
+  const next = resolveValidatedNextPath(value);
+  if (!next || value.length > 512 || next.length > 512) return "/";
   return next;
 }
 
