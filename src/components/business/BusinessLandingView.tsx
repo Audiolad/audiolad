@@ -356,7 +356,6 @@ export default function BusinessLandingView({
           </div>
         </section>
 
-
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
           <div className="business-wrap business-split business-split--half">
               <Poster
