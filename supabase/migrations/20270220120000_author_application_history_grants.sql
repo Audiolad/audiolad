@@ -7,7 +7,5 @@ BEGIN;
 
 REVOKE ALL ON FUNCTION public.log_author_application_status_event(uuid, text, text, uuid, text, text)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.log_author_application_status_event(uuid, text, text, uuid, text, text)
-  TO service_role;
 
 COMMIT;
