@@ -38,9 +38,6 @@ import {
   BUSINESS_UNCONFIRMED_NOTE,
 } from "@/lib/access-grants/copy";
 import {
-  workspaceDeadlineDelay,
-  workspacePlaybackAllowed,
-  workspacePlaybackDeadline,
   workspacePlayerOpen,
   type WorkspacePageModel,
   type WorkspaceTrack,
@@ -63,13 +60,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   // Ratings and day-time choices stay with the owner (cabinet-mode.ts), also in the preview.
   const cabinet = useBusinessCabinetMode();
   const adopt = player.adopt;
-  const release = player.release;
   const playIndex = player.playIndex;
   const setQueueOrder = player.setQueueOrder;
   const applyAtmosphereQueue = player.applyAtmosphereQueue;
   const currentIndex = player.view.index;
   const queue = useCafeQueuePreferences();
-  const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
   const [failedNowCover, setFailedNowCover] = useState<string | null>(null);
   const [feedbackPhase, setFeedbackPhase] = useState<CafeFeedbackPhase>("idle");
   const [feedbackBusyKind, setFeedbackBusyKind] = useState<CafeQueueFeedbackKind | null>(null);
@@ -77,15 +72,19 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const feedbackStarted = useRef(0);
   const feedbackPending = useRef(false);
   const feedbackTimers = useRef<number[]>([]);
-  const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
+  // The persistent provider owns access refreshes even while this screen is unmounted.
+  const model = player.accessModel?.spaceId === initialModel.spaceId ? player.accessModel : initialModel;
   const open = workspacePlayerOpen(model);
   const reportChromeAccess = useReportBusinessChromeAccess();
   const reportedStatus = model.status;
   const reportedEndsAt = model.endsAt;
   useLayoutEffect(() => {
-    if (model.tracks.length > 0) adopt(model);
-  }, [model, adopt]);
+    if (initialModel.tracks.length > 0) adopt(initialModel);
+  }, [initialModel, adopt]);
   useEffect(() => {
+    // Hall access copy is owned by its existing server context. Do not publish the
+    // refreshed playback deadline to staff chrome (it can outlast the contract).
+    if (cabinet.side === "venue") return;
     if ((reportedStatus === "trial" || reportedStatus === "paid" || reportedStatus === "grace") && reportedEndsAt) {
       reportChromeAccess({
         mode: reportedStatus,
@@ -93,7 +92,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         ...(reportedStatus === "grace" && model.playbackUntil ? { graceEndsAt: model.playbackUntil } : {}),
       });
     }
-  }, [model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
+  }, [cabinet.side, model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
   // The live refresh (router.refresh every few seconds) passes a new model object with the same
   // tracks. The queue request depends on this key, not on object identity: an unchanged key keeps
   // the queue the player already has instead of asking the server for a new random mix.
@@ -209,42 +208,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     setQueueOrder,
     applyAtmosphereQueue,
   ]);
-  useEffect(() => {
-    if (!open) return;
-    let timer: ReturnType<typeof setTimeout>;
-    let expired = false;
-    const check = () => {
-      if (expired) return;
-      const deadline = workspacePlaybackDeadline(model);
-      if (workspacePlaybackAllowed(deadline, Date.now())) {
-        clearTimeout(timer);
-        timer = setTimeout(check, workspaceDeadlineDelay(deadline, Date.now()));
-        return;
-      }
-      expired = true;
-      release();
-      setRefreshed({ source: initialModel, value: { ...model, status: "offer", daysLeft: 0, tracks: [] } });
-      const params = new URLSearchParams({ space: model.spaceId });
-      void fetch(`/api/business/workspace/state?${params.toString()}`, { credentials: "same-origin", cache: "no-store" })
-        .then(async (res) => {
-          if (!res.ok) return;
-          const json = await res.json() as { ok?: boolean; model?: WorkspacePageModel };
-          if (!json.ok || !json.model) return;
-          const value = workspacePlayerOpen(json.model) && !workspacePlaybackAllowed(workspacePlaybackDeadline(json.model), Date.now())
-            ? { ...json.model, status: "offer" as const, daysLeft: 0, tracks: [] }
-            : json.model;
-          setRefreshed({ source: initialModel, value });
-        }).catch(() => { /* The local offer stays closed until access can be refreshed. */ });
-    };
-    timer = setTimeout(check, workspaceDeadlineDelay(workspacePlaybackDeadline(model), Date.now()));
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", check);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", check);
-    };
-  }, [open, model, initialModel, release]);
 
   const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
   const author = current?.authorName?.trim() ?? "";

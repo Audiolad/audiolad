@@ -900,8 +900,11 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
   assert.ok(BUSINESS_TRIAL_SIGN_IN_HREF.includes("next=%2Fauth%2Fbusiness-return"));
-  assert.match(playerSource, /workspaceItems\(current\.tracks, current\.playbackUntil \?\? current\.endsAt\)/);
-  assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
+  // Access scheduling lives in the persistent provider; the engine gets a bounded
+  // buffering deadline while that scheduler verifies the real access window.
+  assert.match(playerSource, /workspaceItems\(current\.tracks, workspaceAudioDeadline\(current\)\)/);
+  assert.match(playerSource, /createAccessDeadline\(current/);
+  assert.match(workspaceSource, /player\.accessModel/);
   assert.match(playerSource, /applyManifest\(null\)/);
   assert.doesNotMatch(playerSource, /\u2014/);
   assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);

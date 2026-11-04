@@ -33,11 +33,10 @@ import {
   playbackStorageKey,
   type WorkspacePlayback,
 } from "@/lib/business-workspace/playback";
+import { createAccessDeadline, fetchWorkspaceAccess, workspaceAudioDeadline, workspaceControllerKey } from "@/lib/business-workspace/access-deadline";
 import { workspaceAtmosphereStartIndex } from "@/lib/business-workspace/shelves";
 import {
-  workspaceDeadlineDelay,
   workspaceItems,
-  workspacePlaybackAllowed,
   workspacePlayerOpen,
   type WorkspacePageModel,
 } from "@/lib/business-workspace/model";
@@ -51,6 +50,7 @@ type View = {
 };
 
 type CabinetPlayerApi = {
+  accessModel: WorkspacePageModel | null;
   pointDevice: boolean;
   canChangeMusic: boolean;
   adopt: (model: WorkspacePageModel) => void;
@@ -109,10 +109,6 @@ const JSON_POST = {
   cache: "no-store" as const,
 };
 
-function modelKey(model: WorkspacePageModel): string {
-  return `${model.spaceId}|${model.endsAt ?? ""}|${model.tracks.map((track) => track.audioItemId).join(",")}`;
-}
-
 function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | null {
   try {
     const raw = window.localStorage.getItem(playbackStorageKey(spaceId));
@@ -143,6 +139,7 @@ export function BusinessCabinetPlayerProvider({
 }) {
   const [model, setModel] = useState<WorkspacePageModel | null>(initialModel);
   const modelRef = useRef(model);
+  const accessRef = useRef<ReturnType<typeof createAccessDeadline> | null>(null);
   useLayoutEffect(() => {
     modelRef.current = model;
   }, [model]);
@@ -181,9 +178,9 @@ export function BusinessCabinetPlayerProvider({
 
   const adopt = useCallback((next: WorkspacePageModel) => {
     if (next.tracks.length === 0) return;
-    const key = modelKey(next);
+    const key = workspaceControllerKey(next);
     modelRef.current = next;
-    setModel((prev) => (prev && modelKey(prev) === key ? prev : next));
+    setModel(next);
     const restart = peekAtmosphereRestart();
     if (restart) savedPlaceRef.current = false;
     if (restoredKey.current === key && !restart) return;
@@ -291,7 +288,7 @@ export function BusinessCabinetPlayerProvider({
     return () => window.clearInterval(timer);
   }, [canBeat]);
 
-  const catalogKey = model && open ? modelKey(model) : "";
+  const catalogKey = model && open ? workspaceControllerKey(model) : "";
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -330,7 +327,7 @@ export function BusinessCabinetPlayerProvider({
           }));
         },
       },
-      workspaceItems(current.tracks, current.playbackUntil ?? current.endsAt),
+      workspaceItems(current.tracks, workspaceAudioDeadline(current)),
     );
     ctlRef.current = ctl;
     const onTime = () => {
@@ -379,30 +376,57 @@ export function BusinessCabinetPlayerProvider({
     else audio.volume = playback.volume;
   }, [open, playback.volume, catalogKey]);
 
+  const accessSpace = open ? model?.spaceId : null;
   useEffect(() => {
-    if (!model || !workspacePlayerOpen(model)) return;
-    let timer: ReturnType<typeof setTimeout>;
-    let expired = false;
-    const check = () => {
-      if (expired) return;
-      if (workspacePlaybackAllowed(model.endsAt, Date.now())) {
-        clearTimeout(timer);
-        timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
-        return;
-      }
-      expired = true;
-      void ctlRef.current?.applyManifest(null);
-      (fadeRef.current ?? audioRef.current)?.pause();
-    };
-    timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", check);
+    const current = modelRef.current;
+    if (!accessSpace || !current) return;
+    const access = createAccessDeadline(current, {
+      now: Date.now,
+      setTimer: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimer: (timer) => window.clearTimeout(timer as number),
+      fetchStatus: () => fetchWorkspaceAccess(accessSpace),
+      onStatus: (next) => {
+        const prev = modelRef.current;
+        if (!prev || prev.spaceId !== accessSpace) return;
+        // Access refreshes never restore a playhead or replace the live queue/catalog.
+        const updated = { ...prev, status: next.status, spaceEnabled: next.spaceEnabled,
+          endsAt: next.endsAt, playbackUntil: next.playbackUntil,
+          endsAtLabel: next.endsAtLabel, daysLeft: next.daysLeft };
+        modelRef.current = updated;
+        void ctlRef.current?.applyManifest(workspaceItems(updated.tracks, workspaceAudioDeadline(updated)));
+        setModel(updated);
+      },
+      onExpired: () => {
+        void ctlRef.current?.applyManifest(null);
+        (fadeRef.current ?? audioRef.current)?.pause();
+        const prev = modelRef.current;
+        if (!prev || prev.spaceId !== accessSpace) return;
+        const closed = { ...prev, status: "offer" as const, daysLeft: 0 };
+        modelRef.current = closed;
+        setModel(closed);
+      },
+    });
+    accessRef.current = access;
+    const refresh = () => { void access.refresh(); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", visible);
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", check);
+      access.dispose();
+      if (accessRef.current === access) accessRef.current = null;
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", visible);
     };
-  }, [model]);
+  }, [accessSpace]);
+
+  useEffect(() => {
+    if (!model || !open) return;
+    accessRef.current?.update(model);
+    // applyManifest preserves playing/loading/paused state and the current audio source.
+    void ctlRef.current?.applyManifest(workspaceItems(model.tracks, workspaceAudioDeadline(model)));
+  }, [model, open]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -415,7 +439,7 @@ export function BusinessCabinetPlayerProvider({
   const toggle = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     const index = playbackRef.current.index;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
@@ -435,7 +459,7 @@ export function BusinessCabinetPlayerProvider({
   const next = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -448,7 +472,7 @@ export function BusinessCabinetPlayerProvider({
   const previous = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -508,7 +532,7 @@ export function BusinessCabinetPlayerProvider({
 
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
-    if (!current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -789,6 +813,7 @@ export function BusinessCabinetPlayerProvider({
   const devicePlayIndex = async (index: number) => { if (await authorizeMusicChange()) await playIndex(index); };
 
   const api: CabinetPlayerApi = {
+    accessModel: model,
     pointDevice: pointReports,
     canChangeMusic: !pointReports || pointCanEdit,
     adopt,
