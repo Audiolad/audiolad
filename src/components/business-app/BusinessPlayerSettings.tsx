@@ -334,7 +334,7 @@ export default function BusinessPlayerSettings({
     const pending = pointDevice
       ? persisted.then((error) => (error ? ("failed" as const) : ("deferred" as const)))
       : ownerRebuild
-        // The venue row first; only a saved rebuild changes the owner's own queue (skip fade, player-fade.ts).
+        // The venue row first; only a saved rebuild changes the owner's own upcoming queue, preserving the current track.
         ? persisted.then((error) => continueOwnerRebuild(error, {
             gen,
             currentGeneration: () => generation.current,

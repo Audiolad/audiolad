@@ -34,7 +34,7 @@ const settings = read("src/components/business-app/BusinessPlayerSettings.tsx");
 assert.match(settings, /const json = \(await res.json\(\)\)[^\n]+\n\s*window.dispatchEvent\(new Event\(POINT_SOUND_CHANGED_EVENT\)\)/);
 assert.match(settings, /setConfirm\({ text: VENUE_SOUND_CONFIRM, run }\)/);
 assert.match(settings, /commitVenue\(\(\) =>/);
-assert.match(settings, /cancel: \(\) => resolve\(null\)/);
+assert.match(settings, /cancel: \(\) => resolve\(false\)/);
 assert.match(read("src/app/business-app/settings/page.tsx"), /<VenueControlPanel/);
 // 3: keepCurrent is unconditional on status and returns before any audio/playhead mutation.
 const keep = player.match(/if \(input.keepCurrent\) {([^}]+)}/)?.[1];

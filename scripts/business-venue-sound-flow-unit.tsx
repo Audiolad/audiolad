@@ -115,6 +115,10 @@ const at = (html: string, testid: string) => {
     const workspace = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
     assert.match(workspace, /cancelled = true;\s*ac\.abort\(\);/);
     assert.match(workspace, /queue\.profile\.character/);
+    assert.match(workspace, /applyAtmosphereQueue\(indices\)/);
+    assert.doesNotMatch(workspace, /applyAtmosphereQueue\(indices, \{ play:/);
+    const player = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
+    assert.match(player, /takeAtmosphereRestart\(\);\s*if \(plan\.keepCurrent\) return;/);
     assert.match(prefs, /setAtmosphereRevision\(\(n\) => n \+ 1\)/);
     assert.match(workspace, /\}\)\}#\$\{queue\.atmosphereRevision\}`;/);
   }
