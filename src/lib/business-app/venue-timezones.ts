@@ -17,7 +17,7 @@ export const VENUE_TIMEZONES = [
 ] as const;
 
 export type VenueTimezoneId = (typeof VENUE_TIMEZONES)[number]["id"];
-export const VENUE_TIMEZONE_DEFAULT: VenueTimezoneId = "Europe/Moscow";
+export const VENUE_TIMEZONE_DEFAULT_ID: VenueTimezoneId = "Europe/Moscow";
 
 export function isVenueTimezone(value: unknown): value is VenueTimezoneId {
   return typeof value === "string" && VENUE_TIMEZONES.some((zone) => zone.id === value);
@@ -40,7 +40,7 @@ export function timezoneOffsetMinutes(timeZone: string, now = new Date()): numbe
 
 /** Nearest venue zone to a UTC offset in minutes (ties go west). Outside Russia clamps to the ends. */
 export function nearestVenueTimezone(offsetMinutes: number): VenueTimezoneId {
-  if (!Number.isFinite(offsetMinutes)) return VENUE_TIMEZONE_DEFAULT;
+  if (!Number.isFinite(offsetMinutes)) return VENUE_TIMEZONE_DEFAULT_ID;
   let best: (typeof VENUE_TIMEZONES)[number] = VENUE_TIMEZONES[1];
   let bestDistance = Infinity;
   for (const zone of VENUE_TIMEZONES) {
@@ -56,9 +56,9 @@ export function nearestVenueTimezone(offsetMinutes: number): VenueTimezoneId {
  */
 export function venueTimezoneFromBrowserZone(browserZone: unknown, now = new Date()): VenueTimezoneId {
   if (isVenueTimezone(browserZone)) return browserZone;
-  if (typeof browserZone !== "string" || !browserZone.trim()) return VENUE_TIMEZONE_DEFAULT;
+  if (typeof browserZone !== "string" || !browserZone.trim()) return VENUE_TIMEZONE_DEFAULT_ID;
   const offset = timezoneOffsetMinutes(browserZone.trim(), now);
-  return offset == null ? VENUE_TIMEZONE_DEFAULT : nearestVenueTimezone(offset);
+  return offset == null ? VENUE_TIMEZONE_DEFAULT_ID : nearestVenueTimezone(offset);
 }
 
 /** Browser only. Never throws. */
@@ -66,7 +66,7 @@ export function detectVenueTimezone(now = new Date()): VenueTimezoneId {
   try {
     return venueTimezoneFromBrowserZone(Intl.DateTimeFormat().resolvedOptions().timeZone, now);
   } catch {
-    return VENUE_TIMEZONE_DEFAULT;
+    return VENUE_TIMEZONE_DEFAULT_ID;
   }
 }
 

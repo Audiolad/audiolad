@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { VENUE_TIMEZONE_DEFAULT } from "@/lib/business-app/venue-timezones";
+import { VENUE_TIMEZONE_DEFAULT_ID } from "@/lib/business-app/venue-timezones";
 import { issueBusinessGuestStartTicket } from "@/lib/auth/business-guest/ticket.server";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
@@ -80,7 +80,7 @@ async function handle(request: Request) {
       if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
       // First setup only (created = true): the venue gets the browser's zone mapped to one of the
       // 11 Russian zones. The SQL default stays Moscow; an existing venue is never touched here.
-      if (data[0].created === true && input.timezone && input.timezone !== VENUE_TIMEZONE_DEFAULT) {
+      if (data[0].created === true && input.timezone && input.timezone !== VENUE_TIMEZONE_DEFAULT_ID) {
         const { error: tzError } = await createServiceRoleClient().from("business_locations")
           .update({ timezone: input.timezone }).eq("id", data[0].location_id).eq("organization_id", data[0].organization_id);
         if (tzError) console.warn("guest_start_timezone_failed");
