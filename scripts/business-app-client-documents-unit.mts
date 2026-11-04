@@ -123,7 +123,15 @@ console.log("business-app-client-documents-unit OK");
   const SimpleMarkdown: any = typeof (md as any).default === "function" ? (md as any).default : (md as any).default.default;
   const pageSrc = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
   assert.match(pageSrc, /href=\{clientDocumentHref\(doc\.id\)\}/);
-  assert.match(pageSrc, /target="_blank"/);
+  // Owner report 04.11: target=_blank opened a new standalone PWA window (logo launch splash) and left the cabinet.
+  assert.doesNotMatch(pageSrc, /target="_blank"/);
+  assert.match(pageSrc, /<Link\s+href=\{clientDocumentHref\(doc\.id\)\}/);
+  assert.match(pageSrc, /<Link\s+href=\{BUSINESS_OFFER_HREF\}/);
+  for (const f of ["src/app/business-app/documents/[id]/page.tsx", "src/app/business-app/documents/business-offer/page.tsx"]) {
+    const src = readFileSync(f, "utf8");
+    assert.doesNotMatch(src, /target="_blank"/);
+    assert.doesNotMatch(src, /<a href="\/documents"/, `${f}: back link is a soft navigation`);
+  }
   assert.doesNotMatch(pageSrc, /черновик/i);
   const detailSrc = readFileSync("src/app/business-app/documents/[id]/page.tsx", "utf8");
   assert.match(detailSrc, /SimpleMarkdown source=\{source\.markdown\}/);
