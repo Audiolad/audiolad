@@ -1,3 +1,4 @@
+import { getSafeNextPath } from "@/lib/auth/routes";
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-domain";
 import { coffeeHostEnabled } from "../host";
 
@@ -20,5 +21,5 @@ export function selectGuestToken(shared: string | undefined, legacy: string | un
 
 /** Fixed first-party destination; never accept a user-supplied origin. */
 export function coffeeReturnPath(value: string): string {
-  return value.startsWith("/") && !value.startsWith("//") && !/[\\\r\n]/.test(value) ? value : "/";
+  return getSafeNextPath(value, "/");
 }
