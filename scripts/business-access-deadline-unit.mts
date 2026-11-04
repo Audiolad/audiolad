@@ -98,6 +98,115 @@ function setup(initial: WorkspacePageModel) {
   w.access.dispose();
 }
 
+// Navigation/payment supersedes every outcome of an older in-flight request.
+for (const stale of ["offer", "paid", "network", "unavailable"] as const) {
+  const deadline = T0 + 120_000;
+  const renewed = model(deadline + 3_600_000);
+  const w = setup(model(deadline));
+  let resolve!: (value: WorkspacePageModel) => void;
+  let reject!: (reason: Error) => void;
+  w.fetchWith(() => new Promise((done, fail) => { resolve = done; reject = fail; }));
+  const pending = w.access.refresh();
+  await flush();
+  assert.equal(w.access.update(renewed), true);
+  if (stale === "network") reject(new Error("offline"));
+  else resolve(model(deadline, { status: stale, tracks: [] }));
+  await pending;
+  assert.equal(w.stops, 0, stale);
+  assert.equal(w.adopted.length, 0, "superseded responses never overwrite the provider model");
+  assert.equal(w.access.allowsPlayback(), true);
+  // A stale failure must not impose backoff on the newer access revision either.
+  w.respond(renewed);
+  await w.advance(T0 + ACCESS_MIN_CHECK_MS);
+  await w.access.refresh();
+  assert.equal(w.requests, 2);
+  await w.advance(deadline + ACCESS_TOLERANCE_MS);
+  assert.equal(w.stops, 0, "the renewed deadline survives the old tolerance boundary");
+  w.access.dispose();
+}
+
+// A navigation model is a fresh server access decision, independently of its catalog.
+for (const patch of [
+  { status: "offer" as const },
+  { status: "anonymous" as const },
+  { status: "unconfirmed" as const },
+  { spaceEnabled: false },
+  { playbackUntil: iso(T0) },
+]) {
+  const w = setup(model(T0 + 3_600_000));
+  assert.equal(w.access.update(model(T0 + 3_600_000, { ...patch, tracks: [] })), false);
+  assert.equal(w.stops, 1, "navigation denial stops immediately without waiting for a periodic check");
+  assert.equal(w.access.allowsPlayback(), false);
+  w.access.dispose();
+}
+{
+  const w = setup(model(T0 + 3_600_000));
+  assert.equal(w.access.update(model(T0, { status: "unavailable", tracks: [] })), false);
+  assert.equal(w.stops, 0, "an HTTP-200 outage is not a navigation denial");
+  assert.equal(w.access.allowsPlayback(), true);
+  await w.access.refresh();
+  assert.equal(w.requests, 0, "navigation outages share failure backoff");
+  await w.advance(T0 + ACCESS_MIN_CHECK_MS);
+  assert.equal(w.requests, 1, "retry without another navigation");
+  assert.equal(w.stops, 0);
+  w.access.dispose();
+}
+
+// Focus/online shortly before expiry cannot postpone the mandatory deadline check.
+for (const event of ["focus", "online"] as const) {
+  const deadline = T0 + 120_000;
+  const w = setup(model(deadline));
+  await w.advance(deadline - 5_000);
+  await w.access.refresh();
+  const before = w.requests;
+  w.respond(model(deadline, { status: "offer", tracks: [] }));
+  await w.advance(deadline - 1);
+  assert.equal(w.stops, 0);
+  await w.advance(deadline);
+  assert.equal(w.requests, before + 1, event);
+  assert.equal(w.stops, 1, "server-confirmed expiry at the real deadline");
+  w.access.dispose();
+}
+
+// The deadline exemption still deduplicates a pending focus/online request.
+{
+  const deadline = T0 + 120_000;
+  const w = setup(model(deadline));
+  await w.advance(deadline - 5_000);
+  let resolve!: (value: WorkspacePageModel) => void;
+  w.fetchWith(() => new Promise((done) => { resolve = done; }));
+  const pending = w.access.refresh();
+  await flush();
+  const before = w.requests;
+  await w.advance(deadline);
+  assert.equal(w.access.refresh(), pending);
+  assert.equal(w.requests, before);
+  assert.equal(w.stops, 0);
+  resolve(model(deadline, { status: "offer", tracks: [] }));
+  await pending;
+  assert.equal(w.stops, 1);
+  w.access.dispose();
+}
+
+// A failed pre-deadline event keeps its retry backoff when crossing the deadline.
+{
+  const deadline = T0 + 120_000;
+  const w = setup(model(deadline));
+  await w.advance(deadline - 5_000);
+  w.fetchWith(() => Promise.reject(new Error("offline")));
+  await w.access.refresh();
+  const before = w.requests;
+  await w.advance(deadline);
+  await w.access.refresh();
+  assert.equal(w.requests, before, "deadline/focus/online respect failure backoff");
+  assert.equal(w.stops, 0);
+  w.respond(model(deadline + 3_600_000));
+  await w.advance(deadline + 5_000);
+  assert.equal(w.requests, before + 1);
+  assert.equal(w.stops, 0);
+  w.access.dispose();
+}
+
 // An active status with an elapsed playback deadline is also confirmed expiry.
 {
   const deadline = T0 + 120_000;
@@ -229,5 +338,13 @@ assert.match(player, /workspaceControllerKey\(model\)/);
 assert.match(player, /window.addEventListener\("online", refresh\)/);
 assert.match(player, /document.visibilityState === "visible"/);
 assert.match(workspace, /player.accessModel/);
+assert.match(workspace, /useLayoutEffect\(\(\) => \{\s*adopt\(initialModel\);/);
+const adoption = player.split("const adopt = useCallback")[1]?.split("const release = useCallback")[0];
+assert.ok(adoption);
+assert.match(adoption, /access\.update\(next\)/);
+assert.ok(adoption.indexOf("access.update(next)") < adoption.indexOf("next.tracks.length === 0"),
+  "server access is reconciled before catalog adoption");
+assert.doesNotMatch(player, /accessRef\.current\?\.update\(model\)/,
+  "internal access publications must not invalidate their own requests");
 assert.doesNotMatch(workspace, /release\(\)|setTimeout\(check/);
 console.log("business access deadline: ok");

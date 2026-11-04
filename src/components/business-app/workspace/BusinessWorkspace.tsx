@@ -79,7 +79,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const reportedStatus = model.status;
   const reportedEndsAt = model.endsAt;
   useLayoutEffect(() => {
-    if (initialModel.tracks.length > 0) adopt(initialModel);
+    adopt(initialModel);
   }, [initialModel, adopt]);
   useEffect(() => {
     // Hall access copy is owned by its existing server context. Do not publish the

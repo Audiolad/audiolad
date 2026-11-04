@@ -41,6 +41,7 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
   let lastCheck = -Infinity;
   let retryAt = Infinity;
   let failures = 0;
+  let revision = 0;
   let stopped = false;
   let disposed = false;
   const missingDeadlineAt = d.now();
@@ -67,6 +68,10 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     if (!inFlight && now < deadline) next = Math.min(next, deadline);
     if (!inFlight) next = Math.min(next, retryAt);
     next = Math.max(next, lastCheck + ACCESS_MIN_CHECK_MS);
+    // A successful focus/online check just before expiry cannot delay the
+    // mandatory server check across the deadline. Failed checks retain backoff.
+    if (!inFlight && failures === 0 && lastCheck < deadline) next = Math.min(next, deadline);
+    if (!inFlight && failures > 0) next = Math.max(next, retryAt);
     // A hung request must not bypass the bounded offline tolerance.
     next = Math.min(next, deadline + ACCESS_TOLERANCE_MS);
     timer = d.setTimer(() => {
@@ -75,32 +80,41 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
       void refresh();
     }, Math.max(0, Math.min(next - now, 2 ** 31 - 1)));
   };
+  const failed = () => {
+    if (d.now() >= end() + ACCESS_TOLERANCE_MS) return expire();
+    retryAt = d.now() + Math.min(10_000 * 2 ** Math.min(failures++, 3), 60_000);
+  };
+  const accept = (next: WorkspacePageModel) => {
+    // A 200/unavailable model represents a backend outage, not confirmed expiry.
+    if (next.status === "unavailable") throw new Error("access_unavailable");
+    if (next.spaceId !== model.spaceId) throw new Error("access_space_mismatch");
+    if (!workspacePlayerOpen(next)) return expire();
+    const deadline = workspacePlaybackDeadline(next);
+    if (!deadline || !Number.isFinite(Date.parse(deadline))) throw new Error("access_invalid_deadline");
+    if (!workspacePlaybackAllowed(deadline, d.now())) return expire();
+    model = next;
+    failures = 0;
+    retryAt = Infinity;
+  };
   const refresh = (): Promise<void> => {
     if (disposed || stopped) return Promise.resolve();
     if (inFlight) return inFlight;
-    if (d.now() - lastCheck < ACCESS_MIN_CHECK_MS) {
+    const now = d.now();
+    const crossingDeadline = lastCheck < end() && now >= end();
+    if ((failures > 0 && now < retryAt) || (!crossingDeadline && now - lastCheck < ACCESS_MIN_CHECK_MS)) {
       arm();
       return Promise.resolve();
     }
     lastCheck = d.now();
+    const requestRevision = revision;
     inFlight = Promise.resolve().then(d.fetchStatus).then((next) => {
-      if (disposed || stopped) return;
-      // A 200/unavailable model represents a backend outage, not confirmed expiry.
-      if (next.status === "unavailable") throw new Error("access_unavailable");
-      if (next.spaceId !== model.spaceId) throw new Error("access_space_mismatch");
-      if (!workspacePlayerOpen(next)) return expire();
-      const deadline = workspacePlaybackDeadline(next);
-      if (!deadline || !Number.isFinite(Date.parse(deadline))) throw new Error("access_invalid_deadline");
-      if (!workspacePlaybackAllowed(deadline, d.now())) return expire();
-      model = next;
-      failures = 0;
-      retryAt = Infinity;
-      d.onStatus(next);
+      if (disposed || stopped || requestRevision !== revision) return;
+      accept(next);
+      if (!stopped) d.onStatus(next);
     }).catch(() => {
-      if (disposed || stopped) return;
-      if (d.now() >= end() + ACCESS_TOLERANCE_MS) return expire();
-      // 10, 20, 40, then 60 seconds. Focus/online events share the same rate cap.
-      retryAt = d.now() + Math.min(10_000 * 2 ** Math.min(failures++, 3), 60_000);
+      if (disposed || stopped || requestRevision !== revision) return;
+      // 10, 20, 40, then 60 seconds, also respected by focus/online events.
+      failed();
     }).finally(() => {
       inFlight = null;
       arm();
@@ -114,9 +128,18 @@ export function createAccessDeadline(initial: WorkspacePageModel, d: Deps) {
     refresh,
     allowsPlayback: () => !disposed && !stopped && workspacePlayerOpen(model) && d.now() < end() + ACCESS_TOLERANCE_MS,
     update(next: WorkspacePageModel) {
-      if (disposed || stopped) return;
-      model = next;
+      if (disposed || stopped) return false;
+      // Navigation/payment updates supersede every decision from an older request.
+      revision++;
+      try {
+        accept(next);
+      } catch {
+        failed();
+        arm();
+        return false;
+      }
       arm();
+      return !stopped;
     },
     dispose() {
       disposed = true;

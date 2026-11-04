@@ -177,7 +177,23 @@ export function BusinessCabinetPlayerProvider({
   const rebuildGen = useRef(0);
 
   const adopt = useCallback((next: WorkspacePageModel) => {
-    if (next.tracks.length === 0) return;
+    const current = modelRef.current;
+    // Server navigation models carry access decisions even without a catalog.
+    // Reconcile synchronously so an older in-flight status cannot undo payment.
+    const access = current?.spaceId === next.spaceId ? accessRef.current : null;
+    if (access && !access.update(next)) return;
+    if (next.status === "unavailable") return;
+    if (!workspacePlayerOpen(next)) {
+      void ctlRef.current?.applyManifest(null);
+      (fadeRef.current ?? audioRef.current)?.pause();
+      modelRef.current = next;
+      setModel(next);
+      return;
+    }
+    if (next.tracks.length === 0) {
+      if (!current || current.spaceId !== next.spaceId) return;
+      next = { ...next, tracks: current.tracks, playback: current.playback };
+    }
     const key = workspaceControllerKey(next);
     modelRef.current = next;
     setModel(next);
@@ -423,7 +439,6 @@ export function BusinessCabinetPlayerProvider({
 
   useEffect(() => {
     if (!model || !open) return;
-    accessRef.current?.update(model);
     // applyManifest preserves playing/loading/paused state and the current audio source.
     void ctlRef.current?.applyManifest(workspaceItems(model.tracks, workspaceAudioDeadline(model)));
   }, [model, open]);
