@@ -22,7 +22,7 @@ import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
-import { peekAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
+import { atmosphereQueuePlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex } from "@/lib/business-app/cafe-queue/order";
 import type { CafeDaypart, CafeQueueFeedback } from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
@@ -68,11 +68,11 @@ type CabinetPlayerApi = {
   /** Catalog indices in play order. Null until the cafe queue answers: catalog order. */
   queueOrder: readonly number[] | null;
   setQueueOrder: (indices: readonly number[]) => void;
-  /** Jump to the first track of a queue just built by «Создать атмосферу». */
-  applyAtmosphereQueue: (indices: readonly number[], options: { play: boolean }) => void;
+  /** Replace upcoming tracks; move the cursor only when the player is inactive. */
+  applyAtmosphereQueue: (indices: readonly number[]) => void;
   /**
    * Rebuild the live queue for the stored sound profile.
-   * Applied: the catalog was reordered, and a playing track moved to the new first row.
+   * Applied: the upcoming order was replaced; a playing/loading track stays untouched.
    * Deferred: this visit has no catalog yet, so the music page rebuilds on open.
    * Failed: the queue did not answer. A newer call supersedes this one.
    */
@@ -531,11 +531,17 @@ export function BusinessCabinetPlayerProvider({
       seen.add(index);
       unique.push(index);
     }
-    const prev = playOrderRef.current;
-    if (prev && prev.length === unique.length && prev.every((value, index) => value === unique[index])) return;
-    playOrderRef.current = unique;
-    setQueueOrderState(unique);
     const ctl = ctlRef.current;
+    const plan = atmosphereQueuePlan({
+      indices: unique,
+      currentIndex: ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index,
+      status: ctl?.status ?? "idle",
+    });
+    const order = plan.order;
+    const prev = playOrderRef.current;
+    if (prev && prev.length === order.length && prev.every((value, index) => value === order[index])) return;
+    playOrderRef.current = order;
+    setQueueOrderState(order);
     const idle = !ctl || ctl.status === "idle";
     if (savedPlaceRef.current || !idle) return;
     const start = unique[0] ?? 0;
@@ -550,7 +556,7 @@ export function BusinessCabinetPlayerProvider({
     setView((prevView) => ({ ...prevView, index: start }));
   }, []);
 
-  const applyAtmosphereQueue = useCallback((indices: readonly number[], options: { play: boolean }) => {
+  const applyAtmosphereQueue = useCallback((indices: readonly number[]) => {
     const current = modelRef.current;
     if (!current) return;
     const seen = new Set<number>();
@@ -561,37 +567,18 @@ export function BusinessCabinetPlayerProvider({
       unique.push(index);
     }
     if (unique.length === 0) return;
-    playOrderRef.current = unique;
-    setQueueOrderState(unique);
-    const start = unique[0] ?? 0;
-    savedPlaceRef.current = false;
     const ctl = ctlRef.current;
-    const playingNow = options.play || ctl?.status === "playing" || ctl?.status === "loading";
-    if (playingNow && ctl && (ctl.index !== start || (ctl.status !== "playing" && ctl.status !== "loading"))) {
-      setBarDismissed(false);
-      seekRef.current = 0;
-      evidenceRef.current.reset(0);
-      void ctl.playIndex(start).then(() => {
-        remember({ index: start, positionSec: 0 }, true);
-        reportPlayback();
-      });
-      playbackRef.current = clampWorkspacePlayback(
-        { index: start, positionSec: 0, volume: playbackRef.current.volume, updatedAt: new Date().toISOString() },
-        current.tracks.length,
-      );
-      setPlayback(playbackRef.current);
-      setView((prevView) => ({
-        ...prevView,
-        index: start,
-        currentTime: 0,
-        duration: current.tracks[start]?.durationSeconds ?? prevView.duration,
-      }));
-      return;
-    }
-    if (playingNow && ctl) {
-      remember({ index: start, positionSec: 0 }, true);
-      return;
-    }
+    const plan = atmosphereQueuePlan({
+      indices: unique,
+      currentIndex: ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index,
+      status: ctl?.status ?? "idle",
+    });
+    playOrderRef.current = plan.order;
+    setQueueOrderState(plan.order);
+    takeAtmosphereRestart();
+    if (plan.keepCurrent) return;
+    const start = plan.index;
+    savedPlaceRef.current = false;
     if (ctl && ctl.status !== "playing" && ctl.status !== "loading") {
       ctl.index = start;
       const audio = audioRef.current;
@@ -615,7 +602,7 @@ export function BusinessCabinetPlayerProvider({
       duration: current.tracks[start]?.durationSeconds ?? prevView.duration,
     }));
     remember({ index: start, positionSec: 0 }, false);
-  }, [remember, reportPlayback]);
+  }, [remember]);
 
   const cancelAtmosphereRebuild = useCallback(() => {
     rebuildGen.current += 1;
@@ -656,14 +643,13 @@ export function BusinessCabinetPlayerProvider({
       if (indices.length === 0) return "failed";
       if (rebuildGen.current !== gen) return "failed";
       const ctl = ctlRef.current;
-      const playingNow = Boolean(ctl && (ctl.status === "playing" || ctl.status === "loading"));
       if (input.keepCurrent) {
         const order = pointKeepCurrentOrder(indices, ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index);
         playOrderRef.current = order;
         setQueueOrderState(order);
         return "applied";
       }
-      applyAtmosphereQueue(indices, { play: playingNow && !input.keepCurrent });
+      applyAtmosphereQueue(indices);
       return "applied";
     } catch {
       return "failed";

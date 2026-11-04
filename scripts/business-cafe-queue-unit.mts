@@ -340,30 +340,41 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   ];
   const newOrder = ["missing", "first-of-new", "later", "saved"];
   assert.equal(atmosphereQueueStart(catalog, newOrder), 1, "the new queue starts at its first real track, not the saved one");
-  assert.equal(atmospherePlaybackPlan({
+  assert.deepEqual(atmospherePlaybackPlan({
     tracks: catalog,
     orderedIds: newOrder,
     restart: null,
     status: "playing",
-  }), null, "an ordinary queue refresh keeps the saved place");
+    currentIndex: 0,
+  }), { index: 0, play: false }, "an ordinary active refresh keeps the current track");
+  assert.equal(atmospherePlaybackPlan({
+    tracks: catalog,
+    orderedIds: newOrder,
+    restart: null,
+    status: "paused",
+    currentIndex: 0,
+  }), null, "an ordinary paused refresh keeps the saved place");
   assert.deepEqual(atmospherePlaybackPlan({
     tracks: catalog,
     orderedIds: newOrder,
     restart: { playing: false },
     status: "idle",
+    currentIndex: 0,
   }), { index: 1, play: false }, "after «Создать атмосферу» the music page shows the new first track");
   assert.deepEqual(atmospherePlaybackPlan({
     tracks: catalog,
     orderedIds: newOrder,
     restart: { playing: true },
     status: "paused",
-  }), { index: 1, play: true }, "music that was already playing starts that new first track");
+    currentIndex: 0,
+  }), { index: 1, play: false }, "a historical playing marker never resumes paused audio");
   assert.deepEqual(atmospherePlaybackPlan({
     tracks: catalog,
     orderedIds: newOrder,
     restart: { playing: false },
     status: "playing",
-  }), { index: 1, play: true }, "a still-playing bar also switches");
+    currentIndex: 0,
+  }), { index: 0, play: false }, "a still-playing bar keeps its track");
   const memory = new Map<string, string>();
   const store = {
     getItem: (key: string) => memory.get(key) ?? null,

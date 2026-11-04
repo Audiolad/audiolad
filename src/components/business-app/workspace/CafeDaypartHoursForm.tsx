@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   type CafeDaypart,
@@ -13,23 +13,51 @@ const ROWS: readonly { id: CafeDaypart; label: string }[] = [
   { id: "evening", label: "Вечер" },
 ];
 
-/** Boundaries «Авто» uses. Saved on this device for the current venue. */
+/** How long «Часы сохранены» stays on the button after a successful save. */
+export const DAYPART_HOURS_SAVED_MS = 3000;
+export const DAYPART_HOURS_SAVE_LABEL = "Сохранить часы";
+export const DAYPART_HOURS_SAVED_LABEL = "✓ Часы сохранены";
+
+/**
+ * What `onSave` resolves to: `null` saved, a string is the error to show,
+ * `false` the owner cancelled the confirm (nothing saved, no feedback).
+ */
+export type DaypartHoursSaveResult = string | null | false;
+
+/** Boundaries «Авто» uses. Saved for the current venue. */
 export default function CafeDaypartHoursForm({
   hours,
   onSave,
 }: {
   hours: CafeDaypartHours;
-  onSave: (next: CafeDaypartHours) => string | null | Promise<string | null>;
+  onSave: (next: CafeDaypartHours) => DaypartHoursSaveResult | Promise<DaypartHoursSaveResult>;
 }) {
   const [draft, setDraft] = useState(hours);
   const [error, setError] = useState<string | null>(null);
+  /** «Часы сохранены» on the button for DAYPART_HOURS_SAVED_MS after a successful save. */
   const [saved, setSaved] = useState(false);
+  /** Only the latest press shows its outcome (an earlier one may resolve later). */
+  const submitSeq = useRef(0);
+  const savedTimer = useRef<number | null>(null);
+  const mounted = useRef(true);
+  const clearSavedTimer = () => {
+    if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
+    savedTimer.current = null;
+  };
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
+    };
+  }, []);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved windows arrive after hydration
     setDraft(hours);
   }, [hours]);
 
   const setPart = (id: CafeDaypart, edge: "start" | "end", value: string) => {
+    clearSavedTimer();
     setSaved(false);
     setDraft((prev) => ({ ...prev, [id]: { ...prev[id], [edge]: value } }));
   };
@@ -41,10 +69,22 @@ export default function CafeDaypartHoursForm({
       data-testid="biz-daypart-hours"
       onSubmit={(event) => {
         event.preventDefault();
-        void Promise.resolve(onSave(draft)).then((message) => {
-          setError(message);
-          setSaved(message === null);
-        });
+        const seq = ++submitSeq.current;
+        clearSavedTimer();
+        setSaved(false);
+        void Promise.resolve(onSave(draft))
+          .catch(() => "Не удалось сохранить часы. Попробуйте ещё раз.")
+          .then((result) => {
+            if (!mounted.current || seq !== submitSeq.current) return;
+            if (result === false) return;
+            setError(result);
+            if (result !== null) return;
+            setSaved(true);
+            savedTimer.current = window.setTimeout(() => {
+              savedTimer.current = null;
+              setSaved(false);
+            }, DAYPART_HOURS_SAVED_MS);
+          });
       }}
     >
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Часы суток</h2>
@@ -83,9 +123,13 @@ export default function CafeDaypartHoursForm({
         ))}
       </div>
       {error ? <p className="business-app-alert" data-tone="warn" role="alert" data-testid="biz-daypart-error">{error}</p> : null}
-      {saved ? <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-daypart-saved">Границы сохранены для этой кофейни.</p> : null}
-      <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-daypart-save">
-        Сохранить часы
+      <button
+        type="submit"
+        className={`business-app-btn ${saved ? "business-app-btn-cta" : "business-app-btn-primary"} business-app-focus-ring`}
+        data-state={saved ? "saved" : "idle"}
+        data-testid="biz-daypart-save"
+      >
+        <span aria-live="polite">{saved ? DAYPART_HOURS_SAVED_LABEL : DAYPART_HOURS_SAVE_LABEL}</span>
       </button>
     </form>
   );

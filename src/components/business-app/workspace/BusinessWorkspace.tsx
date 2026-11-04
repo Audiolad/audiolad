@@ -113,10 +113,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   });
   const boundaryRef = useRef<string | null>(null);
   const statusRef = useRef(player.view.status);
+  const currentIndexRef = useRef(currentIndex);
   useEffect(() => {
     const playing = model.tracks[currentIndex];
     boundaryRef.current = player.queueOrder && playing ? playing.audioItemId : null;
     statusRef.current = player.view.status;
+    currentIndexRef.current = currentIndex;
   }, [player.queueOrder, model.tracks, currentIndex, player.view.status]);
   useEffect(() => () => {
     for (const timer of feedbackTimers.current) window.clearTimeout(timer);
@@ -173,10 +175,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               orderedIds: json.order,
               restart: peekAtmosphereRestart(),
               status: statusRef.current,
+              currentIndex: currentIndexRef.current,
             });
             if (plan && indices.length > 0) {
               takeAtmosphereRestart();
-              applyAtmosphereQueue(indices, { play: plan.play });
+              applyAtmosphereQueue(indices);
             } else if (!cancelled) {
               setQueueOrder(indices);
             }

@@ -5,7 +5,7 @@
  * - A refused save changes nothing.
  * - A newer chip change or rebuild (another generation) owns the queue, the marker and the flag.
  * - Saved and still on the page: store the profile, set the restart marker, rebuild through the
- *   layout player (skip fade). A failed rebuild is reported, not shown as success.
+ *   layout player (from the next track). A failed rebuild is reported, not shown as success.
  * - Left the page (before or during the queue request): keep the marker and tell an open music
  *   page to fetch the queue itself – one request path, the settings request is cancelled.
  */

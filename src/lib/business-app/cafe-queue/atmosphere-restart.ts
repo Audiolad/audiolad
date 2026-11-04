@@ -3,7 +3,7 @@
  *
  * The settings page and the music page do not share a catalog. The button records
  * whether music was already playing. When the music page receives the new queue,
- * it starts at that queue's first track instead of the saved place.
+ * it replaces the upcoming order, preserving a playing/loading track and its position.
  */
 
 const ATMOSPHERE_RESTART_KEY = "audiolad-business-atmosphere-restart";
@@ -99,19 +99,36 @@ export function atmosphereQueueStart(
   return 0;
 }
 
+/** Applying a queue never starts audio. An active track is the boundary for the new order. */
+export function atmosphereQueuePlan(input: {
+  indices: readonly number[];
+  currentIndex: number;
+  status: string;
+}): { order: number[]; index: number; keepCurrent: boolean; play: false } {
+  const keepCurrent = input.status === "playing" || input.status === "loading";
+  const order = keepCurrent
+    ? [input.currentIndex, ...input.indices.filter((index) => index !== input.currentIndex)]
+    : [...input.indices];
+  return { order, index: order[0] ?? 0, keepCurrent, play: false };
+}
+
 /**
- * Where playback goes after «Создать атмосферу».
- * Null means this queue refresh is not that handoff, so the saved place stays.
- * `play` is true when music was already playing: the first track of the new queue must start.
+ * A marker requests an explicit queue application, even while paused.
+ * An active player also adopts ordinary refreshes without touching the current track.
+ * The marker's historical `playing` flag must never override the live transport state.
  */
 export function atmospherePlaybackPlan(input: {
   tracks: readonly { audioItemId: string }[];
   orderedIds: readonly unknown[];
   restart: AtmosphereRestart | null;
   status: string;
-}): { index: number; play: boolean } | null {
-  if (!input.restart) return null;
-  const index = atmosphereQueueStart(input.tracks, input.orderedIds);
-  const play = input.restart.playing || input.status === "playing" || input.status === "loading";
-  return { index, play };
+  currentIndex: number;
+}): { index: number; play: false } | null {
+  const plan = atmosphereQueuePlan({
+    indices: [atmosphereQueueStart(input.tracks, input.orderedIds)],
+    currentIndex: input.currentIndex,
+    status: input.status,
+  });
+  if (!input.restart && !plan.keepCurrent) return null;
+  return { index: plan.index, play: plan.play };
 }
