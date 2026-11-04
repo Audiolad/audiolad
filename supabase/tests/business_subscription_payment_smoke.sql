@@ -1,4 +1,4 @@
--- Disposable smoke for 20270205130000_business_subscription_payment.sql.
+-- Disposable smoke for business subscription payments, including guest fulfilment.
 -- No Tochka HTTP. Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;
@@ -332,6 +332,170 @@ BEGIN
   END IF;
 
   RAISE NOTICE 'business_subscription_payment_smoke: ok';
+END $$;
+
+-- Guest payment timeline: gift day 3, then paid-period day 25. Explicit bank
+-- confirmation timestamps simulate time without sleeps or changing the clock.
+DO $$
+DECLARE
+  v_guest uuid := gen_random_uuid();
+  v_org uuid := gen_random_uuid();
+  v_order uuid;
+  v_first_order uuid;
+  v_payment uuid;
+  v_event uuid;
+  v_event2 uuid;
+  v_t0 timestamptz := clock_timestamp() - interval '29 days';
+  v_gift_end timestamptz;
+  v_confirmed timestamptz;
+  v_expected timestamptz;
+  v_paid timestamptz;
+  v_hash text;
+  v_result jsonb;
+  v_step integer;
+BEGIN
+  INSERT INTO auth.users (id, email) VALUES (v_guest, NULL);
+  INSERT INTO public.business_organizations (id, name) VALUES (v_org, 'Кафе гостя');
+  INSERT INTO public.business_organization_members (organization_id, user_id, role)
+    VALUES (v_org, v_guest, 'owner');
+  v_gift_end := v_t0 + interval '4 days';
+  INSERT INTO public.access_grants (email_hash, user_id, kind, starts_at, ends_at, source)
+    VALUES (NULL, v_guest, 'business_new_client', v_t0 - interval '3 days', v_gift_end, 'trial');
+
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', v_guest::text, true);
+  SET LOCAL ROLE authenticated;
+  PERFORM * FROM public.accept_business_offer(
+    'b2b-terms', 'r8-2026-10-18',
+    '0fbbfe610f344920a084e58b5987cce5f4d7033528abc8760aac07b89de7078a'
+  );
+  RESET ROLE;
+
+  FOR v_step IN 1..4 LOOP
+    -- Steps 1/2 are email-less real payments, step 3 is an email-less test.
+    -- Step 4 binds email: the existing guest end must survive and be folded
+    -- into one legacy email summary on the next real payment.
+    IF v_step = 4 THEN
+      UPDATE auth.users SET email = 'cafe-bound-guest@example.test' WHERE id = v_guest;
+      v_hash := public.business_subscription_email_hash('cafe-bound-guest@example.test');
+      -- Also exercise collision with an already present email summary. It is
+      -- older than the guest end; merging must take MAX, never add both.
+      INSERT INTO public.access_paid_periods (email_hash, user_id, kind, paid_until)
+        VALUES (v_hash, v_guest, 'business_new_client', v_expected - interval '1 day');
+      SELECT max(paid_until) INTO v_paid FROM public.access_paid_periods
+        WHERE kind = 'business_new_client' AND (user_id = v_guest OR email_hash = v_hash);
+      IF v_paid IS DISTINCT FROM v_expected THEN
+        RAISE EXCEPTION 'email binding lost guest access';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM public.resolve_access_grant(v_hash, v_guest, 'business_new_client')
+                     WHERE ends_at = v_gift_end) THEN
+        RAISE EXCEPTION 'email binding lost the guest trial identity';
+      END IF;
+    END IF;
+
+    SET LOCAL ROLE authenticated;
+    SELECT o.order_id INTO v_order
+      FROM public.create_business_subscription_order(gen_random_uuid()) AS o;
+    RESET ROLE;
+    IF v_step = 1 THEN v_first_order := v_order; END IF;
+    IF v_step = 3 THEN
+      UPDATE public.orders SET is_test = true, test_reason = 'smoke' WHERE id = v_order;
+    END IF;
+    v_payment := gen_random_uuid();
+    v_event := gen_random_uuid();
+    v_event2 := gen_random_uuid();
+    v_confirmed := CASE WHEN v_step = 1 THEN v_t0 ELSE v_t0 + interval '29 days' END;
+    INSERT INTO public.payments (
+      id, order_id, provider, idempotency_key, status, amount_minor, currency,
+      confirmed_at, provider_metadata, is_test, test_reason
+    ) VALUES (
+      v_payment, v_order, 'tochka', 'pay-' || v_payment::text, 'pending', 79900, 'RUB',
+      v_confirmed, '{}'::jsonb, v_step = 3, CASE WHEN v_step = 3 THEN 'smoke' ELSE NULL END
+    );
+    INSERT INTO public.payment_webhook_events (
+      id, provider, dedup_key, provider_payment_id, event_type, processing_status, signature_verified
+    ) VALUES (
+      v_event, 'tochka', 'tochka:tx:' || v_event::text, 'op-' || v_payment::text,
+      'acquiringInternetPayment', 'received', true
+    );
+    v_result := public.fulfill_tochka_payment_transactional(
+      v_event, 'op-' || v_payment::text, v_payment, 79900, 'RUB', 'APPROVED'
+    );
+    IF v_result->>'outcome' IS DISTINCT FROM 'completed'
+       OR (SELECT status FROM public.orders WHERE id = v_order) IS DISTINCT FROM 'paid'
+       OR (SELECT status FROM public.payments WHERE id = v_payment) IS DISTINCT FROM 'succeeded'
+       OR (SELECT processing_status FROM public.payment_webhook_events WHERE id = v_event)
+            IS DISTINCT FROM 'processed' THEN
+      RAISE EXCEPTION 'guest settlement step % did not commit all states: %', v_step, v_result;
+    END IF;
+
+    IF v_step = 1 THEN
+      v_expected := v_gift_end + interval '30 days';
+    ELSIF v_step <> 3 THEN
+      v_expected := v_expected + interval '30 days';
+    END IF;
+    SELECT paid_until INTO v_paid FROM public.access_paid_periods
+      WHERE user_id = v_guest AND kind = 'business_new_client';
+    IF v_paid IS DISTINCT FROM v_expected THEN
+      RAISE EXCEPTION 'guest step % end % expected %', v_step, v_paid, v_expected;
+    END IF;
+    IF v_step = 2 AND v_paid IS DISTINCT FROM v_confirmed + interval '35 days' THEN
+      RAISE EXCEPTION 'day 25 renewal must leave 35 days';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.business_subscription_periods
+      WHERE order_id = v_order AND opens_access = (v_step <> 3)
+        AND email_hash IS NOT DISTINCT FROM v_hash
+        AND period_start = CASE
+          WHEN v_step = 1 THEN v_gift_end
+          WHEN v_step = 3 THEN v_expected
+          ELSE v_expected - interval '30 days' END
+        AND period_end = CASE WHEN v_step = 3 THEN v_expected + interval '30 days' ELSE v_expected END
+    ) THEN
+      RAISE EXCEPTION 'guest step % period or test marker incorrect', v_step;
+    END IF;
+
+    v_result := public.fulfill_tochka_payment_transactional(
+      v_event, 'op-' || v_payment::text, v_payment, 79900, 'RUB', 'APPROVED'
+    );
+    IF v_result->>'outcome' IS DISTINCT FROM 'already_complete' THEN
+      RAISE EXCEPTION 'guest same-event replay step %: %', v_step, v_result;
+    END IF;
+    INSERT INTO public.payment_webhook_events (
+      id, provider, dedup_key, provider_payment_id, event_type, processing_status, signature_verified
+    ) VALUES (
+      v_event2, 'tochka', 'tochka:tx:' || v_event2::text, 'op-' || v_payment::text,
+      'acquiringInternetPayment', 'received', true
+    );
+    v_result := public.fulfill_tochka_payment_transactional(
+      v_event2, 'op-' || v_payment::text, v_payment, 79900, 'RUB', 'APPROVED'
+    );
+    IF (SELECT count(*) FROM public.business_subscription_periods WHERE order_id = v_order) <> 1
+       OR (SELECT paid_until FROM public.access_paid_periods
+           WHERE user_id = v_guest AND kind = 'business_new_client') IS DISTINCT FROM v_expected
+       OR (SELECT processing_status FROM public.payment_webhook_events WHERE id = v_event2)
+            IS DISTINCT FROM 'duplicate' THEN
+      RAISE EXCEPTION 'guest replay step % extended access or left event unprocessed: %', v_step, v_result;
+    END IF;
+    -- Exercise the inner function's order-period guard independently of the
+    -- outer webhook's early replay return.
+    v_result := public.apply_business_subscription_for_order(v_order);
+    IF v_result->>'already' IS DISTINCT FROM 'true'
+       OR (SELECT paid_until FROM public.access_paid_periods
+           WHERE user_id = v_guest AND kind = 'business_new_client') IS DISTINCT FROM v_expected THEN
+      RAISE EXCEPTION 'guest inner replay step % extended access', v_step;
+    END IF;
+  END LOOP;
+
+  IF (SELECT count(*) FROM public.access_paid_periods WHERE user_id = v_guest) <> 1
+     OR NOT EXISTS (SELECT 1 FROM public.access_paid_periods WHERE user_id = v_guest AND email_hash = v_hash)
+     OR (SELECT count(*) FROM public.access_grant_events
+         WHERE user_id = v_guest AND event_name = 'subscription_renewed') <> 1
+     OR (SELECT email_hash FROM public.business_subscription_periods WHERE order_id = v_first_order) IS NOT NULL
+     OR (SELECT ends_at FROM public.access_grants WHERE user_id = v_guest) IS DISTINCT FROM v_gift_end THEN
+    RAISE EXCEPTION 'guest binding duplicated summary/event or rewrote history/gift';
+  END IF;
+  RAISE NOTICE 'business_subscription_payment_guest_smoke: ok';
 END $$;
 
 ROLLBACK;

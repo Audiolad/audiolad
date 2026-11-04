@@ -5,8 +5,8 @@ import { peekAccessPeriodsWith } from "./peek-closure";
 import { resolveCustomerAccess } from "./policy";
 import type { BusinessAccessPrincipal } from "./principal";
 
-/** Guests only read the bootstrap grant. No activation, email binding or events. */
+/** Guests read the bootstrap grant and their own paid period. No activation, email binding or events. */
 export async function readGuestBusinessAccess(principal: BusinessAccessPrincipal, now = new Date()) {
-  const { grant } = await peekAccessPeriodsWith(createPeekReader(createServiceRoleClient()), principal);
-  return { access: resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil: null }) };
+  const { grant, paidUntil } = await peekAccessPeriodsWith(createPeekReader(createServiceRoleClient()), principal);
+  return { access: resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil }) };
 }
