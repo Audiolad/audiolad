@@ -42,6 +42,7 @@ import {
   parseBusinessSoundProfile,
   serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
+import { latestVenueProfile, recordVenueSound, serialVenueWrite } from "@/lib/business-app/venue-sound-writes";
 import { validateCafeDaypartHours, type CafeDaypartHours, type CafeDaypartMode } from "@/lib/business-app/cafe-queue/prefs";
 import { POINT_SOUND_CHANGED_EVENT } from "@/lib/business-app/point-sound";
 
@@ -113,12 +114,17 @@ export default function BusinessPlayerSettings({
   const timers = useRef<number[]>([]);
   const generation = useRef(0);
   const mounted = useRef(true);
-  /** Venue writes go one after another, so an older save never lands after a newer one. */
-  const writeChain = useRef<Promise<unknown>>(Promise.resolve());
-  const serialWrite = <T,>(run: () => Promise<T>): Promise<T> => {
-    const next = writeChain.current.then(run, run);
-    writeChain.current = next.catch(() => undefined);
-    return next;
+  /**
+   * Venue writes go one after another for the whole tab (venue-sound-writes.ts), so an older
+   * save never lands after a newer one, even from a builder that was collapsed and reopened.
+   */
+  const serialWrite = <T,>(run: () => Promise<T>): Promise<T> => (locationId ? serialVenueWrite(locationId, run) : run());
+  const seededVersion = saved?.settingsVersion ?? 0;
+  /** The atmosphere the venue row holds: this instance's seed or a newer save from this tab. */
+  const currentVenue = (): { profile: GuestCoffeeProfile; known: boolean } => {
+    if (!locationId) return { profile: venueProfile.current, known: venueKnown.current };
+    const latest = latestVenueProfile(locationId, venueProfile.current, seededVersion);
+    return { profile: latest.profile, known: latest.known || venueKnown.current };
   };
 
   useEffect(() => {
@@ -166,6 +172,7 @@ export default function BusinessPlayerSettings({
       const { saveLocationSoundSettings } = await import("@/app/business-app/sound-settings-actions");
       const result = await saveLocationSoundSettings(locationId, draft);
       if (!result.ok) return result.error;
+      if (venueOwner) recordVenueSound(locationId, nextProfile, result.settingsVersion);
       return null;
     } catch {
       return SAVE_ERROR;
@@ -183,6 +190,7 @@ export default function BusinessPlayerSettings({
       // Saved: daypart and hours writes from now on keep this atmosphere.
       venueProfile.current = nextProfile;
       venueKnown.current = true;
+      recordVenueSound(locationId, nextProfile, result.settingsVersion);
       return null;
     } catch {
       return REBUILD_ERROR;
@@ -252,8 +260,9 @@ export default function BusinessPlayerSettings({
     if (ownerRebuild) {
       if (confirm) return;
       const next = profile;
+      const venue = currentVenue();
       setConfirm({
-        text: atmosphereRebuildConfirmText(next, venueKnown.current ? venueProfile.current : null),
+        text: atmosphereRebuildConfirmText(next, venue.known ? venue.profile : null),
         run: () => startAtmosphere(next),
       });
       return;
@@ -316,8 +325,7 @@ export default function BusinessPlayerSettings({
             if (generation.current !== gen) return "stale" as const;
             storeBuilt();
             markAtmosphereRestart(playingNow);
-            // Left the page: the music page applies the stored profile through the restart marker.
-            if (!mounted.current) return "deferred" as const;
+            // The cabinet player lives in the layout: it rebuilds even if the owner already left this page.
             const result = await (player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const));
             if (result === "failed") {
               clearAtmosphereRestart();
@@ -435,7 +443,7 @@ export default function BusinessPlayerSettings({
           onDaypart={(mode) => {
             commitVenue(() => {
               queue.setDaypartMode(mode);
-              void persist(venueOwner ? () => venueProfile.current : profile, mode, queue.hours).then((error) => setSaveError(error));
+              void persist(venueOwner ? () => currentVenue().profile : profile, mode, queue.hours).then((error) => setSaveError(error));
             });
           }}
           hours={queue.hours}
@@ -449,7 +457,7 @@ export default function BusinessPlayerSettings({
             if (invalid) return invalid;
             const save = () => {
               queue.setDaypartHours(next);
-              return persist(venueOwner ? () => venueProfile.current : profile, queue.prefs.daypartMode, next);
+              return persist(venueOwner ? () => currentVenue().profile : profile, queue.prefs.daypartMode, next);
             };
             if (pointDevice || !locationId) return save();
             return new Promise((resolve) => {
