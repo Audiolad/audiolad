@@ -106,7 +106,7 @@ const at = (html: string, testid: string) => {
   assert.match(source, /persisted\.then\(async \(error\) => \{\s*if \(error\) return "failed" as const;/);
   // The layout player rebuilds even if the owner already left the page (no mounted gate here).
   // Left the page: the open music page owns the queue request (no second rebuild path).
-  assert.match(source, /if \(!mounted\.current\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
+  assert.match(source, /if \(!mounted\.current\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}\s*rebuildInFlight\.current = true;\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
   assert.match(source, /const rowProfile = saved \? locationSoundProfile\(saved\) : venueProfile\.current;/);
   assert.match(source, /latestVenueProfile\(locationId, rowProfile, saved\?\.settingsVersion \?\? 0\)/);
   {
@@ -117,6 +117,14 @@ const at = (html: string, testid: string) => {
     const workspace = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
     assert.match(workspace, /cancelled = true;\s*ac\.abort\(\);/);
     assert.match(workspace, /queue\.profile\.character/);
+    assert.match(prefs, /setAtmosphereRevision\(\(n\) => n \+ 1\)/);
+    assert.match(workspace, /\}\)\}#\$\{queue\.atmosphereRevision\}`;/);
+  }
+  {
+    // Navigation after the save but before the queue answer: the settings request is cancelled
+    // and the music page takes over with the marker kept.
+    assert.match(source, /if \(rebuildInFlight\.current\) cancelRebuild\.current\(\);/);
+    assert.match(source, /if \(!mounted\.current && result !== "applied"\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}/);
   }
   assert.match(source, /serialVenueWrite\(locationId, run\)/);
   assert.match(source, /recordVenueSound\(locationId, nextProfile, result\.settingsVersion\)/);

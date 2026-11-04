@@ -114,6 +114,12 @@ export default function BusinessPlayerSettings({
   const timers = useRef<number[]>([]);
   const generation = useRef(0);
   const mounted = useRef(true);
+  /** A settings-owned queue rebuild is waiting for the server. */
+  const rebuildInFlight = useRef(false);
+  const cancelRebuild = useRef<() => void>(() => {});
+  useEffect(() => {
+    cancelRebuild.current = () => player?.cancelAtmosphereRebuild();
+  });
   /**
    * Venue writes go one after another for the whole tab (venue-sound-writes.ts), so an older
    * save never lands after a newer one, even from a builder that was collapsed and reopened.
@@ -215,6 +221,8 @@ export default function BusinessPlayerSettings({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Leaving the page: the open music page owns the queue request from now on.
+      if (rebuildInFlight.current) cancelRebuild.current();
       for (const timer of timers.current) window.clearTimeout(timer);
       timers.current = [];
     };
@@ -338,7 +346,14 @@ export default function BusinessPlayerSettings({
               announceAtmosphereSaved();
               return "deferred" as const;
             }
+            rebuildInFlight.current = true;
             const result = await (player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const));
+            rebuildInFlight.current = false;
+            // Left during the request (cancelled on unmount): hand over to the music page, keep the marker.
+            if (!mounted.current && result !== "applied") {
+              announceAtmosphereSaved();
+              return "deferred" as const;
+            }
             if (result === "failed") {
               clearAtmosphereRestart();
               return "player-failed" as const;

@@ -97,14 +97,16 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   // The live refresh (router.refresh every few seconds) passes a new model object with the same
   // tracks. The queue request depends on this key, not on object identity: an unchanged key keeps
   // the queue the player already has instead of asking the server for a new random mix.
-  const queueBuildKey = cafeQueueBuildKey({
+  // A saved «Пересобрать атмосферу» bumps the revision: a new queue even for unchanged choices,
+  // and the request for the previous one is cancelled.
+  const queueBuildKey = `${cafeQueueBuildKey({
     spaceId: model.spaceId,
     tracks: model.tracks,
     character: queue.profile.character,
     direction: queue.profile.direction,
     daypart: queue.effectiveDaypart,
     feedback: queue.feedback,
-  });
+  })}#${queue.atmosphereRevision}`;
   const queueInputRef = useRef({ model, queue });
   useLayoutEffect(() => {
     queueInputRef.current = { model, queue };

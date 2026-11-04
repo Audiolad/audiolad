@@ -50,6 +50,8 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
   const [hours, setHours] = useState(seed?.hours ?? CAFE_DAYPART_HOURS_DEFAULT);
   const [minuteOfDay, setMinuteOfDay] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  /** Bumped by «Пересобрать атмосферу» saves: the music page asks for a new queue even for unchanged choices. */
+  const [atmosphereRevision, setAtmosphereRevision] = useState(0);
   const seedRef = useRef(seed);
 
   useEffect(() => {
@@ -120,6 +122,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
       }
     };
     const onAtmosphereSaved = () => {
+      setAtmosphereRevision((n) => n + 1);
       try {
         setProfile(parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
       } catch {
@@ -186,6 +189,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
 
   return {
     ready,
+    atmosphereRevision,
     profile,
     prefs,
     feedback,
