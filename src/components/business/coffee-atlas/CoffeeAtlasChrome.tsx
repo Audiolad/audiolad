@@ -107,7 +107,7 @@ export function CoffeeAtlasOffer({ headingId }: { headingId: string }) {
         <div className="atlas-offer__action">
           <p className="atlas-offer__price" aria-hidden="true">
             {COFFEE_ATLAS_OFFER.price}
-            <span>/ мес</span>
+            <span>{COFFEE_ATLAS_OFFER.period}</span>
           </p>
           <CoffeeAtlasCtaButton className="atlas-btn atlas-btn--primary atlas-btn--wide" />
           <p className="atlas-offer__note">{COFFEE_ATLAS_OFFER.trial}</p>

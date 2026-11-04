@@ -9,6 +9,7 @@ import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAcce
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { GUEST_COFFEE_PRICE } from "@/lib/business-app/guest-coffee/copy";
 import { BUSINESS_TRIAL_CARD } from "@/lib/business/landing";
+import { BUSINESS_PLAN_PERIOD_LABEL } from "@/lib/business/plan";
 
 /**
  * Guest coffee page only. The price and the «no card» line come from the live plan:
@@ -31,7 +32,7 @@ export default function GuestCoffeeGiftCta() {
         {`Получить ${BUSINESS_GIFT_TITLE}`}
       </BusinessGuestStartCta>
       <p className="text-center text-sm text-[var(--biz-text-muted)]">
-        {`Со всеми функциями. Далее ${GUEST_COFFEE_PRICE} за 30 дней (${card})`}
+        {`Со всеми функциями. Далее ${GUEST_COFFEE_PRICE} ${BUSINESS_PLAN_PERIOD_LABEL} (${card})`}
       </p>
     </div>
   );
