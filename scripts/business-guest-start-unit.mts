@@ -242,7 +242,45 @@ console.log("business-guest-start-unit: ok");
 {
   // The CTA follows every redirect the start answers with, and only those.
   const cta = readFileSync(new URL("../src/components/business-app/BusinessGuestStartCta.tsx", import.meta.url), "utf8");
-  assert.match(cta, /GUEST_START_REDIRECTS\.includes\(result\.redirect\)/);
+  const request = readFileSync(new URL("../src/lib/business-guest/start-request.ts", import.meta.url), "utf8");
+  assert.match(request, /GUEST_START_REDIRECTS\.includes\(result\.redirect\)/);
+  assert.match(cta, /requestGuestStart\(/, "the CTA goes through the bounded request");
+  assert.doesNotMatch(cta, /await fetch\(/, "no unbounded fetch in the CTA");
   assert.doesNotMatch(cta, /result\.redirect === "\/"/);
   assert.doesNotMatch(cta, /business-guest\/start"/, "client bundle must not import node:crypto start.ts");
+}
+
+{
+  // P0 04.11: the start button must never stay «Запускаем кабинет…» forever.
+  const { requestGuestStart, GUEST_START_TIMEOUT_MS } = await import("../src/lib/business-guest/start-request");
+  const { BUSINESS_GUEST_START_COPY: c } = await import("../src/lib/business-guest/copy");
+  assert.ok(GUEST_START_TIMEOUT_MS >= 10_000 && GUEST_START_TIMEOUT_MS <= 30_000);
+  const json = (status: number, body: unknown) => async () => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+  const t0 = Date.now();
+  // Fetch that never settles and ignores the abort signal (dead mobile connection).
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: () => new Promise(() => {}), timeoutMs: 50 }), { kind: "error", message: c.timeout });
+  // Fetch that honours the signal.
+  let aborted = false;
+  assert.deepEqual(await requestGuestStart({}, { timeoutMs: 50, fetchImpl: (_u, init) => new Promise((_, reject) => { init.signal?.addEventListener("abort", () => { aborted = true; reject(new Error("AbortError")); }); }) }), { kind: "error", message: c.timeout });
+  assert.ok(aborted, "the request is aborted on timeout");
+  // Headers arrive, body never does.
+  assert.deepEqual(await requestGuestStart({}, { timeoutMs: 50, fetchImpl: async () => ({ ok: true, status: 200, json: () => new Promise(() => {}) }) }), { kind: "error", message: c.timeout });
+  assert.ok(Date.now() - t0 < 2000, "timeouts settle promptly");
+  assert.deepEqual(await requestGuestStart({}, { online: false, fetchImpl: () => { throw new Error("must not send offline"); } }), { kind: "error", message: c.offline });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: async () => { throw new TypeError("Failed to fetch"); } }), { kind: "error", message: c.failed });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError("html"); } }) }), { kind: "error", message: c.failed });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(429, { ok: false }) }), { kind: "error", message: c.limit });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(409, { ok: false, code: "offer_changed" }) }), { kind: "error", message: c.offerChanged });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/auth/business-return?site=coffee" }) }), { kind: "redirect", url: "/auth/business-return?site=coffee" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/" }) }), { kind: "redirect", url: "/" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "https://evil.example/" }) }), { kind: "error", message: c.failed });
+  // Request shape is unchanged: same endpoint, JSON body, same-origin cookies.
+  let seen: { url: string; init: RequestInit } | null = null;
+  await requestGuestStart({ accepted: true, idempotencyKey: "k" }, { fetchImpl: async (url, init) => { seen = { url, init }; return { ok: true, status: 200, json: async () => ({ ok: true, redirect: "/" }) }; } });
+  assert.equal(seen!.url, "/api/business/guest-start");
+  assert.equal(seen!.init.method, "POST");
+  assert.equal(seen!.init.credentials, "same-origin");
+  assert.deepEqual(JSON.parse(String(seen!.init.body)), { accepted: true, idempotencyKey: "k" });
+  for (const text of [c.timeout, c.offline, c.retry]) assert.doesNotMatch(text, /—|-/u, "en dash only in user copy");
+  console.log("business-guest-start-request-unit: ok");
 }

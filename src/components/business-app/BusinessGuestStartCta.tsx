@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
-import { GUEST_START_REDIRECTS } from "@/lib/business-guest/redirects";
+import { GUEST_START_TIMEOUT_MS, requestGuestStart } from "@/lib/business-guest/start-request";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
 
@@ -36,27 +36,34 @@ export default function BusinessGuestStartCta({ href, className, children, testI
     busy.current = true;
     setLoading(true);
     setError(null);
+    let navigating = false;
     try {
       if (!key.current) {
         const stored = sessionStorage.getItem(STORAGE_KEY);
         key.current = stored && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored) ? stored : crypto.randomUUID();
         sessionStorage.setItem(STORAGE_KEY, key.current);
       }
-      const response = await fetch("/api/business/guest-start", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ accepted: true, offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash, idempotencyKey: key.current, ...(attributionEnabled ? storedAttribution() : {}) }),
-      });
-      const result = await response.json();
-      if (response.ok && result.ok === true && typeof result.redirect === "string" && GUEST_START_REDIRECTS.includes(result.redirect)) {
+      // Always settles (timeout included); a retry reuses the same idempotency key.
+      const outcome = await requestGuestStart(
+        { accepted: true, offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash, idempotencyKey: key.current, ...(attributionEnabled ? storedAttribution() : {}) },
+        { online: typeof navigator === "undefined" ? undefined : navigator.onLine },
+      );
+      if (outcome.kind === "redirect") {
         // A finished start must not pin a later start in this tab to the old guest's key.
         try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
         key.current = null;
-        window.location.assign(result.redirect);
+        navigating = true;
+        window.location.assign(outcome.url);
+        // If the page is still here (navigation blocked or cancelled), give the button back.
+        window.setTimeout(() => setLoading(false), GUEST_START_TIMEOUT_MS);
         return;
       }
-      setError(response.status === 429 ? copy.limit : result.code === "offer_changed" ? copy.offerChanged : copy.failed);
+      setError(outcome.message);
     } catch { setError(copy.failed); }
-    finally { busy.current = false; setLoading(false); }
+    finally {
+      busy.current = false;
+      if (!navigating) setLoading(false);
+    }
   }
 
   return <div data-testid={`${testId}-guest-start`}>
@@ -68,7 +75,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
         <input type="checkbox" checked={accepted} disabled={loading} onChange={(event) => setAccepted(event.target.checked)} data-testid={`${testId}-accept`} />
         <span>{copy.acceptance}</span>
       </label>
-      <button type="button" className={className} disabled={!accepted || loading} aria-busy={loading} onClick={start} data-testid={`${testId}-start`}>{loading ? copy.loading : copy.start}</button>
+      <button type="button" className={className} disabled={!accepted || loading} aria-busy={loading} onClick={start} data-testid={`${testId}-start`}>{loading ? copy.loading : error ? copy.retry : copy.start}</button>
       {error ? <p role="alert" data-testid={`${testId}-error`}>{error} <a href={href}>Зарегистрироваться</a></p> : null}
     </div> : null}
   </div>;
