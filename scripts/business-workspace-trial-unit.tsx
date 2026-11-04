@@ -431,8 +431,10 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
     items,
   );
   await ctl.playIndex(0);
-  assert.equal(ctl.status, "error");
-  assert.match(ctl.message ?? "", /Проверьте интернет и нажмите «Играть»/);
+  // P0-3: a network failure is not a dead stop – the player reconnects with backoff.
+  assert.equal(ctl.status, "loading");
+  assert.equal(ctl.message, "Связь восстанавливается…");
+  assert.equal(ctl.recovering, true);
   allow = true;
   await ctl.playIndex(0);
   assert.equal(ctl.status, "playing");
@@ -790,7 +792,9 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(workspaceSource, /queue\.prefs\.energyOffset/);
   assert.match(workspaceSource, /boundaryAudioItemId/);
   assert.match(html, /data-testid="biz-workspace-volume"/);
-  assert.match(html, /preload="none"/);
+  // P0-3: buffer ahead once a signed (access-checked) src is set; the element has no src before Play.
+  assert.match(html, /preload="auto"/);
+  assert.doesNotMatch(html, /<audio[^>]*\ssrc=/);
   assert.doesNotMatch(html, /autoplay/i);
 }
 {

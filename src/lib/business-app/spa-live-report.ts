@@ -67,8 +67,14 @@ export type SpaAudioSnapshot = { paused: boolean; ended: boolean };
  * Reported state comes from the real audio element, not from the UI controller: a track the
  * element is playing is "playing" even if the controller thinks it is paused, and vice versa.
  */
-export function deriveSpaPlaybackState(controllerStatus: string | undefined, audio: SpaAudioSnapshot, hasTrack: boolean): SpaPlaybackState {
-  if (controllerStatus === "error") return "error";
+/** `recovering`: the player lost the stream and is reconnecting (P0-3) – the hall is silent. */
+export function deriveSpaPlaybackState(
+  controllerStatus: string | undefined,
+  audio: SpaAudioSnapshot,
+  hasTrack: boolean,
+  recovering = false,
+): SpaPlaybackState {
+  if (controllerStatus === "error" || recovering) return "error";
   if (!hasTrack || audio.ended) return "stopped";
   return audio.paused ? "paused" : "playing";
 }

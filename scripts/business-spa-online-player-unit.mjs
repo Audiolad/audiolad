@@ -107,12 +107,16 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   assert.match(audio.src, /0002/);
 }
 
-// 7. Autoplay refusal -> paused with a hint, not an error loop.
+// 7. Autoplay refusal -> paused, not an error loop. P0-3: the hint is the green
+//    «Включить музыку» button (needsGesture), not a text message; no retry is scheduled.
 {
-  const { p } = make({ playFn: async () => { throw new Error("NotAllowedError"); } });
+  const { p, calls } = make({ playFn: async () => { throw new Error("NotAllowedError"); } });
   await p.toggle();
   assert.equal(p.status, "paused");
-  assert.ok(p.message);
+  assert.equal(p.needsGesture, true);
+  assert.equal(p.recovering, false);
+  assert.equal(calls.length, 1);
+  p.dispose();
 }
 
 // 9. Codex O1 #1: hard stop at playable_until even though the browser already buffered audio;
@@ -150,16 +154,24 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   void calls;
 }
 
-// 10. Codex O1 #2: repeated mid-stream errors on one track do not loop forever.
+// 10. Codex O1 #2: repeated mid-stream errors on one track do not loop (no sign storm).
+//     P0-3 changed the outcome: instead of a dead "error" stop the player reconnects with
+//     backoff (see business-spa-player-recovery-unit.mts); bursts of errors while a retry
+//     is pending are ignored.
 {
-  const { p, calls } = make({ items: [item(1), item(2)] });
+  const timers = [];
+  const clock = { setTimer: (fn, ms) => { const h = { fn, ms }; timers.push(h); return h; }, clearTimer: (h) => { const i = timers.indexOf(h); if (i >= 0) timers.splice(i, 1); } };
+  const { p, calls } = make({ items: [item(1), item(2)], clock });
   await p.toggle();
   for (let k = 0; k < 8; k++) await p.onError();
-  assert.equal(p.status, "error");
-  assert.ok(calls.length <= 4, `signs=${calls.length}`);
-  // a fresh track (user press) gets its own retry budget
+  assert.equal(p.status, "loading");
+  assert.equal(p.recovering, true);
+  assert.equal(calls.length, 1, `signs=${calls.length}`);
+  // a fresh track (user press) cancels the pending reconnect and plays
   await p.playIndex(1);
   assert.equal(p.status, "playing");
+  assert.equal(p.recovering, false);
+  p.dispose();
 }
 
 // 11. Codex O2 #1: window shortened while play() is pending -> stop at the NEW deadline.
