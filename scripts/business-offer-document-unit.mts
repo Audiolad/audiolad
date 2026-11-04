@@ -186,6 +186,9 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
     assert.match(t, /799\u00a0₽ за 30 дней/);
     assert.doesNotMatch(t, /в месяц/);
   }
+  const giftCta = readFileSync("src/components/business-app/sound/GuestCoffeeGiftCta.tsx", "utf8");
+  assert.match(giftCta, /Далее \$\{GUEST_COFFEE_PRICE\} за 30 дней/);
+  assert.doesNotMatch(giftCta, /BUSINESS_PLAN_PERIOD_LABEL|в месяц/);
 }
 
 console.log("business-offer-document-unit: ok");
