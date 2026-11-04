@@ -73,7 +73,13 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         onChange: () => {
           const c = ctlRef.current;
           if (c) {
-            setView({ items: c.items, status: c.status, current: c.current, message: c.message });
+            setView({
+              items: c.items,
+              status: c.status,
+              current: c.current,
+              // This pilot page has no separate CTA: on an autoplay refusal the Play button is the tap.
+              message: c.message ?? (c.needsGesture ? "Нажмите «Играть», чтобы продолжить." : null),
+            });
             const track = c.current?.audioItemId ?? null;
             if (c.status === "loading" || (c.status === "paused" && audio.paused) || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
             if (c.status !== lastState || track !== lastTrack) {

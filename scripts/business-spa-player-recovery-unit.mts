@@ -360,4 +360,51 @@ function world(opts: {
   }
 }
 
+// 15. Server answers but cannot sign the file: a few retries, then the next track. Any other
+//     non-network refusal (space off, audio replaced) is a visible error, not "reconnecting".
+{
+  const w = world({ sign: (id) => (id === "track-1" ? { ok: false, reason: "sign_failed" } : { ok: true, data: { url: `https://s/${id}` } }) });
+  await w.p.toggle();
+  assert.equal(w.p.recovering, true, "sign_failed is retried first");
+  for (let k = 0; k < 3; k++) await w.advance(w.timers[0]?.ms ?? 0);
+  assert.equal(w.p.current?.audioItemId, "track-2", "missing file skipped after a few tries");
+  assert.equal(w.p.status, "playing");
+
+  const single = world({ items: [item(1)], sign: () => ({ ok: false, reason: "sign_failed" }) });
+  await single.p.toggle();
+  for (let k = 0; k < 6; k++) await single.advance(single.timers[0]?.ms ?? 0);
+  assert.equal(single.p.recovering, true, "one-track hall keeps retrying, never a dead stop");
+
+  for (const reason of ["guest_unavailable", "audio_replaced_reload", "forbidden"]) {
+    const off = world({ sign: () => ({ ok: false, reason }) });
+    await off.p.toggle();
+    assert.equal(off.p.status, "error", `${reason}: visible error`);
+    assert.equal(off.p.recovering, false, `${reason}: no reconnect loop`);
+    assert.notEqual(off.p.message, RECONNECTING_MESSAGE);
+    assert.equal(off.timers.length, 0);
+  }
+}
+
+// 16. Healthy playback forgives earlier errors: separate drops on a long track never skip it.
+{
+  const w = world();
+  await w.p.toggle();
+  let pos = 0;
+  for (let k = 0; k < 6; k++) {
+    await w.p.onError(); // a short drop while online
+    await w.advance(w.timers[0]?.ms ?? 0);
+    assert.equal(w.p.current?.audioItemId, "track-1", `drop ${k + 1}: same track`);
+    assert.equal(w.p.status, "playing");
+    pos += 40; // then 40 s of healthy playback
+    w.audio.currentTime = pos;
+    w.p.onProgress(pos, 900);
+  }
+}
+
+// 17. /spa pilot page (no green CTA there) keeps a hint on an autoplay refusal.
+{
+  const spa = readFileSync(new URL("../src/components/business-app/SpaOnlinePlayer.tsx", import.meta.url), "utf8");
+  assert.match(spa, /c\.needsGesture \? "Нажмите «Играть», чтобы продолжить\." : null/);
+}
+
 console.log("business spa player recovery: ok");

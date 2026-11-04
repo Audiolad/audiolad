@@ -87,6 +87,10 @@ export function isAutoplayRefusal(error: unknown): boolean {
 
 /** Sign errors after which the track is skipped (removed / expired), not retried. */
 const SKIP_REASONS = new Set(["not_in_manifest", "expired", "invalid_request"]);
+/** Sign failures worth a reconnect: no answer, or a storage hiccup on the server. */
+const TRANSIENT_SIGN_REASONS = new Set(["network", "sign_failed"]);
+/** Healthy playback this long since the last (re)start forgives earlier errors on the track. */
+const RECOVERY_HEALTHY_SEC = 30;
 
 export class SpaOnlinePlayer {
   items: SpaManifestItem[];
@@ -122,6 +126,8 @@ export class SpaOnlinePlayer {
   private stallTimer: unknown = null;
   private stallAt = 0;
   private lastPosition = 0;
+  /** Position where the current track last (re)started; errors are forgiven after healthy play. */
+  private healthyFrom = 0;
   private presignedFor: string | null = null;
   private presigned: { audioItemId: string; url: string; at: number } | null = null;
 
@@ -272,6 +278,7 @@ export class SpaOnlinePlayer {
       Math.abs(this.d.audio.currentTime - resume.positionSec) > 2) {
       try { this.d.audio.currentTime = resume.positionSec; } catch { /* not seekable yet */ }
     }
+    this.healthyFrom = Number.isFinite(this.d.audio.currentTime) ? this.d.audio.currentTime : 0;
     this.armDeadline(id, op);
     this.set("playing");
   }
@@ -359,6 +366,7 @@ export class SpaOnlinePlayer {
   onProgress(positionSec: number, durationSec: number): void {
     if (this.disposed || this.status !== "playing" || this.fadingOutPrevious) return;
     if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
+    if (this.errorRetries > 0 && positionSec - this.healthyFrom >= RECOVERY_HEALTHY_SEC) this.errorRetries = 0;
     if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
     const cur = this.current;
     if (!cur || !Number.isFinite(durationSec) || durationSec <= 0) return;
@@ -468,6 +476,19 @@ export class SpaOnlinePlayer {
         this.failures++;
         if (this.failures < this.items.length) return this.next();
         return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
+      }
+      if (!TRANSIENT_SIGN_REASONS.has(r.reason)) {
+        // Space switched off, audio replaced, forbidden…: not a connection problem, say so.
+        return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
+      }
+      if (r.reason === "sign_failed") {
+        // The server answered but could not sign this file: after a few tries move on.
+        this.errorRetries++;
+        if (this.errorRetries >= RECOVERY_SKIP_AFTER_ERRORS && this.items.length > 1) {
+          this.errorRetries = 0;
+          this.resumePoint = null;
+          return this.advance(false);
+        }
       }
       // Network / server hiccup: retry the same track with backoff, never a dead stop.
       return this.recover();
