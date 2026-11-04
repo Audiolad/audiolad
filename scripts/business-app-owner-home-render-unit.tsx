@@ -52,7 +52,7 @@ for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, {
   assert.match(html, /data-step="device" data-done="unknown"/);
   assert.match(html, /data-step="documents" data-done="unknown"/);
   assert.match(html, /business-app-btn-cta/);
-  for (const label of ["Пауза в зале", "Разрешить менять музыку", "Сохранить название", "Изменить звучание", "Последний сигнал от плеера", "Лицензия: нет подтверждённых данных", "data-tone=\"error\"", "Нет связи"]) {
+  for (const label of ["Пауза в зале", "Разрешить менять музыку", "Сохранить название", "Изменить звучание", "Пересобрать атмосферу", "Последний сигнал от плеера", "Лицензия: нет подтверждённых данных", "data-tone=\"error\"", "Нет связи"]) {
     assert.equal(html.includes(label), false, label);
   }
   assert.doesNotMatch(html, /https?:\/\//, "no external links");

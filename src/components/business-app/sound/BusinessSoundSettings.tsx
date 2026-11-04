@@ -53,6 +53,7 @@ export default function BusinessSoundSettings({
   action,
   hint = GUEST_COFFEE_ATMOSPHERE_COPY.settingsHint,
   showDaypart = true,
+  title = "Настройки звучания",
 }: {
   profile: GuestCoffeeProfile;
   onChange: <K extends keyof GuestCoffeeProfile>(key: K, value: GuestCoffeeProfile[K]) => void;
@@ -63,11 +64,13 @@ export default function BusinessSoundSettings({
   hint?: string;
   /** The cabinet queue has its own time-of-day control. The guest studio keeps this one. */
   showDaypart?: boolean;
+  /** Card title. The owner's «Пересобрать атмосферу» names it «Новая атмосфера». */
+  title?: string;
 }) {
   return (
     <section className="business-app-card business-sound-settings" aria-labelledby="business-sound-settings-title" data-testid="biz-sound-settings">
       <h2 id="business-sound-settings-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
-        Настройки звучания
+        {title}
       </h2>
       <ChipGroup legend="Характер заведения" name="biz-sound-character" options={GUEST_COFFEE_CHARACTERS} value={profile.character} onChange={(id) => onChange("character", id)} />
       <ChipGroup legend="Тип звучания" name="biz-sound-direction" options={GUEST_COFFEE_DIRECTIONS} value={profile.direction} onChange={(id) => onChange("direction", id)} />
