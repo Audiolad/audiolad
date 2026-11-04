@@ -442,7 +442,7 @@ await scenario("stage 3: guest sees only its own point; server RPCs and tables a
   assert.ok(second.error || (second.data as { ok?: boolean })?.ok === false, "guest gets exactly one point");
   assert.equal(psql(`SELECT count(*) FROM public.business_organization_members WHERE user_id = '${startedId}'`), "1");
 });
-await scenario("stage 1C: registered user without a Business organization: checkbox stored, onboarding path kept", async () => {
+await scenario("stage 1C: registered user without a Business organization: checkbox stored, continues to /auth/business-return (gift + onboarding), not «/»", async () => {
   const client = freshClient();
   const { data, error } = await client.auth.signUp({ email: `stand-${randomBytes(6).toString("hex")}@yandex.ru`, password: randomBytes(18).toString("base64url") });
   assert.equal(error, null, error?.message);
@@ -452,7 +452,7 @@ await scenario("stage 1C: registered user without a Business organization: check
   for (let i = 0; i < 2; i++) {
     const result = await guestStart(client, "203.0.113.77");
     assert.equal(result.status, 200, JSON.stringify(result.body));
-    assert.deepEqual(result.body, { ok: true, redirect: "/" });
+    assert.deepEqual(result.body, { ok: true, redirect: "/auth/business-return?site=coffee" });
   }
   assert.equal(psql(`SELECT count(*) || '|' || string_agg(document_version || ':' || source, ',') FROM public.business_offer_edition_acceptances WHERE user_id = '${newcomerId}'`),
     `1|${BUSINESS_OFFER_EDITION.version}:guest_start`, "stored once, account-level");
