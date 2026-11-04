@@ -170,8 +170,18 @@ export async function submitAuthorApplication(
       return successState(values, "contact_update");
     }
 
+    // Resubmission after «Отправить на доработку»: consent is account-level
+    // and was already given with the first submission – do not ask again.
+    const consentAlreadyGiven =
+      existing?.status === "needs_changes" &&
+      existing.consent_personal_data === true;
+
+    if (consentAlreadyGiven) {
+      values.consentPersonalData = true;
+    }
+
     const errors = validateAuthorApplicationFormValues(values, {
-      requireConsent: true,
+      requireConsent: !consentAlreadyGiven,
       preservedDisplayName: existing?.display_name ?? null,
     });
 

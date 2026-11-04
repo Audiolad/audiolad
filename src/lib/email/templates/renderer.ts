@@ -13,6 +13,13 @@ import {
   renderAuthorApplicationApprovedEmailText,
 } from "./author-application-approved";
 import {
+  AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_SUBJECT,
+  AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY,
+  AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_TEMPLATE_VERSION,
+  renderAuthorApplicationNeedsChangesEmailHtml,
+  renderAuthorApplicationNeedsChangesEmailText,
+} from "./author-application-needs-changes";
+import {
   AUTHOR_APPLICATION_SUBMITTED_EMAIL_SUBJECT,
   AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY,
   AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_VERSION,
@@ -223,6 +230,35 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
         subject: AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
         html: renderAuthorApplicationApprovedEmailHtml({ siteOrigin }),
         text: renderAuthorApplicationApprovedEmailText({ siteOrigin }),
+      };
+    }
+
+    if (input.templateKey === AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY) {
+      const reviewComment = readString(input.payload, "reviewComment");
+
+      if (!reviewComment) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const rawFieldLabels = input.payload.fieldLabels;
+      const fieldLabels = Array.isArray(rawFieldLabels)
+        ? rawFieldLabels.filter(
+            (label): label is string =>
+              typeof label === "string" && label.trim().length > 0,
+          )
+        : [];
+      const templateInput = {
+        applicantName: readString(input.payload, "applicantName"),
+        reviewComment,
+        fieldLabels,
+        siteOrigin: readString(input.payload, "siteOrigin") ?? undefined,
+      };
+
+      return {
+        ok: true,
+        subject: AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_SUBJECT,
+        html: renderAuthorApplicationNeedsChangesEmailHtml(templateInput),
+        text: renderAuthorApplicationNeedsChangesEmailText(templateInput),
       };
     }
 
@@ -771,6 +807,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY) {
     return AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_APPLICATION_NEEDS_CHANGES_EMAIL_TEMPLATE_VERSION;
   }
 
   if (templateKey === AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {

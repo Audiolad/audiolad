@@ -241,6 +241,14 @@ export function maxAuthorDashboardUrl(
 }
 
 export function maxProfileExternalUrl(path: string): string | null {
-  if (path !== "/become-author") return null;
+  // Only the become-author page (optionally with query/hash, e.g. the
+  // «На доработке» edit link) may leave the MAX mini app.
+  if (
+    path !== "/become-author" &&
+    !path.startsWith("/become-author?") &&
+    !path.startsWith("/become-author#")
+  ) {
+    return null;
+  }
   return `${PRODUCTION_APP_ORIGIN}${path}`;
 }

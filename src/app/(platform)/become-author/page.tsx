@@ -10,6 +10,7 @@ import BecomeAuthorHeader, {
   BecomeAuthorTopCta,
 } from "@/components/become-author/BecomeAuthorContent";
 import { getBecomeAuthorPageView } from "@/lib/author-applications/queries";
+import { loadAuthorApplicationRevisionFields } from "@/lib/author-applications/revision";
 import { rowToFormValues } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { getAppOrigin } from "@/lib/seo/app-origin";
@@ -45,7 +46,7 @@ const EMPTY_FORM_VALUES = {
 export default async function BecomeAuthorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ submitted?: string }>;
+  searchParams: Promise<{ submitted?: string; revision?: string }>;
 }) {
   const params = await searchParams;
   const showSubmittedBanner = params.submitted === "1";
@@ -87,6 +88,13 @@ export default async function BecomeAuthorPage({
   const inviteLocked =
     Boolean(partnerAttribution.exists && partnerAttribution.code);
 
+  // «На доработке»: sections the team asked to fix (tolerant – [] before the
+  // revision_fields migration is applied).
+  const revisionFields =
+    view.application?.status === "needs_changes"
+      ? await loadAuthorApplicationRevisionFields(supabase, view.application.id)
+      : [];
+
   return (
     <BecomeAuthorShell>
       <BecomeAuthorHeader audience={view.audience} />
@@ -112,6 +120,7 @@ export default async function BecomeAuthorPage({
             showSubmittedBanner={view.showSubmittedBanner}
             userEmail={view.userEmail}
             inviteLocked={inviteLocked}
+            revisionFields={revisionFields}
           />
         </aside>
 

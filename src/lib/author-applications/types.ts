@@ -1,3 +1,5 @@
+import type { AuthorApplicationRevisionField } from "./revision";
+
 export const AUTHOR_APPLICATION_STATUSES = [
   "draft",
   "submitted",
@@ -78,6 +80,8 @@ export type AdminAuthorApplicationDetail = AuthorApplicationRow & {
   } | null;
   applicationEvents: AuthorApplicationStatusEventRow[];
   accessEvents: AuthorAccessStatusEventRow[];
+  /** Sections staff asked to fix (empty when none or column not deployed). */
+  revisionFields?: AuthorApplicationRevisionField[];
 };
 
 export type AuthorApplicationFormValues = {

@@ -1,4 +1,5 @@
 import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
+import { AUTHOR_APPLICATION_REVISION_EDIT_PATH } from "@/lib/author-applications/revision";
 import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
 
 export function getProfileApplicationCopy(variant: ProfileApplicationVariant): {
@@ -32,9 +33,10 @@ export function getProfileApplicationCopy(variant: ProfileApplicationVariant): {
     case "needs_changes":
       return {
         heading: "Стать автором АудиоЛада",
-        description: "Нужно уточнить заявку автора.",
-        ctaLabel: "Дополнить заявку",
-        ctaHref: BECOME_AUTHOR_HREF,
+        description:
+          "Заявка на доработке – поправьте её по комментарию команды и отправьте повторно.",
+        ctaLabel: "Открыть заявку",
+        ctaHref: AUTHOR_APPLICATION_REVISION_EDIT_PATH,
       };
     case "approved_pending_access":
       return {

@@ -6,7 +6,15 @@ import type { AdminAuthorApplicationActionState } from "@/app/(platform)/admin/a
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { drainPartnerActivationEmailIfNeeded } from "@/lib/author-partner/activation-email-drain";
+import {
+  AUTHOR_APPLICATION_REVISION_COMMENT_MAX,
+  AUTHOR_APPLICATION_REVISION_COMMENT_REQUIRED_MESSAGE,
+  canSendAuthorApplicationToRevision,
+  getAuthorApplicationRevisionFieldLabels,
+  normalizeAuthorApplicationRevisionFields,
+} from "@/lib/author-applications/revision";
 import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";
+import { sendAuthorApplicationNeedsChangesEmail } from "@/lib/email/send-author-application-needs-changes-email";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateApplicationPaths(applicationId: string) {
@@ -87,6 +95,157 @@ export async function requestAuthorApplicationChanges(
     },
     "Запрос изменений отправлен.",
   );
+}
+
+/**
+ * «Отправить на доработку»: works from «Новая» (takes it in review first) and
+ * from «В работе». Sends the applicant one letter with the comment and a link
+ * to the prefilled form. The letter goes out only from this button.
+ */
+export async function sendAuthorApplicationToRevision(
+  _prevState: AdminAuthorApplicationActionState,
+  formData: FormData,
+): Promise<AdminAuthorApplicationActionState> {
+  await requireAdminPermission("authors.manage");
+
+  const applicationId = String(formData.get("applicationId") ?? "").trim();
+  const adminNote = String(formData.get("adminNote") ?? "").trim();
+  const reviewComment = String(formData.get("reviewComment") ?? "").trim();
+  const revisionFields = normalizeAuthorApplicationRevisionFields(
+    formData.getAll("revisionFields"),
+  );
+
+  if (!applicationId) {
+    return { ok: false, error: "Не удалось определить заявку." };
+  }
+
+  if (!reviewComment) {
+    return { ok: false, error: AUTHOR_APPLICATION_REVISION_COMMENT_REQUIRED_MESSAGE };
+  }
+
+  if (reviewComment.length > AUTHOR_APPLICATION_REVISION_COMMENT_MAX) {
+    return {
+      ok: false,
+      error: `Комментарий слишком длинный – до ${AUTHOR_APPLICATION_REVISION_COMMENT_MAX} символов.`,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("author_applications")
+    .select("status")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return { ok: false, error: "Заявка не найдена." };
+  }
+
+  if (!canSendAuthorApplicationToRevision(String(current.status))) {
+    return {
+      ok: false,
+      error: "На доработку можно отправить только новую заявку или заявку в работе.",
+    };
+  }
+
+  if (current.status === "submitted") {
+    const take = await callAuthorApplicationRpc(
+      supabase,
+      "take_author_application_in_review",
+      { p_application_id: applicationId, p_staff_comment: null },
+    );
+
+    if (!take.ok) {
+      return { ok: false, error: take.error };
+    }
+  }
+
+  const rpc = await callAuthorApplicationRpc(
+    supabase,
+    "request_author_application_changes",
+    {
+      p_application_id: applicationId,
+      p_applicant_comment: reviewComment,
+      p_staff_comment: adminNote || null,
+    },
+  );
+
+  if (!rpc.ok) {
+    revalidateApplicationPaths(applicationId);
+    return { ok: false, error: rpc.error };
+  }
+
+  const warnings: string[] = [];
+
+  // Optional highlights; the column comes with migration 20270219120000.
+  const { error: fieldsError } = await supabase
+    .from("author_applications")
+    .update({ revision_fields: revisionFields.length > 0 ? revisionFields : null })
+    .eq("id", applicationId);
+
+  if (fieldsError) {
+    console.error(
+      "author_application_revision_fields_save_failed",
+      applicationId,
+      fieldsError.message,
+    );
+
+    if (revisionFields.length > 0) {
+      warnings.push(
+        "Отмеченные поля не сохранились в заявке – они перечислены только в письме.",
+      );
+    }
+  }
+
+  const { data: application } = await supabase
+    .from("author_applications")
+    .select("contact_email, reviewed_at")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  const recipientEmail = application?.contact_email?.trim().toLowerCase() || null;
+  const revisionAttempt = application?.reviewed_at
+    ? String(application.reviewed_at)
+    : new Date().toISOString();
+
+  if (recipientEmail) {
+    const emailResult = await sendAuthorApplicationNeedsChangesEmail({
+      toEmail: recipientEmail,
+      applicationId,
+      revisionAttempt,
+      reviewComment,
+      // display_name is the project name (often the very thing to fix), not
+      // a person – keep the neutral «Здравствуйте!».
+      applicantName: null,
+      fieldLabels: getAuthorApplicationRevisionFieldLabels(revisionFields),
+    });
+
+    if (!emailResult.ok) {
+      console.error(
+        "author_application_needs_changes_email_failed",
+        applicationId,
+        emailResult.code,
+      );
+      warnings.push(
+        "Статус изменён, но письмо заявителю не удалось отправить. Проверьте SMTP и при необходимости сообщите заявителю вручную.",
+      );
+    }
+  } else {
+    warnings.push(
+      "Статус изменён, но контактный email в заявке не указан – письмо не отправлено.",
+    );
+  }
+
+  revalidateApplicationPaths(applicationId);
+
+  return {
+    ok: true,
+    message:
+      warnings.length > 0
+        ? "Заявка отправлена на доработку."
+        : "Заявка отправлена на доработку. Письмо заявителю отправлено.",
+    warning: warnings.length > 0 ? warnings.join(" ") : undefined,
+  };
 }
 
 export async function returnAuthorApplicationToReview(

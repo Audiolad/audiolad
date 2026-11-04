@@ -10,16 +10,23 @@ import {
 import {
   approveAuthorApplication,
   rejectAuthorApplication,
-  requestAuthorApplicationChanges,
   restoreLinkedAuthorAccess,
   resendAuthorAccessGrantedEmail,
   returnAuthorApplicationToReview,
+  sendAuthorApplicationToRevision,
   suspendLinkedAuthorAccess,
   takeAuthorApplicationInReview,
   updateAuthorApplicationAdminNote,
 } from "@/app/(platform)/admin/author-applications/actions";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
 import { getAuthorAccessStatusLabel } from "@/lib/authors/access";
+import {
+  AUTHOR_APPLICATION_REVISION_COMMENT_REQUIRED_MESSAGE,
+  AUTHOR_APPLICATION_REVISION_FIELDS,
+  canSendAuthorApplicationToRevision,
+  getAuthorApplicationStatusEventLabel,
+  type AuthorApplicationRevisionField,
+} from "@/lib/author-applications/revision";
 import { authorApplicationScreenName } from "@/lib/author-applications/screen-name";
 import type { AdminAuthorApplicationDetail } from "@/lib/author-applications/types";
 
@@ -94,7 +101,7 @@ function StatusEventList({
     ...application.applicationEvents.map((event) => ({
       id: event.id,
       createdAt: event.created_at,
-      label: `${event.from_status ?? "—"} → ${event.to_status}`,
+      label: getAuthorApplicationStatusEventLabel(event),
       staffComment: event.staff_comment,
       applicantComment: event.applicant_comment,
       kind: "application" as const,
@@ -155,13 +162,17 @@ export default function AuthorApplicationReviewForm({
     application.review_comment ?? "",
   );
   const [suspendReason, setSuspendReason] = useState("");
+  const [revisionFields, setRevisionFields] = useState<
+    AuthorApplicationRevisionField[]
+  >(application.revisionFields ?? []);
+  const [revisionCommentError, setRevisionCommentError] = useState(false);
 
   const [takeState, takeAction, takePending] = useActionState(
     takeAuthorApplicationInReview,
     ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   );
   const [changesState, changesAction, changesPending] = useActionState(
-    requestAuthorApplicationChanges,
+    sendAuthorApplicationToRevision,
     ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   );
   const [returnState, returnAction, returnPending] = useActionState(
@@ -232,7 +243,7 @@ export default function AuthorApplicationReviewForm({
 
   const linkedAuthor = application.linkedAuthor;
   const canTake = application.status === "submitted";
-  const canRequestChanges = application.status === "in_review";
+  const canSendToRevision = canSendAuthorApplicationToRevision(application.status);
   const canReturnToReview = application.status === "needs_changes";
   const canApprove = ["submitted", "in_review", "needs_changes"].includes(
     application.status,
@@ -296,7 +307,7 @@ export default function AuthorApplicationReviewForm({
 
         <div className="mt-4 space-y-4">
           <InfoRow
-            label="Имя"
+            label="Название проекта"
             value={authorApplicationScreenName({
               status: application.status,
               displayName: application.display_name,
@@ -427,7 +438,7 @@ export default function AuthorApplicationReviewForm({
             </button>
           </form>
 
-          {(canRequestChanges || canReject) && (
+          {(canSendToRevision || canReject) && (
             <label className="block">
               <span className="text-sm font-medium text-[#25135c]">
                 Комментарий для заявителя
@@ -435,13 +446,66 @@ export default function AuthorApplicationReviewForm({
               <textarea
                 name="reviewComment"
                 value={reviewComment}
-                onChange={(event) => setReviewComment(event.target.value)}
+                onChange={(event) => {
+                  setReviewComment(event.target.value);
+                  if (event.target.value.trim()) {
+                    setRevisionCommentError(false);
+                  }
+                }}
                 rows={4}
-                placeholder="Этот текст увидит заявитель при запросе изменений или отклонении"
-                className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c]"
+                aria-invalid={revisionCommentError || undefined}
+                aria-describedby={
+                  revisionCommentError ? "review-comment-error" : undefined
+                }
+                placeholder="Этот текст увидит заявитель в письме и в заявке при отправке на доработку или отклонении"
+                className={`mt-2 w-full rounded-[18px] border bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c] ${
+                  revisionCommentError ? "border-[#e08a9b]" : "border-[#eadff8]"
+                }`}
               />
+              {revisionCommentError ? (
+                <span
+                  id="review-comment-error"
+                  role="alert"
+                  className="mt-2 block text-sm text-[#b34f63]"
+                >
+                  {AUTHOR_APPLICATION_REVISION_COMMENT_REQUIRED_MESSAGE}
+                </span>
+              ) : null}
             </label>
           )}
+
+          {canSendToRevision ? (
+            <fieldset className="rounded-[18px] border border-[#efe6fa] px-4 py-3">
+              <legend className="px-1 text-sm font-medium text-[#25135c]">
+                Что поправить – необязательно
+              </legend>
+              <p className="text-xs leading-5 text-[#796ba0]">
+                Отмеченные поля подсветятся у заявителя в форме и попадут в письмо.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                {AUTHOR_APPLICATION_REVISION_FIELDS.map((field) => (
+                  <label
+                    key={field.key}
+                    className="inline-flex min-h-9 items-center gap-2 text-sm text-[#25135c]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={revisionFields.includes(field.key)}
+                      onChange={(event) =>
+                        setRevisionFields((current) =>
+                          event.target.checked
+                            ? [...current, field.key]
+                            : current.filter((key) => key !== field.key),
+                        )
+                      }
+                      className="h-4 w-4 accent-[#7042c5]"
+                    />
+                    {field.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
 
           <div className="flex flex-col gap-3">
             {canTake ? (
@@ -454,21 +518,6 @@ export default function AuthorApplicationReviewForm({
                   className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
                 >
                   {takePending ? "Обработка…" : "Взять в работу"}
-                </button>
-              </form>
-            ) : null}
-
-            {canRequestChanges ? (
-              <form action={changesAction} className="contents">
-                <input type="hidden" name="applicationId" value={application.id} />
-                <input type="hidden" name="adminNote" value={adminNote} />
-                <input type="hidden" name="reviewComment" value={reviewComment} />
-                <button
-                  type="submit"
-                  disabled={changesPending}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
-                >
-                  {changesPending ? "Обработка…" : "Запросить изменения"}
                 </button>
               </form>
             ) : null}
@@ -531,6 +580,33 @@ export default function AuthorApplicationReviewForm({
                   </div>
                 )}
               </>
+            ) : null}
+
+            {canSendToRevision ? (
+              <form
+                action={changesAction}
+                className="contents"
+                onSubmit={(event) => {
+                  if (!reviewComment.trim()) {
+                    event.preventDefault();
+                    setRevisionCommentError(true);
+                  }
+                }}
+              >
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="adminNote" value={adminNote} />
+                <input type="hidden" name="reviewComment" value={reviewComment} />
+                {revisionFields.map((key) => (
+                  <input key={key} type="hidden" name="revisionFields" value={key} />
+                ))}
+                <button
+                  type="submit"
+                  disabled={changesPending}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                >
+                  {changesPending ? "Отправка…" : "Отправить на доработку"}
+                </button>
+              </form>
             ) : null}
 
             {canReject ? (

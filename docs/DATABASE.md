@@ -2451,6 +2451,25 @@ the annex 1 (`b2b-terms`) row into `business_offer_acceptances` when missing, so
 `create_business_subscription_order` is unchanged. Smoke:
 `supabase/tests/business_offer_editions_smoke.sql`.
 
+### Author application revision («Отправить на доработку»)
+
+NEEDS MIGRATION/RLS: `20270219120000_author_application_revision.sql` is prepared, not
+applied by this task (Sergey's Human Gate). Additive, no data changes:
+`author_applications.revision_fields text[] NULL` (fields the reviewer asks to fix,
+CHECK on the seven known keys: `display_name` (project name), `direction`, `about`,
+`contact_email`, `contact_details`, `readiness`, `school`), BEFORE UPDATE trigger
+`author_applications_guard_revision_fields` (only platform staff or a no-JWT caller may
+change the column) and AFTER UPDATE OF status trigger
+`author_applications_log_resubmission` (SECURITY DEFINER, no client EXECUTE) that writes
+a `needs_changes → submitted` row to `author_application_status_events` with the
+applicant as `changed_by`. The button itself reuses the existing
+`take_author_application_in_review` and `request_author_application_changes` RPCs, so
+it works before the migration is applied: until then the field list is not saved and
+the resubmission is not written to history (the admin list still marks it
+«После доработки» from the kept team comment). Smoke:
+`supabase/tests/author_application_revision_smoke.sql`. Rollback (manual, not a
+migration): `supabase/rollbacks/20270219120000_author_application_revision.rollback.sql`.
+
 ### Business profile personalization (biz-profile-edit)
 
 NEEDS MIGRATION/RLS: `20270216120000_business_profile_organization.sql` is prepared,

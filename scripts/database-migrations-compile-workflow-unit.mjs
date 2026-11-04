@@ -41,6 +41,8 @@ assert.match(driver, /seo_wordstat_jazz_queries_seed_smoke\.sql/);
 assert.match(workflow, /supabase\/tests\/jwt_claims_trigger_guards_smoke\.sql/);
 assert.match(workflow, /supabase\/tests\/business_offer_editions_smoke\.sql/);
 assert.match(driver, /business_offer_editions_smoke\.sql/);
+assert.match(workflow, /supabase\/tests\/author_application_revision_smoke\.sql/);
+assert.match(driver, /author_application_revision_smoke\.sql/);
 assert.match(driver, /jwt_claims_trigger_guards_smoke\.sql/);
 assert.match(driver, /20261102120000/);
 assert.match(driver, /CREATE DATABASE \$\{expectedDatabase\}/);

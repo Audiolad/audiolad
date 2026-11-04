@@ -300,7 +300,7 @@ export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
         (variant === "needs_changes" || variant === "rejected") ? (
           <div className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#796ba0]">
             <p className="font-medium text-[#7042c5]">Комментарий команды</p>
-            <p className="mt-2">{reviewComment}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words">{reviewComment}</p>
           </div>
         ) : null}
 
