@@ -1263,6 +1263,7 @@
 
 .atlas-offer__price span {
   margin-left: 6px;
+  white-space: nowrap;
   font-size: 1.1rem;
   font-weight: 500;
   color: rgba(246, 234, 215, 0.7);

@@ -186,6 +186,22 @@ assert.match(domain, /if \(acceptanceError\) \{\s*throw new Error/, "a read erro
     assert.match(t, /799\u00a0₽ за 30 дней/);
     assert.doesNotMatch(t, /в месяц/);
   }
+  const giftCta = readFileSync("src/components/business-app/sound/GuestCoffeeGiftCta.tsx", "utf8");
+  assert.match(giftCta, /Далее \$\{GUEST_COFFEE_PRICE\} \$\{BUSINESS_PLAN_PERIOD_LABEL\}/);
+  assert.doesNotMatch(giftCta, /в месяц/);
+  // Sergey 04.11 12:30: every Business price says «за 30 дней» (landing, atlas, gift). No grace wording.
+  const plan = await import("../src/lib/business/plan");
+  assert.equal(plan.BUSINESS_PLAN_PERIOD_LABEL, "за 30 дней");
+  const atlas = await import("../src/lib/business/coffee-atlas/constants");
+  assert.equal(atlas.COFFEE_ATLAS_OFFER.afterTrial, "Далее 799 ₽ за 30 дней");
+  const chrome = readFileSync("src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx", "utf8");
+  assert.match(chrome, /<span>\{COFFEE_ATLAS_OFFER\.period\}<\/span>/);
+  assert.doesNotMatch(chrome, /\/ ?мес/);
+  for (const f of ["src/lib/business/landing.ts", "src/components/business/BusinessLandingView.tsx", "src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx", "src/lib/business/coffee-atlas/constants.ts", "src/lib/business-app/guest-coffee/copy.ts", "src/lib/business-guest/copy.ts"]) {
+    const src = readFileSync(f, "utf8");
+    assert.doesNotMatch(src, /₽[^"`\n]{0,8}(в месяц|\/ ?мес)|ежемесячн/, f);
+    assert.doesNotMatch(src, /grace|льготн/i, f);
+  }
 }
 
 console.log("business-offer-document-unit: ok");

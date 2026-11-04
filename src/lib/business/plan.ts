@@ -6,8 +6,6 @@
 
 export const BUSINESS_PLAN_MONTHLY_PRICE_RUB = 799;
 
-export const BUSINESS_PLAN_PERIOD_LABEL = "в месяц";
-
 /**
  * Free full-access period for a new venue account (task 39ef47c4: 30 -> 7 days).
  * Applies only to grants issued from now on: stored access_grants.ends_at is never recomputed.
@@ -16,6 +14,9 @@ export const BUSINESS_GIFT_DAYS = 7;
 
 /** One paid period (799 ₽). Not the gift length. */
 export const BUSINESS_PAID_PERIOD_DAYS = 30;
+
+/** Price period wording on every Business surface, as in the offer (Sergey 04.11): «799 ₽ за 30 дней», never «в месяц». */
+export const BUSINESS_PLAN_PERIOD_LABEL = `за ${BUSINESS_PAID_PERIOD_DAYS} дней`;
 
 export const BUSINESS_GIFT_MS = BUSINESS_GIFT_DAYS * 24 * 60 * 60 * 1000;
 
