@@ -38,6 +38,7 @@
     "test:business-workspace-trial": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/business-workspace-trial-unit.tsx && npx tsx scripts/business-trial-7-days-unit.mts && npx tsx scripts/business-subscription-payment-unit.tsx",
     "test:business-cafe-queue": "npx tsx scripts/business-cafe-queue-unit.mts && npx tsx scripts/business-playlist-shuffle-unit.mts",
     "test:health-build": "npx tsx scripts/health-build-route-unit.mts",
+    "test:auth-return-path": "node --import tsx scripts/auth-return-path-unit.mts",
     "test:password-recovery-hardening": "npx tsx scripts/password-recovery-hardening-unit.mts",
     "test:password-recovery": "npx tsx scripts/password-recovery-navigation-unit.ts && npx tsx scripts/password-recovery-hardening-unit.mts && npx tsx scripts/email-template-unit.ts && node scripts/email-policy-unit.mjs",
     "test:auth-network-timeout": "npx tsx scripts/auth-network-timeout-unit.mts",
