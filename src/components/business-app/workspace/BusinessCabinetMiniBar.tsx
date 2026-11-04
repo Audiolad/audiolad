@@ -26,6 +26,9 @@ export default function BusinessCabinetMiniBar({
   onVolume,
   message,
   messageTestId,
+  ctaLabel,
+  onCta,
+  ctaTestId,
   note,
   noteTestId,
   testId,
@@ -53,6 +56,10 @@ export default function BusinessCabinetMiniBar({
   onVolume?: (value: number) => void;
   message?: string | null;
   messageTestId?: string;
+  /** One green main action (e.g. «Включить музыку» after an autoplay refusal). */
+  ctaLabel?: string | null;
+  onCta?: () => void;
+  ctaTestId?: string;
   note?: string | null;
   noteTestId?: string;
   testId: string;
@@ -77,7 +84,7 @@ export default function BusinessCabinetMiniBar({
       observer.disconnect();
       shell.style.removeProperty("--biz-cabinet-player-height");
     };
-  }, [title, message, note, playing, loading, timeLabel]);
+  }, [title, message, ctaLabel, note, playing, loading, timeLabel]);
 
   const ratio = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
@@ -112,19 +119,31 @@ export default function BusinessCabinetMiniBar({
       <p className="business-cabinet-player__time" data-testid={`${controlsPrefix}-time`}>
         {timeLabel}
       </p>
-      <BusinessPlayerControls
-        testIdPrefix={controlsPrefix}
-        playing={playing}
-        loading={loading}
-        nowTitle={null}
-        onToggle={onToggle}
-        onNext={onNext}
-        nextDisabled={nextDisabled}
-        volume={volume}
-        onVolume={onVolume}
-        appearance="round"
-        size="compact"
-      />
+      {ctaLabel && onCta ? (
+        // Autoplay refused: ONE green main action instead of the round controls.
+        <button
+          type="button"
+          className="business-app-btn business-app-btn-cta business-app-focus-ring business-cabinet-player__cta"
+          data-testid={ctaTestId}
+          onClick={onCta}
+        >
+          {ctaLabel}
+        </button>
+      ) : (
+        <BusinessPlayerControls
+          testIdPrefix={controlsPrefix}
+          playing={playing}
+          loading={loading}
+          nowTitle={null}
+          onToggle={onToggle}
+          onNext={onNext}
+          nextDisabled={nextDisabled}
+          volume={volume}
+          onVolume={onVolume}
+          appearance="round"
+          size="compact"
+        />
+      )}
       <button
         type="button"
         className="business-cabinet-player__close business-app-focus-ring"

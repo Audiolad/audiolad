@@ -1060,6 +1060,13 @@
   display: none;
 }
 
+.business-cabinet-player__cta {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  white-space: nowrap;
+}
+
 .business-cabinet-player__close {
   display: inline-grid;
   place-items: center;

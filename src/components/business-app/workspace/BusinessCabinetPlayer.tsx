@@ -33,11 +33,12 @@ import {
   playbackStorageKey,
   type WorkspacePlayback,
 } from "@/lib/business-workspace/playback";
+import { createAccessDeadline, fetchWorkspaceAccess, workspaceAudioDeadline, workspaceControllerKey } from "@/lib/business-workspace/access-deadline";
 import { workspaceAtmosphereStartIndex } from "@/lib/business-workspace/shelves";
 import {
-  workspaceDeadlineDelay,
   workspaceItems,
   workspacePlaybackAllowed,
+  workspacePlaybackDeadline,
   workspacePlayerOpen,
   type WorkspacePageModel,
 } from "@/lib/business-workspace/model";
@@ -45,12 +46,15 @@ import {
 type View = {
   status: OnlineStatus;
   message: string | null;
+  /** Autoplay refused after a reload/reconnect: show one green «Включить музыку» button. */
+  needsGesture: boolean;
   index: number;
   currentTime: number;
   duration: number;
 };
 
 type CabinetPlayerApi = {
+  accessModel: WorkspacePageModel | null;
   pointDevice: boolean;
   canChangeMusic: boolean;
   adopt: (model: WorkspacePageModel) => void;
@@ -102,16 +106,17 @@ export function musicPlayerMessage(message: string): string {
   return message.replaceAll("«Играть»", "круглую кнопку");
 }
 
+/** Track URL request timeout: a hung request falls back to the controller's backoff retry. */
+const SIGN_TIMEOUT_MS = 15_000;
+/** The one green button shown when the browser refused autoplay (no tap yet). */
+export const ENABLE_MUSIC_LABEL = "Включить музыку";
+
 const JSON_POST = {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   credentials: "same-origin" as const,
   cache: "no-store" as const,
 };
-
-function modelKey(model: WorkspacePageModel): string {
-  return `${model.spaceId}|${model.endsAt ?? ""}|${model.tracks.map((track) => track.audioItemId).join(",")}`;
-}
 
 function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | null {
   try {
@@ -143,6 +148,7 @@ export function BusinessCabinetPlayerProvider({
 }) {
   const [model, setModel] = useState<WorkspacePageModel | null>(initialModel);
   const modelRef = useRef(model);
+  const accessRef = useRef<ReturnType<typeof createAccessDeadline> | null>(null);
   useLayoutEffect(() => {
     modelRef.current = model;
   }, [model]);
@@ -165,6 +171,7 @@ export function BusinessCabinetPlayerProvider({
   const [view, setView] = useState<View>({
     status: "idle",
     message: null,
+    needsGesture: false,
     index: initialPlayback.index,
     currentTime: initialPlayback.positionSec,
     duration: model?.tracks[initialPlayback.index]?.durationSeconds ?? 0,
@@ -180,10 +187,27 @@ export function BusinessCabinetPlayerProvider({
   const rebuildGen = useRef(0);
 
   const adopt = useCallback((next: WorkspacePageModel) => {
-    if (next.tracks.length === 0) return;
-    const key = modelKey(next);
+    const current = modelRef.current;
+    // Navigation may arrive after a newer status response. Reject conflicting
+    // access here (including catalog-less denial) until a fresh status check confirms it.
+    // Extensions still supersede older in-flight status decisions synchronously.
+    const access = current?.spaceId === next.spaceId ? accessRef.current : null;
+    if (access && !access.update(next)) return;
+    if (next.status === "unavailable") return;
+    if (!workspacePlayerOpen(next)) {
+      void ctlRef.current?.applyManifest(null);
+      (fadeRef.current ?? audioRef.current)?.pause();
+      modelRef.current = next;
+      setModel(next);
+      return;
+    }
+    if (next.tracks.length === 0) {
+      if (!current || current.spaceId !== next.spaceId) return;
+      next = { ...next, tracks: current.tracks, playback: current.playback };
+    }
+    const key = workspaceControllerKey(next);
     modelRef.current = next;
-    setModel((prev) => (prev && modelKey(prev) === key ? prev : next));
+    setModel(next);
     const restart = peekAtmosphereRestart();
     if (restart) savedPlaceRef.current = false;
     if (restoredKey.current === key && !restart) return;
@@ -270,7 +294,7 @@ export function BusinessCabinetPlayerProvider({
     if (!audio || !ctl) return;
     // During a skip fade-out the element still sounds the previous track: report that one.
     const audible = ctl.audibleItemId;
-    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible));
+    const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible), ctl.recovering);
     const report = evidenceRef.current.report(state, audible, Date.now());
     sendSpaLiveReport(
       (live) => postPointReport({ kind: "playback", report: live }),
@@ -291,7 +315,7 @@ export function BusinessCabinetPlayerProvider({
     return () => window.clearInterval(timer);
   }, [canBeat]);
 
-  const catalogKey = model && open ? modelKey(model) : "";
+  const catalogKey = model && open ? workspaceControllerKey(model) : "";
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -304,17 +328,24 @@ export function BusinessCabinetPlayerProvider({
       {
         audio: fader,
         sign: async (audioItemId) => {
+          // A hung request on a flaky network must not freeze recovery: give up after 15 s
+          // and let the controller retry with backoff.
+          const abort = new AbortController();
+          const timeout = window.setTimeout(() => abort.abort(), SIGN_TIMEOUT_MS);
           try {
             const params = new URLSearchParams({ space: modelRef.current?.spaceId ?? "cafe" });
             const res = await fetch(`/api/business/workspace/track-url?${params.toString()}`, {
               ...JSON_POST,
               body: JSON.stringify({ audioItemId }),
+              signal: abort.signal,
             });
             const json = (await res.json()) as { ok?: boolean; data?: { url?: string }; reason?: string };
             if (json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
             return { ok: false, reason: json.reason || "network" };
           } catch {
             return { ok: false, reason: "network" };
+          } finally {
+            window.clearTimeout(timeout);
           }
         },
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
@@ -322,15 +353,18 @@ export function BusinessCabinetPlayerProvider({
         onChange: () => {
           const current = ctlRef.current;
           if (!current) return;
+          // The «Включить музыку» tap must be reachable: never keep it inside a closed bar.
+          if (current.needsGesture) setBarDismissed(false);
           setView((prev) => ({
             ...prev,
             status: current.status,
             message: current.message,
+            needsGesture: current.needsGesture,
             index: current.index < 0 ? prev.index : current.index,
           }));
         },
       },
-      workspaceItems(current.tracks, current.playbackUntil ?? current.endsAt),
+      workspaceItems(current.tracks, workspaceAudioDeadline(current)),
     );
     ctlRef.current = ctl;
     const onTime = () => {
@@ -342,6 +376,7 @@ export function BusinessCabinetPlayerProvider({
         currentTime: audio.currentTime,
         duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : prev.duration,
       }));
+      ctl.onProgress(audio.currentTime, audio.duration);
       if (audio.paused) return;
       remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true);
     };
@@ -352,6 +387,15 @@ export function BusinessCabinetPlayerProvider({
     };
     const onEnded = () => void ctl.onEnded();
     const onError = () => void ctl.onError();
+    // Network recovery (P0-3): a stall that does not move on, or the connection coming
+    // back, is handled by the controller (backoff retries, resume at the position).
+    const onWaiting = () => ctl.onWaiting();
+    const onOnline = () => void ctl.onOnline();
+    const onVisible = () => { if (document.visibilityState === "visible") void ctl.onOnline(); };
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onWaiting);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", sendReport);
@@ -360,6 +404,10 @@ export function BusinessCabinetPlayerProvider({
     const reportTimer = window.setInterval(sendReport, 15_000);
     return () => {
       window.clearInterval(reportTimer);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onWaiting);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", sendReport);
@@ -379,30 +427,63 @@ export function BusinessCabinetPlayerProvider({
     else audio.volume = playback.volume;
   }, [open, playback.volume, catalogKey]);
 
+  const accessSpace = open ? model?.spaceId : null;
   useEffect(() => {
-    if (!model || !workspacePlayerOpen(model)) return;
-    let timer: ReturnType<typeof setTimeout>;
-    let expired = false;
-    const check = () => {
-      if (expired) return;
-      if (workspacePlaybackAllowed(model.endsAt, Date.now())) {
-        clearTimeout(timer);
-        timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
-        return;
-      }
-      expired = true;
-      void ctlRef.current?.applyManifest(null);
-      (fadeRef.current ?? audioRef.current)?.pause();
-    };
-    timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", check);
+    const current = modelRef.current;
+    if (!accessSpace || !current) return;
+    const access = createAccessDeadline(current, {
+      now: Date.now,
+      setTimer: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimer: (timer) => window.clearTimeout(timer as number),
+      fetchStatus: () => fetchWorkspaceAccess(accessSpace),
+      onStatus: (next) => {
+        const prev = modelRef.current;
+        if (!prev || prev.spaceId !== accessSpace) return;
+        // Access refreshes never restore a playhead or replace the live queue/catalog.
+        const updated = { ...prev, status: next.status, spaceEnabled: next.spaceEnabled,
+          endsAt: next.endsAt, playbackUntil: next.playbackUntil,
+          endsAtLabel: next.endsAtLabel, daysLeft: next.daysLeft };
+        modelRef.current = updated;
+        const ctl = ctlRef.current;
+        const items = workspaceItems(updated.tracks, workspaceAudioDeadline(updated));
+        if (workspacePlayerOpen(updated) && workspacePlaybackAllowed(workspacePlaybackDeadline(updated), Date.now())) {
+          if (ctl?.status === "no_access") seekRef.current = 0;
+          void ctl?.restoreVerifiedAccess(items);
+        } else {
+          void ctl?.applyManifest(items);
+        }
+        setModel(updated);
+      },
+      onExpired: () => {
+        void ctlRef.current?.applyManifest(null);
+        (fadeRef.current ?? audioRef.current)?.pause();
+        const prev = modelRef.current;
+        if (!prev || prev.spaceId !== accessSpace) return;
+        const closed = { ...prev, status: "offer" as const, daysLeft: 0 };
+        modelRef.current = closed;
+        setModel(closed);
+      },
+    });
+    accessRef.current = access;
+    const refresh = () => { void access.refresh(); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", visible);
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", check);
+      access.dispose();
+      if (accessRef.current === access) accessRef.current = null;
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", visible);
     };
-  }, [model]);
+  }, [accessSpace]);
+
+  useEffect(() => {
+    if (!model || !open) return;
+    // applyManifest preserves playing/loading/paused state and the current audio source.
+    void ctlRef.current?.applyManifest(workspaceItems(model.tracks, workspaceAudioDeadline(model)));
+  }, [model, open]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -415,7 +496,7 @@ export function BusinessCabinetPlayerProvider({
   const toggle = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     const index = playbackRef.current.index;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
@@ -435,7 +516,7 @@ export function BusinessCabinetPlayerProvider({
   const next = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -448,7 +529,7 @@ export function BusinessCabinetPlayerProvider({
   const previous = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
-    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -508,7 +589,7 @@ export function BusinessCabinetPlayerProvider({
 
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
-    if (!current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    if (!current || !accessRef.current?.allowsPlayback()) return;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -789,6 +870,7 @@ export function BusinessCabinetPlayerProvider({
   const devicePlayIndex = async (index: number) => { if (await authorizeMusicChange()) await playIndex(index); };
 
   const api: CabinetPlayerApi = {
+    accessModel: model,
     pointDevice: pointReports,
     canChangeMusic: !pointReports || pointCanEdit,
     adopt,
@@ -835,6 +917,9 @@ export function BusinessCabinetPlayerProvider({
           volume={playback.volume}
           onVolume={setVolume}
           message={view.message ? musicPlayerMessage(view.message) : null}
+          ctaLabel={view.needsGesture ? ENABLE_MUSIC_LABEL : null}
+          onCta={() => void toggle()}
+          ctaTestId="biz-workspace-enable-music"
           messageTestId="biz-workspace-player-message"
           note={saveNote}
           noteTestId="biz-workspace-save-note"
@@ -846,7 +931,7 @@ export function BusinessCabinetPlayerProvider({
           ariaLabel="Плеер кабинета"
         />
       ) : null}
-      {open ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}
+      {open ? <audio ref={audioRef} preload="auto" playsInline data-testid="biz-workspace-audio" /> : null}
     </CabinetContext.Provider>
   );
 }

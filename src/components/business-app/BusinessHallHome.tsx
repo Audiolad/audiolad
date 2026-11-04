@@ -6,18 +6,15 @@ import { useBusinessChromeAccess } from "@/components/business-app/BusinessAcces
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
-import { formatMoscowDay, hasLiveBusinessAccess, type BusinessChromeAccess } from "@/lib/access-grants/access-line";
+import { hasLiveBusinessAccess, type BusinessChromeAccess } from "@/lib/access-grants/access-line";
 
 /** What the hall says about the venue period: nothing while it lasts, «сообщите владельцу» after. No pay link. */
 export function businessHallAccessNotice(access: BusinessChromeAccess | null): { kind: "expired" | "grace"; text: string } | null {
   if (!access) return null;
   if (access.mode === "grace") {
-    const day = access.graceEndsAt ? formatMoscowDay(access.graceEndsAt) : null;
     return {
       kind: "grace",
-      text: day
-        ? `Оплаченный период закончился, музыка играет до ${day}. Сообщите владельцу кофейни.`
-        : "Оплаченный период закончился. Сообщите владельцу кофейни.",
+      text: "Оплаченный период закончился. Сообщите владельцу кофейни.",
     };
   }
   if (hasLiveBusinessAccess(access)) return null;

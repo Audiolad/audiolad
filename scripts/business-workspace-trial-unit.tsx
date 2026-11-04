@@ -431,8 +431,10 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
     items,
   );
   await ctl.playIndex(0);
-  assert.equal(ctl.status, "error");
-  assert.match(ctl.message ?? "", /Проверьте интернет и нажмите «Играть»/);
+  // P0-3: a network failure is not a dead stop – the player reconnects with backoff.
+  assert.equal(ctl.status, "loading");
+  assert.equal(ctl.message, "Связь восстанавливается…");
+  assert.equal(ctl.recovering, true);
   allow = true;
   await ctl.playIndex(0);
   assert.equal(ctl.status, "playing");
@@ -790,7 +792,9 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(workspaceSource, /queue\.prefs\.energyOffset/);
   assert.match(workspaceSource, /boundaryAudioItemId/);
   assert.match(html, /data-testid="biz-workspace-volume"/);
-  assert.match(html, /preload="none"/);
+  // P0-3: buffer ahead once a signed (access-checked) src is set; the element has no src before Play.
+  assert.match(html, /preload="auto"/);
+  assert.doesNotMatch(html, /<audio[^>]*\ssrc=/);
   assert.doesNotMatch(html, /autoplay/i);
 }
 {
@@ -900,8 +904,11 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
   assert.ok(BUSINESS_TRIAL_SIGN_IN_HREF.includes("next=%2Fauth%2Fbusiness-return"));
-  assert.match(playerSource, /workspaceItems\(current\.tracks, current\.playbackUntil \?\? current\.endsAt\)/);
-  assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
+  // Access scheduling lives in the persistent provider; the engine gets a bounded
+  // buffering deadline while that scheduler verifies the real access window.
+  assert.match(playerSource, /workspaceItems\(current\.tracks, workspaceAudioDeadline\(current\)\)/);
+  assert.match(playerSource, /createAccessDeadline\(current/);
+  assert.match(workspaceSource, /player\.accessModel/);
   assert.match(playerSource, /applyManifest\(null\)/);
   assert.doesNotMatch(playerSource, /\u2014/);
   assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);
