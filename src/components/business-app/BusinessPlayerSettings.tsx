@@ -56,6 +56,7 @@ const SAVE_ERROR = "Не удалось сохранить звучание. П�
  */
 const VENUE_SOUND_CONFIRM = "Применить это звучание в зале со следующего трека?";
 const REBUILD_ERROR = "Не удалось пересобрать атмосферу. Попробуйте ещё раз.";
+const REBUILD_PLAYER_ERROR = "Атмосфера сохранена для заведения, но плеер на этом телефоне не пересобрался. Нажмите «Пересобрать атмосферу» ещё раз.";
 
 /** Where the owner turns venue-device music changes back on. En dash only. */
 function PointSoundLockedHow() {
@@ -112,6 +113,13 @@ export default function BusinessPlayerSettings({
   const timers = useRef<number[]>([]);
   const generation = useRef(0);
   const mounted = useRef(true);
+  /** Venue writes go one after another, so an older save never lands after a newer one. */
+  const writeChain = useRef<Promise<unknown>>(Promise.resolve());
+  const serialWrite = <T,>(run: () => Promise<T>): Promise<T> => {
+    const next = writeChain.current.then(run, run);
+    writeChain.current = next.catch(() => undefined);
+    return next;
+  };
 
   useEffect(() => {
     if (saved) {
@@ -133,7 +141,14 @@ export default function BusinessPlayerSettings({
     setProfile(next);
   }, [saved]);
 
-  const persist = async (nextProfile: GuestCoffeeProfile, daypartMode: CafeDaypartMode, hours: CafeDaypartHours) => {
+  /** `nextProfile` as a function is read when the write runs (after earlier writes in the chain). */
+  const persist = (
+    nextProfile: GuestCoffeeProfile | (() => GuestCoffeeProfile),
+    daypartMode: CafeDaypartMode,
+    hours: CafeDaypartHours,
+  ): Promise<string | null> => serialWrite(() => persistNow(typeof nextProfile === "function" ? nextProfile() : nextProfile, daypartMode, hours));
+
+  const persistNow = async (nextProfile: GuestCoffeeProfile, daypartMode: CafeDaypartMode, hours: CafeDaypartHours) => {
     if (!locationId) return null;
     const draft = locationSoundDraftFromParts(nextProfile, { ...queue.prefs, daypartMode }, hours);
     try {
@@ -158,17 +173,21 @@ export default function BusinessPlayerSettings({
   };
 
   /** «Пересобрать атмосферу»: the same RPC, behind the owner-only row «atmosphereRebuild». */
-  const persistRebuild = async (nextProfile: GuestCoffeeProfile): Promise<string | null> => {
+  const persistRebuild = (nextProfile: GuestCoffeeProfile): Promise<string | null> => serialWrite(async () => {
     if (!locationId) return REBUILD_ERROR;
     const draft = locationSoundDraftFromParts(nextProfile, queue.prefs, queue.hours);
     try {
       const { rebuildLocationAtmosphere } = await import("@/app/business-app/sound-settings-actions");
       const result = await rebuildLocationAtmosphere(locationId, draft);
-      return result.ok ? null : result.error;
+      if (!result.ok) return result.error;
+      // Saved: daypart and hours writes from now on keep this atmosphere.
+      venueProfile.current = nextProfile;
+      venueKnown.current = true;
+      return null;
     } catch {
       return REBUILD_ERROR;
     }
-  };
+  });
 
   const commitVenue = (run: () => void) => {
     if (pointDevice || !locationId) {
@@ -202,6 +221,8 @@ export default function BusinessPlayerSettings({
       clearTimers();
       setPhase("idle");
       setSaveError(null);
+      // Owner rebuild: chips stay in memory until the confirmed save; the player must not pick them up earlier.
+      if (ownerRebuild) return;
       try {
         coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
@@ -244,11 +265,15 @@ export default function BusinessPlayerSettings({
   const startAtmosphere = (built: GuestCoffeeProfile = profile) => {
     const daypart = queue.effectiveDaypart;
     if (!daypart) return;
-    try {
-      coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(built));
-    } catch {
-      /* the in-memory profile still goes to the player */
-    }
+    const storeBuilt = () => {
+      try {
+        coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(built));
+      } catch {
+        /* the in-memory profile still goes to the player */
+      }
+    };
+    // Owner rebuild stores the profile only after the venue row is saved.
+    if (!ownerRebuild) storeBuilt();
     setSaveError(null);
     // Point device and owner rebuild: wait for the server. A 403 must not look like success.
     const persisted = ownerRebuild
@@ -274,7 +299,7 @@ export default function BusinessPlayerSettings({
       }
     }
     const playingNow = player?.view.status === "playing" || player?.view.status === "loading";
-    if (!pointDevice) markAtmosphereRestart(playingNow);
+    if (!pointDevice && !ownerRebuild) markAtmosphereRestart(playingNow);
     const rebuildInput = {
       character: built.character,
       direction: built.direction,
@@ -287,8 +312,17 @@ export default function BusinessPlayerSettings({
         // The venue row first; only a saved rebuild changes the owner's own queue (skip fade, player-fade.ts).
         ? persisted.then(async (error) => {
             if (error) return "failed" as const;
+            // A newer chip change or a newer rebuild owns the queue now.
+            if (generation.current !== gen) return "stale" as const;
+            storeBuilt();
+            markAtmosphereRestart(playingNow);
+            // Left the page: the music page applies the stored profile through the restart marker.
+            if (!mounted.current) return "deferred" as const;
             const result = await (player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const));
-            if (result === "failed") clearAtmosphereRestart();
+            if (result === "failed") {
+              clearAtmosphereRestart();
+              return "player-failed" as const;
+            }
             return "applied" as const;
           })
       : player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const);
@@ -297,13 +331,14 @@ export default function BusinessPlayerSettings({
         if (!mounted.current || generation.current !== gen) return;
         setSaveError(error);
         if (result === "failed") {
-          clearAtmosphereRestart();
+          if (!ownerRebuild) clearAtmosphereRestart();
           setPhase("idle");
           return;
         }
-        if (ownerRebuild) {
-          venueProfile.current = built;
-          venueKnown.current = true;
+        if (result === "player-failed") {
+          setSaveError(REBUILD_PLAYER_ERROR);
+          setPhase("idle");
+          return;
         }
         setPhase("done");
       });
@@ -400,7 +435,7 @@ export default function BusinessPlayerSettings({
           onDaypart={(mode) => {
             commitVenue(() => {
               queue.setDaypartMode(mode);
-              void persist(venueOwner ? venueProfile.current : profile, mode, queue.hours).then((error) => setSaveError(error));
+              void persist(venueOwner ? () => venueProfile.current : profile, mode, queue.hours).then((error) => setSaveError(error));
             });
           }}
           hours={queue.hours}
@@ -414,7 +449,7 @@ export default function BusinessPlayerSettings({
             if (invalid) return invalid;
             const save = () => {
               queue.setDaypartHours(next);
-              return persist(venueOwner ? venueProfile.current : profile, queue.prefs.daypartMode, next);
+              return persist(venueOwner ? () => venueProfile.current : profile, queue.prefs.daypartMode, next);
             };
             if (pointDevice || !locationId) return save();
             return new Promise((resolve) => {

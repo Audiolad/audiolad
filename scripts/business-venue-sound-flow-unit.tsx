@@ -103,7 +103,19 @@ const at = (html: string, testid: string) => {
   assert.match(source, /text: atmosphereRebuildConfirmText\(next, venueKnown\.current \? venueProfile\.current : null\)/);
   assert.match(source, /rebuildLocationAtmosphere\(locationId, draft\)/);
   // The venue row first: a refused save never touches the owner's queue.
-  assert.match(source, /persisted\.then\(async \(error\) => \{\s*if \(error\) return "failed" as const;\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
+  assert.match(source, /persisted\.then\(async \(error\) => \{\s*if \(error\) return "failed" as const;/);
+  assert.match(source, /if \(!mounted\.current\) return "deferred" as const;\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
+  // Review fixes: a newer action wins, the profile/marker are published only after the save,
+  // a failed local rebuild is not reported as success, and venue writes are serialized.
+  assert.match(source, /if \(error\) return "failed" as const;\s*\/\/[^\n]*\n\s*if \(generation\.current !== gen\) return "stale" as const;\s*storeBuilt\(\);\s*markAtmosphereRestart\(playingNow\);/);
+  assert.match(source, /if \(!pointDevice && !ownerRebuild\) markAtmosphereRestart\(playingNow\);/);
+  assert.match(source, /if \(!ownerRebuild\) storeBuilt\(\);/);
+  assert.match(source, /if \(ownerRebuild\) return;\s*try \{\s*coffeeStorage\.setItem/);
+  assert.match(source, /return "player-failed" as const;/);
+  assert.match(source, /if \(result === "player-failed"\) \{\s*setSaveError\(REBUILD_PLAYER_ERROR\);\s*setPhase\("idle"\);/);
+  assert.match(source, /if \(!result\.ok\) return result\.error;\s*\/\/[^\n]*\n\s*venueProfile\.current = nextProfile;/);
+  assert.match(source, /const persistRebuild = \(nextProfile: GuestCoffeeProfile\): Promise<string \| null> => serialWrite\(/);
+  assert.match(source, /persist\(venueOwner \? \(\) => venueProfile\.current : profile, mode, queue\.hours\)/);
   assert.match(source, /const ownerRebuild = venueOwner && !venueSide;/);
   // Point device waits for the server: a 403 must not look like success, and it says where to change it.
   assert.match(source, /persisted\.then\(\(error\) => \(error \? \("failed" as const\)/);
