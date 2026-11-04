@@ -33,8 +33,6 @@ import {
   BUSINESS_LOCATION_PREVIEW,
   BUSINESS_NETWORK_LEAD,
   BUSINESS_NETWORK_TITLE,
-  BUSINESS_OFFLINE_LEAD,
-  BUSINESS_OFFLINE_TITLE,
   BUSINESS_PICK_LABEL,
   BUSINESS_PRICE_ROWS,
   BUSINESS_PRICE_TITLE,
@@ -358,14 +356,6 @@ export default function BusinessLandingView({
           </div>
         </section>
 
-        <section className="business-section" id="offline" aria-labelledby="business-offline-title">
-          <div className="business-wrap">
-            <h2 id="business-offline-title" className="business-h2">
-              {BUSINESS_OFFLINE_TITLE}
-            </h2>
-            <p className="business-lead">{BUSINESS_OFFLINE_LEAD}</p>
-          </div>
-        </section>
 
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
           <div className="business-wrap business-split business-split--half">

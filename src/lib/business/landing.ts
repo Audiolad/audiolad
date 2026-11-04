@@ -163,7 +163,6 @@ export const BUSINESS_RELIEF = [
   { id: "playlists", text: "вручную собирать плейлисты" },
   { id: "loop", text: "слушать одни и те же композиции по кругу" },
   { id: "dayparts", text: "менять музыку вручную утром, днём и вечером" },
-  { id: "offline", text: "переживать, что музыка остановится из-за интернета" },
   { id: "staff", text: "контролировать, что включил персонал" },
   { id: "rights", text: "самостоятельно разбираться в правах и документах" },
   { id: "sites", text: "отдельно следить за каждой точкой" },
@@ -234,10 +233,6 @@ export const BUSINESS_DAYPARTS = [
   { id: "day", title: "День", text: "Живее и энергичнее" },
   { id: "evening", title: "Вечер", text: "Мягко и атмосферно" },
 ] as const;
-
-export const BUSINESS_OFFLINE_TITLE = "Интернет пропал – музыка продолжает играть";
-export const BUSINESS_OFFLINE_LEAD =
-  "Аудиолад заранее сохраняет запас музыки на устройстве и продолжает воспроизведение при временных проблемах со связью.";
 
 export const BUSINESS_LEGAL_LEAD =
   "Понятные условия. Необходимые документы. Прозрачная информация о правах. Всё в одном месте.";
@@ -534,8 +529,6 @@ export function listBusinessLandingCopy(): string[] {
     BUSINESS_CONTROL_LEAD,
     BUSINESS_DAYPART_TITLE,
     BUSINESS_DAYPART_LEAD,
-    BUSINESS_OFFLINE_TITLE,
-    BUSINESS_OFFLINE_LEAD,
     BUSINESS_LEGAL_LEAD,
     BUSINESS_STAFF_TITLE,
     BUSINESS_STAFF_LEAD,
