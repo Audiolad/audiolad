@@ -104,6 +104,17 @@ function isUnsafeNextPath(value: string): boolean {
   return isAuthEntryRoute(getPathnameFromNext(value));
 }
 
+function decodeValidEscapes(value: string): string {
+  return value.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      // Keep invalid multi-byte text literal, but still expose ASCII escapes to the next check.
+      return run.replace(/%([0-7][0-9a-f])/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+    }
+  });
+}
+
 export function resolveValidatedNextPath(
   next: string | null | undefined,
 ): string | null {
@@ -113,6 +124,7 @@ export function resolveValidatedNextPath(
 
   let value = next;
   let normalized: string | null = null;
+  let layer = 0;
 
   try {
     // Validate every decoding layer, while preserving the original URL encoding.
@@ -128,7 +140,9 @@ export function resolveValidatedNextPath(
       }
       normalized ??= path;
 
-      const decoded = decodeURIComponent(value);
+      // The submitted value must be well-formed; deeper layers may hold literal "%" text.
+      const decoded = layer === 0 ? decodeURIComponent(value) : decodeValidEscapes(value);
+      layer += 1;
       if (decoded === value) {
         return normalized;
       }

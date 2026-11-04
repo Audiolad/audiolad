@@ -37,7 +37,7 @@ function testRejectUnsafeReturnPaths() {
     "/\t/x.org", "/\n/x.org", "/\r/x.org", "/%09/x.org", "/%2F%2Fx.org", "/%252f%252fx.org",
     "https://x.org", "javascript:alert(1)", "data:text/plain,a", "http://x.org",
     "/path?url=https://x.org", "/path?url=https%3A%2F%2Fx.org",
-    "/%", "/%0", "/%GG", "/%C0%AF", "/%ED%A0%80", "/%250", "/%25GG",
+    "/%", "/%0", "/%GG", "/%C0%AF", "/%ED%A0%80", "/%25C0%250a/x.org", "/%2525%250a",
     "/auth/sign-in", "/auth/sign-up?x=1#a", "/auth/sign-in/nested",
     "/%61uth/sign-in", "/%2561uth/sign-up", "/a/../auth/sign-in",
     "/a/%2e%2e/auth/sign-up", "/a/..//x.org", "/a/%252e%252e//x.org",
@@ -87,6 +87,8 @@ function testPreserveValidReturnPaths() {
     "/practice/%D0%BC%D0%B8%D1%80", "/practice/%25D0%25BC%25D0%25B8%25D1%2580",
     "/access/abcdefghijklmnopqrstuvwxyz0123456789ABCD", "/auth/business-return?site=coffee",
     "/auth/business-cabinet?site=coffee", "/workspace?space=cafe", "/cabinet#dostup",
+    // Literal percent text in deeper layers stays a valid destination.
+    "/catalog?q=100%25", "/catalog?q=100%25%25", "/%250", "/%25GG", "/catalog?q=%25D0",
   ]) {
     assert.equal(resolveValidatedNextPath(path), path);
     assert.equal(getSafeNextPath(path), path);
