@@ -42,6 +42,7 @@ import {
   parseBusinessSoundProfile,
   serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
+import { continueOwnerRebuild } from "@/lib/business-app/atmosphere-rebuild-flow";
 import { latestVenueProfile, recordVenueSound, serialVenueWrite } from "@/lib/business-app/venue-sound-writes";
 import { validateCafeDaypartHours, type CafeDaypartHours, type CafeDaypartMode } from "@/lib/business-app/cafe-queue/prefs";
 import { POINT_SOUND_CHANGED_EVENT } from "@/lib/business-app/point-sound";
@@ -114,8 +115,8 @@ export default function BusinessPlayerSettings({
   const timers = useRef<number[]>([]);
   const generation = useRef(0);
   const mounted = useRef(true);
-  /** A settings-owned queue rebuild is waiting for the server. */
-  const rebuildInFlight = useRef(false);
+  /** Generation of the settings-owned queue rebuild waiting for the server, if any. */
+  const rebuildInFlight = useRef<number | null>(null);
   const cancelRebuild = useRef<() => void>(() => {});
   useEffect(() => {
     cancelRebuild.current = () => player?.cancelAtmosphereRebuild();
@@ -222,7 +223,8 @@ export default function BusinessPlayerSettings({
     return () => {
       mounted.current = false;
       // Leaving the page: the open music page owns the queue request from now on.
-      if (rebuildInFlight.current) cancelRebuild.current();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- the in-flight token at unmount time is wanted, not the one at mount
+      if (rebuildInFlight.current !== null) cancelRebuild.current();
       for (const timer of timers.current) window.clearTimeout(timer);
       timers.current = [];
     };
@@ -333,33 +335,17 @@ export default function BusinessPlayerSettings({
       ? persisted.then((error) => (error ? ("failed" as const) : ("deferred" as const)))
       : ownerRebuild
         // The venue row first; only a saved rebuild changes the owner's own queue (skip fade, player-fade.ts).
-        ? persisted.then(async (error) => {
-            if (error) return "failed" as const;
-            // A newer chip change or a newer rebuild owns the queue now.
-            if (generation.current !== gen) return "stale" as const;
-            storeBuilt();
-            markAtmosphereRestart(playingNow);
-            // Left this page: an open music page re-reads the profile and replaces its own
-            // queue request (one request path, so an old response cannot land last); otherwise
-            // the music page applies the marker when it opens. No second rebuild here.
-            if (!mounted.current) {
-              announceAtmosphereSaved();
-              return "deferred" as const;
-            }
-            rebuildInFlight.current = true;
-            const result = await (player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const));
-            rebuildInFlight.current = false;
-            // Left during the request (cancelled on unmount): hand over to the music page, keep the marker.
-            if (!mounted.current && result !== "applied") {
-              announceAtmosphereSaved();
-              return "deferred" as const;
-            }
-            if (result === "failed") {
-              clearAtmosphereRestart();
-              return "player-failed" as const;
-            }
-            return "applied" as const;
-          })
+        ? persisted.then((error) => continueOwnerRebuild(error, {
+            gen,
+            currentGeneration: () => generation.current,
+            isMounted: () => mounted.current,
+            inFlight: rebuildInFlight,
+            storeProfile: storeBuilt,
+            markRestart: () => markAtmosphereRestart(playingNow),
+            clearRestart: clearAtmosphereRestart,
+            announceSaved: announceAtmosphereSaved,
+            rebuild: () => player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const),
+          }))
       : player?.rebuildFromProfile(rebuildInput) ?? Promise.resolve("deferred" as const);
     timers.current.push(window.setTimeout(() => {
       void Promise.all([pending, persisted]).then(([result, error]) => {

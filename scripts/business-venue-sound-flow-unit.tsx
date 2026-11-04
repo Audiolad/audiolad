@@ -103,10 +103,8 @@ const at = (html: string, testid: string) => {
   assert.match(source, /text: atmosphereRebuildConfirmText\(next, venue\.known \? venue\.profile : null\)/);
   assert.match(source, /rebuildLocationAtmosphere\(locationId, draft\)/);
   // The venue row first: a refused save never touches the owner's queue.
-  assert.match(source, /persisted\.then\(async \(error\) => \{\s*if \(error\) return "failed" as const;/);
   // The layout player rebuilds even if the owner already left the page (no mounted gate here).
   // Left the page: the open music page owns the queue request (no second rebuild path).
-  assert.match(source, /if \(!mounted\.current\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}\s*rebuildInFlight\.current = true;\s*const result = await \(player\?\.rebuildFromProfile\(rebuildInput\)/);
   assert.match(source, /const rowProfile = saved \? locationSoundProfile\(saved\) : venueProfile\.current;/);
   assert.match(source, /latestVenueProfile\(locationId, rowProfile, saved\?\.settingsVersion \?\? 0\)/);
   {
@@ -123,23 +121,24 @@ const at = (html: string, testid: string) => {
   {
     // Navigation after the save but before the queue answer: the settings request is cancelled
     // and the music page takes over with the marker kept.
-    assert.match(source, /if \(rebuildInFlight\.current\) cancelRebuild\.current\(\);/);
-    assert.match(source, /if \(!mounted\.current && result !== "applied"\) \{\s*announceAtmosphereSaved\(\);\s*return "deferred" as const;\s*\}/);
+    assert.match(source, /if \(rebuildInFlight\.current !== null\) cancelRebuild\.current\(\);/);
+    // A stale completion (an older rebuild) never clears the newer flag or marker.
   }
   assert.match(source, /serialVenueWrite\(locationId, run\)/);
   assert.match(source, /recordVenueSound\(locationId, nextProfile, result\.settingsVersion\)/);
   // Review fixes: a newer action wins, the profile/marker are published only after the save,
   // a failed local rebuild is not reported as success, and venue writes are serialized.
-  assert.match(source, /if \(error\) return "failed" as const;\s*\/\/[^\n]*\n\s*if \(generation\.current !== gen\) return "stale" as const;\s*storeBuilt\(\);\s*markAtmosphereRestart\(playingNow\);/);
   assert.match(source, /if \(!pointDevice && !ownerRebuild\) markAtmosphereRestart\(playingNow\);/);
   assert.match(source, /if \(!ownerRebuild\) storeBuilt\(\);/);
   assert.match(source, /if \(ownerRebuild\) return;\s*try \{\s*coffeeStorage\.setItem/);
-  assert.match(source, /return "player-failed" as const;/);
   assert.match(source, /if \(result === "player-failed"\) \{\s*setSaveError\(REBUILD_PLAYER_ERROR\);\s*setPhase\("idle"\);/);
   assert.match(source, /if \(!result\.ok\) return result\.error;\s*\/\/[^\n]*\n\s*venueProfile\.current = nextProfile;/);
   assert.match(source, /const persistRebuild = \(nextProfile: GuestCoffeeProfile\): Promise<string \| null> => serialWrite\(/);
   assert.match(source, /persist\(venueOwner \? \(\) => currentVenue\(\)\.profile : profile, mode, queue\.hours\)/);
   assert.match(source, /const ownerRebuild = venueOwner && !venueSide;/);
+  // The save continuation lives in atmosphere-rebuild-flow.ts (completion orders tested there).
+  assert.match(source, /persisted\.then\(\(error\) => continueOwnerRebuild\(error, \{/);
+  assert.match(source, /inFlight: rebuildInFlight,/);
   // Point device waits for the server: a 403 must not look like success, and it says where to change it.
   assert.match(source, /persisted\.then\(\(error\) => \(error \? \("failed" as const\)/);
   assert.match(source, /saveError === POINT_MUSIC_FORBIDDEN \? <PointSoundLockedHow \/>/);
