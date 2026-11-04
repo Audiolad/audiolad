@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
+import { BUSINESS_OFFER_URL } from "@/lib/business/offer";
 
 export const metadata: Metadata = {
   title: "Как устроены права на музыку – АудиоЛад Бизнес",
@@ -142,7 +143,7 @@ export default function BusinessRightsPage() {
           </section>
         </div>
 
-        <LegalLinksNav className="mt-10 border-t border-[#eadff8] pt-7" />
+        <LegalLinksNav className="mt-10 border-t border-[#eadff8] pt-7" offerHref={BUSINESS_OFFER_URL} />
       </div>
     </main>
   );

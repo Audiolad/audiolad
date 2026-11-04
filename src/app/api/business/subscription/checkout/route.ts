@@ -2,6 +2,7 @@ import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { NextResponse } from "next/server";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
+import { BUSINESS_OFFER_HREF, businessOfferPaymentGate } from "@/lib/business/offer";
 import { mapBusinessSubscriptionRpcError, resolveBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -52,6 +53,17 @@ export async function POST(request: Request) {
   const idempotencyKey = resolveIdempotencyKey(request.headers.get("Idempotency-Key"));
   if (typeof idempotencyKey !== "string") {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  // Payment needs the current edition of the договор-оферта (the SQL order gate only
+  // knows the annex 1 row). Accepted once per account, never asked twice.
+  const offerGate = await businessOfferPaymentGate("business_subscription", () =>
+    supabase.rpc("business_offer_edition_acceptances_for_caller"));
+  if (offerGate === "unavailable") {
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+  if (offerGate === "offer_acceptance_required") {
+    return NextResponse.json({ error: "offer_acceptance_required", href: BUSINESS_OFFER_HREF }, { status: 409 });
   }
 
   const { data, error } = await supabase.rpc("create_business_subscription_order", {

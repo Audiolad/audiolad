@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
+import { BUSINESS_OFFER_URL } from "@/lib/business/offer";
 import {
   buildCoffeeAtlasShopPath,
   COFFEE_ATLAS_CTA_HREF,
@@ -128,7 +129,7 @@ export function CoffeeAtlasFooter() {
           {" · "}
           <a href={`mailto:${BUSINESS_INQUIRY_EMAIL}`}>{BUSINESS_INQUIRY_EMAIL}</a>
         </p>
-        <LegalLinksNav />
+        <LegalLinksNav offerHref={BUSINESS_OFFER_URL} />
       </div>
     </footer>
   );

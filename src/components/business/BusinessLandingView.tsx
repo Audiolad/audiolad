@@ -6,6 +6,7 @@ import BusinessListenStudio from "@/components/business/BusinessListenStudio";
 import BusinessSnapCarousel from "@/components/business/BusinessSnapCarousel";
 import BusinessSocialProofSlot from "@/components/business/BusinessSocialProofSlot";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
+import { BUSINESS_OFFER_URL } from "@/lib/business/offer";
 import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import { BUSINESS_TRIAL_SIGN_UP_HREF, BUSINESS_TRIAL_SIGN_IN_HREF } from "@/lib/access-grants/paths";
 import {
@@ -33,8 +34,6 @@ import {
   BUSINESS_LOCATION_PREVIEW,
   BUSINESS_NETWORK_LEAD,
   BUSINESS_NETWORK_TITLE,
-  BUSINESS_OFFLINE_LEAD,
-  BUSINESS_OFFLINE_TITLE,
   BUSINESS_PICK_LABEL,
   BUSINESS_PRICE_ROWS,
   BUSINESS_PRICE_TITLE,
@@ -358,15 +357,6 @@ export default function BusinessLandingView({
           </div>
         </section>
 
-        <section className="business-section" id="offline" aria-labelledby="business-offline-title">
-          <div className="business-wrap">
-            <h2 id="business-offline-title" className="business-h2">
-              {BUSINESS_OFFLINE_TITLE}
-            </h2>
-            <p className="business-lead">{BUSINESS_OFFLINE_LEAD}</p>
-          </div>
-        </section>
-
         <section className="business-section" id="rights" aria-labelledby="business-rights-title">
           <div className="business-wrap business-split business-split--half">
               <Poster
@@ -393,7 +383,7 @@ export default function BusinessLandingView({
                   </Link>
                 </li>
                 <li>
-                  <Link className="business-source-link" href="/offer">
+                  <Link className="business-source-link" href={BUSINESS_OFFER_URL}>
                     Публичная оферта
                   </Link>
                 </li>
@@ -703,7 +693,7 @@ export default function BusinessLandingView({
               <a href={`mailto:${BUSINESS_INQUIRY_EMAIL}`}>{BUSINESS_INQUIRY_EMAIL}</a>
             </p>
           </div>
-          <LegalLinksNav />
+          <LegalLinksNav offerHref={BUSINESS_OFFER_URL} />
         </div>
       </footer>
     </div>

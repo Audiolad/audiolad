@@ -112,7 +112,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   const bar = g.slice(g.indexOf('data-testid="biz-guest-status"'), g.indexOf("</section>", g.indexOf('data-testid="biz-guest-status"')));
-  has(bar, /7 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  has(bar, /7 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ за 30 дней/);
   has(bar, /Получить 7 дней бесплатно/);
   hasNot(bar, /30 минут/, "the top banner does not mention the 30 minutes before they run out");
   hasNot(bar, /Гостевой режим/);

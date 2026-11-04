@@ -181,7 +181,9 @@ assert.equal(
 assert.match(copy, /7 дней в подарок/);
 assert.match(copy, /Без привязки карты/);
 assert.match(copy, /Музыка не надоедает/);
-assert.match(copy, /Интернет пропал – музыка продолжает играть/);
+// The player has no offline cache: no offline-playback promise on the landing (pilot audit 04.11.2026).
+assert.doesNotMatch(copy, /Интернет пропал|продолжает играть|запас музыки|остановится из-за интернета|без интернета|офлайн/i);
+assert.doesNotMatch(view, /id="offline"|BUSINESS_OFFLINE_/);
 assert.match(copy, /7 дней в подарок · без привязки карты/);
 assert.match(copy, /Без повторов одних и тех же треков/);
 assert.match(copy, /Музыка подобрана под выбранную атмосферу/);
@@ -236,7 +238,6 @@ assert.doesNotMatch(studio, /\u2014/);
 assert.doesNotMatch(read("src/components/business/BusinessListenRail.tsx"), /\u2014/);
 assert.doesNotMatch(read("src/lib/business/landing.ts"), /\u2014/);
 assert.match(view, /id="variety"/);
-assert.match(view, /id="offline"/);
 assert.match(view, /id="network"/);
 assert.match(read("src/components/business/BusinessSocialProofSlot.tsx"), /return null/);
 assert.equal(

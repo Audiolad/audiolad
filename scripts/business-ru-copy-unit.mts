@@ -115,7 +115,7 @@ assert.equal(audit("consts.ts", 'const POINT = "SPA garden"; const STORAGE_KEY =
 assert.equal(audit("anchor.tsx", '<a href="#main">Перейти</a>').length, 0);
 // Signed legal documents (fixed text + sha256 per published version) change only with a new
 // document version approved by the owner; they are checked separately by their own tests.
-const legalDocuments = new Set(["src/lib/business-app/client-document-content.ts"]);
+const legalDocuments = new Set(["src/lib/business-app/client-document-content.ts", "src/lib/business-app/business-offer-content.ts"]);
 const failures = roots.flatMap(files).filter((file) => !legalDocuments.has(file)).flatMap((file) => audit(file, readFileSync(file, "utf8")));
 if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
 else console.log("business Russian copy: passed");

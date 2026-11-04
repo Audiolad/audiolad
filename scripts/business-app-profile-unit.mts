@@ -120,16 +120,21 @@ for (const payLabel of ["Оплатить заранее", "Продлить", "
 const unaccepted = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, accepted: false }));
 assert.doesNotMatch(unaccepted, /biz-home-pay-button/);
 assert.match(unaccepted, /Принять условия/);
-assert.match(unaccepted, /href="\/documents\/b2b-terms"/);
+assert.match(unaccepted, /href="\/documents\/business-offer"/);
 assert.equal(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, canPay: false })), "");
 assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, busy: true })), /disabled=""/);
 // Profile: after acceptance the accepted document stays visible and clickable.
 const profileAccepted = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", showAcceptedNote: true }));
-assert.match(profileAccepted, /Условия приняты для всего аккаунта/);
-assert.match(profileAccepted, /href="\/documents\/b2b-terms" target="_blank"/);
+assert.match(profileAccepted, /Оплата по договору:/);
+assert.match(profileAccepted, /Принят один раз\s+для всего аккаунта/);
+assert.match(profileAccepted, /href="\/documents\/business-offer" target="_blank"/);
+// The offer link sits next to every «Оплатить», with or without the profile flag.
+for (const payLabel of ["Оплатить заранее", "Продлить", "Оплатить"]) {
+  assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel })), /href="\/documents\/business-offer" target="_blank"/);
+}
 assert.equal((profileAccepted.match(/<button/g) ?? []).length, 1);
 // Before acceptance: clear text + document link right above «Принять условия».
-assert.match(unaccepted, /Нажимая «Принять условия», вы соглашаетесь с документом/);
+assert.match(unaccepted, /Нажимая «Принять\s+условия», вы принимаете/);
 assert.match(unaccepted, /target="_blank" rel="noopener noreferrer"/);
 // Guest-start account without email: the receipt email field sits before the pay button.
 const withEmail = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", receiptEmail: { value: "", onChange() {} } }));

@@ -5,6 +5,7 @@ import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
+import { hasAcceptedCurrentBusinessOffer } from "@/lib/business/offer";
 
 export { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
@@ -86,8 +87,14 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   );
   let offerAccepted = false;
   if (canPay) {
-    const { data: acceptance } = await supabase.rpc("business_offer_acceptance_for_caller");
-    offerAccepted = Array.isArray(acceptance) && acceptance.length > 0;
+    // The current edition of the договор-оферта, not any older acceptance.
+    // A read error is an error, never «not accepted»: otherwise an owner who already
+    // accepted would be asked for the same edition again.
+    const { data: acceptance, error: acceptanceError } = await supabase.rpc("business_offer_edition_acceptances_for_caller");
+    if (acceptanceError) {
+      throw new Error(`business_domain_offer_read_failed:${acceptanceError.message}`);
+    }
+    offerAccepted = hasAcceptedCurrentBusinessOffer(acceptance);
   }
   const needsReceiptEmail = canPay && !(user.email?.trim() ?? "");
 

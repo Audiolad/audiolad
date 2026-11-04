@@ -63,6 +63,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/announcements": `${BUSINESS_SITE_PATH}/announcements`,
   "/documents": `${BUSINESS_SITE_PATH}/documents`,
   // Readable full texts of client documents (tasks 8d9cd0af/8dcba9d1); keep in sync with CLIENT_DOCUMENTS ids.
+  // Договор-оферта (Stage 1C): its own static route, the four documents below are its annexes.
+  "/documents/business-offer": `${BUSINESS_SITE_PATH}/documents/business-offer`,
   "/documents/venue-license": `${BUSINESS_SITE_PATH}/documents/venue-license`,
   "/documents/b2b-terms": `${BUSINESS_SITE_PATH}/documents/b2b-terms`,
   "/documents/claims-procedure": `${BUSINESS_SITE_PATH}/documents/claims-procedure`,
