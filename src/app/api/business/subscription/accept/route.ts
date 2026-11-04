@@ -5,7 +5,7 @@ import {
   BUSINESS_OFFER_EDITION,
   BUSINESS_OFFER_HREF,
   currentBusinessOfferEdition,
-  isCurrentBusinessOfferEdition,
+  isShownCurrentBusinessOfferBody,
 } from "@/lib/business/offer";
 import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-checkout";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
@@ -14,17 +14,11 @@ import { createClientFromRequest } from "@/lib/supabase/request-client";
 export const dynamic = "force-dynamic";
 
 async function shownEditionIsCurrent(request: Request): Promise<boolean> {
-  let body: unknown = null;
   try {
-    body = await request.json();
+    return isShownCurrentBusinessOfferBody(await request.json());
   } catch {
-    // An empty body accepts the edition published now (older cabinet pages).
-    return true;
+    return false;
   }
-  if (!body || typeof body !== "object") return true;
-  const { offerVersion, offerHash } = body as { offerVersion?: unknown; offerHash?: unknown };
-  if (offerVersion === undefined && offerHash === undefined) return true;
-  return isCurrentBusinessOfferEdition(offerVersion, offerHash);
 }
 
 /**

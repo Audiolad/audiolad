@@ -17,6 +17,7 @@ import {
   BUSINESS_OFFER_TITLE,
   hasAcceptedCurrentBusinessOffer,
   isCurrentBusinessOfferEdition,
+  isShownCurrentBusinessOfferBody,
 } from "../src/lib/business/offer";
 import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS } from "../src/lib/business/plan";
 
@@ -95,6 +96,18 @@ assert.equal(BUSINESS_PUBLIC_PATH_REWRITES["/documents/business-offer"], "/busin
 assert.equal(isCurrentBusinessOfferEdition(BUSINESS_OFFER_EDITION.version, sha), true);
 assert.equal(isCurrentBusinessOfferEdition(BUSINESS_OFFER_EDITION.version, "0".repeat(64)), false);
 assert.equal(isCurrentBusinessOfferEdition(undefined, undefined), false);
+// Accept route body: only an explicit, matching edition is consent.
+assert.equal(isShownCurrentBusinessOfferBody({ offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: sha }), true);
+for (const body of [null, undefined, {}, [], "x", 1, { offerVersion: BUSINESS_OFFER_EDITION.version }, { offerHash: sha },
+  { offerVersion: "offer-v0", offerHash: sha }, { offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: "0".repeat(64) }]) {
+  assert.equal(isShownCurrentBusinessOfferBody(body), false, JSON.stringify(body) ?? String(body));
+}
+{
+  const route = readFileSync("src/app/api/business/subscription/accept/route.ts", "utf8");
+  assert.match(route, /isShownCurrentBusinessOfferBody\(await request\.json\(\)\)/);
+  assert.match(route, /catch \{\s*return false;/, "an empty or malformed body is refused");
+  assert.doesNotMatch(route, /return true/, "no implicit consent path");
+}
 assert.equal(hasAcceptedCurrentBusinessOffer(null), false);
 assert.equal(hasAcceptedCurrentBusinessOffer([{ document_key: "b2b-terms", document_version: "r8-2026-10-18", content_hash: "x" }]), false);
 assert.equal(hasAcceptedCurrentBusinessOffer([{ document_key: "business-offer", document_version: "offer-v0", content_hash: sha }]), false);

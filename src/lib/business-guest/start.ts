@@ -53,12 +53,11 @@ export async function handleBusinessGuestStart(req: GuestStartRequest, deps: Gue
   if (!isCurrentBusinessOfferEdition(body.offerVersion, body.offerHash)) return response(409, "offer_changed");
   const idempotencyHash = createHash("sha256").update(body.idempotencyKey.toLowerCase()).digest("hex");
   try {
-    const acceptQuietly = async (userId: string) => {
-      try { await deps.acceptOffer(userId); } catch { deps.log("guest_start_offer_accept_failed"); }
-    };
+    // A failed save is a failed start on every path: the retry records it, so the
+    // cabinet never asks again for an edition the owner already ticked.
     let user = await deps.currentUser();
-    if (user && user.is_anonymous !== true) { await acceptQuietly(user.id); return response(200); }
-    if (user && await deps.ready(user.id)) { await acceptQuietly(user.id); return response(200); }
+    if (user && user.is_anonymous !== true) { await deps.acceptOffer(user.id); return response(200); }
+    if (user && await deps.ready(user.id)) { await deps.acceptOffer(user.id); return response(200); }
     const networkHash = deps.networkHash();
     if (!networkHash) return response(503, "guest_start_failed");
     if (!await deps.reserve(networkHash, deps.config.networkLimit, deps.config.windowSeconds)) return response(429, "guest_start_limit");

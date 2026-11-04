@@ -110,13 +110,33 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   assert.equal(h.calls.clear, 0);
 }
 {
-  // Already started or signed in: the tick is still recorded, best effort.
+  // Already signed in: a failed save is reported, never a silent success; the retry records it.
   const h = harness(); h.setUser({ id: "email-user" }); h.setFail("accept");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
+  h.setFail("");
   assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 200);
-  assert.deepEqual(h.calls.acceptedBy, ["email-user"]);
-  const g = harness(); g.setUser({ id: "existing-guest", is_anonymous: true }); g.setReady();
+  assert.deepEqual(h.calls.acceptedBy, ["email-user", "email-user", "email-user"]);
+  assert.equal(h.calls.bootstrap, 0);
+}
+{
+  // Ready guest (gift already started): same, repeated failures then recovery.
+  const g = harness(); g.setUser({ id: "existing-guest", is_anonymous: true }); g.setReady(); g.setFail("accept");
+  assert.equal((await handleBusinessGuestStart(request(), g.deps)).status, 503);
+  assert.equal((await handleBusinessGuestStart(request(), g.deps)).status, 503);
+  g.setFail("");
   assert.equal((await handleBusinessGuestStart(request(), g.deps)).status, 200);
-  assert.deepEqual(g.calls.acceptedBy, ["existing-guest"]);
+  assert.deepEqual(g.calls.acceptedBy, ["existing-guest", "existing-guest", "existing-guest"]);
+  assert.equal(g.calls.bootstrap, 0);
+}
+{
+  // New guest: bootstrap succeeds, acceptance fails twice, the third retry records it.
+  const h = harness(); h.setFail("accept");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
+  h.setFail("");
+  assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 200);
+  assert.equal(h.calls.accept, 3);
 }
 assert.match(BUSINESS_GUEST_START_COPY.offerChanged, /Обновите страницу/);
 for (const failure of ["", "clear"]) {

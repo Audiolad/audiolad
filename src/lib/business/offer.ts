@@ -74,6 +74,17 @@ export function isCurrentBusinessOfferEdition(version: unknown, contentHash: unk
   return version === BUSINESS_OFFER_EDITION.version && contentHash === BUSINESS_OFFER_EDITION.contentHash;
 }
 
+/**
+ * Body of POST /api/business/subscription/accept. Consent is recorded only for the edition
+ * the page explicitly names: an empty, malformed or edition-less body is refused, never
+ * treated as consent to whatever edition is published now.
+ */
+export function isShownCurrentBusinessOfferBody(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const { offerVersion, offerHash } = body as { offerVersion?: unknown; offerHash?: unknown };
+  return isCurrentBusinessOfferEdition(offerVersion, offerHash);
+}
+
 /** Rows of business_offer_edition_acceptances_for_caller(): has the owner accepted the current edition? */
 export function hasAcceptedCurrentBusinessOffer(rows: unknown): boolean {
   if (!Array.isArray(rows)) return false;
