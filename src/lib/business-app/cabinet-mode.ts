@@ -50,6 +50,8 @@ export const BUSINESS_CABINET_PERMISSIONS = {
 
   // Settings screen.
   atmosphereSettings: { owner: true, venue: "if_allowed" },
+  /** «Пересобрать атмосферу» (Sergey 04.11.2026): a new venue playlist from the 4 × 4 choices. Owner only. */
+  atmosphereRebuild: { owner: true, venue: false },
   venueRemote: { owner: true, venue: false },
   deviceManagement: { owner: true, venue: false },
 

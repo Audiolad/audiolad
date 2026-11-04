@@ -75,7 +75,8 @@ assert.match(panel, /Поставить музыку в зале на паузу
 assert.match(panel, /Запретить устройству в зале менять музыку\?/);
 assert.match(panel, /Разрешить устройству в зале менять музыку\?/);
 assert.match(panel, /commandId/);
-assert.match(panel, /Изменить звучание/);
+assert.match(panel, /ATMOSPHERE_REBUILD_LABEL/);
+assert.doesNotMatch(panel, /Изменить звучание/);
 assert.match(panel, /VENUE_SOUND_HREF = "\/preferences\?sound=open"/);
 const homePage = readFileSync(new URL("../src/components/business-app/BusinessHomePage.tsx", import.meta.url), "utf8");
 assert.match(homePage, /<BusinessHomeChecklist steps=\{steps\}/);

@@ -559,7 +559,19 @@
   background: color-mix(in srgb, var(--biz-text) 45%, transparent);
 }
 
-/* Atmosphere picker under «Изменить звучание»: scrolled into view below the top bar. */
+/* «Пересобрать атмосферу» in «Управление кофейней» (04.11.2026): the main action of the card, pine like other main actions. */
+.business-atmosphere-rebuild {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--biz-border);
+}
+
+.business-atmosphere-rebuild__cta {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+
+/* Atmosphere builder under «Пересобрать атмосферу»: scrolled into view below the top bar. */
 .business-venue-sound {
   scroll-margin-top: 6rem;
   border-top: 1px solid var(--biz-border);

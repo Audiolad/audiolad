@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 
 import PointPairingCard from "@/components/business-app/PointPairingCard";
 import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
+import { ATMOSPHERE_REBUILD_HINT, ATMOSPHERE_REBUILD_LABEL } from "@/lib/business-app/atmosphere-rebuild";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
 
-/** Settings page with the atmosphere picker opened under «Изменить звучание». */
+/** Settings page with the atmosphere builder opened under «Пересобрать атмосферу». */
 const VENUE_SOUND_HREF = "/preferences?sound=open";
 
 const QUESTIONS: Record<PointCommandType, string> = {
@@ -21,12 +22,18 @@ export default function VenueControlPanel({
   pointCanEdit,
   soundSlot = null,
   soundInitiallyOpen = false,
+  atmosphereSummary = null,
 }: {
   locationId: string;
   pointCanEdit: boolean;
-  /** Atmosphere picker. It opens right under «Изменить звучание». Without it the button links to the settings page. */
+  /**
+   * The 4 × 4 atmosphere builder (BusinessPlayerSettings). It opens right under «Пересобрать
+   * атмосферу». Without it the button links to the settings page.
+   */
   soundSlot?: ReactNode;
   soundInitiallyOpen?: boolean;
+  /** «Уютная, Джаз» – what the venue plays now, when a saved atmosphere is known. */
+  atmosphereSummary?: string | null;
 }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(pointCanEdit);
@@ -106,6 +113,40 @@ export default function VenueControlPanel({
       <h2 id="venue-control-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
         Музыка в зале
       </h2>
+      <div className="business-atmosphere-rebuild space-y-3" data-testid="biz-atmosphere-rebuild">
+        <h3 className="text-base font-semibold text-[var(--biz-text)]">Атмосфера</h3>
+        {atmosphereSummary ? (
+          <p className="text-sm leading-6 text-[var(--biz-text)]" data-testid="biz-atmosphere-current">
+            Сейчас: {atmosphereSummary}.
+          </p>
+        ) : null}
+        <p className="text-sm leading-6 text-[var(--biz-text-muted)]">{ATMOSPHERE_REBUILD_HINT}</p>
+        {soundSlot ? (
+          <button
+            type="button"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring business-atmosphere-rebuild__cta"
+            aria-expanded={soundOpen}
+            aria-controls="venue-sound-panel"
+            data-testid="biz-venue-atmosphere-toggle"
+            onClick={toggleSound}
+          >
+            {ATMOSPHERE_REBUILD_LABEL}
+          </button>
+        ) : (
+          <a
+            href={VENUE_SOUND_HREF}
+            className="business-app-btn business-app-btn-cta business-app-focus-ring business-atmosphere-rebuild__cta"
+            data-testid="biz-venue-atmosphere-link"
+          >
+            {ATMOSPHERE_REBUILD_LABEL}
+          </a>
+        )}
+        {soundSlot && soundOpen ? (
+          <div id="venue-sound-panel" ref={soundRef} className="business-venue-sound space-y-4" data-testid="biz-venue-sound-panel">
+            {soundSlot}
+          </div>
+        ) : null}
+      </div>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         Пауза, продолжение, следующий трек и новое звучание уходят в зал после подтверждения. Вкладка «Музыка» играет только у вас.
       </p>
@@ -134,27 +175,6 @@ export default function VenueControlPanel({
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         В зале новое звучание начнётся со следующего трека.
       </p>
-      {soundSlot ? (
-        <button
-          type="button"
-          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          aria-expanded={soundOpen}
-          aria-controls="venue-sound-panel"
-          data-testid="biz-venue-atmosphere-toggle"
-          onClick={toggleSound}
-        >
-          Изменить звучание
-        </button>
-      ) : (
-        <a href={VENUE_SOUND_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-venue-atmosphere-link">
-          Изменить звучание
-        </a>
-      )}
-      {soundSlot && soundOpen ? (
-        <div id="venue-sound-panel" ref={soundRef} className="business-venue-sound space-y-4" data-testid="biz-venue-sound-panel">
-          {soundSlot}
-        </div>
-      ) : null}
       {error ? <p className="business-app-alert" data-tone="warn" role="alert">{error}</p> : null}
       {confirm ? (
         <VenueConfirmDialog

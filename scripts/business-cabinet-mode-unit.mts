@@ -51,7 +51,7 @@ assert.deepEqual(
 // Hidden on the venue side.
 for (const permission of [
   "accessCard", "accessLine", "payLink", "offerAccept", "sectionProfile", "sectionOnboarding", "trackRatings",
-  "daypartSettings", "venueRemote", "deviceManagement", "stickerDownload", "ownerChecklist", "profileEdit", "signOut",
+  "daypartSettings", "atmosphereRebuild", "venueRemote", "deviceManagement", "stickerDownload", "ownerChecklist", "profileEdit", "signOut",
 ] as const) {
   assert.equal(businessCabinetCan({ mode: "point" }, permission), false, `point: no ${permission}`);
   assert.equal(businessCabinetCan({ mode: "owner" }, permission), true, `owner: ${permission}`);
@@ -127,6 +127,15 @@ for (const path of [
   "src/app/api/business/venue-licence/sticker/route.ts",
 ]) {
   assert.match(read(path), /businessHallDeviceLocked\(\)/, `${path}: owner action guarded on the hall device`);
+}
+// «Пересобрать атмосферу» (04.11.2026): owner only, refused on the hall device and in the preview.
+assert.equal(businessCabinetCan({ mode: "owner" }, "atmosphereRebuild"), true);
+assert.equal(businessCabinetCan({ mode: "preview" }, "atmosphereRebuild"), false);
+assert.equal(businessCabinetCan({ mode: "point", pointCanEdit: true }, "atmosphereRebuild"), false, "the hall switch never unlocks a rebuild");
+{
+  const actions = read("src/app/business-app/sound-settings-actions.ts");
+  const rebuild = actions.slice(actions.indexOf("export async function rebuildLocationAtmosphere"));
+  assert.match(rebuild, /const \{ mode \} = await loadBusinessCabinetMode\(\);\s*if \(!businessCabinetCan\(\{ mode \}, "atmosphereRebuild"\)\) return \{ ok: false, error: REBUILD_OWNER_ONLY \};\s*return writeLocationSound\(/, "guard before the write");
 }
 // Codex review1 (03.11.2026): fail closed, no reusable owner session in the hall, every owner door guarded.
 const pointSession = read("src/lib/business-app/point-session.server.ts");

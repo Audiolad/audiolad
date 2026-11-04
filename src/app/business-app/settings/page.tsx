@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import BusinessPlayerSettings from "@/components/business-app/BusinessPlayerSettings";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
+import { atmosphereChoiceLabel } from "@/lib/business-app/atmosphere-rebuild";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { BUSINESS_VENUE_FALLBACK_PATH, businessCabinetCan } from "@/lib/business-app/cabinet-mode";
@@ -39,6 +40,8 @@ export default async function BusinessAppSettingsPage({
   if (!businessCabinetCan({ mode: cabinet.mode, pointCanEdit }, "sectionSettings")) redirect(BUSINESS_VENUE_FALLBACK_PATH);
   const venueSide = cabinet.mode !== "owner";
   const ownerPanel = Boolean(locationId) && !venueSide;
+  // «Пересобрать атмосферу» is an owner action (row «atmosphereRebuild»): never on the hall device or in the preview.
+  const canRebuild = ownerPanel && businessCabinetCan({ mode: cabinet.mode }, "atmosphereRebuild");
 
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-player-settings">
@@ -48,12 +51,13 @@ export default async function BusinessAppSettingsPage({
           {ownerPanel ? "Музыка в зале и устройство у колонки." : venueSide ? "Звучание музыки в зале." : "Звучание плеера в этом кабинете."}
         </p>
       </header>
-      {ownerPanel && locationId ? (
-        // Owner phone: the picker opens right under «Изменить звучание», not further down the page.
+      {canRebuild && locationId ? (
+        // Owner phone: the 4 × 4 builder opens right under «Пересобрать атмосферу», not further down the page.
         <VenueControlPanel
           locationId={locationId}
           pointCanEdit={pointCanEdit}
           soundInitiallyOpen={query.sound === "open"}
+          atmosphereSummary={saved ? atmosphereChoiceLabel(saved) : null}
           soundSlot={<BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={false} pointCanEdit={pointCanEdit} />}
         />
       ) : (
