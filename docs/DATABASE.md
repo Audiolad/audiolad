@@ -2437,6 +2437,20 @@ Read-only dry-run count: `docs/business/player-retention-dry-run.sql`.
 See [policy, controls and local EXPLAIN evidence](business/player-retention.md).
 Applied only to isolated synthetic test clusters (local/CI), never to a real database.
 
+### Business offer editions (Stage 1C)
+
+NEEDS MIGRATION/RLS: `20270218120000_business_offer_editions.sql` is prepared, not
+applied by this task (Sergey's Human Gate, rollback SQL in the file header). Additive:
+`business_offer_editions` (published editions of the договор-оферта, seed
+`offer-v1-2026-11-04`) and `business_offer_edition_acceptances` (one row per owner
+account and edition, source `guest_start` or `cabinet`), both RLS on and service_role
+only. Functions: `record_business_offer_edition_acceptance` (service_role only, used by
+the gift start), `accept_business_offer_edition` (authenticated owner, support mode
+forbidden) and `business_offer_edition_acceptances_for_caller`. Accepting also inserts
+the annex 1 (`b2b-terms`) row into `business_offer_acceptances` when missing, so
+`create_business_subscription_order` is unchanged. Smoke:
+`supabase/tests/business_offer_editions_smoke.sql`.
+
 ### Business profile personalization (biz-profile-edit)
 
 NEEDS MIGRATION/RLS: `20270216120000_business_profile_organization.sql` is prepared,

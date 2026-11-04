@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   BusinessOfferAcceptNote,
   BusinessOfferAcceptedNote,
+  BusinessOfferAcceptedStepNote,
   BusinessPayError,
   BusinessReceiptEmailField,
   useBusinessHomePay,
@@ -115,7 +116,7 @@ export default function BusinessHomeChecklist({
         })}
         {withAccess ? (
           <Step id="terms" index={steps.length + 1} done={accepted} title="Примите условия">
-            {accepted ? <BusinessOfferAcceptedNote /> : <BusinessOfferAcceptNote />}
+            {accepted ? <BusinessOfferAcceptedStepNote /> : <BusinessOfferAcceptNote />}
             {accepted ? null : (
               <button
                 type="button"
@@ -166,6 +167,7 @@ export default function BusinessHomeChecklist({
               {accepted && askReceiptEmail ? (
                 <BusinessReceiptEmailField control={{ value: receiptEmail, onChange: setReceiptEmail }} busy={busy} />
               ) : null}
+              {accepted ? <BusinessOfferAcceptedNote testId="biz-home-pay-offer" /> : null}
               {accepted ? (
                 <button
                   type="button"

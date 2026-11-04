@@ -20,6 +20,7 @@ import {
   formatVenueZoneRu,
 } from "@/lib/business-app/client-documents";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
+import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_SUMMARY, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
 import { businessCabinetCan, type BusinessCabinetMode } from "@/lib/business-app/cabinet-mode";
 import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
 import { loadPlaybackReport, type PlaybackReportVenue } from "@/lib/business-app/load-playback-report";
@@ -101,6 +102,22 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Правообладатели треков указываются по данным реестра прав сервиса в отчёте «Что играло в заведении».
         </p>
         <ul className="mt-4 flex flex-col gap-3">
+          <li data-doc-id={BUSINESS_OFFER_EDITION.documentKey}>
+            <a
+              href={BUSINESS_OFFER_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
+              data-doc-link={BUSINESS_OFFER_EDITION.documentKey}
+            >
+              <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">{BUSINESS_OFFER_TITLE}</div>
+              <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
+                <span className="font-semibold">{BUSINESS_OFFER_EDITION.label}</span>
+              </div>
+              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{BUSINESS_OFFER_SUMMARY}</p>
+              <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
+            </a>
+          </li>
           {CLIENT_DOCUMENTS.map((doc) => (
             <li key={doc.id} data-doc-id={doc.id}>
               <a

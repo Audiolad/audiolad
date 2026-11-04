@@ -13,7 +13,7 @@ import {
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
-import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
+import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
 
@@ -57,10 +57,13 @@ export function useBusinessHomePay() {
     setBusy(true);
     setError(null);
     try {
+      // The edition linked next to the button; the server refuses a stale one.
       const response = await fetch("/api/business/subscription/accept", {
         method: "POST",
         credentials: "same-origin",
         cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash }),
       });
       const payload = (await response.json().catch(() => null)) as { error?: string; href?: string } | null;
       if (!response.ok) {
@@ -209,7 +212,7 @@ export default function BusinessHomeAccessCard() {
 
 export type ReceiptEmailControl = { value: string; onChange: (value: string) => void } | null;
 
-/** The one document the «Принять условия» button records, as a link that opens in a new tab. */
+/** The договор-оферта that «Принять условия» records and «Оплатить» pays under; opens in a new tab. */
 export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { testId?: string }) {
   return (
     <a
@@ -218,8 +221,9 @@ export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { tes
       rel="noopener noreferrer"
       className="font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring"
       data-testid={testId}
+      data-offer-version={BUSINESS_OFFER_EDITION.version}
     >
-      «{BUSINESS_OFFER_TITLE}»
+      {BUSINESS_OFFER_TITLE}
     </a>
   );
 }
@@ -228,16 +232,29 @@ export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { tes
 export function BusinessOfferAcceptNote() {
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
-      Перед первой оплатой примите условия сервиса – один раз для всего аккаунта. Нажимая «Принять условия», вы
-      соглашаетесь с документом <BusinessOfferTermsLink /> (откроется в новой вкладке).
+      Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек. Нажимая «Принять
+      условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()} (откроется в
+      новой вкладке).
     </p>
   );
 }
 
-export function BusinessOfferAcceptedNote() {
+/** Shown next to every «Оплатить»: the payment is made under this offer edition. */
+export function BusinessOfferAcceptedNote({ testId = "biz-home-terms-accepted" }: { testId?: string } = {}) {
   return (
-    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-terms-accepted">
-      Условия приняты для всего аккаунта: <BusinessOfferTermsLink />.
+    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid={testId}>
+      Оплата по договору: <BusinessOfferTermsLink testId={`${testId}-link`} />,{" "}
+      {BUSINESS_OFFER_EDITION.label.toLowerCase()}. Принят один раз для всего аккаунта.
+    </p>
+  );
+}
+
+/** Checklist «Примите условия» once done: what was accepted, one tap away. */
+export function BusinessOfferAcceptedStepNote() {
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-terms-step-accepted">
+      Принят <BusinessOfferTermsLink testId="biz-home-terms-step-link" />,{" "}
+      {BUSINESS_OFFER_EDITION.label.toLowerCase()}. Один раз для всего аккаунта и всех точек.
     </p>
   );
 }
@@ -280,7 +297,6 @@ export function BusinessPayControls({
   payLabel = "Оплатить",
   buttonVariant = "primary",
   receiptEmail = null,
-  showAcceptedNote = false,
 }: {
   canPay: boolean;
   accepted: boolean;
@@ -291,6 +307,7 @@ export function BusinessPayControls({
   payLabel?: string;
   buttonVariant?: "primary" | "cta";
   receiptEmail?: ReceiptEmailControl;
+  /** @deprecated The offer link is always shown next to «Оплатить». */
   showAcceptedNote?: boolean;
 }) {
   if (!canPay) return null;
@@ -301,7 +318,7 @@ export function BusinessPayControls({
       </p>
       {accepted ? (
         <>
-          {showAcceptedNote ? <BusinessOfferAcceptedNote /> : null}
+          <BusinessOfferAcceptedNote />
           {receiptEmail ? <BusinessReceiptEmailField control={receiptEmail} busy={busy} /> : null}
           <button
             type="button"
@@ -336,7 +353,7 @@ export function BusinessPayError({ error }: { error: PayError }) {
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
-        Сначала примите условия: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.
+        Сначала примите договор-оферту: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.
       </p>
     );
   }
