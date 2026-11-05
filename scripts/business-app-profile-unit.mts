@@ -127,15 +127,16 @@ assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, bus
 const profileAccepted = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", showAcceptedNote: true }));
 assert.match(profileAccepted, /Оплата по договору:/);
 assert.match(profileAccepted, /Принят один раз\s+для всего аккаунта/);
-assert.match(profileAccepted, /href="\/documents\/business-offer" target="_blank"/);
+assert.match(profileAccepted, /href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"/);
 // The offer link sits next to every «Оплатить», with or without the profile flag.
 for (const payLabel of ["Оплатить заранее", "Продлить", "Оплатить"]) {
-  assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel })), /href="\/documents\/business-offer" target="_blank"/);
+  assert.match(renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel })), /href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"/);
 }
 assert.equal((profileAccepted.match(/<button/g) ?? []).length, 1);
 // Before acceptance: clear text + document link right above «Принять условия».
 assert.match(unaccepted, /Нажимая «Принять\s+условия», вы принимаете/);
-assert.match(unaccepted, /target="_blank" rel="noopener noreferrer"/);
+assert.match(unaccepted, /href="\/documents\/business-offer"[^>]*aria-haspopup="dialog"/);
+assert.doesNotMatch(unaccepted, /target="_blank"|новой вкладке/);
 // Guest-start account without email: the receipt email field sits before the pay button.
 const withEmail = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel: "Оплатить заранее", receiptEmail: { value: "", onChange() {} } }));
 assert.match(withEmail, /Почта для чека/);

@@ -98,10 +98,10 @@ assert.match(graceHtml, /data-testid="biz-home-accept"/);
 assert.doesNotMatch(graceHtml, /data-testid="biz-home-pay-button"/);
 assert.doesNotMatch(graceHtml, /—/);
 
-// Every «Принять условия» says what is accepted, once per account, and links the document in a new tab.
+// Every «Принять условия» says what is accepted, once per account, and links the document (in-app sheet, no new PWA window).
 assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
 assert.match(graceHtml, /один раз для всего аккаунта/);
-assert.match(graceHtml, /<a href="\/documents\/business-offer" target="_blank" rel="noopener noreferrer"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
+assert.match(graceHtml, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
 assert.match(graceHtml, /data-offer-version="offer-v1-2026-11-04"/);
 assert.match(graceHtml, /редакция 1 от 04\.11\.2026/);
 assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
@@ -135,7 +135,7 @@ assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /needsRecei
 assert.match(accepted, /data-testid="biz-home-pay-button"/);
 // Next to «Оплатить» the same offer link and edition, every time.
 assert.match(accepted, /data-testid="biz-home-terms-accepted"/);
-assert.match(accepted, /<a href="\/documents\/business-offer" target="_blank" rel="noopener noreferrer"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
+assert.match(accepted, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
 assert.ok(accepted.indexOf("biz-home-terms-accepted") < accepted.indexOf("biz-home-pay-button"), "offer link before pay");
 assert.match(accepted, /Оплатить/);
 assert.match(accepted, /Автосписания нет/);

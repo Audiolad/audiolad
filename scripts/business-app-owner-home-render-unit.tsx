@@ -105,7 +105,8 @@ const stepOf = (html: string, id: string) => {
 // Terms step: accepted already, the offer stays one tap away.
 const termsStep = stepOf(trialHome, "terms");
 assert.deepEqual(visibleLines(termsStep), ["Примите условия", "Принят", BUSINESS_OFFER_TITLE, `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Один раз для всего аккаунта и всех точек.`]);
-assert.match(termsStep, /target="_blank"/);
+assert.doesNotMatch(termsStep, /target="_blank"/);
+assert.match(termsStep, /aria-haspopup="dialog"/);
 assert.match(termsStep, /data-done="true"/);
 assert.match(termsStep, /href="\/documents\/business-offer"/);
 // Pay step: exactly these lines, in this order.

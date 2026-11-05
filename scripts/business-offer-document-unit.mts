@@ -116,7 +116,8 @@ assert.equal(hasAcceptedCurrentBusinessOffer([{ document_key: "business-offer", 
 
 // 8. Every accept button links the offer; payment and gift start check the edition server-side.
 const guestCta = readFileSync("src/components/business-app/BusinessGuestStartCta.tsx", "utf8");
-assert.match(guestCta, /href=\{BUSINESS_OFFER_HREF\}/);
+assert.match(guestCta, /<BusinessOfferDocumentLink testId=/);
+assert.match(readFileSync("src/components/business-app/BusinessOfferDocumentLink.tsx", "utf8"), /href=\{BUSINESS_OFFER_HREF\}/);
 assert.match(guestCta, /offerVersion: BUSINESS_OFFER_EDITION\.version, offerHash: BUSINESS_OFFER_EDITION\.contentHash/);
 assert.match(readFileSync("src/app/api/business/guest-start/route.ts", "utf8"), /record_business_offer_edition_acceptance/);
 assert.match(readFileSync("src/app/api/business/subscription/accept/route.ts", "utf8"), /accept_business_offer_edition/);

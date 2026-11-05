@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useState } from "react";
 
+import { BusinessOfferDocumentLink } from "@/components/business-app/BusinessOfferDocumentLink";
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
@@ -13,7 +14,7 @@ import {
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
-import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
+import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
 
@@ -212,19 +213,16 @@ export default function BusinessHomeAccessCard() {
 
 export type ReceiptEmailControl = { value: string; onChange: (value: string) => void } | null;
 
-/** The договор-оферта that «Принять условия» records and «Оплатить» pays under; opens in a new tab. */
+/**
+ * The договор-оферта that «Принять условия» records and «Оплатить» pays under. Opens the same
+ * edition in an in-app sheet: no new PWA window, payment form state and music stay.
+ */
 export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { testId?: string }) {
   return (
-    <a
-      href={BUSINESS_OFFER_HREF}
-      target="_blank"
-      rel="noopener noreferrer"
+    <BusinessOfferDocumentLink
       className="font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring"
-      data-testid={testId}
-      data-offer-version={BUSINESS_OFFER_EDITION.version}
-    >
-      {BUSINESS_OFFER_TITLE}
-    </a>
+      testId={testId}
+    />
   );
 }
 
@@ -233,8 +231,7 @@ export function BusinessOfferAcceptNote() {
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
       Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек. Нажимая «Принять
-      условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()} (откроется в
-      новой вкладке).
+      условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
     </p>
   );
 }

@@ -4,7 +4,8 @@ import { useRef, useState, type ReactNode } from "react";
 import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
 import { GUEST_START_TIMEOUT_MS, requestGuestStart } from "@/lib/business-guest/start-request";
-import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
+import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
+import { BusinessOfferDocumentLink } from "./BusinessOfferDocumentLink";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
 
 const STORAGE_KEY = "audiolad.business.guest-start.v1";
@@ -70,7 +71,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
     <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
     {open ? <div className="space-y-3 py-3" data-testid={`${testId}-confirmation`}>
       <p>{copy.terms}</p>
-      <p><a href={BUSINESS_OFFER_HREF} target="_blank" rel="noreferrer" data-testid={`${testId}-offer-link`}>{BUSINESS_OFFER_TITLE}</a> ({BUSINESS_OFFER_EDITION.label}){" · "}<a href="https://audiolad.ru/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p>
+      <p><BusinessOfferDocumentLink testId={`${testId}-offer-link`} /> ({BUSINESS_OFFER_EDITION.label}){" · "}<a href="https://audiolad.ru/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p>
       <label className="flex items-start gap-2">
         <input type="checkbox" checked={accepted} disabled={loading} onChange={(event) => setAccepted(event.target.checked)} data-testid={`${testId}-accept`} />
         <span>{copy.acceptance}</span>
