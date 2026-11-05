@@ -6429,6 +6429,11 @@
       "file": "supabase/migrations/20270221120000_business_test_account_reset.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.reset_business_test_account(uuid, uuid, text[], text, text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270222120000_author_application_function_grants.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.approve_author_application(uuid, text) TO authenticated, service_role;"
     }
   ]
 }

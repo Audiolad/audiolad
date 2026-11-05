@@ -45,6 +45,8 @@ assert.match(workflow, /supabase\/tests\/business_test_account_reset_smoke\.sql/
 assert.match(driver, /business_test_account_reset_smoke\.sql/);
 assert.match(workflow, /supabase\/tests\/author_application_revision_smoke\.sql/);
 assert.match(driver, /author_application_revision_smoke\.sql/);
+assert.match(workflow, /supabase\/tests\/author_application_function_grants_smoke\.sql/);
+assert.match(driver, /author_application_function_grants_smoke\.sql/);
 assert.match(driver, /jwt_claims_trigger_guards_smoke\.sql/);
 assert.match(driver, /20261102120000/);
 assert.match(driver, /CREATE DATABASE \$\{expectedDatabase\}/);

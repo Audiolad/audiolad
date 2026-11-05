@@ -216,6 +216,32 @@ function testMigrationFiles() {
     historyGrants,
     /REVOKE ALL ON FUNCTION public\.log_author_application_status_event\(uuid, text, text, uuid, text, text\)\s+FROM PUBLIC, anon, authenticated;/,
   );
+  const functionGrants = readFileSync(
+    "supabase/migrations/20270222120000_author_application_function_grants.sql",
+    "utf8",
+  );
+  assert.match(
+    functionGrants,
+    /REVOKE ALL ON FUNCTION public\.guard_author_applications_user_update\(\)\s+FROM PUBLIC, anon, authenticated;/,
+  );
+  assert.match(
+    functionGrants,
+    /REVOKE ALL ON FUNCTION public\.transition_author_application_status\(uuid, text, text, text\)\s+FROM PUBLIC, anon, authenticated;/,
+  );
+  assert.match(
+    functionGrants,
+    /REVOKE ALL ON FUNCTION public\.approve_author_application\(uuid, text\)\s+FROM PUBLIC, anon;/,
+  );
+  // The admin approval action calls the RPC through the staff session.
+  assert.match(
+    functionGrants,
+    /GRANT EXECUTE ON FUNCTION public\.approve_author_application\(uuid, text\)\s+TO authenticated, service_role;/,
+  );
+  assert.match(functionGrants, /has_function_privilege/);
+  assert.match(
+    readFileSync("supabase/rollbacks/20270222120000_author_application_function_grants.rollback.sql", "utf8"),
+    /NOT a migration/,
+  );
   // The greeting must not use display_name: it is the project name.
   const adminActions = readFileSync(
     "src/app/(platform)/admin/author-applications/actions.ts",
