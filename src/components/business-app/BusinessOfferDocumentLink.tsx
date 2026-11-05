@@ -99,7 +99,7 @@ export function BusinessOfferDocumentSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/50 sm:items-center"
+      className="fixed inset-0 z-[1000] flex items-end justify-center bg-[rgb(0_0_0/0.5)] sm:items-center"
       data-testid={testId}
       onClick={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) onClose(); }}
     >
