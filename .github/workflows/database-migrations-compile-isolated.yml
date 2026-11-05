@@ -27,6 +27,7 @@ on:
       - "supabase/tests/business_offer_editions_smoke.sql"
       - "supabase/tests/business_test_account_reset_smoke.sql"
       - "supabase/tests/author_application_revision_smoke.sql"
+      - "supabase/tests/author_application_function_grants_smoke.sql"
       - "supabase/tests/ecompany_catalog_stats_smoke.sql"
       - "supabase/tests/seo_wordstat_music_queries_seed_smoke.sql"
       - "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"
