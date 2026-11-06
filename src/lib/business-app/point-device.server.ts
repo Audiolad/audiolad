@@ -1,4 +1,5 @@
 import "server-only";
+import { loadBusinessPilotSlots } from "./pilot-slots";
 
 import { pilotLocationAccess } from "./location-access.server";
 
@@ -44,10 +45,9 @@ export const loadPointDeviceVenue = cache(async function loadPointDeviceVenue():
     } | null;
     if (locationError || !loc || loc.status !== "active") return null;
     if (typeof loc.id !== "string" || typeof loc.organization_id !== "string") return null;
-    const { data: org, error: orgError } = await db.from("business_organizations").select("pilot_location_limit").eq("id", loc.organization_id).single();
-    if (orgError || !org) return null;
+    const pilotSlots = await loadBusinessPilotSlots(db, loc.organization_id);
     return {
-      pilotSlots: org.pilot_location_limit === 3,
+      pilotSlots,
       locationId: loc.id,
       organizationId: loc.organization_id,
       locationName: typeof loc.name === "string" && loc.name.trim() ? loc.name.trim() : "Кофейня",

@@ -1,4 +1,21 @@
 -- Throwaway fixture only. Run via scripts/business-pilot-isolated.py, never on production.
+-- Catalog ACL checks remain meaningful in single-user PG; this is not HTTP/RLS coverage.
+SELECT public.check_test(NOT has_function_privilege('anon','public.activate_business_pilot_location(uuid,integer)','EXECUTE'), 'anon cannot activate');
+SELECT public.check_test(has_function_privilege('authenticated','public.activate_business_pilot_location(uuid,integer)','EXECUTE'), 'authenticated activation uses owner check');
+SELECT public.check_test(NOT has_function_privilege('authenticated','public.apply_business_player_usage_sample(uuid,uuid,uuid,bigint,uuid,bigint,bigint,numeric,text)','EXECUTE'), 'account cannot call private A3 helper');
+SELECT public.check_test(has_function_privilege('anon','public.apply_business_point_usage_sample(text,uuid,uuid,bigint,uuid,bigint)','EXECUTE'), 'point token RPC available to paired anonymous devices');
+DO $$ DECLARE token text; BEGIN
+  FOREACH token IN ARRAY ARRAY['', 'invalid', repeat('0',64)] LOOP
+    BEGIN
+      PERFORM public.apply_business_point_usage_sample(token,gen_random_uuid(),gen_random_uuid(),1,gen_random_uuid(),0);
+      RAISE EXCEPTION 'missing or unknown point token accepted';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    BEGIN
+      PERFORM public.apply_business_playback_usage_heartbeat(token,gen_random_uuid(),gen_random_uuid(),1,gen_random_uuid(),0);
+      RAISE EXCEPTION 'missing or unknown player credential accepted';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  END LOOP;
+END; $$;
 INSERT INTO auth.users VALUES ('00000000-0000-4000-8000-000000000001'), ('00000000-0000-4000-8000-000000000002');
 SET test.uid = '00000000-0000-4000-8000-000000000001';
 CREATE TEMP TABLE fixture AS SELECT public.create_business_organization_with_location('Пилот','Стритфуд 1','cafe','RU','Europe/Moscow') AS bootstrap;

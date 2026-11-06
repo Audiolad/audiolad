@@ -1,3 +1,5 @@
+import { loadPilotBillingSummary } from "./pilot-billing.server";
+import { loadBusinessPilotSlots } from "./pilot-slots";
 import { cookies } from "next/headers";
 import { BUSINESS_LOCATION_COOKIE, selectBusinessLocation } from "./location-selection";
 import { createClient } from "@/lib/supabase/server";
@@ -38,6 +40,7 @@ export type BusinessOwnerHomeContext =
       location: BusinessDomainLocation | null;
       locations?: Array<{ id: string; name: string; status: string }>;
       pilotSlots?: boolean;
+      pilotBilling?: { paidUntil: string | null; renewalBlocked: boolean };
       organizationName: string | null;
       organizationId: string | null;
       /** True only for an organization owner. A manager and a venue device cannot pay. */
@@ -88,7 +91,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   const memberships = membershipRows ?? [];
   const membership = memberships[0] ?? null;
   const canPay = ownerCanPayFromThisBrowser(
-    membership?.role === "owner",
+    memberships.some((row) => row.role === "owner"),
     await businessHallDeviceLocked(),
   );
   let offerAccepted = false;
@@ -122,13 +125,15 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   const { data: org, error: orgError } = await supabase
     .from("business_organizations")
-    .select("id, name, status, pilot_location_limit")
+    .select("id, name, status")
     .eq("id", organizationId)
     .maybeSingle();
 
   if (orgError) {
     throw new Error(`business_domain_org_read_failed:${orgError.message}`);
   }
+
+  const pilotSlots = await loadBusinessPilotSlots(supabase, organizationId);
 
   const { data: locations, error: locationError } = await supabase
     .from("business_locations")
@@ -145,7 +150,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     );
   }
 
-  const location = selectBusinessLocation(locations ?? [], (await cookies()).get(BUSINESS_LOCATION_COOKIE)?.value);
+  const pilotBilling = pilotSlots ? await loadPilotBillingSummary(organizationId, (locations ?? []).filter((l) => l.status === "active").map((l) => l.id)) : undefined;
+  const location = selectBusinessLocation(locations ?? [], pilotSlots ? (await cookies()).get(BUSINESS_LOCATION_COOKIE)?.value : undefined);
 
   if (!location) {
     const signals = await loadBusinessOwnerHomeSignals({
@@ -158,7 +164,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       owner: { userId: user.id, firstName },
       location: null,
       locations: locations ?? [],
-      pilotSlots: org?.pilot_location_limit === 3,
+      pilotSlots,
+      pilotBilling,
       organizationName: org?.name ?? null,
       organizationId,
       canPay,
@@ -192,7 +199,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     status: "authenticated",
     owner: { userId: user.id, firstName },
     locations: locations ?? [],
-    pilotSlots: org?.pilot_location_limit === 3,
+    pilotSlots,
+    pilotBilling,
     organizationName: org?.name ?? null,
     organizationId,
     canPay,

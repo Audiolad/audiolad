@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { loadBusinessPilotSlots } from "../src/lib/business-app/pilot-slots";
 import { selectBusinessLocation, businessPilotSlots } from "../src/lib/business-app/location-selection";
 import { deriveBusinessPointState } from "../src/lib/business-app/owner-home-signals";
 import { playbackStorageKey, clampWorkspacePlayback } from "../src/lib/business-workspace/playback";
@@ -55,3 +57,45 @@ assert.equal(second.endsAt, trial.endsAt, "second location cannot inherit first 
 assert.equal(resolveCustomerAccess({ now: new Date("2026-11-20"), emailConfirmed: true, grant: trial, paidUntil: null }).player, false);
 assert.deepEqual([1, 2, 3].map((n) => n * BUSINESS_PLAN_MONTHLY_PRICE_RUB), [799, 1598, 2397]);
 console.log("business-pilot-unit: owner switching, reserve, health/state isolation, device evidence payload, trial/payment, legacy: PASS");
+
+// Code may ship before the optional column. Missing schema, NULL, read errors and
+// transport failures must disable slots, not the existing cabinet/device/access.
+function pilotDb(result: { data: { pilot_location_limit: number | null } | null; error: { message: string } | null }) {
+  return { from(table: string) {
+    assert.equal(table, "business_organizations");
+    return { select(column: string) {
+      assert.equal(column, "pilot_location_limit");
+      return { eq(key: string, id: string) {
+        assert.equal(key, "id"); assert.equal(id, "org");
+        return { maybeSingle: async () => result };
+      } };
+    } };
+  } } as unknown as Parameters<typeof loadBusinessPilotSlots>[0];
+}
+for (const result of [
+  { data: null, error: { message: "column business_organizations.pilot_location_limit does not exist" } },
+  { data: null, error: { message: "schema cache unavailable" } },
+  { data: null, error: null },
+  { data: { pilot_location_limit: null }, error: null },
+  { data: { pilot_location_limit: 1 }, error: null },
+  { data: { pilot_location_limit: 3 }, error: { message: "read failed" } },
+]) assert.equal(await loadBusinessPilotSlots(pilotDb(result), "org"), false);
+assert.equal(await loadBusinessPilotSlots(pilotDb({ data: { pilot_location_limit: 3 }, error: null }), "org"), true);
+assert.equal(await loadBusinessPilotSlots({ from() { throw new Error("transport"); } } as unknown as Parameters<typeof loadBusinessPilotSlots>[0], "org"), false);
+const readSource = (path: string) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+for (const file of ["domain.ts", "point-device.server.ts", "location-access.server.ts"]) {
+  const source = readSource("src/lib/business-app/" + file);
+  assert.match(source, /loadBusinessPilotSlots\(/, file + " uses optional flag reader");
+  assert.doesNotMatch(source, /\.select\([^)]*pilot_location_limit/, file + " main reads work before migration");
+}
+assert.match(readSource("src/lib/business-app/location-access.server.ts"), /if \(!await loadBusinessPilotSlots\(db, location.organization_id\)\) return null/);
+assert.match(readSource("src/lib/business-app/domain.ts"), /memberships.some\(\(row\) => row.role === "owner"\)/);
+for (const file of ["src/lib/business-workspace/load.server.ts", "src/app/api/business/workspace/state/route.ts"]) {
+  assert.doesNotMatch(readSource(file), /loadBusinessOwnerHomeContext/, "workspace must not load owner health/live signals");
+}
+const context = readSource("src/lib/business-app/location-context.server.ts");
+assert.match(context, /eq\("user_id", userId\)/);
+assert.match(context, /eq\("organization_id", organizationId\)/);
+assert.match(context, /selectBusinessLocation\(locations \?\? \[\], pilotSlots \?/);
+assert.doesNotMatch(context, /\.rpc\(/);
+console.log("business-pilot-unit: optional-column fallback, scoped lightweight selection, canPay regression: PASS");

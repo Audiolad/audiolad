@@ -6464,6 +6464,36 @@
       "file": "supabase/migrations/20270225120000_business_location_venue_address.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.create_business_organization_with_location(text, text, text, text, text, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270226120000_business_pilot_three_locations.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.activate_business_pilot_location(uuid, integer) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270226130000_business_point_playback_attribution.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_player_usage_sample(uuid, uuid, uuid, bigint, uuid, bigint, bigint, numeric, text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270226130000_business_point_playback_attribution.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_playback_usage_heartbeat(text, uuid, uuid, bigint, uuid, bigint, bigint, numeric, text) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270226130000_business_point_playback_attribution.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_point_usage_sample(text, uuid, uuid, bigint, uuid, bigint) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270226140000_business_shared_venue_renewal.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_subscription_order(uuid) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270226140000_business_shared_venue_renewal.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
     }
   ]
 }

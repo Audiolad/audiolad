@@ -1,15 +1,20 @@
 "use client";
 
+import { useBusinessChromeAccess } from "./BusinessAccessLine";
+import { BusinessPayControls, useBusinessHomePay } from "./BusinessHomeAccessCard";
+import { formatMoscowDateTime } from "@/lib/access-grants/policy";
+import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 import { useEffect, useState, useTransition } from "react";
 import { activateBusinessPoint, selectBusinessPoint } from "@/app/business-app/actions";
 import { useBusinessDomain } from "./BusinessDomainProvider";
 import { useBusinessCabinetMode } from "./BusinessPointMode";
 import { emptyBusinessOwnerHomeSignals, type BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { businessPilotSlots } from "@/lib/business-app/location-selection";
-import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, BUSINESS_PLAN_PERIOD_LABEL } from "@/lib/business/plan";
 
 export default function BusinessPointSlots() {
   const domain = useBusinessDomain();
+  const access = useBusinessChromeAccess();
+  const payment = useBusinessHomePay();
   const cabinet = useBusinessCabinetMode();
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
@@ -73,7 +78,11 @@ export default function BusinessPointSlots() {
         Точка {slot.number}{slot.location ? `: ${slot.location.name}` : slot.number === 3 ? " – резерв для кофейни · Активировать" : " – Активировать"}
       </button>)}
     </div>
-    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. После перехода на оплату: {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за точку, {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ {BUSINESS_PLAN_PERIOD_LABEL} всего. Оплата пилота согласуется отдельно.</p>
+    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за точку, {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
+    {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}
+    {domain.pilotBilling?.renewalBlocked ? <p role="status">Новая точка пока не оплачена. Она будет включена при следующем продлении; доплата в текущем периоде недоступна.</p> : null}
+    <BusinessPayControls canPay={payment.canPay} accepted={payment.accepted} busy={payment.busy} error={payment.error}
+      onAccept={payment.accept} onPay={payment.pay} receiptEmail={payment.askReceiptEmail ? { value: payment.receiptEmail, onChange: payment.setReceiptEmail } : null} />
     {domain.location ? <p className="text-sm" role="status">
       Выбрана: {domain.location.name}. Подключение: {signals?.liveConnected ? "на связи" : "нет свежего подтверждения"}.
       {signals?.liveConnected && signals.playbackState === "playing" && signals.playbackConfirmedSecondsAgo != null && signals.playbackConfirmedSecondsAgo <= 300
