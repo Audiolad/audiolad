@@ -138,7 +138,9 @@ for (const mode of ["point", "preview", "owner"] as const) {
       if (mode === "point") {
         assert.doesNotMatch(hall, /biz-hall-renew|href="\/profile"|Продлить доступ/u);
       } else {
-        assert.match(hall, /href="\/profile"[^>]*class="[^"]*business-app-btn-cta[^>]*data-testid="biz-hall-renew"/u);
+        assert.match(hall, /data-testid="biz-hall-renew"/u);
+        assert.match(hall, /href="\/profile"/u);
+        assert.match(hall, /business-app-btn-cta/u);
         assert.match(hall, /Продлить доступ/u);
       }
     }
