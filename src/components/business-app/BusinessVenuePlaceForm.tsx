@@ -60,7 +60,7 @@ export default function BusinessVenuePlaceForm({
             />
           </label>
           <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="venue-address">
-            Адрес точки
+            Адрес точки (город, улица, дом, при необходимости офис или помещение)
             <input
               id="venue-address"
               value={address}
