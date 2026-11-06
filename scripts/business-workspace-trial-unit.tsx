@@ -17,6 +17,7 @@ import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSo
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessPlayerSettings from "../src/components/business-app/BusinessPlayerSettings";
+import { BusinessCabinetModeProvider, BusinessEntryProvider } from "../src/components/business-app/BusinessPointMode";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
 import { musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
@@ -883,6 +884,20 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /Условия и подписка/);
   assert.doesNotMatch(html, /data-testid="biz-workspace-player"/);
   assert.doesNotMatch(html, /Оформить подписку|Кафе, рестораны и отели/);
+  for (const mode of ["point", "preview"] as const) {
+    const hall = renderToStaticMarkup(
+      <BusinessCabinetModeProvider value={{
+        mode, pointReports: mode === "point", pointCanEdit: false,
+        pointVenueName: "Кафе", ownerUnlockUntil: null, canPreview: mode === "preview",
+      }}>
+        <BusinessEntryProvider initialEntry="venue">
+          <BusinessWorkspace model={model({ status: "offer", daysLeft: 0, tracks: [] })} />
+        </BusinessEntryProvider>
+      </BusinessCabinetModeProvider>,
+    );
+    assert.match(hall, /Попросите владельца продлить доступ\./u);
+    assert.doesNotMatch(hall, /12 марта|2026|10:00|период закончился|играет до|дополнительн|запасн|Условия и подписка/iu);
+  }
 }
 {
   const css = read("src/components/business-app/business-app.css");
