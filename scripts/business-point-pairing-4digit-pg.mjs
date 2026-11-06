@@ -2,7 +2,7 @@
 /**
  * Isolated SQL test for 4-digit point pairing. Optional: runs only when
  * BUSINESS_POINT_PG_TEST_URL points at a throwaway postgres (never production).
- * Builds minimal stubs, the pairing part of 20270206120000, then 20270208120000.
+ * Builds minimal stubs, the pairing part of 20270206120000, then 20270208120000 and 20270223120000.
  */
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
@@ -39,6 +39,7 @@ async function runAsync(sql, database) {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const base = readFileSync(join(root, "supabase/migrations/20270206120000_business_point_pairing.sql"), "utf8");
 const next = readFileSync(join(root, "supabase/migrations/20270208120000_business_point_pairing_4digit.sql"), "utf8");
+const noGlobal = readFileSync(join(root, "supabase/migrations/20270223120000_business_point_pairing_no_global_burn.sql"), "utf8");
 // Tables, sha256 helper, create and consume from the base migration; the rest needs the full schema.
 const cut = base.indexOf("CREATE OR REPLACE FUNCTION public.revoke_business_point_sessions");
 const basePart = base.slice(0, cut).replace(/^BEGIN;/m, "") ;
@@ -88,6 +89,7 @@ try {
 psql(stubs);
 psql(basePart.replace(/COMMIT;\s*$/m, ""));
 psql(next);
+psql(noGlobal);
 
 // Format: 4 digits, random.
 const seen = new Set();
@@ -157,24 +159,54 @@ check(redeem(good, "203.0.113.10").ok === true, "other client still works");
 psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '11 minutes'");
 check(redeem(wrong, "203.0.113.9").reason === "invalid_point_code", "lock ends after the window");
 
-// Global limit: 30 wrong codes worldwide burn all open codes.
+// Restore the CSPRNG generator after the collision/exhaustion stubs above.
+psql(`CREATE OR REPLACE FUNCTION public.business_point_random_code()
+RETURNS text LANGUAGE sql VOLATILE SET search_path = public, pg_temp AS $$
+  SELECT lpad(
+    ((('x' || encode(substr(uuid_send(gen_random_uuid()), 1, 4), 'hex'))::bit(32)::bigint) % 10000)::text,
+    4, '0');
+$$;
+REVOKE ALL ON FUNCTION public.business_point_random_code() FROM PUBLIC, anon, authenticated;`);
+
+// No worldwide burn: 30 unmatched wrong codes must leave other venues' open codes alive.
 psql("TRUNCATE business_point_pairing_failures");
-const live = create(6).code;
-const miss = live === "0000" ? "0001" : "0000";
-for (let i = 0; i < 29; i += 1) redeem(miss, `192.0.2.${i}`);
-// The global window is the code TTL: 15 minute old misses still count, 21 minute old do not.
-psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '15 minutes'");
-check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL AND expires_at > now()")) > 0, "open before burn");
-redeem(miss, "192.0.2.200");
-check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL")) === 0, "burned");
-check(redeem(live, "192.0.2.201").reason === "invalid_point_code", "burned code refused");
+const liveA = create(6).code;
+const liveB = create(7).code;
+// Pick a 4-digit code whose hash is absent from every pairing row.
+let miss = null;
+for (let c = 0; c < 10000; c += 1) {
+  const code = String(c).padStart(4, "0");
+  const hit = Number(psql(`SELECT count(*) FROM business_point_pairings WHERE code_hash = business_point_sha256('${code}')`));
+  if (hit === 0) { miss = code; break; }
+}
+check(miss !== null, "found unused miss code");
+for (let i = 0; i < 30; i += 1) {
+  const r = redeem(miss, `192.0.2.${i}`);
+  check(r.reason === "invalid_point_code" && r.burned === false, `unmatched spray ${i}`);
+}
+check(Number(psql("SELECT count(*) FROM business_point_pairing_failures WHERE location_id IS NOT NULL")) === 0, "unmatched failures have no venue");
+check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL AND expires_at > now()")) >= 2, "open codes survive unmatched spray");
+check(redeem(liveA, "192.0.2.210").ok === true, "venue A still redeemable after spray");
+check(redeem(liveB, "192.0.2.211").ok === true, "venue B still redeemable after spray");
+
+// Per-venue burn: guessing a retired code of venue 10 thirty times retires only venue 10.
 psql("TRUNCATE business_point_pairing_failures");
-const live2 = create(7).code;
-const miss2 = live2 === "0000" ? "0001" : "0000";
-for (let i = 0; i < 29; i += 1) redeem(miss2, `192.0.2.${i}`);
-psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '21 minutes'");
-redeem(miss2, "192.0.2.202");
-check(redeem(live2, "192.0.2.203").ok === true, "old misses outside the window do not burn");
+const retiredGuess = create(10).code;
+const open10 = create(10).code; // retires retiredGuess; open10 is the live code for loc 10
+check(open10 !== retiredGuess, "new code after retire");
+const liveKeep = create(11).code;
+for (let i = 0; i < 29; i += 1) {
+  const r = redeem(retiredGuess, `198.51.100.${i}`);
+  check(r.reason === "invalid_point_code", `venue-attributed miss ${i}`);
+}
+psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '15 minutes' WHERE location_id IS NOT NULL");
+check(Number(psql(`SELECT count(*) FROM business_point_pairings WHERE location_id='${loc(10)}' AND consumed_at IS NULL AND retired_at IS NULL`)) === 1, "loc10 open before venue burn");
+const burnHit = redeem(retiredGuess, "198.51.100.250");
+check(burnHit.burned === true, "venue burn reported");
+check(Number(psql(`SELECT count(*) FROM business_point_pairings WHERE location_id='${loc(10)}' AND consumed_at IS NULL AND retired_at IS NULL`)) === 0, "loc10 burned only");
+check(Number(psql(`SELECT count(*) FROM business_point_pairings WHERE location_id='${loc(11)}' AND consumed_at IS NULL AND retired_at IS NULL`)) === 1, "loc11 untouched");
+check(redeem(liveKeep, "198.51.100.251").ok === true, "untargeted venue still works");
+check(redeem(open10, "198.51.100.252").reason === "invalid_point_code", "burned venue code refused");
 
 // Grants.
 check(psql("SELECT has_function_privilege('anon', 'public.redeem_business_point_pairing(text, text)', 'EXECUTE')") === "f", "anon cannot redeem");
