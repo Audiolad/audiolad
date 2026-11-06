@@ -47,7 +47,7 @@ export default async function BusinessAppSettingsPage({
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-player-settings">
       <header>
-        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{ownerPanel ? domain.status === "authenticated" ? `Управление: ${domain.location?.name ?? "точка"}` : "Управление точкой" : "Настройка"}</h1>
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{ownerPanel ? "Управление кофейней" : "Настройка"}</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
           {ownerPanel ? "Музыка в зале и устройство у колонки." : venueSide ? "Звучание музыки в зале." : "Звучание плеера в этом кабинете."}
         </p>
