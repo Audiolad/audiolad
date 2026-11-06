@@ -72,6 +72,11 @@ export const COFFEE_ALLOWED_AUTH_API_PATHS = [
   "/api/analytics/signup/complete", // authenticated signup completion
 ] as const;
 
+/** Coffee-only legal pages linked from auth (same platform page as apex). */
+export const COFFEE_ALLOWED_LEGAL_PATHS = [
+  "/privacy",
+] as const;
+
 /**
  * Business APIs never served on the coffee host: the /spa pilot player loads SPA programs
  * (loadSpaPilotContext). Coffee is the coffee cabinet only; business keeps them unchanged.
@@ -149,7 +154,8 @@ export function resolveBusinessProxyAction(
 
   if (hostname === COFFEE_HOSTNAME &&
       ((COFFEE_ALLOWED_AUTH_PATHS as readonly string[]).includes(pathname) ||
-       (COFFEE_ALLOWED_AUTH_API_PATHS as readonly string[]).includes(pathname))) {
+       (COFFEE_ALLOWED_AUTH_API_PATHS as readonly string[]).includes(pathname) ||
+       (COFFEE_ALLOWED_LEGAL_PATHS as readonly string[]).includes(pathname))) {
     return { action: "pass_through" };
   }
 
