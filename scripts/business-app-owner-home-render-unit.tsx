@@ -19,7 +19,7 @@ const context: Extract<BusinessOwnerHomeContext, { status: "authenticated" }> = 
   status: "authenticated",
   owner: { userId: "owner", firstName: "Анна" },
   organizationId: "org", organizationName: "Организация",
-  location: { id: "loc", organizationId: "org", name: "Тестовая точка", businessCategory: "spa", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
+  location: { id: "loc", organizationId: "org", name: "Тестовая точка", addressLine1: null, businessCategory: "spa", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
   canPay: true,
   offerAccepted: true,
   signals: { ...emptyBusinessOwnerHomeSignals(), playerCount: 1, primaryHealthStatus: "online", secondsSinceHeartbeat: 30 },

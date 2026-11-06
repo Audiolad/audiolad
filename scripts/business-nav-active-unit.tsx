@@ -83,7 +83,7 @@ const member: Domain = {
   owner: { userId: "u1", firstName: "Анна" },
   organizationId: "org",
   organizationName: "Кофейня",
-  location: { id: "loc", organizationId: "org", name: "Зал", businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
+  location: { id: "loc", organizationId: "org", name: "Зал", addressLine1: null, businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
   canPay: true,
   offerAccepted: true,
   signals: null,

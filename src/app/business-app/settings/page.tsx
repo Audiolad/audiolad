@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import BusinessPlayerSettings from "@/components/business-app/BusinessPlayerSettings";
+import BusinessVenuePlaceForm from "@/components/business-app/BusinessVenuePlaceForm";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import { atmosphereChoiceLabel } from "@/lib/business-app/atmosphere-rebuild";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
@@ -51,6 +52,15 @@ export default async function BusinessAppSettingsPage({
           {ownerPanel ? "Музыка в зале и устройство у колонки." : venueSide ? "Звучание музыки в зале." : "Звучание плеера в этом кабинете."}
         </p>
       </header>
+      {ownerPanel && domain.status === "authenticated" && domain.location ? (
+        <BusinessVenuePlaceForm
+          locationId={domain.location.id}
+          name={domain.location.name}
+          addressLine1={domain.location.addressLine1}
+          canEdit
+        />
+      ) : null}
+
       {canRebuild && locationId ? (
         // Owner phone: the 4 × 4 builder opens right under «Пересобрать атмосферу», not further down the page.
         <VenueControlPanel

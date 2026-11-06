@@ -12,8 +12,7 @@ import { presentVenueLicence, type PaidWindow, type VenueLicenceView, type Venue
 /**
  * Public card for one location.
  * Name and address come from business_locations (name, address_line1/2, city,
- * region, postal_code). If task ff4b8a16 has added venue_name and venue_address,
- * those win. The branch was not on origin when this was written.
+ * region, postal_code). address_line1 is the owner-edited street address (P1-12).
  * The clock is the organization owner's gift / payment. The view drops the user id.
  */
 
@@ -23,18 +22,6 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
-async function registrationPlace(db: Db, locationId: string): Promise<Pick<VenuePlaceFields, "venueName" | "venueAddress">> {
-  const { data, error } = await db
-    .from("business_locations")
-    .select("venue_name, venue_address")
-    .eq("id", locationId)
-    .maybeSingle();
-  if (error || !data) return {};
-  return {
-    venueName: asString(data.venue_name),
-    venueAddress: asString(data.venue_address),
-  };
-}
 
 export async function loadVenueLicenceView(publicId: string, now: Date = new Date()): Promise<VenueLicenceView | null> {
   if (!isVenueLicencePublicId(publicId)) return null;
@@ -47,11 +34,8 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
   if (error) throw new Error("venue_licence_unavailable");
   if (!location?.id || !location.organization_id) return null;
 
-  const extra = await registrationPlace(db, location.id);
   const place: VenuePlaceFields = {
     locationName: asString(location.name) ?? "",
-    venueName: extra.venueName,
-    venueAddress: extra.venueAddress,
     addressLine1: asString(location.address_line1),
     addressLine2: asString(location.address_line2),
     city: asString(location.city),
