@@ -20,6 +20,11 @@ const form = readFileSync(join(root, "src/components/business-app/BusinessVenueP
 assert.match(form, /saveBusinessLocationVenue/);
 assert.match(form, /id="venue"/);
 assert.match(form, /data-testid="venue-address"/);
+assert.match(
+  form,
+  /htmlFor="venue-address">\s*Адрес точки \(город, улица, дом, при необходимости офис или помещение\)\s*<input/,
+  "address guidance stays in the editable field label",
+);
 
 const mig = readFileSync(
   join(root, "supabase/migrations/20270225120000_business_location_venue_address.sql"),
