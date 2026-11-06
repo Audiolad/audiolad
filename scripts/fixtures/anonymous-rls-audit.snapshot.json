@@ -6434,6 +6434,21 @@
       "file": "supabase/migrations/20270222120000_author_application_function_grants.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.approve_author_application(uuid, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270224120000_business_point_commands_ack_after_apply.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.list_business_point_commands(text) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270224120000_business_point_commands_ack_after_apply.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.claim_business_point_commands(text) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270224120000_business_point_commands_ack_after_apply.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.ack_business_point_command(text, uuid, text, uuid) TO anon, authenticated, service_role;"
     }
   ]
 }
