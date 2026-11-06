@@ -23,7 +23,7 @@ import {
 import { VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag.ts";
 import {
   COFFEE_ALLOWED_AUTH_PATHS,
-  COFFEE_ALLOWED_AUTH_API_PATHS,
+  COFFEE_ALLOWED_AUTH_API_PATHS, COFFEE_ALLOWED_LEGAL_PATHS,
   businessPrivateGuestRedirect,
   resolveBusinessProxyAction,
 } from "../src/lib/business-app/proxy-policy.ts";
@@ -274,8 +274,13 @@ try {
       assertAction("audiolad.ru", path, "pass_through");
       assertAction("coffee.audiolad.ru", `${path}/extra`, "not_found");
     }
-    for (const path of ["/auth/unknown", "/api/listen/resume-session", "/api/analytics/session", "/catalog", "/privacy"]) {
+    for (const path of ["/auth/unknown", "/api/listen/resume-session", "/api/analytics/session", "/catalog"]) {
       assertAction("coffee.audiolad.ru", path, "not_found");
+    }
+    for (const path of COFFEE_ALLOWED_LEGAL_PATHS) {
+      assertAction("coffee.audiolad.ru", path, enabled ? "pass_through" : "not_found");
+      assertAction(BUSINESS_HOSTNAME, path, "not_found");
+      assertAction("audiolad.ru", path, "pass_through");
     }
   }
 } finally {
