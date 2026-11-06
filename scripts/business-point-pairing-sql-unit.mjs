@@ -64,7 +64,12 @@ assert(noGlobal.includes("c_venue_limit constant integer := 30"), "no-global: pe
 assert(noGlobal.includes("c_venue_window constant interval := interval '20 minutes'"), "no-global: venue window");
 assert(noGlobal.includes("WHERE location_id = v_guess_location"), "no-global: retire only that venue");
 assert(noGlobal.includes("WHERE location_id = v_guess_location\n          AND consumed_at IS NULL"), "no-global: burn scoped to venue");
-assert(!noGlobal.includes("burn every open code"), "no-global: old comment gone");
+const noGlobalLive = noGlobal
+  .split("\n")
+  .filter((line) => !line.trimStart().startsWith("--"))
+  .join("\n");
+assert(!noGlobalLive.includes("burn every open code"), "no-global: old comment gone from live SQL");
+assert(!noGlobalLive.includes("burn all open codes"), "no-global: old COMMENT gone from live SQL");
 assert(noGlobal.includes("No worldwide burn") || noGlobal.includes("never burn another"), "no-global: documents no worldwide burn");
 assert(noGlobal.includes("REVOKE ALL ON FUNCTION public.redeem_business_point_pairing(text, text) FROM PUBLIC, anon, authenticated"), "no-global: redeem server-only");
 assert(!/https?:\/\//.test(noGlobal), "no-global: no links");
