@@ -57,4 +57,16 @@ assert(rollback.includes("expires_at = least(expires_at, now())"), "4digit: roll
 assert(!/^-- DROP INDEX/m.test(rollback), "4digit: rollback keeps the partial index");
 assert(!/^-- .*ADD CONSTRAINT/m.test(rollback), "4digit: rollback does not restore UNIQUE");
 
+
+const noGlobal = readFileSync(join(repoRoot, "supabase/migrations", "20270223120000_business_point_pairing_no_global_burn.sql"), "utf8");
+assert(noGlobal.includes("ADD COLUMN IF NOT EXISTS location_id"), "no-global: location_id on failures");
+assert(noGlobal.includes("c_venue_limit constant integer := 30"), "no-global: per-venue limit");
+assert(noGlobal.includes("c_venue_window constant interval := interval '20 minutes'"), "no-global: venue window");
+assert(noGlobal.includes("WHERE location_id = v_guess_location"), "no-global: retire only that venue");
+assert(noGlobal.includes("WHERE location_id = v_guess_location\n          AND consumed_at IS NULL"), "no-global: burn scoped to venue");
+assert(!noGlobal.includes("burn every open code"), "no-global: old comment gone");
+assert(noGlobal.includes("No worldwide burn") || noGlobal.includes("never burn another"), "no-global: documents no worldwide burn");
+assert(noGlobal.includes("REVOKE ALL ON FUNCTION public.redeem_business_point_pairing(text, text) FROM PUBLIC, anon, authenticated"), "no-global: redeem server-only");
+assert(!/https?:\/\//.test(noGlobal), "no-global: no links");
+
 console.log("business-point-pairing-sql-unit: ok");
