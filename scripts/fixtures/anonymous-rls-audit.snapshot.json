@@ -6434,6 +6434,11 @@
       "file": "supabase/migrations/20270222120000_author_application_function_grants.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.approve_author_application(uuid, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270223120000_business_point_pairing_no_global_burn.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.redeem_business_point_pairing(text, text) TO service_role;"
     }
   ]
 }
