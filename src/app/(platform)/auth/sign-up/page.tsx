@@ -263,13 +263,13 @@ function SignUpForm() {
       >
         <header className="text-center">
           <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
+            {coffee ? "АудиоЛад Бизнес" : "АудиоЛад"}
           </Link>
 
           <h1 className="mt-8 text-[30px] font-semibold">Создать аккаунт</h1>
 
           <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            {isBusinessTrialNext(nextParam)
+            {coffee || isBusinessTrialNext(nextParam)
               ? BUSINESS_SIGN_UP_INTRO
               : "Сохраняйте практики, создавайте плейлисты и слушайте материалы на разных устройствах."}
           </p>
@@ -485,11 +485,11 @@ function SignUpForm() {
               />
               <span className="text-sm leading-6 text-[#4c3d78]">
                 Я принимаю{" "}
-                <Link href={coffee ? "https://audiolad.ru/offer" : "/offer"} className="font-semibold text-[#7042c5]">
-                  Пользовательское соглашение
+                <Link href={coffee ? "/documents/business-offer" : "/offer"} className="font-semibold text-[#7042c5]">
+                  {coffee ? "Условия АудиоЛад Бизнес" : "Пользовательское соглашение"}
                 </Link>{" "}
                 и{" "}
-                <Link href={coffee ? "https://audiolad.ru/privacy" : "/privacy"} className="font-semibold text-[#7042c5]">
+                <Link href="/privacy" className="font-semibold text-[#7042c5]">
                   Политику обработки персональных данных
                 </Link>
                 .
@@ -514,8 +514,9 @@ function SignUpForm() {
                 className="mt-1 h-4 w-4 shrink-0 accent-[#7042c5]"
               />
               <span className="text-sm leading-6 text-[#4c3d78]">
-                Хочу получать новости АудиоЛада, рекомендации практик и
-                специальные предложения по электронной почте.
+                {coffee
+                  ? "Хочу получать новости АудиоЛад Бизнес и специальные предложения по электронной почте."
+                  : "Хочу получать новости АудиоЛада, рекомендации практик и специальные предложения по электронной почте."}
                 <span className="mt-1 block text-xs leading-5 text-[#8a7ca9]">
                   От подписки можно отказаться в любой момент в профиле или по
                   ссылке в письме.
