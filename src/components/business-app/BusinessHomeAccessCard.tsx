@@ -41,7 +41,7 @@ function payErrorFromPayload(payload: { error?: string; href?: string } | null):
 export function useBusinessHomePay() {
   const access = useBusinessChromeAccess();
   const domain = useBusinessDomain();
-  const canPay = domain.status === "authenticated" && domain.canPay;
+  const canPay = domain.status === "authenticated" && domain.canPay && !domain.pilotSlots;
   const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);

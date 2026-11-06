@@ -1,3 +1,4 @@
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { NextResponse } from "next/server";
 
@@ -38,6 +39,11 @@ export async function POST(request: Request) {
   }
   if (authError) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  const domain = await loadBusinessOwnerHomeContext();
+  if (domain.status === "authenticated" && domain.pilotSlots) {
+    return NextResponse.json({ error: "pilot_payment_requires_location_binding", message: "Оплата пилота за каждую точку согласуется отдельно." }, { status: 409 });
   }
 
   // Optional body { receipt_email }: only for an account without email (guest start).

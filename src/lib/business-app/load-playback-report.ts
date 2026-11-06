@@ -9,7 +9,7 @@ import {
   type RegistryHolderPeriod,
 } from "@/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "@/lib/business-app/playback-facts-query";
-import { createClient } from "@/lib/supabase/server";
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type PlaybackReportResult =
@@ -58,37 +58,11 @@ export async function loadPlaybackReport(params: {
 type ReportVenue = { kind?: undefined; organizationId: string; locationId: string; locationName: string; timezone: unknown };
 
 async function loadMemberVenue(): Promise<ReportVenue | { kind: "anonymous" } | { kind: "no_location" }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { kind: "anonymous" };
-
-  const { data: membership } = await supabase
-    .from("business_organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!membership?.organization_id) return { kind: "no_location" };
-  const organizationId = membership.organization_id as string;
-
-  const { data: location } = await supabase
-    .from("business_locations")
-    .select("id, name, timezone")
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!location?.id) return { kind: "no_location" };
-  return {
-    organizationId,
-    locationId: location.id as string,
-    locationName: String(location.name ?? "Кофейня"),
-    timezone: location.timezone,
-  };
+  const domain = await loadBusinessOwnerHomeContext();
+  if (domain.status !== "authenticated") return { kind: "anonymous" };
+  if (!domain.location) return { kind: "no_location" };
+  return { organizationId: domain.location.organizationId, locationId: domain.location.id,
+    locationName: domain.location.name, timezone: domain.location.timezone };
 }
 
 async function buildVenuePlaybackReport(

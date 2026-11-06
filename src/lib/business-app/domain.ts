@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { BUSINESS_LOCATION_COOKIE, selectBusinessLocation } from "./location-selection";
 import { createClient } from "@/lib/supabase/server";
 
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
@@ -34,6 +36,8 @@ export type BusinessOwnerHomeContext =
       status: "authenticated";
       owner: BusinessDomainOwner;
       location: BusinessDomainLocation | null;
+      locations?: Array<{ id: string; name: string; status: string }>;
+      pilotSlots?: boolean;
       organizationName: string | null;
       organizationId: string | null;
       /** True only for an organization owner. A manager and a venue device cannot pay. */
@@ -47,7 +51,7 @@ export type BusinessOwnerHomeContext =
     };
 
 /**
- * Reads the caller's first Organization membership + primary Location + default Zone
+ * Reads the caller's first Organization membership + selected Location + default Zone
  * and (when org exists) A2 player health + latest business PoP for Home 🟢/🟡/🔴.
  * Expand-only read path. No mock fallback. No rights / ELIGIBLE invention.
  */
@@ -84,7 +88,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   const memberships = membershipRows ?? [];
   const membership = memberships[0] ?? null;
   const canPay = ownerCanPayFromThisBrowser(
-    memberships.some((row) => row.role === "owner"),
+    membership?.role === "owner",
     await businessHallDeviceLocked(),
   );
   let offerAccepted = false;
@@ -118,7 +122,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   const { data: org, error: orgError } = await supabase
     .from("business_organizations")
-    .select("id, name, status")
+    .select("id, name, status, pilot_location_limit")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -126,22 +130,22 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     throw new Error(`business_domain_org_read_failed:${orgError.message}`);
   }
 
-  const { data: location, error: locationError } = await supabase
+  const { data: locations, error: locationError } = await supabase
     .from("business_locations")
     .select(
       "id, organization_id, name, address_line1, business_category, country_code, timezone, status",
     )
     .eq("organization_id", organizationId)
-    .eq("status", "active")
     .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("id", { ascending: true });
 
   if (locationError) {
     throw new Error(
       `business_domain_location_read_failed:${locationError.message}`,
     );
   }
+
+  const location = selectBusinessLocation(locations ?? [], (await cookies()).get(BUSINESS_LOCATION_COOKIE)?.value);
 
   if (!location) {
     const signals = await loadBusinessOwnerHomeSignals({
@@ -153,6 +157,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       status: "authenticated",
       owner: { userId: user.id, firstName },
       location: null,
+      locations: locations ?? [],
+      pilotSlots: org?.pilot_location_limit === 3,
       organizationName: org?.name ?? null,
       organizationId,
       canPay,
@@ -185,6 +191,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   return {
     status: "authenticated",
     owner: { userId: user.id, firstName },
+    locations: locations ?? [],
+    pilotSlots: org?.pilot_location_limit === 3,
     organizationName: org?.name ?? null,
     organizationId,
     canPay,

@@ -118,9 +118,9 @@ const JSON_POST = {
   cache: "no-store" as const,
 };
 
-function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | null {
+function readLocal(spaceId: string, trackCount: number, locationId?: string): WorkspacePlayback | null {
   try {
-    const raw = window.localStorage.getItem(playbackStorageKey(spaceId));
+    const raw = window.localStorage.getItem(playbackStorageKey(spaceId, locationId));
     if (!raw) return null;
     return clampWorkspacePlayback(JSON.parse(raw) as Partial<WorkspacePlayback>, trackCount);
   } catch {
@@ -128,9 +128,9 @@ function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | nul
   }
 }
 
-function writeLocal(spaceId: string, playback: WorkspacePlayback): void {
+function writeLocal(spaceId: string, playback: WorkspacePlayback, locationId?: string): void {
   try {
-    window.localStorage.setItem(playbackStorageKey(spaceId), JSON.stringify(playback));
+    window.localStorage.setItem(playbackStorageKey(spaceId, locationId), JSON.stringify(playback));
   } catch {
     /* private mode */
   }
@@ -146,6 +146,8 @@ export function BusinessCabinetPlayerProvider({
   pointReports?: boolean;
   children: ReactNode;
 }) {
+  const usageSession = useRef<string | null>(null);
+  const usageSeq = useRef(0);
   const [model, setModel] = useState<WorkspacePageModel | null>(initialModel);
   const modelRef = useRef(model);
   const accessRef = useRef<ReturnType<typeof createAccessDeadline> | null>(null);
@@ -216,7 +218,7 @@ export function BusinessCabinetPlayerProvider({
     playOrderRef.current = null;
     setQueueOrderState(null);
     const count = next.tracks.length;
-    const local = readLocal(next.spaceId, count);
+    const local = readLocal(next.spaceId, count, next.playbackScope);
     const server = next.playback ? clampWorkspacePlayback(next.playback, count) : null;
     const chosen = newerPlayback(local, server);
     if (chosen) {
@@ -263,7 +265,7 @@ export function BusinessCabinetPlayerProvider({
     );
     playbackRef.current = next;
     if (!silent) setPlayback(next);
-    writeLocal(current.spaceId, next);
+    writeLocal(current.spaceId, next, current.playbackScope);
     const now = Date.now();
     if (!play && now - lastPostRef.current < 15_000) return;
     lastPostRef.current = now;
@@ -297,7 +299,13 @@ export function BusinessCabinetPlayerProvider({
     const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible), ctl.recovering);
     const report = evidenceRef.current.report(state, audible, Date.now());
     sendSpaLiveReport(
-      (live) => postPointReport({ kind: "playback", report: live }),
+      (live) => {
+        if (!usageSession.current) usageSession.current = crypto.randomUUID();
+        return postPointReport({ kind: "playback", report: live, sample: live.playingConfirmed && audioRef.current ? {
+          eventId: crypto.randomUUID(), sessionId: usageSession.current, seq: ++usageSeq.current,
+          positionMs: Math.floor(audioRef.current.currentTime * 1000),
+        } : null });
+      },
       report,
     );
   }, [canBeat]);

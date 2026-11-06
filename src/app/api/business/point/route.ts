@@ -1,3 +1,4 @@
+import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
 import { createHash } from "node:crypto";
 
 import { after, NextResponse } from "next/server";
@@ -28,7 +29,7 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store" };
 
 /** Owner actions. The hall device without a fresh owner password gets 403 (cabinet-mode.ts). */
-const OWNER_ACTIONS = new Set(["create", "revoke", "link", "permission", "enqueue"]);
+const OWNER_ACTIONS = new Set(["owner-state", "create", "revoke", "link", "permission", "enqueue"]);
 
 /** Same hash as the database stores: sha256 of the token text (business_point_sessions.token_hash). */
 function pointTokenHashHex(token: string): string {
@@ -183,6 +184,18 @@ export async function POST(request: Request) {
     });
   }
 
+  if (body.action === "owner-state") {
+    if (!isPointCommandId(body.locationId)) return json({ ok: false }, 400);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return json({ ok: false }, 401);
+    // The caller's RLS client checks the location before any service-role reads in the loader.
+    const { data: location, error } = await supabase.from("business_locations")
+      .select("id, organization_id").eq("id", body.locationId).eq("status", "active").maybeSingle();
+    if (error || !location) return json({ ok: false }, 403);
+    const signals = await loadBusinessOwnerHomeSignals({ organizationId: location.organization_id, locationId: location.id, userId: user.id });
+    return json({ ok: true, locationId: location.id, signals });
+  }
+
   if (body.action === "permission") {
     const locationId = typeof body.locationId === "string" ? body.locationId : "";
     if (typeof body.allowed !== "boolean" || !locationId) {
@@ -318,6 +331,19 @@ export async function POST(request: Request) {
       p_playing_confirmed: report?.playingConfirmed ?? false,
       p_error_code: report?.errorCode ?? null,
     });
+    if (!error && report?.playingConfirmed && report.audioItemId && body.sample && typeof body.sample === "object") {
+      const sample = body.sample as Record<string, unknown>;
+      if (!isPointCommandId(sample.eventId) || !isPointCommandId(sample.sessionId)
+        || !Number.isSafeInteger(sample.seq) || Number(sample.seq) < 1
+        || !Number.isSafeInteger(sample.positionMs) || Number(sample.positionMs) < 0) {
+        return json({ ok: false, reason: "invalid_sample" }, 400);
+      }
+      const { error: usageError } = await supabase.rpc("apply_business_point_usage_sample", {
+        p_token: token, p_client_event_id: sample.eventId, p_playback_session_id: sample.sessionId,
+        p_sample_seq: sample.seq, p_audio_item_id: report.audioItemId, p_position_ms: sample.positionMs,
+      });
+      if (usageError) return json({ ok: false, reason: "usage_report_failed" });
+    }
     // Gift-week minutes (flag OFF by default): only confirmed playback on a valid session.
     if (!error && report?.state === "playing" && report.playingConfirmed && businessTrialActivityConfig(process.env).enabled) {
       after(() => recordBusinessTrialPointListen(token));

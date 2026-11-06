@@ -1,3 +1,4 @@
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { after, NextResponse } from "next/server";
 
 import { recordAccessActivity } from "@/lib/access-grants/apply";
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
         after(() => recordBusinessTrialListen(venueLocationId));
       }
       if (!account) return;
+      const domain = await loadBusinessOwnerHomeContext();
+      // Pilot previews never persist under the shared account/space key. Venue devices are already local.
+      if (domain.status === "authenticated" && domain.pilotSlots) return;
       const store = createSupabaseAccessGrantStore();
       const clamped = clampWorkspacePlayback({ ...input, updatedAt: new Date().toISOString() }, 10_000);
       await store.writePlayback({

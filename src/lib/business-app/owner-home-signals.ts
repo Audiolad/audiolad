@@ -92,7 +92,7 @@ export function deriveBusinessPointState(input: {
   const nowMs = input.nowMs ?? Date.now();
   const scoped = input.locationId
     ? input.players.filter(
-        (p) => p.locationId == null || p.locationId === input.locationId,
+        (p) => p.locationId === input.locationId,
       )
     : [...input.players];
 

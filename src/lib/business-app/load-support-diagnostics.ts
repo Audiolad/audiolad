@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { BUSINESS_LOCATION_COOKIE, selectBusinessLocation } from "./location-selection";
 import {
   anonymousSupportDiagnostics,
   buildSupportDiagnostics,
@@ -50,16 +52,14 @@ export async function loadBusinessSupportDiagnostics(): Promise<BusinessSupportD
     .eq("id", organizationId)
     .maybeSingle();
 
-  const { data: location } = await supabase
+  const { data: locations } = await supabase
     .from("business_locations")
     .select(
       "id, organization_id, name, business_category, country_code, timezone, status",
     )
     .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true }).order("id", { ascending: true });
+  const location = selectBusinessLocation(locations ?? [], (await cookies()).get(BUSINESS_LOCATION_COOKIE)?.value);
 
   let defaultZoneId: string | null = null;
   if (location?.id) {
@@ -81,7 +81,7 @@ export async function loadBusinessSupportDiagnostics(): Promise<BusinessSupportD
     { p_organization_id: organizationId },
   );
   if (!healthError) {
-    players = mapSupportHealthRpcRows(healthData);
+    players = mapSupportHealthRpcRows(healthData).filter((p) => p.locationId === location?.id);
   }
 
   let lastPlay: BusinessSupportLastPlay | null = null;

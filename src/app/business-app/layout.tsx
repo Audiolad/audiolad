@@ -1,3 +1,7 @@
+import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
+import { businessAccessPrincipal } from "@/lib/access-grants/principal";
+import { createClient } from "@/lib/supabase/server";
+import BusinessPointSlots from "@/components/business-app/BusinessPointSlots";
 import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
@@ -60,7 +64,7 @@ export default async function BusinessAppLayout({
   const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;
   // ba344b7f: live gift / paid state (read-only) – such a visitor never sees the guest strip.
   // The hall device shows the venue's period, not the account that may be signed in on it.
-  const customerAccess =
+  let customerAccess =
     cabinet.mode === "point"
       ? pointVenue
         ? await loadPointDeviceAccess(pointVenue)
@@ -68,6 +72,13 @@ export default async function BusinessAppLayout({
       : domain.status === "authenticated"
         ? await peekBusinessChromeAccess()
         : null;
+  if (cabinet.mode !== "point" && domain.status === "authenticated" && domain.pilotSlots && domain.location) {
+    const db = await createClient();
+    const { data: { user } } = await db.auth.getUser();
+    const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
+    const scoped = principal ? await pilotLocationAccess(domain.location.id, principal) : null;
+    customerAccess = scoped ? { mode: scoped.mode, endsAt: scoped.endsAt, ...(scoped.mode === "grace" ? { graceEndsAt: scoped.playbackUntil } : {}) } : null;
+  }
   // Preview «как видит точка» follows the owner's own «Разрешить менять настройку на точке» switch.
   const previewSound =
     cabinet.mode === "preview" && domain.status === "authenticated" && domain.location
@@ -99,7 +110,7 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}><BusinessPointSlots />{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

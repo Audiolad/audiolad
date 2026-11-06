@@ -1,3 +1,4 @@
+import type { LocationSoundSettings } from "@/lib/business-app/location-sound-settings";
 import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import type { BusinessSpaceId } from "./spaces";
 
@@ -39,6 +40,8 @@ export type WorkspacePageStatus =
  * `player` is closed unless status is trial or paid AND the space is enabled.
  */
 export type WorkspacePageModel = {
+  playbackScope?: string;
+  soundSettings?: LocationSoundSettings | null;
   spaceId: BusinessSpaceId;
   spaceTitle: string;
   spaceEnabled: boolean;

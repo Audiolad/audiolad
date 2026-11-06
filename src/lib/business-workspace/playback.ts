@@ -50,6 +50,6 @@ export function newerPlayback(
   return Date.parse(left.updatedAt) >= Date.parse(right.updatedAt) ? left : right;
 }
 
-export function playbackStorageKey(spaceId: string): string {
-  return `${WORKSPACE_PLAYBACK_STORAGE_KEY}:${spaceId}`;
+export function playbackStorageKey(spaceId: string, locationId?: string): string {
+  return `${WORKSPACE_PLAYBACK_STORAGE_KEY}:${spaceId}${locationId ? `:${locationId}` : ""}`;
 }

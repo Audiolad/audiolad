@@ -1,5 +1,7 @@
 import "server-only";
 
+import { pilotLocationAccessPeriods } from "../location-access.server";
+
 import type { GrantRow } from "@/lib/access-grants/policy";
 import { hashAccessEmail } from "@/lib/access-grants/email-hash";
 import { peekAccessPeriodsWith } from "@/lib/access-grants/peek-closure";
@@ -63,6 +65,9 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
       userId: ownerId,
       emailHash: hashAccessEmail(owner.user.email),
     }));
+
+    const scoped = await pilotLocationAccessPeriods(location.id, { userId: ownerId, emailHash: hashAccessEmail(owner.user.email) });
+    if (scoped) ({ grant, paidUntil } = scoped);
 
     const { data: periods, error: periodError } = await db
       .from("business_subscription_periods")
