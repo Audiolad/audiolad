@@ -96,11 +96,11 @@ function ResetPasswordForm() {
 
   if (!sessionChecked) {
     return (
-      <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
         <div
-          className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+          className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}
         >
-          <p className="text-center text-sm text-[#7d70a2]">Проверяем ссылку…</p>
+          <p className="text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">Проверяем ссылку…</p>
         </div>
       </main>
     );
@@ -108,12 +108,12 @@ function ResetPasswordForm() {
 
   if (!hasSession) {
     return (
-      <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
         <div
-          className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+          className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}
         >
           <header className="text-center">
-            <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
+            <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">
               АудиоЛад
             </Link>
 
@@ -127,13 +127,13 @@ function ResetPasswordForm() {
             {PASSWORD_RESET_EXPIRED_MESSAGE}
           </div>
 
-          <p className="mt-6 text-center text-sm text-[#7d70a2]">
+          <p className="mt-6 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
             <Link
               href={buildAuthRouteHref(
                 "/auth/forgot-password",
                 searchParams.get("next"),
               )}
-              className="font-semibold text-[#7042c5]"
+              className="font-semibold text-[var(--biz-accent,#7042c5)]"
             >
               Запросить новую ссылку
             </Link>
@@ -146,18 +146,18 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
+          <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">
             АудиоЛад
           </Link>
 
           <h1 className="mt-8 text-[30px] font-semibold">Создайте новый пароль</h1>
 
-          <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+          <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">
             Придумайте новый пароль для входа в аккаунт.
           </p>
         </header>
@@ -174,8 +174,8 @@ function ResetPasswordForm() {
               autoComplete="new-password"
               placeholder={`Минимум ${PASSWORD_MIN_LENGTH} символов`}
               aria-invalid={Boolean(fieldErrors.password)}
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
-                fieldErrors.password ? "border-[#efc7cf]" : "border-[#ddcfef]"
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
+                fieldErrors.password ? "border-[#efc7cf]" : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
@@ -197,10 +197,10 @@ function ResetPasswordForm() {
               autoComplete="new-password"
               placeholder="Повторите пароль"
               aria-invalid={Boolean(fieldErrors.confirmPassword)}
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
                 fieldErrors.confirmPassword
                   ? "border-[#efc7cf]"
-                  : "border-[#ddcfef]"
+                  : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
@@ -230,10 +230,10 @@ function ResetPasswordForm() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#7d70a2]">
+        <p className="mt-6 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
           <Link
             href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"))}
-            className="font-semibold text-[#7042c5]"
+            className="font-semibold text-[var(--biz-accent,#7042c5)]"
           >
             Вернуться ко входу
           </Link>

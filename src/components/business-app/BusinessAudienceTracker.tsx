@@ -19,7 +19,7 @@ function subscribeReady(onChange: () => void) {
 
 const serverReady = () => false;
 
-const PRIVACY_HREF = "https://audiolad.ru/privacy#section-8";
+const PRIVACY_HREF = "/documents/privacy#section-8";
 
 // Per-tab flags survive reloads. Only goal names are stored, never IDs or dates.
 const SENT_GOALS_KEY = "audiolad_ym_business_goals_sent";
@@ -83,7 +83,7 @@ export default function BusinessAudienceTracker({ pointDevice }: { pointDevice: 
   return (
     <>
       <Suspense fallback={null}><YandexMetrika /></Suspense>
-      <AnalyticsConsentBanner privacyHref={PRIVACY_HREF} />
+      <AnalyticsConsentBanner privacyHref={PRIVACY_HREF} business />
     </>
   );
 }

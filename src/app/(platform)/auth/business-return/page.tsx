@@ -58,11 +58,11 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
     });
   } catch {
     return (
-      <main className="mx-auto min-h-screen max-w-[430px] bg-platform-surface px-5 py-10 text-[#25135c]">
+      <main className="mx-auto min-h-screen max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 py-10 text-[var(--biz-text,#25135c)]">
         <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
-        <p className="mt-4 text-sm leading-6 text-[#7d70a2]">{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
+        <p className="mt-4 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
         <p className="mt-6">
-          <a className="font-semibold text-[#7042c5] underline" href={returnPath}>
+          <a className="font-semibold text-[var(--biz-accent,#7042c5)] underline" href={returnPath}>
             Перейти и повторить
           </a>
         </p>
@@ -84,18 +84,18 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
 /** Unconfirmed address: the same short gift lines as the cabinet home card. The period has not started. */
 export function BusinessTrialReturnPending({ signInHref = businessAuthHref("", "sign-in", true), helpHref = HELP_HREF }: { signInHref?: string; helpHref?: string } = {}) {
   return (
-    <main className="mx-auto min-h-screen max-w-[430px] bg-platform-surface px-5 py-10 text-[#25135c]" data-testid="biz-return-access">
+    <main className="mx-auto min-h-screen max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 py-10 text-[var(--biz-text,#25135c)]" data-testid="biz-return-access">
       <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
-      <p className="mt-4 text-sm leading-6 text-[#7d70a2]">{BUSINESS_UNCONFIRMED_NOTE}</p>
+      <p className="mt-4 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">{BUSINESS_UNCONFIRMED_NOTE}</p>
       <p className="mt-3 text-sm leading-6">{BUSINESS_REGISTERED_NOTE}</p>
-      <p className="mt-3 text-sm leading-6 text-[#7d70a2]" data-testid="biz-return-closing">{BUSINESS_GIFT_CLOSING_NOTE}</p>
-      <p className="mt-3 text-sm leading-6 text-[#7d70a2]" data-testid="biz-return-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
-      <p className="mt-3 text-sm leading-6 text-[#7d70a2]" data-testid="biz-return-price">{businessGiftPriceNote()}</p>
+      <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]" data-testid="biz-return-closing">{BUSINESS_GIFT_CLOSING_NOTE}</p>
+      <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]" data-testid="biz-return-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
+      <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]" data-testid="biz-return-price">{businessGiftPriceNote()}</p>
       <p className="mt-6 flex flex-wrap gap-3 text-sm">
-        <Link className="font-semibold text-[#7042c5] underline" href={signInHref}>
+        <Link className="font-semibold text-[var(--biz-accent,#7042c5)] underline" href={signInHref}>
           Перейти и войти после подтверждения
         </Link>
-        <Link className="font-semibold text-[#7042c5] underline" href={helpHref}>
+        <Link className="font-semibold text-[var(--biz-accent,#7042c5)] underline" href={helpHref}>
           Перейти и найти письмо
         </Link>
       </p>

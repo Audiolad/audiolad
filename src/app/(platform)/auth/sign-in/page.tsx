@@ -2,7 +2,7 @@
 
 import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { BUSINESS_REGISTERED_NOTE } from "@/lib/access-grants/copy";
+import { BUSINESS_REGISTERED_NOTE, BUSINESS_SIGN_IN_INTRO } from "@/lib/access-grants/copy";
 import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import {
@@ -95,19 +95,19 @@ function SignInForm() {
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
+          <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">
+            {coffee ? "АудиоЛад Бизнес" : "АудиоЛад"}
           </Link>
 
           <h1 className="mt-8 text-[30px] font-semibold">Войти</h1>
 
-          <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            {resolveSignInIntroCopy(searchParams.get("next"))}
+          <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">
+            {coffee ? BUSINESS_SIGN_IN_INTRO : resolveSignInIntroCopy(searchParams.get("next"))}
           </p>
         </header>
 
@@ -147,7 +147,7 @@ function SignInForm() {
               required
               autoComplete="email"
               placeholder="name@example.com"
-              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5]"
+              className="mt-3 w-full rounded-[20px] border border-[var(--biz-border,#ddcfef)] bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)]"
             />
           </label>
 
@@ -160,7 +160,7 @@ function SignInForm() {
               required
               autoComplete="current-password"
               placeholder="Введите пароль"
-              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5]"
+              className="mt-3 w-full rounded-[20px] border border-[var(--biz-border,#ddcfef)] bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)]"
             />
 
             <p className="mt-2 text-right text-sm">
@@ -169,7 +169,7 @@ function SignInForm() {
                   "/auth/forgot-password",
                   searchParams.get("next"),
                 )}
-                className="font-medium text-[#7042c5]"
+                className="font-medium text-[var(--biz-accent,#7042c5)]"
               >
                 Забыли пароль?
               </Link>
@@ -197,11 +197,11 @@ function SignInForm() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#7d70a2]">
+        <p className="mt-6 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
           Нет аккаунта?{" "}
           <Link
             href={buildAuthRouteHref("/auth/sign-up", searchParams.get("next"))}
-            className="font-semibold text-[#7042c5]"
+            className="font-semibold text-[var(--biz-accent,#7042c5)]"
           >
             Зарегистрироваться
           </Link>

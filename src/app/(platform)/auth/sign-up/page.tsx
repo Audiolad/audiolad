@@ -257,19 +257,19 @@ function SignUpForm() {
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
+          <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">
+            {coffee ? "АудиоЛад Бизнес" : "АудиоЛад"}
           </Link>
 
           <h1 className="mt-8 text-[30px] font-semibold">Создать аккаунт</h1>
 
-          <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            {isBusinessTrialNext(nextParam)
+          <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">
+            {coffee || isBusinessTrialNext(nextParam)
               ? BUSINESS_SIGN_UP_INTRO
               : "Сохраняйте практики, создавайте плейлисты и слушайте материалы на разных устройствах."}
           </p>
@@ -308,10 +308,10 @@ function SignUpForm() {
                   ? fieldErrorId("firstName")
                   : undefined
               }
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
                 formState.firstNameFieldInvalid
                   ? "border-[#efc7cf]"
-                  : "border-[#ddcfef]"
+                  : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
@@ -350,10 +350,10 @@ function SignUpForm() {
                   ? fieldErrorId("lastName")
                   : undefined
               }
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
                 formState.lastNameFieldInvalid
                   ? "border-[#efc7cf]"
-                  : "border-[#ddcfef]"
+                  : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
@@ -392,16 +392,16 @@ function SignUpForm() {
                   ? fieldErrorId("email")
                   : "sign-up-email-hint"
               }
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
                 formState.emailFieldInvalid
                   ? "border-[#efc7cf]"
-                  : "border-[#ddcfef]"
+                  : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
             <p
               id="sign-up-email-hint"
-              className="mt-2 text-xs leading-5 text-[#8a7ca9]"
+              className="mt-2 text-xs leading-5 text-[var(--biz-text-muted,#8a7ca9)]"
             >
               {EMAIL_FIELD_HINT}
             </p>
@@ -439,16 +439,16 @@ function SignUpForm() {
                   ? fieldErrorId("password")
                   : "sign-up-password-hint"
               }
-              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+              className={`mt-3 w-full rounded-[20px] border bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)] ${
                 formState.passwordFieldInvalid
                   ? "border-[#efc7cf]"
-                  : "border-[#ddcfef]"
+                  : "border-[var(--biz-border,#ddcfef)]"
               }`}
             />
 
             <p
               id="sign-up-password-hint"
-              className="mt-2 text-xs leading-5 text-[#8a7ca9]"
+              className="mt-2 text-xs leading-5 text-[var(--biz-text-muted,#8a7ca9)]"
             >
               {SIGNUP_PASSWORD_HINT}
             </p>
@@ -464,7 +464,7 @@ function SignUpForm() {
             ) : null}
           </label>
 
-          <fieldset className="space-y-4 rounded-[20px] border border-[#eadff8] bg-[#faf6ff] px-4 py-4">
+          <fieldset className="space-y-4 rounded-[20px] border border-[var(--biz-border,#eadff8)] bg-[var(--biz-surface-soft,#faf6ff)] px-4 py-4">
             <legend className="sr-only">Согласия</legend>
 
             <label className="flex items-start gap-3">
@@ -475,7 +475,7 @@ function SignUpForm() {
                   setLegalConsent(event.target.checked);
                   clearFieldError("legalConsent");
                 }}
-                className="mt-1 h-4 w-4 shrink-0 accent-[#7042c5]"
+                className="mt-1 h-4 w-4 shrink-0 accent-[var(--biz-accent,#7042c5)]"
                 aria-invalid={Boolean(fieldErrors.legalConsent)}
                 aria-describedby={
                   fieldErrors.legalConsent
@@ -483,13 +483,13 @@ function SignUpForm() {
                     : undefined
                 }
               />
-              <span className="text-sm leading-6 text-[#4c3d78]">
+              <span className="text-sm leading-6 text-[var(--biz-text-muted,#4c3d78)]">
                 Я принимаю{" "}
-                <Link href={coffee ? "https://audiolad.ru/offer" : "/offer"} className="font-semibold text-[#7042c5]">
-                  Пользовательское соглашение
+                <Link href={coffee ? "/documents/business-offer" : "/offer"} className="font-semibold text-[var(--biz-accent,#7042c5)]">
+                  {coffee ? "Условия АудиоЛад Бизнес" : "Пользовательское соглашение"}
                 </Link>{" "}
                 и{" "}
-                <Link href={coffee ? "https://audiolad.ru/privacy" : "/privacy"} className="font-semibold text-[#7042c5]">
+                <Link href="/privacy" className="font-semibold text-[var(--biz-accent,#7042c5)]">
                   Политику обработки персональных данных
                 </Link>
                 .
@@ -511,12 +511,13 @@ function SignUpForm() {
                 type="checkbox"
                 checked={marketingConsent}
                 onChange={(event) => setMarketingConsent(event.target.checked)}
-                className="mt-1 h-4 w-4 shrink-0 accent-[#7042c5]"
+                className="mt-1 h-4 w-4 shrink-0 accent-[var(--biz-accent,#7042c5)]"
               />
-              <span className="text-sm leading-6 text-[#4c3d78]">
-                Хочу получать новости АудиоЛада, рекомендации практик и
-                специальные предложения по электронной почте.
-                <span className="mt-1 block text-xs leading-5 text-[#8a7ca9]">
+              <span className="text-sm leading-6 text-[var(--biz-text-muted,#4c3d78)]">
+                {coffee
+                  ? "Хочу получать новости АудиоЛад Бизнес и специальные предложения по электронной почте."
+                  : "Хочу получать новости АудиоЛада, рекомендации практик и специальные предложения по электронной почте."}
+                <span className="mt-1 block text-xs leading-5 text-[var(--biz-text-muted,#8a7ca9)]">
                   От подписки можно отказаться в любой момент в профиле или по
                   ссылке в письме.
                 </span>
@@ -544,11 +545,11 @@ function SignUpForm() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#7d70a2]">
+        <p className="mt-6 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
           Уже есть аккаунт?{" "}
           <Link
             href={buildAuthRouteHref("/auth/sign-in", nextParam)}
-            className="font-semibold text-[#7042c5]"
+            className="font-semibold text-[var(--biz-accent,#7042c5)]"
           >
             Войти
           </Link>

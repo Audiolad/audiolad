@@ -17,7 +17,7 @@ import {
 type PasswordInputProps = Omit<ComponentPropsWithoutRef<"input">, "type">;
 
 const toggleButtonClassName =
-  "absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[#7d70a2] transition-colors hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-50";
+  "absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[var(--biz-text-muted,#7d70a2)] transition-colors hover:text-[var(--biz-accent,#7042c5)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--biz-accent,#7042c5)] disabled:cursor-not-allowed disabled:opacity-50";
 
 const iconClassName = "h-5 w-5 shrink-0";
 
