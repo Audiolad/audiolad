@@ -3,6 +3,9 @@ import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { CoffeeAuthProvider } from "@/components/auth/AuthHostNavigation";
 import type { ReactNode } from "react";
 
+import "@/components/business-app/theme/business-theme.css";
+import "@/components/auth/business-auth.css";
+
 import PlatformProviders from "@/components/providers/PlatformProviders";
 
 export default async function PlatformRouteLayout({

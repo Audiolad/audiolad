@@ -131,12 +131,12 @@ export default function RecoveryLanding({
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}>
+    <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
+      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}>
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">АудиоЛад</Link>
+          <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">АудиоЛад</Link>
           <h1 className="mt-8 text-[30px] font-semibold">Восстановление пароля</h1>
-          <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+          <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">
             Нажмите продолжить, чтобы перейти к созданию нового пароля.
           </p>
         </header>
@@ -150,19 +150,19 @@ export default function RecoveryLanding({
           </button>
         )}
         {error ? (
-          <div className="mt-6 space-y-3 text-center text-sm text-[#7d70a2]">
+          <div className="mt-6 space-y-3 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
             {ready ? (
               <button
                 type="button"
                 disabled={isVerifying}
                 onClick={continueRecovery}
-                className="font-semibold text-[#7042c5]"
+                className="font-semibold text-[var(--biz-accent,#7042c5)]"
               >
                 Попробовать ещё раз
               </button>
             ) : null}
             <p>
-              <Link href="/auth/forgot-password" className="font-semibold text-[#7042c5]">
+              <Link href="/auth/forgot-password" className="font-semibold text-[var(--biz-accent,#7042c5)]">
                 Запросить новую ссылку
               </Link>
             </p>

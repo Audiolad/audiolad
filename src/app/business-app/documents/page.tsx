@@ -126,7 +126,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               >
                 <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">{doc.title}</div>
                 <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
-                  <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
+                  <span className="font-semibold">{doc.editionLabel ?? CLIENT_DOCUMENT_EDITION_LABEL}</span>
                 </div>
                 <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
                 <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
