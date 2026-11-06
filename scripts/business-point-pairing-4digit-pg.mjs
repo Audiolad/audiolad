@@ -159,12 +159,32 @@ check(redeem(good, "203.0.113.10").ok === true, "other client still works");
 psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '11 minutes'");
 check(redeem(wrong, "203.0.113.9").reason === "invalid_point_code", "lock ends after the window");
 
+// Restore the CSPRNG generator after the collision/exhaustion stubs above.
+psql(`CREATE OR REPLACE FUNCTION public.business_point_random_code()
+RETURNS text LANGUAGE sql VOLATILE SET search_path = public, pg_temp AS $$
+  SELECT lpad(
+    ((('x' || encode(substr(uuid_send(gen_random_uuid()), 1, 4), 'hex'))::bit(32)::bigint) % 10000)::text,
+    4, '0');
+$$;`);
+REVOKE ALL ON FUNCTION public.business_point_random_code() FROM PUBLIC, anon, authenticated;
+
 // No worldwide burn: 30 unmatched wrong codes must leave other venues' open codes alive.
 psql("TRUNCATE business_point_pairing_failures");
 const liveA = create(6).code;
 const liveB = create(7).code;
-const miss = "9999";
-for (let i = 0; i < 30; i += 1) redeem(miss, `192.0.2.${i}`);
+// Pick a 4-digit code whose hash is absent from every pairing row.
+let miss = null;
+for (let c = 0; c < 10000; c += 1) {
+  const code = String(c).padStart(4, "0");
+  const hit = Number(psql(`SELECT count(*) FROM business_point_pairings WHERE code_hash = business_point_sha256('${code}')`));
+  if (hit === 0) { miss = code; break; }
+}
+check(miss !== null, "found unused miss code");
+for (let i = 0; i < 30; i += 1) {
+  const r = redeem(miss, `192.0.2.${i}`);
+  check(r.reason === "invalid_point_code" && r.burned === false, `unmatched spray ${i}`);
+}
+check(Number(psql("SELECT count(*) FROM business_point_pairing_failures WHERE location_id IS NOT NULL")) === 0, "unmatched failures have no venue");
 check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL AND expires_at > now()")) >= 2, "open codes survive unmatched spray");
 check(redeem(liveA, "192.0.2.210").ok === true, "venue A still redeemable after spray");
 check(redeem(liveB, "192.0.2.211").ok === true, "venue B still redeemable after spray");
