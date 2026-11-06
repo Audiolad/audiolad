@@ -26,6 +26,7 @@ import {
   getRecentlyListenedProducts,
   isProgramProduct,
   loadAudioSummaryMap,
+  takeHomeActivePrograms,
 } from "./listening-progress";
 import {
   HOME_START_SUGGESTIONS_LIMIT,
@@ -370,7 +371,7 @@ export async function getPersonalHomeData(
     startSuggestions,
     forYouProducts,
     recentlyListened: visibleRecentlyListened,
-    activePrograms: visibleActivePrograms,
+    activePrograms: takeHomeActivePrograms(visibleActivePrograms),
     newProducts,
     authors,
     showBecomeAuthorPromo,
