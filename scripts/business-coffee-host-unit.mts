@@ -101,7 +101,7 @@ try {
   assert.equal(buildBusinessSubscriptionSignInHref(), "/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet");
   assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/coffee-handoff"), { action: "rewrite_business_app", pathname: "/business-app/coffee-handoff" });
   assert.equal(resolveBusinessProxyAction("business.audiolad.ru", "/sitemap.xml").action, "not_found");
-  const publicPaths = ["/", "/help", "/documents", "/documents/business-offer", "/documents/venue-license", "/documents/b2b-terms", "/documents/claims-procedure", "/documents/claim-reply-kit"];
+  const publicPaths = ["/", "/help", "/documents", "/documents/privacy", "/documents/business-offer", "/documents/venue-license", "/documents/b2b-terms", "/documents/claims-procedure", "/documents/claim-reply-kit"];
   assert.deepEqual(buildCoffeeSitemap().map((entry) => entry.url), publicPaths.map((path) => COFFEE_ORIGIN + path));
   assert.equal(buildCoffeeRobotsRoute().sitemap, `${COFFEE_ORIGIN}/sitemap.xml`);
   assert.equal(buildCoffeeRobotsRoute().host, COFFEE_ORIGIN);

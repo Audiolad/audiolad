@@ -20,17 +20,17 @@ export default async function ResetPasswordLayout({
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}>
+    <main className="min-h-screen bg-[var(--biz-bg,var(--platform-surface-background))] text-[var(--biz-text,#25135c)]">
+      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 pt-8 ${platformNavPaddingClass}`}>
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">АудиоЛад</Link>
+          <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">АудиоЛад</Link>
           <h1 className="mt-8 text-[30px] font-semibold">Смена пароля</h1>
         </header>
         <div role="alert" className="mt-8 rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-4 text-sm leading-6 text-[#b34f63]">
           {PASSWORD_RESET_EXPIRED_MESSAGE}
         </div>
-        <p className="mt-6 text-center text-sm text-[#7d70a2]">
-          <Link href="/auth/forgot-password" className="font-semibold text-[#7042c5]">Запросить новую ссылку</Link>
+        <p className="mt-6 text-center text-sm text-[var(--biz-text-muted,#7d70a2)]">
+          <Link href="/auth/forgot-password" className="font-semibold text-[var(--biz-accent,#7042c5)]">Запросить новую ссылку</Link>
         </p>
         <BottomNav />
       </div>

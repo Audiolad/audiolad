@@ -105,7 +105,7 @@ effects.length = 0; component(); effects.map(fn => fn()).forEach(fn => fn?.());
 assert.equal(reloads, 0, 'no reload on SPA navigation into /documents');
 assert.equal(win._tmr.filter(e => e.type === 'pageView').length, 0, 'no VK page view on /documents');
 assert(!readFileSync(new URL('../src/components/analytics/VkAdsPixel.tsx', import.meta.url), 'utf8').includes('location.reload'), 'VkAdsPixel never reloads');
-const privacy = readFileSync(new URL('../src/app/(platform)/privacy/page.tsx', import.meta.url), 'utf8');
+const privacy = readFileSync(new URL('../src/components/legal/PrivacyDocument.tsx', import.meta.url), 'utf8');
 assert(privacy.includes('Последнее обновление: 3 ноября 2026 года'));
 const banner = readFileSync(new URL('../src/components/analytics/AnalyticsConsentBanner.tsx', import.meta.url), 'utf8');
 assert(banner.includes('Мы используем cookies, чтобы собирать статистику и улучшать сайт, а также для нашей рекламы. '));

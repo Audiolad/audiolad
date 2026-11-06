@@ -1,0 +1,38 @@
+/* Coffee auth uses Business colours, without pretending to be an owner cabinet. */
+.business-auth-root {
+  min-height: 100dvh;
+  background: var(--biz-bg);
+  color: var(--biz-text);
+}
+
+html:has(.business-auth-root),
+html:has(.business-auth-root) body {
+  background: #f7f1e8;
+}
+
+.business-auth-root .bottom-nav {
+  background: var(--biz-surface);
+  color: var(--biz-text);
+}
+
+.business-auth-root .primary-cta {
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
+  box-shadow: var(--biz-shadow);
+}
+
+.business-auth-root .primary-cta:hover:not(:disabled),
+.business-auth-root .primary-cta:active:not(:disabled) {
+  background: var(--biz-accent-hover);
+  box-shadow: var(--biz-shadow-strong);
+}
+
+.business-auth-root .primary-cta:focus-visible {
+  outline-color: var(--biz-focus);
+}
+
+.business-auth-root .primary-cta:disabled {
+  background: var(--biz-border);
+  color: var(--biz-text-muted);
+  box-shadow: none;
+}

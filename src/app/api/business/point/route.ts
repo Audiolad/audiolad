@@ -8,7 +8,7 @@ import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } f
 import { businessHallDeviceLocked, loadBusinessOwnerUnlockUntil } from "@/lib/business-app/cabinet-mode.server";
 import { businessPointDeviceStatus } from "@/lib/business-app/point-session.server";
 import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, pointSoundUpdate, soundDraftFromBody } from "@/lib/business-app/point-sound";
-import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
+import { isClaimedPointCommand, isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
 import { pointClientIpCollapsed, pointJoinResult } from "@/lib/business-app/point-join";
 import { pointCodeSecondsLeft } from "@/lib/business-app/point-share";
@@ -286,17 +286,15 @@ export async function POST(request: Request) {
     if (body.action === "commands") {
       const { data, error } = await supabase.rpc("claim_business_point_commands", { p_token: token });
       if (error || !Array.isArray(data)) return json({ ok: false, reason: "commands_failed" });
-      const commands = data.filter(
-        (row): row is { id: string; type: "pause" | "resume" | "next_track"; created_at: string } =>
-          !!row && isPointCommandId((row as { id?: unknown }).id) && isPointCommandType((row as { type?: unknown }).type),
-      );
+      const commands = data.filter(isClaimedPointCommand);
       return json({ ok: true, commands });
     }
-    if (!isPointCommandId(body.id)) return json({ ok: false, reason: "invalid_request" }, 400);
+    if (!isPointCommandId(body.id) || !isPointCommandId(body.claimId)) return json({ ok: false, reason: "invalid_request" }, 400);
     const { data, error } = await supabase.rpc("ack_business_point_command", {
       p_token: token,
       p_command_id: body.id,
       p_result: "applied",
+      p_claim_id: body.claimId,
     });
     if (error || !(data as { ok?: boolean } | null)?.ok) {
       return json({ ok: false, reason: "ack_failed" });

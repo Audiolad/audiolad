@@ -86,6 +86,15 @@ for (const f of usedIn) {
 for (const dir of ["src/app/(platform)", "src/components/author-dashboard"]) {
   for (const f of walkUsed(dir).filter((p) => /\.(tsx?|css)$/.test(p))) {
     const src = read(f);
+    if (f === "src/app/(platform)/layout.tsx") {
+      assert.match(src, /if \(isCoffeeHostRequest\(await headers\(\)\)\) \{\s*return <CoffeeAuthProvider>/);
+      continue;
+    }
+    if (f.startsWith("src/app/(platform)/auth/")) {
+      assert.doesNotMatch(src, /data-biz-theme|business-app\/theme\/business-theme\.css/);
+      assert.doesNotMatch(src, /var\(--biz-[^,)]+\)/, `${f}: shared auth tokens must preserve listener fallbacks`);
+      continue;
+    }
     assert.doesNotMatch(src, /business-app\/theme\/business-theme\.css/, `${f}: Business theme imported in the author cabinet`);
     assert.doesNotMatch(src, /data-biz-theme|var\(--biz-/, `${f}: Business theme tokens used in the author cabinet`);
   }
@@ -176,7 +185,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const importers = walk("src").filter((p) => /import\s+["']@\/components\/business-app\/theme\/business-theme\.css["']/.test(read(p)));
-assert.deepEqual(importers, ["src/app/(venue-licence)/layout.tsx", "src/app/business-app/layout.tsx"]);
+assert.deepEqual(importers, ["src/app/(platform)/layout.tsx", "src/app/(venue-licence)/layout.tsx", "src/app/business-app/layout.tsx"]);
 
 // 8. No colours outside the token layer: no hex/rgb in Business CSS, no hard-coded
 //    palette classes, inline colour styles or dark-on-light leftovers in Business TSX.

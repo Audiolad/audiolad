@@ -274,8 +274,13 @@ try {
       assertAction("audiolad.ru", path, "pass_through");
       assertAction("coffee.audiolad.ru", `${path}/extra`, "not_found");
     }
-    for (const path of ["/auth/unknown", "/api/listen/resume-session", "/api/analytics/session", "/catalog", "/privacy"]) {
+    for (const path of ["/auth/unknown", "/api/listen/resume-session", "/api/analytics/session", "/catalog"]) {
       assertAction("coffee.audiolad.ru", path, "not_found");
+    }
+    for (const path of ["/privacy", "/documents/privacy"]) {
+      assertAction("coffee.audiolad.ru", path, enabled ? "rewrite_business_app" : "not_found", "/business-app/documents/privacy");
+      assertAction(BUSINESS_HOSTNAME, path, "rewrite_business_app", "/business-app/documents/privacy");
+      assertAction("audiolad.ru", path, "pass_through");
     }
   }
 } finally {

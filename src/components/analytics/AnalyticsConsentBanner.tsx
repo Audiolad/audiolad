@@ -24,11 +24,13 @@ function useClientMounted(): boolean {
   );
 }
 
-/** Business hosts have no /privacy route: they pass the absolute audiolad.ru policy URL. */
+/** Business callers supply their same-host cabinet document URL. */
 export default function AnalyticsConsentBanner({
   privacyHref = "/privacy#section-8",
+  business = false,
 }: {
   privacyHref?: string;
+  business?: boolean;
 } = {}) {
   const consent = useAnalyticsConsent();
   const advertising = useAdvertisingConsent();
@@ -51,22 +53,23 @@ export default function AnalyticsConsentBanner({
 
   return createPortal(
     <aside
+      data-biz-theme={business ? "jazz-coffee" : undefined}
       role="dialog"
       aria-labelledby="analytics-consent-heading"
       aria-describedby="analytics-consent-description"
       className={`fixed left-1/2 ${ANALYTICS_CONSENT_BANNER_CLASS} ${ANALYTICS_CONSENT_BANNER_Z_INDEX_CLASS} w-[min(100%-2rem,430px)] -translate-x-1/2 px-4`}
     >
-      <div className="w-full rounded-[22px] border border-[#eadff8] bg-white p-5 shadow-[0_12px_30px_rgba(90,60,145,0.16)]">
+      <div className="w-full rounded-[22px] border border-[var(--biz-border,#eadff8)] bg-[var(--biz-surface,white)] p-5 shadow-[var(--biz-shadow,0_12px_30px_rgba(90,60,145,0.16))]">
         <h2
           id="analytics-consent-heading"
-          className="text-[17px] font-semibold leading-snug text-[#25135c]"
+          className="text-[17px] font-semibold leading-snug text-[var(--biz-text,#25135c)]"
         >
           {variant === "all" ? "Cookies на сайте" : variant === "advertising" ? "Рекламные cookies" : "Аналитические cookies"}
         </h2>
 
         <p
           id="analytics-consent-description"
-          className="mt-2 text-sm leading-6 text-[#796ba0]"
+          className="mt-2 text-sm leading-6 text-[var(--biz-text-muted,#796ba0)]"
         >
           {variant === "all"
             ? "Мы используем cookies, чтобы собирать статистику и улучшать сайт, а также для нашей рекламы. "
@@ -74,11 +77,11 @@ export default function AnalyticsConsentBanner({
               ? "Разрешите рекламные cookies – так мы покажем вам только полезное об АудиоЛаде. "
               : "Для обезличенной статистики посещений мы используем Яндекс Метрику. Персональные данные не передаются. Метрика загружается только после вашего согласия. "}
           {/^https?:\/\//i.test(privacyHref) ? (
-            <a href={privacyHref} className="text-[#7042c5] underline">
+            <a href={privacyHref} className="text-[var(--biz-accent,#7042c5)] underline">
               Подробнее в политике
             </a>
           ) : (
-            <Link href={privacyHref} className="text-[#7042c5] underline">
+            <Link href={privacyHref} className="text-[var(--biz-accent,#7042c5)] underline">
               Подробнее в политике
             </Link>
           )}
@@ -89,7 +92,7 @@ export default function AnalyticsConsentBanner({
           <button
             type="button"
             onClick={() => choose("allow")}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[var(--biz-accent,#7042c5)] px-5 py-2.5 text-sm font-medium text-white"
           >
             {variant === "all" ? "Разрешить все" : "Разрешить"}
           </button>
@@ -98,7 +101,7 @@ export default function AnalyticsConsentBanner({
             <button
               type="button"
               onClick={() => choose("analytics-only")}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[#eadff8] px-3 py-2.5 text-sm font-medium text-[#7042c5]"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[var(--biz-border,#eadff8)] px-3 py-2.5 text-sm font-medium text-[var(--biz-accent,#7042c5)]"
             >
               Только аналитика
             </button>
@@ -107,7 +110,7 @@ export default function AnalyticsConsentBanner({
           <button
             type="button"
             onClick={() => choose("deny")}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[#eadff8] px-5 py-2.5 text-sm font-medium text-[#7042c5]"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[var(--biz-border,#eadff8)] px-5 py-2.5 text-sm font-medium text-[var(--biz-accent,#7042c5)]"
           >
             Отклонить
           </button>

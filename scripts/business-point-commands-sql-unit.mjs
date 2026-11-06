@@ -36,4 +36,17 @@ assert(applied.includes("interval '2 minutes'"), "two minute expiry");
 assert(applied.includes("DROP TABLE") === false, "no drop before commit");
 assert(!/https?:\/\//.test(migration), "no links");
 
+const fix = readFileSync(join(repoRoot, "supabase/migrations/20270224120000_business_point_commands_ack_after_apply.sql"), "utf8");
+const forward = fix.split("COMMIT;")[0];
+const claim = forward.split("CREATE FUNCTION public.claim_business_point_commands")[1].split("CREATE FUNCTION public.ack_business_point_command")[0];
+assert(!/SET acked_at|ack_result = 'applied'/.test(claim), "claim never acknowledges");
+assert(claim.includes("FOR UPDATE SKIP LOCKED") && claim.includes("pg_try_advisory_xact_lock"), "exclusive claim");
+assert(claim.includes("LIMIT 1") && claim.includes("interval '30 seconds'"), "one leased row, no batch lease expiry");
+assert(claim.includes("claim_id = gen_random_uuid()"), "new fence on each attempt");
+assert(forward.includes("v_row.claimed_by IS DISTINCT FROM v_session OR v_row.claim_id IS DISTINCT FROM p_claim_id"), "ack requires current claim + session");
+assert(forward.includes("point_command_claim_expired") && forward.includes("point_command_expired"), "no expired ack");
+assert(forward.includes("DROP FUNCTION public.ack_business_point_command(text, uuid, text)"), "remove legacy ack bypass");
+assert(forward.includes("REVOKE INSERT ON TABLE public.business_point_commands FROM authenticated"), "no forged owner ack inserts");
+assert(forward.includes("REVOKE ALL ON FUNCTION public.ack_business_point_command(text, uuid, text, uuid) FROM PUBLIC"), "ack grants explicit");
+assert(fix.includes("-- Rollback:") && fix.includes("-- ALTER TABLE public.business_point_commands DROP COLUMN"), "executable commented rollback");
 console.log("business-point-commands-sql-unit: ok");

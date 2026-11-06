@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useRef, useState, type ReactNode } from "react";
 import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
@@ -71,7 +73,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
     <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
     {open ? <div className="space-y-3 py-3" data-testid={`${testId}-confirmation`}>
       <p>{copy.terms}</p>
-      <p><BusinessOfferDocumentLink testId={`${testId}-offer-link`} /> ({BUSINESS_OFFER_EDITION.label}){" · "}<a href="https://audiolad.ru/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p>
+      <p><BusinessOfferDocumentLink testId={`${testId}-offer-link`} /> ({BUSINESS_OFFER_EDITION.label}){" · "}<Link href="/documents/privacy">Политика обработки персональных данных</Link></p>
       <label className="flex items-start gap-2">
         <input type="checkbox" checked={accepted} disabled={loading} onChange={(event) => setAccepted(event.target.checked)} data-testid={`${testId}-accept`} />
         <span>{copy.acceptance}</span>

@@ -23,32 +23,68 @@ export function pointCommandAction(
   return playing ? "none" : "toggle";
 }
 
+export type ClaimedPointCommand = {
+  id: string;
+  type: PointCommandType;
+  claim_id: string;
+  claim_until: string;
+};
+
+export function isClaimedPointCommand(value: unknown): value is ClaimedPointCommand {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return isPointCommandId(row.id) && isPointCommandType(row.type)
+    && isPointCommandId(row.claim_id) && typeof row.claim_until === "string"
+    && Number.isFinite(Date.parse(row.claim_until));
+}
+
 export type PointCommandRunner = {
+  ready(): boolean;
   status(): string;
-  toggle(): Promise<void>;
-  next(): Promise<void>;
+  toggle(signal: AbortSignal): Promise<void>;
+  next(signal: AbortSignal): Promise<void>;
+  /** Includes the real audio state: controller errors and soft pauses may resolve early. */
+  applied(type: PointCommandType): Promise<boolean>;
+  ack(command: ClaimedPointCommand): Promise<void>;
   stopped(): boolean;
 };
 
-/**
- * Runs one claimed batch in order. Consecutive "next" commands start back to back without
- * awaiting each transition, so the player supersedes the earlier ones like rapid presses
- * (one fade-out, only the last chosen track loads). Pause / resume wait for them first.
- */
-export async function runPointCommands(types: readonly unknown[], run: PointCommandRunner): Promise<void> {
-  let switching: Promise<void> | null = null;
-  for (const type of types) {
-    if (run.stopped() || !isPointCommandType(type)) continue;
-    if (type === "next_track") {
-      switching = run.next();
-      continue;
+/** One command at a time; never acknowledge a failed, timed out or interrupted apply. */
+export async function runPointCommands(
+  commands: readonly unknown[],
+  run: PointCommandRunner,
+  timeoutMs = 20_000,
+): Promise<void> {
+  for (const command of commands) {
+    if (run.stopped() || !run.ready()) return;
+    if (!isClaimedPointCommand(command)) continue;
+    // Leave time for the acknowledgement before the server's 30s lease expires.
+    const remaining = Date.parse(command.claim_until) - Date.now() - 1_000;
+    if (remaining <= 0) return;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        (async () => {
+          const action = pointCommandAction(run.status(), command.type);
+          if (action === "next") await run.next(abort.signal);
+          if (action === "toggle") await run.toggle(abort.signal);
+          if (abort.signal.aborted || run.stopped() || !run.ready()) throw new Error("point_command_interrupted");
+          if (!(await run.applied(command.type))) throw new Error("point_command_not_applied");
+        })(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            abort.abort();
+            reject(new Error("point_command_timeout"));
+          }, Math.min(timeoutMs, remaining));
+        }),
+      ]);
+      if (abort.signal.aborted || run.stopped() || !run.ready()
+        || Date.now() >= Date.parse(command.claim_until) - 1_000) return;
+      await run.ack(command);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      abort.abort();
     }
-    if (switching) {
-      await switching;
-      switching = null;
-    }
-    if (run.stopped()) continue;
-    if (pointCommandAction(run.status(), type) === "toggle") await run.toggle();
   }
-  if (switching) await switching;
 }
