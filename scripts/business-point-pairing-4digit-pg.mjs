@@ -165,8 +165,8 @@ RETURNS text LANGUAGE sql VOLATILE SET search_path = public, pg_temp AS $$
   SELECT lpad(
     ((('x' || encode(substr(uuid_send(gen_random_uuid()), 1, 4), 'hex'))::bit(32)::bigint) % 10000)::text,
     4, '0');
-$$;`);
-REVOKE ALL ON FUNCTION public.business_point_random_code() FROM PUBLIC, anon, authenticated;
+$$;
+REVOKE ALL ON FUNCTION public.business_point_random_code() FROM PUBLIC, anon, authenticated;`);
 
 // No worldwide burn: 30 unmatched wrong codes must leave other venues' open codes alive.
 psql("TRUNCATE business_point_pairing_failures");
