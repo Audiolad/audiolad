@@ -266,17 +266,17 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       {model.status === "offer" ? (
         <section className="business-app-card space-y-2" data-testid="biz-workspace-offer">
           <p>
-            {model.endsAtLabel
-              ? `Подарочный период закончился ${model.endsAtLabel}. Полный плеер закрыт.`
-              : "Подарочный период закончился. Полный плеер закрыт."}
+            {cabinet.side === "venue"
+              ? "Попросите владельца продлить доступ."
+              : model.endsAtLabel
+                ? `Подарочный период закончился ${model.endsAtLabel}. Полный плеер закрыт.`
+                : "Подарочный период закончился. Полный плеер закрыт."}
           </p>
           {cabinet.can("payLink") ? (
             <p>
               <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
             </p>
-          ) : (
-            <p data-testid="biz-workspace-tell-owner">Сообщите владельцу кофейни.</p>
-          )}
+          ) : null}
         </section>
       ) : null}
 

@@ -4,29 +4,30 @@ import Link from "next/link";
 
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
-import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
+import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
 import { hasLiveBusinessAccess, type BusinessChromeAccess } from "@/lib/access-grants/access-line";
 
-/** What the hall says about the venue period: nothing while it lasts, «сообщите владельцу» after. No pay link. */
+/** The hall never discloses access dates or why renewal is needed. */
 export function businessHallAccessNotice(access: BusinessChromeAccess | null): { kind: "expired" | "grace"; text: string } | null {
   if (!access) return null;
   if (access.mode === "grace") {
     return {
       kind: "grace",
-      text: "Оплаченный период закончился. Сообщите владельцу кофейни.",
+      text: "Попросите владельца продлить доступ.",
     };
   }
   if (hasLiveBusinessAccess(access)) return null;
-  return { kind: "expired", text: "Доступ к музыке закончился. Сообщите владельцу кофейни." };
+  return { kind: "expired", text: "Попросите владельца продлить доступ." };
 }
 
 /**
  * «Главная» of the venue side (cabinet-mode.ts): the hall device, or the owner's preview of it.
- * The venue name, the period notice without a pay link, the hall buttons and the way to music.
+ * The venue name, a neutral access notice, the hall buttons and the way to music.
  */
 export default function BusinessHallHome() {
   const cabinet = useBusinessCabinetMode();
+  const { setEntry } = useBusinessEntry();
   const domain = useBusinessDomain();
   const access = useBusinessChromeAccess();
   const venueName =
@@ -50,12 +51,23 @@ export default function BusinessHallHome() {
       <div className="business-app-owner-home space-y-4">
         {notice ? (
           <section
-            className="business-app-card business-app-hall-notice"
+            className="business-app-card business-app-hall-notice space-y-3"
             role="status"
             data-testid="biz-hall-access-notice"
             data-kind={notice.kind}
           >
             <p className="text-[1.05rem] font-semibold text-[var(--biz-text)]">{notice.text}</p>
+            {cabinet.mode !== "point" ? (
+              <Link
+                href="/profile"
+                prefetch={false}
+                onClick={() => setEntry("person")}
+                className="business-app-btn business-app-btn-cta business-app-focus-ring"
+                data-testid="biz-hall-renew"
+              >
+                Продлить доступ
+              </Link>
+            ) : null}
           </section>
         ) : null}
         {cabinet.can("hallControls") ? <PointDeviceControls /> : null}

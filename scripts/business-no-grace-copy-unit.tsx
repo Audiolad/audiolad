@@ -9,7 +9,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
-import { businessHallAccessNotice } from "../src/components/business-app/BusinessHallHome";
+import BusinessHallHome, { businessHallAccessNotice } from "../src/components/business-app/BusinessHallHome";
+import { BusinessCabinetModeProvider, BusinessEntryProvider } from "../src/components/business-app/BusinessPointMode";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import * as copy from "../src/lib/access-grants/copy";
 import { businessAccessLine } from "../src/lib/access-grants/access-line";
@@ -98,7 +99,7 @@ for (const graceEndsAt of [grace.graceEndsAt, null, "2099-12-31T23:59:59Z"]) {
   const notice = businessHallAccessNotice({ ...grace, graceEndsAt });
   assert.deepEqual(notice, {
     kind: "grace",
-    text: "Оплаченный период закончился. Сообщите владельцу кофейни.",
+    text: "Попросите владельца продлить доступ.",
   });
   assert.ok(notice);
   assert.doesNotMatch(notice.text, /\d|играет до|\u2014/u);
@@ -108,7 +109,40 @@ assert.equal(businessHallAccessNotice({ mode: "paid", endsAt: END }), null);
 assert.equal(businessHallAccessNotice(null), null);
 assert.deepEqual(businessHallAccessNotice({ mode: "none", endsAt: END }), {
   kind: "expired",
-  text: "Доступ к музыке закончился. Сообщите владельцу кофейни.",
+  text: "Попросите владельца продлить доступ.",
 });
+
+// Render the actual hall in every mode, including a stale signed-in owner on a paired device.
+// The device mode wins over domain.canPay, so staff never receive a payment link.
+for (const mode of ["point", "preview", "owner"] as const) {
+  for (const access of [grace, { mode: "none" as const, endsAt: END }]) {
+    for (const canPay of [false, true]) {
+      const hall = renderToStaticMarkup(
+        <BusinessDomainProvider value={{ ...owner, canPay }}>
+          <BusinessCabinetModeProvider value={{
+            mode, pointReports: mode === "point", pointCanEdit: false,
+            pointVenueName: "Кафе", ownerUnlockUntil: null, canPreview: mode === "preview",
+          }}>
+            <BusinessEntryProvider initialEntry={mode === "preview" ? "venue" : "person"}>
+              <BusinessChromeAccessProvider value={access}>
+                <BusinessHallHome />
+              </BusinessChromeAccessProvider>
+            </BusinessEntryProvider>
+          </BusinessCabinetModeProvider>
+        </BusinessDomainProvider>,
+      );
+      assert.match(hall, new RegExp(`data-mode="${mode}"`));
+      assert.match(hall, /Попросите владельца продлить доступ\./u);
+      assert.doesNotMatch(hall, /2026|22 ноября|25 ноября|14:11|играет до|дополнительн|запасн|период закончился|доступ к музыке закончился|\u2014/iu);
+      assert.doesNotMatch(hall, FORBIDDEN);
+      if (mode === "point") {
+        assert.doesNotMatch(hall, /biz-hall-renew|href="\/profile"|Продлить доступ/u);
+      } else {
+        assert.match(hall, /href="\/profile"[^>]*class="[^"]*business-app-btn-cta[^>]*data-testid="biz-hall-renew"/u);
+        assert.match(hall, /Продлить доступ/u);
+      }
+    }
+  }
+}
 
 console.log(`business-no-grace-copy-unit: ok (${scanned.length} files)`);
