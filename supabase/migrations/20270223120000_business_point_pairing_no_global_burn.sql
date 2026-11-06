@@ -272,6 +272,7 @@ COMMIT;
 -- 
 -- REVOKE ALL ON FUNCTION public.redeem_business_point_pairing(text, text) FROM PUBLIC, anon, authenticated;
 -- GRANT EXECUTE ON FUNCTION public.redeem_business_point_pairing(text, text) TO service_role;
--- Optional: DROP INDEX IF EXISTS business_point_pairing_failures_location_idx;
+-- -- Optional cleanup after the function body is restored (safe; app does not read location_id today):
+-- DROP INDEX IF EXISTS business_point_pairing_failures_location_idx;
 -- ALTER TABLE public.business_point_pairing_failures DROP COLUMN IF EXISTS location_id;
 -- COMMIT;
