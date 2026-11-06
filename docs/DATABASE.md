@@ -2546,3 +2546,48 @@ removes the added columns, preserving command rows. Stop polling/roll back the
 client first; rollback also restores the known early-ack bug. Old incorrectly
 acknowledged rows are not replayed. See `business-point-commands.md` for client
 failure handling, at-least-once delivery and the independent atmosphere poll.
+
+## Пилот трёх физических точек (84e4bc65, подготовлено, не применено)
+
+`20270226120000_business_pilot_three_locations.sql` добавляет nullable
+`business_organizations.pilot_location_limit` (пилотное значение только 3).
+Слоты – существующие `business_locations` в порядке `created_at, id`; незанятый
+слот виртуальный, без Zone, Player, триала и оплаты. Активация owner-only через
+`activate_business_pilot_location`, блокировку строки организации и существующий
+инициализатор контекста прав. Повтор идемпотентен; закрытые точки тоже занимают
+слот. Триггер ограничивает новые вставки в пилотную организацию тремя Location.
+Автоматического включения организаций нет.
+
+`business_location_subscription_bindings` связывает существующий
+`business_subscription_periods.order_id` ровно с одной Location. RLS включён,
+клиентские SELECT/запись закрыты, привязка service-only; проверяются владелец,
+`opens_access` и сумма 79900. Перенос привязки UPDATE запрещён. Эта таблица сохранена как история подготовки и не участвует в живом checkout
+или расчёте доступа после `20270226140000`.
+
+`20270226130000_business_point_playback_attribution.sql` выделяет существующий
+алгоритм A3 в приватную `apply_business_player_usage_sample`; старый credential RPC
+и новый `apply_business_point_usage_sample` используют один алгоритм и прежние
+`playback_usage_contexts/facts`. Сеанс точки определяет Player, assignment и Location,
+права проверяются resolver-ом. Медиавремя и seq приходят от audio, атрибуция и время
+сервера – из БД. Отчёт heartbeat/live-state отклоняет изменённый assignment.
+Списание, royalties и новый ledger не добавлены.
+
+`20270226140000_business_shared_venue_renewal.sql` добавляет service-only
+`business_subscription_order_scopes`: один заказ, организация, неизменяемый список
+активных Location. Checkout вычисляет 79900 × количество (1–3); допустимы только
+79900/159800/239700. Fulfilment сверяет платёж со снимком, один раз создаёт период
+на 30 дней, учитывая существующий общий конец периода и подарка. Повторный webhook
+возвращает существующий период. Test-платежи не открывают доступ. Доступ Location
+требует включения в оплаченный снимок; новая точка после оплаты не наследует срок.
+Если есть действующий период и неоплаченная новая точка, новый checkout закрыт до
+продления: пропорциональная доплата не реализована. Общий подарок владельца не
+перезапускается при активации дополнительных Location.
+Opt-in требует отдельного Human Gate после независимого ревью и staging-проверок.
+Single-user PG fixture не доказывает HTTP/RLS или конкурентную активацию.
+Факт применения на сервере этой документацией не подтверждается.
+Приложение читает pilot_location_limit отдельно от основных данных; отсутствие
+колонки, NULL или ошибка чтения оставляют прежний single-venue путь.
+Проверка включения не допускает организацию с более чем тремя существующими
+Location. Триггер `business_pilot_order_guard` также закрывает выдачу старого
+account-level pending business_subscription через прямой RPC/другие серверные пути;
+старые оплаченные заказы не переписываются.

@@ -373,3 +373,31 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
     eligibleCount: filterEligibleAirplayRows(rows).length,
   };
 }
+
+/** Owner preference; no credentials or access authority are stored in this cookie. */
+export async function selectBusinessPoint(locationId: string): Promise<{ ok: boolean }> {
+  if (await businessHallDeviceLocked()) return { ok: false };
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return { ok: false };
+  const { data: membership } = await db.from("business_organization_members").select("organization_id").eq("user_id", user.id).order("created_at", { ascending: true }).limit(1).maybeSingle();
+  if (!membership) return { ok: false };
+  const { data: row, error } = await db.from("business_locations").select("id").eq("organization_id", membership.organization_id).eq("id", locationId).eq("status", "active").maybeSingle();
+  if (error || !row) return { ok: false };
+  const { cookies } = await import("next/headers");
+  const { BUSINESS_LOCATION_COOKIE } = await import("@/lib/business-app/location-selection");
+  (await cookies()).set(BUSINESS_LOCATION_COOKIE, row.id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  revalidatePath(BUSINESS_SITE_PATH, "layout");
+  return { ok: true };
+}
+
+export async function activateBusinessPoint(slot: number): Promise<{ ok: boolean; error?: string }> {
+  if (await businessHallDeviceLocked()) return { ok: false, error: "Активация доступна владельцу в его кабинете." };
+  const { loadBusinessOwnerHomeContext } = await import("@/lib/business-app/domain");
+  const domain = await loadBusinessOwnerHomeContext();
+  if (domain.status !== "authenticated" || !domain.organizationId || !domain.pilotSlots || !domain.canPay) return { ok: false, error: "Активация недоступна." };
+  const db = await createClient();
+  const { data, error } = await db.rpc("activate_business_pilot_location", { p_organization_id: domain.organizationId, p_slot: slot });
+  if (error || !data?.location_id) return { ok: false, error: "Не удалось активировать точку. Обновите страницу и повторите." };
+  return selectBusinessPoint(data.location_id);
+}

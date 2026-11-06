@@ -1,5 +1,7 @@
 "use client";
 
+import { locationSoundProfile, locationSoundPrefs } from "@/lib/business-app/location-sound-settings";
+
 import BusinessGuestStartCta from "../BusinessGuestStartCta";
 import { useGuestStartEnabled } from "../BusinessDomainProvider";
 
@@ -64,7 +66,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const setQueueOrder = player.setQueueOrder;
   const applyAtmosphereQueue = player.applyAtmosphereQueue;
   const currentIndex = player.view.index;
-  const queue = useCafeQueuePreferences();
+  const sound = initialModel.soundSettings;
+  const queue = useCafeQueuePreferences(sound ? { profile: locationSoundProfile(sound), prefs: locationSoundPrefs(sound), hours: sound.hours } : null);
   const [failedNowCover, setFailedNowCover] = useState<string | null>(null);
   const [feedbackPhase, setFeedbackPhase] = useState<CafeFeedbackPhase>("idle");
   const [feedbackBusyKind, setFeedbackBusyKind] = useState<CafeQueueFeedbackKind | null>(null);

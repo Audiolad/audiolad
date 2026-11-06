@@ -15,8 +15,19 @@ import {
 } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
-import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
+import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+
+function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): string {
+  if (domain.status !== "authenticated" || !domain.pilotSlots) return formatBusinessMonthlyPrice();
+  const count = (domain.locations ?? []).filter((l) => l.status === "active").length;
+  return `${count * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽`;
+}
+function businessPaymentNote(domain: ReturnType<typeof useBusinessDomain>): string {
+  return domain.status === "authenticated" && domain.pilotSlots
+    ? `${businessPaymentLabel(domain)} за 30 дней за все активные точки. Одна оплата, общая дата продления.`
+    : businessGiftPriceNote();
+}
 
 export type PayError = { code: BusinessPayErrorCode; href: string | null };
 
@@ -41,7 +52,7 @@ function payErrorFromPayload(payload: { error?: string; href?: string } | null):
 export function useBusinessHomePay() {
   const access = useBusinessChromeAccess();
   const domain = useBusinessDomain();
-  const canPay = domain.status === "authenticated" && domain.canPay;
+  const canPay = domain.status === "authenticated" && domain.canPay && !domain.pilotBilling?.renewalBlocked;
   const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
@@ -145,6 +156,8 @@ export function useBusinessHomePay() {
 
 /** Owner payment before the first venue. A manager and a venue device do not see the button. */
 export default function BusinessHomeAccessCard() {
+  const domain = useBusinessDomain();
+  const totalLabel = businessPaymentLabel(domain);
   const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay, askReceiptEmail, receiptEmail, setReceiptEmail } =
     useBusinessHomePay();
 
@@ -189,7 +202,7 @@ export default function BusinessHomeAccessCard() {
   if (access.mode === "offer") {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="offer">
-        <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {formatBusinessMonthlyPrice()} за 30 дней</h2>
+        <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {totalLabel} за 30 дней</h2>
         <p data-testid="biz-home-ended">Подарочный период закончился {label}.</p>
         <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>
         {pay}
@@ -307,11 +320,12 @@ export function BusinessPayControls({
   /** @deprecated The offer link is always shown next to «Оплатить». */
   showAcceptedNote?: boolean;
 }) {
+  const domain = useBusinessDomain();
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        {businessGiftPriceNote()}
+        {businessPaymentNote(domain)}
       </p>
       {accepted ? (
         <>
@@ -378,5 +392,7 @@ export function BusinessPayError({ error }: { error: PayError }) {
   if (error.code === "payments_not_configured") {
     return <p role="alert" data-testid="biz-home-pay-error">Оплата временно недоступна. Попробуйте ещё раз позже.</p>;
   }
+  if (error.code === "venue_topup_not_available") return <p role="alert">Новая точка будет включена при следующем продлении. Доплата в текущем периоде пока недоступна.</p>;
+  if (error.code === "pending_order_mismatch") return <p role="alert">Состав точек изменился. Не оплачивайте прежнюю ссылку; обратитесь в поддержку.</p>;
   return <p role="alert" data-testid="biz-home-pay-error">Не удалось перейти к оплате. Попробуйте ещё раз.</p>;
 }

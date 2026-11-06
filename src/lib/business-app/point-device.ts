@@ -12,6 +12,7 @@ import type { WorkspacePageStatus } from "@/lib/business-workspace/model";
 export const POINT_DEVICE_PLAYER_PATH = "/music";
 
 export type PointDeviceVenue = {
+  pilotSlots?: boolean;
   locationId: string;
   organizationId: string;
   locationName: string;

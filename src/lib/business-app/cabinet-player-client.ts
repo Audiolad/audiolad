@@ -41,7 +41,7 @@ export function getCabinetDeviceSecret(
  * The route writes the venue player tables; it does not call the spa allowlist RPCs.
  */
 export async function postPointReport(
-  payload: { kind: "heartbeat" } | { kind: "playback"; report: SpaLiveReport },
+  payload: { kind: "heartbeat" } | { kind: "playback"; report: SpaLiveReport; sample?: { eventId: string; sessionId: string; seq: number; positionMs: number } | null },
   f: Fetch = fetch,
 ): Promise<Result> {
   try {

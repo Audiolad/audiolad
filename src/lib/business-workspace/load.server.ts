@@ -1,6 +1,9 @@
+import "server-only";
+
+import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
+import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { readGuestBusinessAccess } from "@/lib/access-grants/principal.server";
-import "server-only";
 
 import { activateBusinessTrial, recordAccessActivity } from "@/lib/access-grants/apply";
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
@@ -16,7 +19,7 @@ import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
-import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
+import { loadBusinessLocationContext } from "@/lib/business-app/location-context.server";
 import { pointDeviceWorkspaceAccess, type PointDeviceVenue } from "@/lib/business-app/point-device";
 import { loadPointDeviceAccess, loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
 import { GUEST_COFFEE_RIGHTS_URL } from "@/lib/business-app/guest-coffee/copy";
@@ -516,6 +519,7 @@ async function loadPointDeviceWorkspacePage(
   }
   return {
     ...model,
+    playbackScope: venue.pilotSlots ? venue.locationId : undefined,
     status: access.status,
     endsAtLabel,
     endsAt: access.endsAt,
@@ -556,6 +560,9 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       ? await readGuestBusinessAccess(principal)
       : await activateBusinessTrial(store, { userId: user.id, email: user.email! });
     if (principal.kind === "email") await recordAccessActivity(store, { userId: user.id, email: user.email!, action: "visit" });
+    const selectedDomain = await loadBusinessLocationContext(supabase, user.id);
+    const selectedLocationId = selectedDomain.locationId;
+    if (selectedLocationId) activation.access = await pilotLocationAccess(selectedLocationId, principal) ?? activation.access;
     const status = activation.access.mode === "none" ? "unavailable" : activation.access.mode;
     const endsAtLabel = activation.access.endsAt
       ? formatMoscowDateTime(new Date(activation.access.endsAt))
@@ -563,8 +570,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
     let tracks: WorkspaceTrack[] = [];
     let needsVenue = false;
     if (workspacePlayerOpen({ status, spaceEnabled: space.enabled })) {
-      const domain = await loadBusinessOwnerHomeContext();
-      const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
+      const locationId = selectedLocationId;
       needsVenue = locationId == null;
       const catalog = await loadWorkspaceCatalog({
         spaceId: space.id,
@@ -576,10 +582,12 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       }
       tracks = catalog.tracks;
     }
-    const saved = await store.readPlayback(user.id, space.id);
+    const saved = selectedDomain.pilotSlots ? null : await store.readPlayback(user.id, space.id);
     return {
       ...model,
       status,
+      playbackScope: selectedDomain.pilotSlots ? selectedLocationId ?? undefined : undefined,
+      soundSettings: selectedDomain.pilotSlots && selectedLocationId ? await loadLocationSoundSettings(selectedLocationId) : null,
       daysLeft: activation.access.daysLeft,
       endsAtLabel,
       endsAt: activation.access.endsAt,
@@ -608,6 +616,7 @@ export type WorkspaceActor =
       userId: string;
       email: string | null;
       playerOpen: boolean;
+      pilotSlots?: boolean;
       locationId: string | null;
       space: ReturnType<typeof resolveBusinessSpace>;
     }
@@ -653,13 +662,14 @@ export async function loadWorkspaceActor(spaceParam: string | null): Promise<Wor
     const activation = principal.kind === "guest"
       ? await readGuestBusinessAccess(principal)
       : await activateBusinessTrial(createSupabaseAccessGrantStore(), { userId: user.id, email: user.email! });
-    const domain = await loadBusinessOwnerHomeContext();
-    const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
+    const domain = await loadBusinessLocationContext(supabase, user.id);
+    const locationId = domain.locationId;
+    if (locationId) activation.access = await pilotLocationAccess(locationId, principal) ?? activation.access;
     const playerOpen = workspacePlayerOpen({
       status: activation.access.mode === "none" ? "unavailable" : activation.access.mode,
       spaceEnabled: space.enabled,
     });
-    return { ok: true, device: false, userId: user.id, email: principal.kind === "guest" ? null : user.email!, playerOpen, locationId, space };
+    return { ok: true, device: false, userId: user.id, email: principal.kind === "guest" ? null : user.email!, playerOpen, locationId, pilotSlots: domain.pilotSlots, space };
   } catch {
     return { ok: false, reason: "unavailable" };
   }

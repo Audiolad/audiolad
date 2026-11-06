@@ -1,4 +1,7 @@
 import "server-only";
+import { loadBusinessPilotSlots } from "./pilot-slots";
+
+import { pilotLocationAccess } from "./location-access.server";
 
 import { cookies } from "next/headers";
 import { cache } from "react";
@@ -42,7 +45,9 @@ export const loadPointDeviceVenue = cache(async function loadPointDeviceVenue():
     } | null;
     if (locationError || !loc || loc.status !== "active") return null;
     if (typeof loc.id !== "string" || typeof loc.organization_id !== "string") return null;
+    const pilotSlots = await loadBusinessPilotSlots(db, loc.organization_id);
     return {
+      pilotSlots,
       locationId: loc.id,
       organizationId: loc.organization_id,
       locationName: typeof loc.name === "string" && loc.name.trim() ? loc.name.trim() : "Кофейня",
@@ -75,6 +80,9 @@ export async function loadPointDeviceAccess(venue: PointDeviceVenue, now: Date =
     const user = owner?.user ?? null;
     const principal = businessAccessPrincipal(user, process.env.AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED === "1");
     if (!principal) return BUSINESS_NO_ACCESS;
+    const scoped = await pilotLocationAccess(venue.locationId, principal, now);
+    if (scoped) return { mode: scoped.mode, endsAt: scoped.endsAt,
+      ...(scoped.mode === "grace" ? { graceEndsAt: scoped.playbackUntil } : {}) };
     return await peekBusinessAccessFor(principal, now);
   } catch {
     return BUSINESS_NO_ACCESS;

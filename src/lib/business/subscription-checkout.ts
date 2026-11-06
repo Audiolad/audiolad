@@ -11,6 +11,8 @@ export type BusinessPayErrorCode =
   | "payments_not_configured"
   | "invalid_request"
   | "receipt_email_required"
+  | "venue_topup_not_available"
+  | "pending_order_mismatch"
   | "internal_error";
 
 const RECEIPT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +46,8 @@ export function mapBusinessSubscriptionRpcError(message: string): {
   href: string | null;
 } {
   const normalized = message.toLowerCase();
+  if (normalized.includes("venue_topup_not_available")) return { status: 409, error: "venue_topup_not_available", href: null };
+  if (normalized.includes("pending_order_mismatch")) return { status: 409, error: "pending_order_mismatch", href: null };
   if (normalized.includes("not_authenticated")) {
     return { status: 401, error: "unauthorized", href: null };
   }

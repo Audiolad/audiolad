@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:business-pilot": "node --import tsx scripts/business-pilot-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-pilot-ui-unit.tsx && python3 scripts/business-pilot-isolated.py",
     "test:business-player-retention": "node --import tsx scripts/business-player-retention-unit.mts && python3 scripts/business-player-retention-isolated.py",
     "test:advertising-consent": "node scripts/advertising-consent-unit.mjs",
     "test:vk-ads": "node scripts/vk-ads-unit.mjs",

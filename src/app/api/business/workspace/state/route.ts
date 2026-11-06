@@ -46,6 +46,8 @@ export async function POST(request: Request) {
         after(() => recordBusinessTrialListen(venueLocationId));
       }
       if (!account) return;
+      // Pilot previews never persist under the shared account/space key. Venue devices are already local.
+      if (account.pilotSlots) return;
       const store = createSupabaseAccessGrantStore();
       const clamped = clampWorkspacePlayback({ ...input, updatedAt: new Date().toISOString() }, 10_000);
       await store.writePlayback({

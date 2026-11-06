@@ -13,8 +13,8 @@ export const ACCESS_MIN_CHECK_MS = 10_000;
 export const ACCESS_TOLERANCE_MS = 15 * 60_000;
 export const ACCESS_REQUEST_TIMEOUT_MS = 15_000;
 
-export function workspaceControllerKey(model: Pick<WorkspacePageModel, "spaceId" | "tracks">): string {
-  return `${model.spaceId}|${model.tracks.map((track) => track.audioItemId).join(",")}`;
+export function workspaceControllerKey(model: Pick<WorkspacePageModel, "spaceId" | "tracks" | "playbackScope">): string {
+  return `${model.spaceId}${model.playbackScope ? `:${model.playbackScope}` : ""}|${model.tracks.map((track) => track.audioItemId).join(",")}`;
 }
 
 /** Engine backstop, not the access decision: leave time for server verification/retries. */

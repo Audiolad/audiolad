@@ -9,15 +9,18 @@ import { displayWorkspaceTrackTitle } from "@/lib/business-workspace/display-tit
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-async function resolveDisplayedLiveTitle(organizationId: string, rpcTitle: string | null): Promise<string | null> {
+async function resolveDisplayedLiveTitle(organizationId: string, locationId: string, rpcTitle: string | null): Promise<string | null> {
   const ready = rpcTitle ? displayWorkspaceTrackTitle({ title: rpcTitle }) : null;
   if (ready && rpcTitle && ready === rpcTitle.trim()) return ready;
   try {
     const service = createServiceRoleClient();
+    const { data: zones } = await service.from("business_zones").select("id").eq("location_id", locationId);
+    const { data: assignments } = await service.from("business_player_assignments").select("player_id").in("zone_id", (zones ?? []).map((z) => z.id)).is("unassigned_at", null);
     const { data: state } = await service
       .from("business_player_playback_state")
       .select("audio_item_id")
       .eq("organization_id", organizationId)
+      .in("player_id", (assignments ?? []).map((a) => a.player_id))
       .eq("playback_state", "playing")
       .order("reported_at", { ascending: false })
       .limit(1)
@@ -61,7 +64,7 @@ export async function loadBusinessOwnerHomeSignals(input: {
     return emptyBusinessOwnerHomeSignals();
   }
 
-  const players = mapHealthRpcRows(healthData);
+  const players = mapHealthRpcRows(healthData).filter((p) => p.locationId === input.locationId);
   let live = mapOwnerLiveState(null, input.organizationId);
   // User RPC enforces the existing owner membership predicate and track eligibility.
   // Missing migration, permission errors and network failures remain neutral.
@@ -73,7 +76,7 @@ export async function loadBusinessOwnerHomeSignals(input: {
       if (!error) {
         live = mapOwnerLiveState(data, input.organizationId);
         if (live.playbackState === "playing") {
-          const title = await resolveDisplayedLiveTitle(input.organizationId, live.currentTrack?.title ?? null);
+          const title = await resolveDisplayedLiveTitle(input.organizationId, input.locationId, live.currentTrack?.title ?? null);
           live = { ...live, currentTrack: title ? { title } : null };
         }
       }

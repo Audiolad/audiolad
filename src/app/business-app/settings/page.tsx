@@ -64,6 +64,7 @@ export default async function BusinessAppSettingsPage({
       {canRebuild && locationId ? (
         // Owner phone: the 4 × 4 builder opens right under «Пересобрать атмосферу», not further down the page.
         <VenueControlPanel
+          key={locationId}
           locationId={locationId}
           pointCanEdit={pointCanEdit}
           soundInitiallyOpen={query.sound === "open"}
