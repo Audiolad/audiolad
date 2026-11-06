@@ -46,6 +46,7 @@
         "Расчёт безубыточности для нескольких товаров зависит от принятого соотношения продаж этих товаров; изменение состава продаж меняет результат расчёта. Источник: тот же учебник издательства «Опенстакс», раздел 3.4 о безубыточности многопродуктового бизнеса."
       ],
       "links": [
+        "/b/atlas-kofeen",
         "/b/coffee/vygodno-li-otkryvat-kofeynyu",
         "/b/coffee/sebestoimost-kofe-v-kofeyne",
         "/b/coffee/biznes-plan-kofeyni"
@@ -67,7 +68,7 @@
       "experts": [
         {
           "id": "ilya-lazerson",
-          "quoteIndex": 5
+          "quoteIndex": 0
         },
         {
           "id": "prue-leith",
@@ -122,6 +123,7 @@
         "В инструкции предусмотрены отдельные процедуры очистки и удаления накипи; уход входит в рабочий цикл аппарата. Источник: руководство изготовителя «Анимо» для серии «Эксельсо», редакция февраля 2015 года, разделы 7 «Обслуживание» и 7.1 «Удаление накипи»."
       ],
       "links": [
+        "/b/atlas-kofeen",
         "/b/coffee/kak-vybrat-kofemashinu-dlya-kofeyni",
         "/b/coffee/oborudovanie-dlya-kofeyni-kupit",
         "/b/coffee/chto-zakupit-dlya-kofeyni",
@@ -148,11 +150,11 @@
       "experts": [
         {
           "id": "konstantin-ivlev",
-          "quoteIndex": 4
+          "quoteIndex": 5
         },
         {
           "id": "petra-vesela",
-          "quoteIndex": 4,
+          "quoteIndex": 5,
           "translation": "Как дома, так и в кофейне я пью фильтр-кофе."
         }
       ]
@@ -195,6 +197,7 @@
         "Оборудование и инвентарь, контактирующие с пищевой продукцией, должны позволять мойку, очищение и дезинфекцию. Источник: ТР ТС 021/2011 «О безопасности пищевой продукции», утверждён решением Комиссии Таможенного союза от 9 декабря 2011 года №880, статья 15, пункт 1, подпункт 2."
       ],
       "links": [
+        "/b/atlas-kofeen",
         "/b/coffee/gotovaya-eda-dlya-kofeyni",
         "/b/coffee/zavtraki-dlya-kofeyni",
         "/b/coffee/kruassany-dlya-kofeyni",
@@ -290,6 +293,7 @@
         "При реализации пищевой продукции соблюдают заданные изготовителем условия хранения и сроки годности. Источник: ТР ТС 021/2011 «О безопасности пищевой продукции», утверждён решением Комиссии Таможенного союза от 9 декабря 2011 года №880, статья 17, пункт 12."
       ],
       "links": [
+        "/b/atlas-kofeen",
         "/b/coffee/holodilnik-dlya-kofeyni",
         "/b/coffee/vidy-desertov-v-kofeynyah",
         "/b/coffee/postavshchiki-desertov-dlya-kofeyni",
@@ -315,13 +319,13 @@
       ],
       "experts": [
         {
-          "id": "elena-letuchaya",
-          "quoteIndex": 0
+          "id": "ekaterina-alekhina",
+          "quoteIndex": 2
         },
         {
           "id": "massimo-bottura",
           "quoteIndex": 5,
-          "translation": "Мы росли вместе с моим рестораном."
+          "translation": "Мы выросли вместе с моим рестораном, и именно они позволяют передавать гостям эмоции через продукты, которые привозят нам каждый день."
         }
       ]
     },
@@ -364,6 +368,7 @@
         "В производственном помещении предусмотрен умывальник для рук с горячей и холодной водой, средствами для мытья и вытирания либо сушки рук. Источник: ТР ТС 021/2011 «О безопасности пищевой продукции», утверждён решением Комиссии Таможенного союза от 9 декабря 2011 года №880, статья 14, пункт 2, подпункт 4."
       ],
       "links": [
+        "/b/atlas-kofeen",
         "/b/coffee/chto-nuzhno-dlya-otkrytiya-kofeyni",
         "/b/coffee/biznes-plan-kofeyni",
         "/b/coffee/kofeynya-samoobsluzhivaniya",
@@ -394,7 +399,7 @@
       ],
       "experts": [
         {
-          "id": "julia-vysotskaya",
+          "id": "anna-labusheva",
           "quoteIndex": 1
         },
         {

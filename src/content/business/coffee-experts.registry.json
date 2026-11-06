@@ -1325,8 +1325,7 @@
           "language": "ru",
           "sourceLabel": "интервью Юлии Высоцкой журналу «Москвич», 26 марта 2020 года",
           "topics": [
-            "управление",
-            "команда"
+            "меню"
           ]
         },
         {
@@ -1679,8 +1678,8 @@
           "language": "ru",
           "sourceLabel": "интервью Елены Летучей журналу «Отельер про», 16 сентября 2014 года",
           "topics": [
-            "хранение",
-            "холодильник"
+            "гости",
+            "команда"
           ]
         },
         {
@@ -2051,7 +2050,7 @@
       "countryCode": "IT",
       "origin": "foreign",
       "gender": "man",
-      "role": "Шеф-повар и ресторатор",
+      "role": "Шеф-повар и владелец ресторана «Остерия Францескана» в Модене",
       "competence": "Его Osteria Francescana дважды признавалась лучшим рестораном мира по версии The World’s 50 Best Restaurants; основал фонд Food for Soul. В интервью Resy и Robb Report говорит о команде, гостях и поставщиках.",
       "competenceUrl": "https://blog.resy.com/2020/08/massimo-bottura-role-of-chef-future-dining-staff-empowerment/",
       "photo": {
@@ -2367,7 +2366,7 @@
       "countryCode": "US",
       "origin": "foreign",
       "gender": "man",
-      "role": "Шеф-повар и ресторатор",
+      "role": "Шеф-повар и ресторатор, основатель благотворительной организации «Всемирная центральная кухня»",
       "competence": "В 1993 году участвовал в открытии Jaleo в Вашингтоне; его ThinkFoodGroup управляет примерно 30 ресторанами. В интервью US Foods рассказывает, как компания удержала команду в пандемию.",
       "competenceUrl": "https://www.usfoods.com/tools-tips-and-ideas/articles-and-publications/articles/interview-with-jose-andres",
       "photo": {
@@ -2508,7 +2507,7 @@
       "countryCode": "GB",
       "origin": "foreign",
       "gender": "woman",
-      "role": "Ресторатор и преподаватель кулинарии",
+      "role": "Ресторатор, основательница ресторана «Лейтс» и кулинарной школы",
       "competence": "В 1960 году начала с маленького кейтеринга в Лондоне, в 1969 году открыла ресторан Leith’s, в 1975 году – школу Leith’s School of Food and Wine. Об этом она рассказывает Harpers и The Independent.",
       "competenceUrl": "https://harpers.co.uk/news/fullstory.php/aid/1880/THE_INTERVIEW_-_PRUE_LEITH_OBE.html",
       "photo": {
