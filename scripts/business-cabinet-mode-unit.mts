@@ -171,7 +171,7 @@ for (const path of ["src/app/api/business/subscription/checkout/route.ts", "src/
   assert.match(read(path), /await businessHallDeviceLocked\(\)/, `${path}: payment follows the unlock, fails closed`);
   assert.doesNotMatch(read(path), /businessPointSessionAlive/);
 }
-assert.equal((read("src/app/business-app/actions.ts").match(/businessHallDeviceLocked\(\)/g) ?? []).length, 3, "bootstrap, provision, eligibility probe");
+assert.equal((read("src/app/business-app/actions.ts").match(/businessHallDeviceLocked\(\)/g) ?? []).length, 4, "bootstrap, provision, eligibility, save venue");
 const documents = read("src/app/business-app/documents/page.tsx");
 assert.match(documents, /<Form action="\/documents"/, "report form is a soft navigation: the hall music keeps playing");
 assert.doesNotMatch(documents, /<form method="get"/);

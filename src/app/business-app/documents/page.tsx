@@ -9,6 +9,11 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 import InspectorContactCard from "@/components/business-app/InspectorContactCard";
 import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
+import {
+  BUSINESS_VENUE_ADDRESS_LINK,
+  BUSINESS_VENUE_QR_NEEDS_ADDRESS,
+} from "@/lib/business-app/licensing-copy";
+import { venuePlaceLine } from "@/lib/business-app/venue-place";
 
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
@@ -78,8 +83,30 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
     cabinet.mode === "point" && !reportVenue
       ? ({ kind: "no_location" } as const)
       : await loadPlaybackReport({ at, windowMinutes, venue: reportVenue });
-  const { qrUrl, sticker } = await loadDocumentsQr(cabinet.mode, pointVenue);
+  const loadedQr = await loadDocumentsQr(cabinet.mode, pointVenue);
   const venueSide = cabinet.mode !== "owner";
+  const domainForAddress =
+    cabinet.mode === "owner" || cabinet.mode === "preview"
+      ? await loadBusinessOwnerHomeContext()
+      : null;
+  const ownerLocation =
+    domainForAddress && domainForAddress.status === "authenticated"
+      ? domainForAddress.location
+      : null;
+  const addressReady = Boolean(
+    ownerLocation && venuePlaceLine(ownerLocation.name, ownerLocation.addressLine1),
+  );
+  // Hall device: keep QR if the paired venue has a public id (address is owner duty).
+  // Owner/preview: QR and sticker only when address is saved.
+  const qrUrl =
+    cabinet.mode === "point"
+      ? loadedQr.qrUrl
+      : addressReady
+        ? loadedQr.qrUrl
+        : null;
+  const sticker = cabinet.mode === "point" ? null : addressReady ? loadedQr.sticker : null;
+  const showAddressPrompt =
+    !venueSide && ownerLocation && !addressReady && businessCabinetCan({ mode: cabinet.mode }, "stickerDownload");
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -150,6 +177,15 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </p>
       </section>
 
+      {showAddressPrompt ? (
+        <section className="business-app-card space-y-2" data-testid="biz-venue-qr-needs-address">
+          <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">QR-наклейка с подтверждением прав на музыку</h2>
+          <p className="text-sm leading-6 text-[var(--biz-text-muted)]">{BUSINESS_VENUE_QR_NEEDS_ADDRESS}</p>
+          <Link href="/preferences#venue" className="text-sm font-semibold text-[var(--biz-accent)] underline-offset-2 hover:underline">
+            {BUSINESS_VENUE_ADDRESS_LINK}
+          </Link>
+        </section>
+      ) : null}
       {sticker ? (
         <VenueLicenceStickerCard locationId={sticker.locationId} publicId={sticker.publicId} />
       ) : null}

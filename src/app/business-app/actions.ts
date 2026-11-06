@@ -1,6 +1,7 @@
 "use server";
 
 import { VENUE_TIMEZONE_DEFAULT_ID, isVenueTimezone } from "@/lib/business-app/venue-timezones";
+import { validateVenuePlace } from "@/lib/business-app/venue-place";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -98,6 +99,49 @@ export type ProvisionVenuePlayerResult =
  * Owner-only: create Player + assign to Zone in one UI step.
  * Returns plaintext credential once (A2 contract).
  */
+
+export type SaveBusinessLocationVenueResult =
+  | { ok: true; name: string; addressLine1: string }
+  | { ok: false; error: string };
+
+/** Owner corrects the point name and the address shown on the licence / QR. */
+export async function saveBusinessLocationVenue(input: {
+  locationId: string;
+  name: string;
+  addressLine1: string;
+}): Promise<SaveBusinessLocationVenueResult> {
+  if (await businessHallDeviceLocked()) {
+    return { ok: false, error: "На устройстве в зале это делает владелец после ввода пароля." };
+  }
+  const place = validateVenuePlace({ name: input.name, addressLine1: input.addressLine1 });
+  if (!place.ok) return { ok: false, error: place.error };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
+
+  const { data, error } = await supabase.rpc("business_owner_set_location_venue", {
+    p_location_id: input.locationId,
+    p_name: place.value.name,
+    p_address_line1: place.value.addressLine1,
+  });
+  if (error) {
+    return { ok: false, error: "Не удалось сохранить адрес. Попробуйте ещё раз." };
+  }
+  const payload = data as { ok?: boolean; name?: string; address_line1?: string } | null;
+  if (!payload?.ok || !payload.name || !payload.address_line1) {
+    return { ok: false, error: "Не удалось подтвердить сохранение адреса. Попробуйте ещё раз." };
+  }
+  revalidatePath(BUSINESS_SITE_PATH);
+  revalidatePath(`${BUSINESS_SITE_PATH}/documents`);
+  revalidatePath(`${BUSINESS_SITE_PATH}/settings`);
+  revalidatePath("/documents");
+  revalidatePath("/preferences");
+  return { ok: true, name: payload.name, addressLine1: payload.address_line1 };
+}
+
 export async function provisionVenuePlayer(input: {
   organizationId: string;
   zoneId: string;
