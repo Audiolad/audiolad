@@ -17,7 +17,7 @@ const SOURCES = [
   "src/lib/analytics/client.ts",
   "src/lib/pwa/analytics-client.ts",
   "src/components/providers/BaseProviders.tsx",
-  "src/app/(platform)/privacy/page.tsx",
+  "src/components/legal/PrivacyDocument.tsx",
   "src/lib/analytics/yandex-metrika-privacy.ts",
   "src/components/analytics/ListenAnalyticsTracker.tsx",
   "src/components/become-author/AuthorApplicationPanel.tsx",
@@ -109,7 +109,7 @@ function testClientHooks() {
 
 function testProvidersAndSettings() {
   const providers = readSource("src/components/providers/BaseProviders.tsx");
-  const privacy = readSource("src/app/(platform)/privacy/page.tsx");
+  const privacy = readSource("src/components/legal/PrivacyDocument.tsx");
 
   assert(providers.includes("YandexMetrika"), "metrika mounted in providers");
   assert(privacy.includes("Яндекс Метрика"), "privacy mentions metrika");

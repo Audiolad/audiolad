@@ -18,8 +18,8 @@ assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
   // venue-license r7 (18.10.2026, п. 7 offline player, task 8d9cd0af); the rest r6.1.
-  assert.equal(d.version, d.id === "venue-license" ? "r7-2026-10-18" : "r6.1-2026-10-18");
-  assert.equal(d.versionDate, "2026-10-18");
+  assert.equal(d.version, d.id === "privacy" ? "2026-11-03" : d.id === "venue-license" ? "r7-2026-10-18" : "r6.1-2026-10-18");
+  assert.equal(d.versionDate, d.id === "privacy" ? "2026-11-03" : "2026-10-18");
   assert.doesNotMatch(d.version, /draft/);
 }
 assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 18.10.2026");
@@ -141,6 +141,10 @@ console.log("business-app-client-documents-unit OK");
     // Business host rewrites the href to an existing internal route.
     const { resolveBusinessInternalPath } = await import("../src/lib/business-app/host");
     assert.equal(resolveBusinessInternalPath(href), `/business-app/documents/${d.id}`);
+    if (d.id === "privacy") {
+      assert.ok(readFileSync("src/app/business-app/documents/privacy/page.tsx", "utf8").includes("<PrivacyDocument />"));
+      continue;
+    }
     // Target has full readable content.
     const src = CLIENT_DOCUMENT_SOURCES[d.id];
     assert.ok(src, `content for ${d.id}`);

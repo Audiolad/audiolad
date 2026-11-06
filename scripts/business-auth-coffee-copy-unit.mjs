@@ -33,11 +33,8 @@ assert.doesNotMatch(intro, /BUSINESS_SIGN_UP_INTRO[\s\S]{0,200}практик/, 
 assert.doesNotMatch(intro, /BUSINESS_SIGN_IN_INTRO[\s\S]{0,200}практик/, "sign-in intro without practices");
 assert.doesNotMatch(intro, /\u2014/, "intro no em dash");
 
-assert.ok(proxy.includes('COFFEE_ALLOWED_LEGAL_PATHS'), "legal paths export");
-assert.ok(proxy.includes('"/privacy"'), "coffee allows /privacy");
-assert.ok(
-  proxy.includes("COFFEE_ALLOWED_LEGAL_PATHS as readonly string[]).includes(pathname)"),
-  "privacy checked in coffee pass_through",
-);
+assert.ok(!proxy.includes("COFFEE_ALLOWED_LEGAL_PATHS"), "privacy no longer passes through to purple platform legal page");
+const host = readFileSync(join(root, "src/lib/business-app/host.ts"), "utf8");
+assert.ok(host.includes('"/privacy": `${BUSINESS_SITE_PATH}/documents/privacy`'), "privacy is a public Business document rewrite");
 
 console.log("business-auth-coffee-copy-unit: ok");

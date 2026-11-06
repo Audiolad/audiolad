@@ -23,7 +23,7 @@ export const dynamicParams = false;
 export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
-  return CLIENT_DOCUMENTS.map((d) => ({ id: d.id }));
+  return CLIENT_DOCUMENTS.filter((d) => d.id !== "privacy").map((d) => ({ id: d.id }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

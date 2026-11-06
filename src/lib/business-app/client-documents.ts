@@ -18,9 +18,19 @@ export type ClientDocumentEntry = {
   versionDate: string;
   status: "approved";
   summary: string;
+  editionLabel?: string;
 };
 
 export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
+  {
+    id: "privacy",
+    title: "Политика обработки персональных данных",
+    version: "2026-11-03",
+    versionDate: "2026-11-03",
+    editionLabel: "Последнее обновление: 3 ноября 2026 года",
+    status: "approved",
+    summary: "Обработка и защита персональных данных пользователей сайта «АудиоЛад».",
+  },
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение музыки в заведении",

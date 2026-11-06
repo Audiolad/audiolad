@@ -685,7 +685,7 @@ const opportunities = read(
 );
 assert.match(opportunities, /Справочный центр/);
 
-const privacy = read("src/app/(platform)/privacy/page.tsx");
+const privacy = read("src/components/legal/PrivacyDocument.tsx");
 assert.match(privacy, /текст обращения в поддержку/);
 
 console.log("help-center-support-unit: ok");

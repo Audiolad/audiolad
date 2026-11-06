@@ -62,7 +62,7 @@ const listCopy = CLIENT_DOCUMENTS.map((d) => `${d.title} ${d.summary}`).join(" "
 assertCleanRussian("/documents list", listCopy);
 
 // business.audiolad.ru/documents/<id> — render the real server page.
-for (const d of CLIENT_DOCUMENTS) {
+for (const d of CLIENT_DOCUMENTS.filter((d) => d.id !== "privacy")) {
   assert.ok(CLIENT_DOCUMENT_SOURCES[d.id], d.id);
   const el = await ClientDocumentPage({ params: Promise.resolve({ id: d.id }) });
   const text = visibleText(renderToStaticMarkup(el));
