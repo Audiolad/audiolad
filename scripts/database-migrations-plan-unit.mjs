@@ -800,7 +800,7 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20270208120000",
     "20270208130000", "20270209120000", "20270210170000", "20270210180000", "20270211120000", "20270212120000", "20270213120000", "20270214120000", "20270215120000", "20270216120000", "20270217120000", "20270218120000", "20270219120000", "20270220120000", "20270221120000", "20270222120000", "20270225120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 247);
+  assert.equal(plan.database_migrations_pending, 248);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {

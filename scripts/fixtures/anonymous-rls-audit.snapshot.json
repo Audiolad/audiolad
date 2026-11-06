@@ -6434,6 +6434,16 @@
       "file": "supabase/migrations/20270222120000_author_application_function_grants.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.approve_author_application(uuid, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270225120000_business_location_venue_address.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_owner_set_location_venue(uuid, text, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270225120000_business_location_venue_address.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_organization_with_location(text, text, text, text, text, text) TO authenticated, service_role;"
     }
   ]
 }
