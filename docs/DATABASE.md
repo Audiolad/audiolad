@@ -2525,3 +2525,24 @@ account's business analytics events `is_test`. Orders, payments and
 operation `coffee_test_account_reset` (email hash + counts only). Smoke:
 `supabase/tests/business_test_account_reset_smoke.sql`. Rollback SQL is in the
 migration header.
+
+### P1-7: venue command acknowledgement after apply
+
+Prepared, not applied: `20270224120000_business_point_commands_ack_after_apply.sql`.
+Adds nullable `claimed_at timestamptz`, `claimed_by uuid` (FK to point sessions,
+ON DELETE RESTRICT), and `claim_id uuid` to `business_point_commands`.
+Claim acquires the oldest pending command with a 30-second lease and a fresh UUID;
+location transaction advisory lock + row lock serialize claimers. Active leases
+are hidden from list/claim, including tabs sharing a session. Unacknowledged
+expired leases are reclaimable until the command expires (two minutes).
+Only the four-argument ack RPC checks the owning session + current claim UUID and
+sets `acked_at`/`applied` after the device applied it. Legacy three-argument ack is
+removed. RPC grants stay explicit for anon/authenticated/service_role; PUBLIC is
+revoked. Direct authenticated INSERT is revoked to prevent forged acknowledgement
+fields; the owner uses the existing checked SECURITY DEFINER enqueue RPC. Owner
+SELECT and RLS stay in place; no owner UPDATE permission is introduced.
+Rollback SQL in the migration comments restores the previous functions/grants and
+removes the added columns, preserving command rows. Stop polling/roll back the
+client first; rollback also restores the known early-ack bug. Old incorrectly
+acknowledged rows are not replayed. See `business-point-commands.md` for client
+failure handling, at-least-once delivery and the independent atmosphere poll.

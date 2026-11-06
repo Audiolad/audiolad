@@ -162,7 +162,7 @@ export function BusinessCabinetPlayerProvider({
   /** Fade-in on play, fade-out on pause (player-fade.ts). Owns `audio.volume`. */
   const fadeRef = useRef<FadingAudio | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
-  const nextRef = useRef<() => Promise<void>>(async () => {});
+  const nextRef = useRef<(signal?: AbortSignal) => Promise<void>>(async () => {});
   const refreshPointSoundRef = useRef<() => void>(() => {});
   const [pointCanEdit, setPointCanEdit] = useState(false);
   const soundInstallRef = useRef<Promise<unknown> | null>(null);
@@ -513,7 +513,7 @@ export function BusinessCabinetPlayerProvider({
     reportPlayback();
   }, [remember, reportPlayback]);
 
-  const next = useCallback(async () => {
+  const next = useCallback(async (signal?: AbortSignal) => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
@@ -521,6 +521,7 @@ export function BusinessCabinetPlayerProvider({
     seekRef.current = 0;
     evidenceRef.current.reset(0);
     if (soundInstallRef.current) await soundInstallRef.current;
+    if (signal?.aborted) return;
     await ctl.next();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
@@ -553,6 +554,18 @@ export function BusinessCabinetPlayerProvider({
     if (!canBeat) return;
     let stop = false;
     let inFlight = false;
+    const commandTransport = async (signal: AbortSignal, apply: () => Promise<void>) => {
+      const ctl = ctlRef.current;
+      const cancel = () => {
+        if (ctl?.status === "loading") void ctl.toggle();
+      };
+      signal.addEventListener("abort", cancel, { once: true });
+      try {
+        if (!signal.aborted) await apply();
+      } finally {
+        signal.removeEventListener("abort", cancel);
+      }
+    };
     const tick = async () => {
       if (stop || inFlight) return;
       inFlight = true;
@@ -563,18 +576,41 @@ export function BusinessCabinetPlayerProvider({
           credentials: "same-origin",
           cache: "no-store",
           body: JSON.stringify({ action: "commands" }),
+          signal: AbortSignal.timeout(5_000),
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
         if (json.commands.length > 0) refreshPointSoundRef.current();
-        await runPointCommands(json.commands.map((row) => row.type), {
+        await runPointCommands(json.commands, {
+          ready: () => !!ctlRef.current && !!modelRef.current?.tracks.length
+            && accessRef.current?.allowsPlayback() === true,
           status: () => ctlRef.current?.status ?? "idle",
-          toggle: () => toggleRef.current(),
-          next: () => nextRef.current(),
+          toggle: (signal) => commandTransport(signal, () => toggleRef.current()),
+          next: (signal) => commandTransport(signal, () => nextRef.current(signal)),
+          applied: async (type) => {
+            // Soft pause resolves before the fade has actually silenced the element.
+            if (type === "pause" && fadeRef.current?.fadingOut) await fadeRef.current.fadeOut();
+            const status = ctlRef.current?.status;
+            const audio = audioRef.current;
+            return !!audio && (type === "pause"
+              ? (status === "paused" || status === "idle") && audio.paused
+              : status === "playing" && !audio.paused);
+          },
+          ack: async (command) => {
+            const ack = await fetch("/api/business/point", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "same-origin",
+              cache: "no-store",
+              signal: AbortSignal.timeout(5_000),
+              body: JSON.stringify({ action: "ack", id: command.id, claimId: command.claim_id }),
+            });
+            if (!ack.ok || (await ack.json()).ok !== true) throw new Error("point_command_ack_failed");
+          },
           stopped: () => stop,
         });
       } catch {
-        /* the next poll retries; a claimed command is not returned again */
+        /* No ack: the command becomes reclaimable after its lease, until expires_at. */
       } finally {
         inFlight = false;
       }
