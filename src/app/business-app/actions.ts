@@ -395,7 +395,7 @@ export async function activateBusinessPoint(slot: number): Promise<{ ok: boolean
   if (await businessHallDeviceLocked()) return { ok: false, error: "Активация доступна владельцу в его кабинете." };
   const { loadBusinessOwnerHomeContext } = await import("@/lib/business-app/domain");
   const domain = await loadBusinessOwnerHomeContext();
-  if (domain.status !== "authenticated" || !domain.organizationId || !domain.pilotSlots || !domain.canPay) return { ok: false, error: "Активация недоступна." };
+  if (domain.status !== "authenticated" || !domain.organizationId || (domain.venueSlotLimit ?? 1) < 2 || !domain.canPay) return { ok: false, error: "Активация недоступна." };
   const db = await createClient();
   const { data, error } = await db.rpc("activate_business_pilot_location", { p_organization_id: domain.organizationId, p_slot: slot });
   if (error || !data?.location_id) return { ok: false, error: "Не удалось активировать точку. Обновите страницу и повторите." };

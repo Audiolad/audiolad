@@ -48,9 +48,13 @@ export default function BusinessPointSlots() {
     return () => { stopped = true; activeRequest?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", wake); };
   }, [enabled, locationId]);
   const signals = live?.locationId === locationId ? live?.signals : domain.status === "authenticated" ? domain.signals : null;
-  if (cabinet.side === "venue" || domain.status !== "authenticated" || !domain.pilotSlots) return null;
-  const slots = businessPilotSlots(domain.locations ?? []);
-  const active = slots.filter((slot) => slot.location?.status === "active").length;
+  const limit = domain.status === "authenticated" ? domain.venueSlotLimit ?? 1 : 1;
+  // Same rule for every owner: one hall at start, «Добавить» up to the system limit.
+  if (cabinet.side === "venue" || domain.status !== "authenticated" || limit < 2) return null;
+  const halls = domain.locations ?? [];
+  const slots = businessPilotSlots(halls, limit);
+  const active = halls.filter((hall) => hall.status === "active").length;
+  const multi = !!domain.pilotSlots;
   function run(slot: typeof slots[number]) {
     setError("");
     start(async () => {
@@ -71,14 +75,17 @@ export default function BusinessPointSlots() {
     <h2 className="text-lg font-bold">Мои точки</h2>
     <div className="flex flex-wrap gap-2">
       {slots.map((slot) => <button key={slot.number} type="button"
-        className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-        aria-pressed={!!slot.location && domain.location?.id === slot.location.id}
+        className={slot.location ? "business-app-btn business-app-btn-secondary business-app-focus-ring" : "business-app-btn business-app-btn-primary business-app-focus-ring"}
+        aria-pressed={slot.location ? domain.location?.id === slot.location.id : undefined}
+        data-testid={slot.location ? undefined : "biz-add-point"}
         disabled={pending || (!!slot.location && slot.location.status !== "active") || (!slot.location && !domain.canPay)}
         onClick={() => run(slot)}>
-        Точка {slot.number}{slot.location ? `: ${slot.location.name}` : slot.number === 3 ? " – резерв для кофейни · Активировать" : " – Активировать"}
+        {slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`}
       </button>)}
     </div>
-    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за точку, {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
+    <p className="text-sm text-[var(--biz-text-muted)]">Точек: {halls.length} из {limit}. {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за каждую активную точку в 30 дней, пустые места не оплачиваются.</p>
+    {multi ? <>
+    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
     {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}
     {domain.pilotBilling?.renewalBlocked ? <p role="status">Новая точка пока не оплачена. Она будет включена при следующем продлении; доплата в текущем периоде недоступна.</p> : null}
     <BusinessPayControls canPay={payment.canPay} accepted={payment.accepted} busy={payment.busy} error={payment.error}
@@ -89,6 +96,7 @@ export default function BusinessPointSlots() {
         ? ` Сейчас играет: ${signals.currentTrack?.title ?? "название недоступно"}.`
         : signals?.playbackState === "paused" ? " Музыка на паузе." : " Воспроизведение не подтверждено."}
     </p> : null}
+    </> : null}
     {error ? <p role="alert">{error}</p> : null}
   </section>;
 }

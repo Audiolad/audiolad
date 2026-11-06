@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { loadBusinessPilotSlots } from "../src/lib/business-app/pilot-slots";
+import { loadBusinessPilotSlots, loadBusinessVenueSlots, normalizeBusinessVenueSlotLimit } from "../src/lib/business-app/pilot-slots";
 import { selectBusinessLocation, businessPilotSlots } from "../src/lib/business-app/location-selection";
 import { deriveBusinessPointState } from "../src/lib/business-app/owner-home-signals";
 import { playbackStorageKey, clampWorkspacePlayback } from "../src/lib/business-workspace/playback";
@@ -18,10 +18,15 @@ assert.equal(selectBusinessLocation(rows, "two")?.id, "two", "owner switches to 
 assert.equal(selectBusinessLocation(rows, "one")?.id, "one", "owner switches back");
 assert.equal(selectBusinessLocation(rows, "foreign")?.id, "one", "foreign/stale cookie grants no authority");
 assert.equal(selectBusinessLocation([{ ...rows[0], status: "closed" }]), null);
-const slots = businessPilotSlots(rows);
+// Same rule for every organization: existing halls plus one «add» slot up to the system limit.
+const slots = businessPilotSlots(rows, 3);
 assert.equal(slots.length, 3);
-assert.equal(slots[2].location, null, "reserve creates no fake active location");
-assert.equal(businessPilotSlots([...rows, { ...rows[0], id: "three" }])[2].location?.id, "three");
+assert.equal(slots[2].location, null, "next empty slot creates no fake active location");
+assert.equal(businessPilotSlots([rows[0]], 3).length, 2, "one hall at start: one add button, no extra reserve");
+assert.equal(businessPilotSlots([...rows, { ...rows[0], id: "three" }], 3).length, 3, "no add button at cap");
+assert.equal(businessPilotSlots([...rows, { ...rows[0], id: "three" }], 3)[2].location?.id, "three");
+assert.equal(businessPilotSlots([...rows, { ...rows[0], id: "three" }], 5).length, 4, "raised limit offers the fourth hall");
+assert.equal(businessPilotSlots([...rows, { ...rows[0], id: "three" }], 2).length, 3, "lowered limit never hides existing halls");
 const players = [
   { playerId: "p1", playerCode: "P1", displayName: null, healthStatus: "offline", secondsSinceHeartbeat: 600, locationId: "one" },
   { playerId: "p2", playerCode: "P2", displayName: null, healthStatus: "online", secondsSinceHeartbeat: 1, locationId: "two" },
@@ -58,34 +63,49 @@ assert.equal(resolveCustomerAccess({ now: new Date("2026-11-20"), emailConfirmed
 assert.deepEqual([1, 2, 3].map((n) => n * BUSINESS_PLAN_MONTHLY_PRICE_RUB), [799, 1598, 2397]);
 console.log("business-pilot-unit: owner switching, reserve, health/state isolation, device evidence payload, trial/payment, legacy: PASS");
 
-// Code may ship before the optional column. Missing schema, NULL, read errors and
-// transport failures must disable slots, not the existing cabinet/device/access.
-function pilotDb(result: { data: { pilot_location_limit: number | null } | null; error: { message: string } | null }) {
-  return { from(table: string) {
-    assert.equal(table, "business_organizations");
-    return { select(column: string) {
-      assert.equal(column, "pilot_location_limit");
-      return { eq(key: string, id: string) {
-        assert.equal(key, "id"); assert.equal(id, "org");
-        return { maybeSingle: async () => result };
+// Code may ship before the migration. Missing RPC, bad values, read errors and transport
+// failures keep the single-hall cabinet; the limit itself comes from one system row, no flag.
+function slotsDb(limit: { data: unknown; error: { message: string } | null }, count: { count: number | null; error: { message: string } | null } = { count: 1, error: null }) {
+  return {
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      assert.equal(name, "business_venue_slot_limit");
+      assert.deepEqual(args, { p_organization_id: "org" });
+      return limit;
+    },
+    from(table: string) {
+      assert.equal(table, "business_locations");
+      return { select(column: string, options: unknown) {
+        assert.equal(column, "id"); assert.deepEqual(options, { count: "exact", head: true });
+        return { eq: async (key: string, id: string) => { assert.equal(key, "organization_id"); assert.equal(id, "org"); return count; } };
       } };
-    } };
-  } } as unknown as Parameters<typeof loadBusinessPilotSlots>[0];
+    },
+  } as unknown as Parameters<typeof loadBusinessVenueSlots>[0];
 }
-for (const result of [
-  { data: null, error: { message: "column business_organizations.pilot_location_limit does not exist" } },
-  { data: null, error: { message: "schema cache unavailable" } },
+for (const limit of [
+  { data: null, error: { message: "function business_venue_slot_limit does not exist" } },
+  { data: 3, error: { message: "read failed" } },
   { data: null, error: null },
-  { data: { pilot_location_limit: null }, error: null },
-  { data: { pilot_location_limit: 1 }, error: null },
-  { data: { pilot_location_limit: 3 }, error: { message: "read failed" } },
-]) assert.equal(await loadBusinessPilotSlots(pilotDb(result), "org"), false);
-assert.equal(await loadBusinessPilotSlots(pilotDb({ data: { pilot_location_limit: 3 }, error: null }), "org"), true);
-assert.equal(await loadBusinessPilotSlots({ from() { throw new Error("transport"); } } as unknown as Parameters<typeof loadBusinessPilotSlots>[0], "org"), false);
+  { data: 0, error: null },
+  { data: "x", error: null },
+]) assert.deepEqual(await loadBusinessVenueSlots(slotsDb(limit), "org"), { limit: 1, multiVenue: false });
+assert.deepEqual(await loadBusinessVenueSlots(slotsDb({ data: 3, error: null }, { count: null, error: { message: "count failed" } }), "org"), { limit: 1, multiVenue: false });
+assert.deepEqual(await loadBusinessVenueSlots({ rpc() { throw new Error("transport"); } } as unknown as Parameters<typeof loadBusinessVenueSlots>[0], "org"), { limit: 1, multiVenue: false });
+// Default 3 for an organization without any special flag: the RPC is the only input.
+assert.deepEqual(await loadBusinessVenueSlots(slotsDb({ data: 3, error: null }), "org"), { limit: 3, multiVenue: false }, "one hall, add button offered");
+assert.deepEqual(await loadBusinessVenueSlots(slotsDb({ data: 3, error: null }, { count: 2, error: null }), "org"), { limit: 3, multiVenue: true });
+assert.equal(await loadBusinessPilotSlots(slotsDb({ data: 3, error: null }, { count: 3, error: null }), "org"), true);
+assert.equal(await loadBusinessPilotSlots(slotsDb({ data: 3, error: null }), "org"), false, "single hall keeps the existing path");
+// Raising the system row (or a per-organization override) changes the number with no code change.
+assert.deepEqual(await loadBusinessVenueSlots(slotsDb({ data: 5, error: null }), "org"), { limit: 5, multiVenue: false });
+assert.equal(normalizeBusinessVenueSlotLimit(10), 10);
+assert.equal(normalizeBusinessVenueSlotLimit("5"), 5);
+assert.equal(normalizeBusinessVenueSlotLimit(99), 10, "schema ceiling");
+const pilotSource = readFileSync(new URL("../src/lib/business-app/pilot-slots.ts", import.meta.url), "utf8");
+assert.doesNotMatch(pilotSource, /pilot_location_limit/, "no per-client pilot flag gates halls");
 const readSource = (path: string) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 for (const file of ["domain.ts", "point-device.server.ts", "location-access.server.ts"]) {
   const source = readSource("src/lib/business-app/" + file);
-  assert.match(source, /loadBusinessPilotSlots\(/, file + " uses optional flag reader");
+  assert.match(source, /loadBusiness(Pilot|Venue)Slots\(/, file + " uses the optional slot reader");
   assert.doesNotMatch(source, /\.select\([^)]*pilot_location_limit/, file + " main reads work before migration");
 }
 assert.match(readSource("src/lib/business-app/location-access.server.ts"), /if \(!await loadBusinessPilotSlots\(db, location.organization_id\)\) return null/);
@@ -98,4 +118,4 @@ assert.match(context, /eq\("user_id", userId\)/);
 assert.match(context, /eq\("organization_id", organizationId\)/);
 assert.match(context, /selectBusinessLocation\(locations \?\? \[\], pilotSlots \?/);
 assert.doesNotMatch(context, /\.rpc\(/);
-console.log("business-pilot-unit: optional-column fallback, scoped lightweight selection, canPay regression: PASS");
+console.log("business-pilot-unit: systemic default-3 limit, raisable cap, optional-RPC fallback, scoped lightweight selection, canPay regression: PASS");
