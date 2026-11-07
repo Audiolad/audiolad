@@ -23,12 +23,12 @@ function bodyWithoutTitle(markdown: string): string {
  */
 export const BUSINESS_OFFER_LINK_ATTR = "font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring";
 
-function sheetHost(): HTMLElement {
+export function sheetHost(): HTMLElement {
   return document.querySelector<HTMLElement>(".business-app-root") ?? document.body;
 }
 
 /** Fallback when the sheet ends up on document.body: carry the live theme id so tokens apply. */
-function themeOfRoot(): string | undefined {
+export function themeOfRoot(): string | undefined {
   return document.querySelector<HTMLElement>(".business-app-root")?.dataset.bizTheme;
 }
 
