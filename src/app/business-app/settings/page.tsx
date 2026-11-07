@@ -54,6 +54,7 @@ export default async function BusinessAppSettingsPage({
       </header>
       {ownerPanel && domain.status === "authenticated" && domain.location ? (
         <BusinessVenuePlaceForm
+          key={domain.location.id}
           locationId={domain.location.id}
           name={domain.location.name}
           addressLine1={domain.location.addressLine1}

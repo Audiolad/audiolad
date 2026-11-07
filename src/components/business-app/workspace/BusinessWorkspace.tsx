@@ -255,7 +255,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       {model.status === "unavailable" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unavailable">
           <p>{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
-          <a className="underline" href={`/music`}>Перейти и повторить</a>
+          <Link className="underline" href="/music">Перейти и повторить</Link>
         </section>
       ) : null}
 
@@ -287,9 +287,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <section className="business-app-card space-y-3" data-testid="biz-workspace-connect">
           <p>{BUSINESS_CONNECT_VENUE_NOTE}</p>
           <p>
-            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.onboardingHref} data-testid="biz-workspace-connect-venue">
+            <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.onboardingHref} data-testid="biz-workspace-connect-venue">
               {BUSINESS_CONNECT_VENUE_CTA}
-            </a>
+            </Link>
           </p>
         </section>
       ) : null}

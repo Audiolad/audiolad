@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   BUSINESS_GIFT_TITLE,
   BUSINESS_PERIOD_ENDED_PAY_NOTE,
@@ -73,7 +75,7 @@ export default function VenueLicencePage({ view }: { view: VenueLicenceView }) {
         </p>
         <p className="mt-3 text-sm leading-6 text-[var(--biz-text)]">{AFTER_ACCESS}</p>
         <p className="mt-3 text-sm">
-          <a href="/documents/b2b-terms">{BUSINESS_LICENSING_TERMS_TITLE}</a>
+          <Link href="/documents/b2b-terms">{BUSINESS_LICENSING_TERMS_TITLE}</Link>
         </p>
       </section>
 
