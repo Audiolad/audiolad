@@ -4,7 +4,7 @@ import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import BusinessGuestStartCta from "../BusinessGuestStartCta";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useBusinessHostname, useBusinessDomain, useGuestStartEnabled } from "@/components/business-app/BusinessDomainProvider";
 import { businessAuthHref } from "@/lib/access-grants/paths";
@@ -12,7 +12,7 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
-import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
+import { useBusinessGuestPlayback } from "@/components/business-app/sound/BusinessGuestPlayback";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
 import { PauseIcon, PlayIcon } from "@/components/business-app/BusinessPlayerControls";
 import GuestCoffeeGiftCta from "@/components/business-app/sound/GuestCoffeeGiftCta";
@@ -42,15 +42,12 @@ import {
 } from "@/lib/business-app/guest-coffee/catalog";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import { FadingAudio } from "@/lib/business-app/player-fade";
 import {
   GUEST_COFFEE_ATLAS_URL,
   GUEST_COFFEE_ATMOSPHERE_COPY,
   GUEST_COFFEE_COPY,
 } from "@/lib/business-app/guest-coffee/copy";
 import {
-  GUEST_COFFEE_REPORT_INTERVAL_MS,
-  GuestCoffeePlaybackMeter,
   type GuestCoffeeLimitState,
 } from "@/lib/business-app/guest-coffee/limit";
 import type { GuestCoffeeRecommendationPlan } from "@/lib/business-app/guest-coffee/recommend";
@@ -60,7 +57,6 @@ import {
   serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
 import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
-import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
 /**
  * a8240527 – Music section of the AudioLad Business cabinet: sound settings, the
@@ -85,10 +81,6 @@ type Props = {
   initialLimit: GuestCoffeeLimitState;
 };
 
-type View = { status: OnlineStatus; current: SpaManifestItem | null; message: string | null; index: number };
-
-const JSON_POST = { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store" } as const;
-
 function toItems(atmosphere: GuestCoffeeAtmosphere): SpaManifestItem[] {
   return atmosphere.tracks.map((t, position) => ({
     position,
@@ -101,10 +93,6 @@ function toItems(atmosphere: GuestCoffeeAtmosphere): SpaManifestItem[] {
     offlineAllowed: false,
     offlineCacheUntil: null,
   }));
-}
-
-function isLimit(value: unknown): value is GuestCoffeeLimitState {
-  return value === "ok" || value === "near_end" || value === "exhausted" || value === "unavailable";
 }
 
 function readStoredProfile(): GuestCoffeeProfile {
@@ -123,25 +111,20 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const liveAccess = useHasLiveBusinessAccess();
   const offerGift = guest && !liveAccess;
   const guestStartEnabled = useGuestStartEnabled();
-  const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const ctlRef = useRef<Controller | null>(null);
-  /** Fade-in on play, fade-out on pause (player-fade.ts). Owns `audio.volume`. */
-  const fadeRef = useRef<FadingAudio | null>(null);
-  const meterRef = useRef(new GuestCoffeePlaybackMeter());
+  const playback = useBusinessGuestPlayback();
+  const { ctlRef, view, clock, volume, barDismissed, setBarDismissed, limit, seedLimit, atmosphere, setAtmosphere, attachStudio, setBarMeta } = playback;
   const resultRef = useRef<HTMLDivElement | null>(null);
   const timersRef = useRef<number[]>([]);
   // SSR renders the default profile; the device's saved settings are applied after mount.
   const [profile, setProfile] = useState<GuestCoffeeProfile>(GUEST_COFFEE_DEFAULT_PROFILE);
-  const [atmosphere, setAtmosphere] = useState<GuestCoffeeAtmosphere | null>(null);
   /** Assembling in progress: the step shown (0-based) and the steps' texts. */
   const [assembling, setAssembling] = useState<{ step: number; steps: string[] } | null>(null);
-  const [view, setView] = useState<View>({ status: "idle", current: null, message: null, index: -1 });
-  const [barDismissed, setBarDismissed] = useState(false);
   const [failedCover, setFailedCover] = useState<string | null>(null);
-  const [volume, setVolume] = useState(1);
-  const [clock, setClock] = useState({ current: 0, duration: 0 });
-  const [limit, setLimit] = useState<GuestCoffeeLimitState>(initialLimit);
+
+  // The playback (audio, controller, bar) lives in the shell provider and outlives this page:
+  // unmounting only hands the bar over to the shell, it never pauses or disposes the music.
+  useEffect(() => attachStudio(), [attachStudio]);
+  useEffect(() => seedLimit(initialLimit), [seedLimit, initialLimit]);
 
   useEffect(() => {
     const stored = readStoredProfile();
@@ -149,132 +132,11 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     setProfile((prev) => (serializeBusinessSoundProfile(prev) === serializeBusinessSoundProfile(stored) ? prev : stored));
   }, []);
 
-  useEffect(() => reportLimitToShell(limit), [limit, reportLimitToShell]);
-
   useEffect(() => {
     const timers = timersRef.current;
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  const applyLimit = useCallback((value: unknown) => {
-    if (!isLimit(value)) return;
-    // The server total only grows within a visit: never step back from "exhausted".
-    setLimit((prev) => (prev === "exhausted" && value !== "unavailable" ? prev : value));
-  }, []);
-
-  /** Report seconds of actual playback to the server meter. */
-  const flush = useCallback(
-    async (keepalive = false) => {
-      const meter = meterRef.current;
-      const seconds = meter.take();
-      if (seconds <= 0) return;
-      try {
-        const res = await fetch("/api/business/guest/coffee/usage", {
-          ...JSON_POST,
-          keepalive,
-          body: JSON.stringify({ seconds }),
-        });
-        const json = (await res.json().catch(() => null)) as { ok?: boolean; limit?: unknown } | null;
-        if (!json || json.ok !== true) {
-          if (json && isLimit(json.limit)) applyLimit(json.limit);
-          else meter.restore(seconds);
-          return;
-        }
-        applyLimit(json.limit);
-      } catch {
-        meter.restore(seconds);
-      }
-    },
-    [applyLimit],
-  );
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const meter = meterRef.current;
-    const fader = new FadingAudio(audio);
-    fadeRef.current = fader;
-    const ctl = new Controller(
-      {
-        audio: fader,
-        now: () => Date.now(),
-        setTimer: (fn, ms) => window.setTimeout(fn, ms),
-        clearTimer: (t) => window.clearTimeout(t as number),
-        sign: async (audioItemId) => {
-          try {
-            const res = await fetch("/api/business/guest/coffee/track-url", {
-              ...JSON_POST,
-              body: JSON.stringify({ audioItemId }),
-            });
-            const json = (await res.json()) as
-              | { ok: true; data: { url: string }; limit?: unknown }
-              | { ok: false; reason: string; limit?: unknown };
-            if (json && "limit" in json) applyLimit(json.limit);
-            if (json && json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
-            return { ok: false, reason: json && json.ok === false ? json.reason : "network" };
-          } catch {
-            return { ok: false, reason: "network" };
-          }
-        },
-        onChange: () => {
-          const c = ctlRef.current;
-          if (c) setView({ status: c.status, current: c.current, message: c.message, index: c.index });
-        },
-      },
-      [],
-    );
-    ctlRef.current = ctl;
-    const onTime = () => {
-      meter.sample(audio.currentTime, !audio.paused && !audio.ended);
-      // Skip fade-out: the time is the previous track's, the bar already shows the chosen one.
-      if (ctl.fadingOutPrevious) return;
-      setClock({
-        current: audio.currentTime,
-        duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0,
-      });
-    };
-    const onBreak = () => meter.reanchor();
-    const onEnded = () => {
-      meter.reanchor();
-      void ctl.onEnded();
-    };
-    const onError = () => {
-      meter.reanchor();
-      void ctl.onError();
-    };
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("pause", onBreak);
-    audio.addEventListener("seeking", onBreak);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onError);
-    const timer = window.setInterval(() => void flush(), GUEST_COFFEE_REPORT_INTERVAL_MS);
-    const onHide = () => {
-      if (document.visibilityState === "hidden") void flush(true);
-    };
-    const onPageHide = () => void flush(true);
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", onPageHide);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", onPageHide);
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("pause", onBreak);
-      audio.removeEventListener("seeking", onBreak);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
-      void flush(true);
-      ctl.dispose();
-      ctlRef.current = null;
-      fader.dispose();
-      if (fadeRef.current === fader) fadeRef.current = null;
-    };
-  }, [applyLimit, flush]);
-
-  // Report promptly when playback pauses so the server total stays accurate.
-  useEffect(() => {
-    if (view.status === "paused" || view.status === "idle" || view.status === "no_access") void flush();
-  }, [view.status, flush]);
 
   const exhausted = limit === "exhausted";
   const unavailable = limit === "unavailable";
@@ -384,39 +246,26 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const guestDuration = clock.duration > 0 ? clock.duration : (guestTrack?.durationSeconds ?? 0);
   const showGuestBar = Boolean(atmosphere && view.current && !barDismissed && status !== "idle");
 
-  const setGuestVolume = (value: number) => {
-    setVolume(value);
-    const audio = audioRef.current;
-    if (fadeRef.current) fadeRef.current.setVolume(value);
-    else if (audio) audio.volume = value;
-  };
+  const setGuestVolume = playback.setVolume;
+  const seekGuest = playback.seek;
 
-  const seekGuest = (ratio: number) => {
-    const audio = audioRef.current;
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-    if (ctlRef.current?.fadingOutPrevious) return;
-    audio.currentTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
-  };
+  const dismissGuestBar = playback.dismiss;
 
-  const dismissGuestBar = async () => {
-    const ctl = ctlRef.current;
-    const audio = audioRef.current;
-    const fader = fadeRef.current;
-    setBarDismissed(true);
-    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
-      await ctl.toggle();
+  // The shell shows the same bar (title, cover, length) after this page is left.
+  useEffect(() => {
+    if (!atmosphere) { setBarMeta(null); return; }
+    const tracks = new Map<string, { title: string; coverSrc: string | null; duration: number }>();
+    for (const track of atmosphere.tracks) {
+      const album = playlists.find((playlist) => playlist.id === track.playlistId);
+      const author = track.authorName?.trim() || "";
+      tracks.set(track.audioItemId, {
+        title: author ? `${track.title} – ${author}` : track.title,
+        coverSrc: album ? cabinetAlbumCoverUrl({ coverUrl: album.coverUrl, coverImage: album.coverImage, updatedAt: album.updatedAt }) : null,
+        duration: track.durationSeconds ?? 0,
+      });
     }
-    // Let the fade-out finish; a play pressed meanwhile keeps the music.
-    if (fader && fader.fadingOut && !(await fader.fadeOut())) return;
-    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) return;
-    if (fader) fader.pause();
-    else audio?.pause();
-    if (audio) {
-      audio.removeAttribute("src");
-      audio.load();
-    }
-    setClock({ current: 0, duration: 0 });
-  };
+    setBarMeta(tracks);
+  }, [setBarMeta, atmosphere, playlists]);
 
   const assembleButton = (
     <div className="business-atmosphere-action">
@@ -640,7 +489,6 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
         </p>
       )}
 
-      <audio ref={audioRef} preload="none" playsInline />
     </div>
   );
 }

@@ -17,6 +17,8 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessMemberOnly from "../src/components/business-app/BusinessMemberOnly";
 import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSoundStudio";
+import { BusinessGuestStatusProvider } from "../src/components/business-app/BusinessGuestStatus";
+import { BusinessGuestPlaybackProvider } from "../src/components/business-app/sound/BusinessGuestPlayback";
 import {
   BUSINESS_CONNECT_HREF,
   businessNavHref,
@@ -69,6 +71,14 @@ function wrap(domain: BusinessOwnerHomeContext, pathname: string, node: React.Re
         <BusinessDomainProvider value={domain} guestStartEnabled={guestStartEnabled}>{node}</BusinessDomainProvider>
       </PathnameContext.Provider>
     </AppRouterContext.Provider>,
+  );
+}
+/** Bare studio renders need the shell playback context (CI: BusinessGuestPlaybackProvider missing). */
+function withGuestPlayback(node: React.ReactNode, initialLimit: "ok" | "near_end" | "exhausted" | "unavailable" = "ok") {
+  return (
+    <BusinessGuestStatusProvider initialLimit={initialLimit}>
+      <BusinessGuestPlaybackProvider initialLimit={initialLimit}>{node}</BusinessGuestPlaybackProvider>
+    </BusinessGuestStatusProvider>
   );
 }
 const shell = (domain: BusinessOwnerHomeContext, pathname: string) => wrap(domain, pathname, <BusinessAppShell><main data-testid="page">page</main></BusinessAppShell>);
@@ -196,7 +206,7 @@ const playlists: GuestCoffeePlaylist[] = [{
   tracks: [{ audioItemId: "t1", title: "Трек", durationSeconds: 180 }],
 }];
 for (const [name, domain] of [["guest", anonymous], ["member", member]] as const) {
-  const html = wrap(domain, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="ok" />);
+  const html = wrap(domain, "/guest/coffee", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="ok" />, "ok"));
   has(html, /data-testid="biz-sound-settings"/, `${name}: settings`);
   for (const legend of ["Характер заведения", "Тип звучания", "Время суток"]) has(html, new RegExp(legend));
   has(html, /data-testid="biz-player"/, `${name}: Business player`);
@@ -222,7 +232,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   has(html, new RegExp(`data-access="${name === "guest" ? "guest" : "member"}"`));
 }
 {
-  const g = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  const g = wrap(anonymous, "/guest/coffee", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"));
   has(g, /data-testid="biz-sound-exhausted"/);
   has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 7 дней в подарок с полным доступом/);
   has(g, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/, "register button after the meter");
@@ -232,13 +242,13 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   assert.equal((gBlock.match(/<a |<button /g) ?? []).length, 1, "exhausted block: exactly one CTA");
   has(gBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/, "exhausted CTA is green (pine)");
   hasNot(gBlock, /Подключить|href="\/onboarding/, "no «Подключить» in the exhausted block");
-  const on = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, true);
+  const on = wrap(anonymous, "/guest/coffee", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"), true);
   const onBlock = on.slice(on.indexOf('data-testid="biz-sound-exhausted"'), on.indexOf("business-atmosphere-anchor"));
   has(onBlock, /Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./, "flag on: no-registration copy");
   assert.equal((onBlock.match(/<a |<button /g) ?? []).length, 1, "flag on: exactly one CTA");
   has(onBlock, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"[^>]*>Получить 7 дней бесплатно</, "flag on: green guest-start CTA");
   hasNot(onBlock, /Подключить|Зарегистрируйтесь|Зарегистрироваться/, "flag on: no registration wording, no «Подключить»");
-  const m = wrap(member, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  const m = wrap(member, "/music", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"));
   hasNot(m, /href="\/onboarding/);
   has(m, /плеер программы/);
   assert.equal(wrap(anonymous, "/music", <BusinessMemberOnly><p>probe</p></BusinessMemberOnly>), "", "member tools hidden for a guest");
@@ -313,7 +323,7 @@ async function closedApis() {
   hasNot(onb, /onboarding-terms-note|7 дней в подарок|799/, "onboarding in trial: no gift terms / price");
   has(onb, /data-testid="onboarding-access-line"[^>]*>Бесплатный доступ до 22 ноября 2026/, "onboarding in trial: end date line");
   has(wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />), /onboarding-terms-note/, "onboarding without gift keeps the terms");
-  const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  const studio = inTrial(signedInNoOrg, "/music", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"));
   hasNot(studio, /biz-trial-cta|Получить 7 дней бесплатно|799/, "sound limit in trial: no gift CTA");
   has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
 

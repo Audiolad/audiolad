@@ -273,7 +273,7 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(studio, /business-track-panel/);
   assert.doesNotMatch(studio, /audio_path|createSignedUrl|object\/sign/);
   // Existing guest listening API and 30-minute meter only – no new endpoint, no payment.
-  const endpoints = [...studio.matchAll(/fetch\("([^"]+)"/g)].map((m) => m[1]).sort();
+  const endpoints = [...(studio + read("src/components/business-app/sound/BusinessGuestPlayback.tsx")).matchAll(/fetch\("([^"]+)"/g)].map((m) => m[1]).sort();
   assert.deepEqual(endpoints, ["/api/business/guest/coffee/track-url", "/api/business/guest/coffee/usage"]);
   assert.doesNotMatch(studio, /checkout|payment|\/api\/payments/i);
   assert.match(settings, /\{action\}/, "the button sits in the settings card");

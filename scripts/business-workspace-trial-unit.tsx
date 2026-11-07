@@ -14,6 +14,8 @@ import { signUpAction } from "../src/app/(platform)/auth/sign-up/actions";
 import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSoundStudio";
+import { BusinessGuestStatusProvider } from "../src/components/business-app/BusinessGuestStatus";
+import { BusinessGuestPlaybackProvider } from "../src/components/business-app/sound/BusinessGuestPlayback";
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessPlayerSettings from "../src/components/business-app/BusinessPlayerSettings";
@@ -559,6 +561,13 @@ function wrap(pathname: string, node: React.ReactNode, hostname = "", guestStart
     </AppRouterContext.Provider>,
   );
 }
+function withGuestPlayback(node: React.ReactNode, initialLimit: "ok" | "near_end" | "exhausted" | "unavailable" = "ok") {
+  return (
+    <BusinessGuestStatusProvider initialLimit={initialLimit}>
+      <BusinessGuestPlaybackProvider initialLimit={initialLimit}>{node}</BusinessGuestPlaybackProvider>
+    </BusinessGuestStatusProvider>
+  );
+}
 const playlists: GuestCoffeePlaylist[] = [{
   id: "p1",
   authorSlug: "a",
@@ -602,7 +611,7 @@ const playlists: GuestCoffeePlaylist[] = [{
   assert.doesNotMatch(html, /Зарегистрируйтесь|Зарегистрироваться|на этом устройстве закончились|\u2014/, "no registration wording anywhere on the exhausted page");
 }
 {
-  const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  const html = wrap("/guest/coffee", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"));
   assert.match(html, /data-testid="biz-sound-exhausted"/);
   assert.match(html, /Зарегистрироваться/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
@@ -614,7 +623,7 @@ const playlists: GuestCoffeePlaylist[] = [{
 }
 {
   // 253821e0, AUDIOLAD_BUSINESS_GUEST_AUTH_ENABLED on: the same guest start as the top banner, no registration wording.
-  const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "", true);
+  const html = wrap("/guest/coffee", withGuestPlayback(<BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />, "exhausted"), "", true);
   const block = html.slice(html.indexOf('data-testid="biz-sound-exhausted"'), html.indexOf("business-atmosphere-anchor"));
   assert.match(block, /Пробные 30 минут закончились\. Получите 7 дней бесплатно – без регистрации и карты\./);
   assert.equal((block.match(/<a |<button /g) ?? []).length, 1, "exhausted block (flag on): exactly one CTA");

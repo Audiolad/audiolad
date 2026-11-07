@@ -174,7 +174,7 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   // the start goes on to the cabinet instead of failing forever.
   const h = harness(); h.setUser({ id: "manager-user" }); h.setNotParty();
   const result = await handleBusinessGuestStart(request(), h.deps);
-  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/");
+  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/cabinet");
   assert.equal(h.calls.accept, 1); assert.deepEqual(h.calls.acceptedBy, []);
   assert.deepEqual(h.calls.logs, ["guest_start_offer_not_party"]);
   assert.equal(h.calls.bootstrap, 0); assert.equal(h.calls.reserve, 0);
@@ -187,11 +187,18 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
   assert.equal(h.calls.bootstrap, 1); assert.equal(h.calls.clear, 0);
 }
+{
+  // After the start the guest lands on the owner home: /cabinet on coffee, "/" on business.
+  const h = harness();
+  const onBusiness = await handleBusinessGuestStart(request(payload, { ...baseHeaders, origin: "https://business.audiolad.ru" }), h.deps);
+  assert.equal(onBusiness.status, 200); assert.deepEqual(onBusiness.body, { ok: true, redirect: "/" });
+  assert.ok(GUEST_START_REDIRECTS.includes("/")); assert.ok(GUEST_START_REDIRECTS.includes("/cabinet"));
+}
 assert.match(BUSINESS_GUEST_START_COPY.offerChanged, /Обновите страницу/);
 for (const failure of ["", "clear"]) {
   const h = harness(); h.setFail(failure);
   const result = await handleBusinessGuestStart(request(), h.deps);
-  assert.equal(result.status, 200); assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.equal(result.status, 200); assert.deepEqual(result.body, { ok: true, redirect: "/cabinet" });
   for (const privateValue of ["private-ticket", "auth-user-id", "token", "ticket", "a".repeat(64)]) assert.ok(!JSON.stringify(result.body).includes(privateValue));
 }
 {
@@ -281,6 +288,8 @@ console.log("business-guest-start-unit: ok");
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(409, { ok: false, code: "offer_changed" }) }), { kind: "error", message: c.offerChanged });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/auth/business-return?site=coffee" }) }), { kind: "redirect", url: "/auth/business-return?site=coffee" });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/" }) }), { kind: "redirect", url: "/" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/cabinet" }) }), { kind: "redirect", url: "/cabinet" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/cabinet/evil" }) }), { kind: "error", message: c.failed });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "https://evil.example/" }) }), { kind: "error", message: c.failed });
   // Request shape is unchanged: same endpoint, JSON body, same-origin cookies.
   let seen: { url: string; init: RequestInit } | null = null;
@@ -293,4 +302,68 @@ console.log("business-guest-start-unit: ok");
   assert.equal(isVenueTimezone(sent.timezone), true, "the browser zone mapped to a venue zone goes with the start");
   for (const text of [c.timeout, c.offline, c.retry]) assert.doesNotMatch(text, /—|-/u, "en dash only in user copy");
   console.log("business-guest-start-request-unit: ok");
+}
+
+{
+  // Sergey 07.11.2026: after the start the guest music keeps playing on the home.
+  const { readFileSync } = await import("node:fs");
+  const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+  const { guestStartClientNavigation } = await import("../src/components/business-app/BusinessGuestStartCta");
+  assert.equal(guestStartClientNavigation("/cabinet"), "push");
+  assert.equal(guestStartClientNavigation("/"), "push");
+  assert.equal(guestStartClientNavigation("/auth/business-return?site=coffee"), "assign");
+  assert.equal(guestStartClientNavigation("https://audiolad.ru/auth/business-return"), "assign");
+  const cta = read("src/components/business-app/BusinessGuestStartCta.tsx");
+  assert.match(cta, /router\.push\(outcome\.url\);\n\s*router\.refresh\(\);/);
+  assert.match(cta, /else \{\n\s*window\.location\.assign\(outcome\.url\);/);
+  // The studio no longer owns the <audio>: unmounting it never pauses or disposes the music.
+  const studio = read("src/components/business-app/sound/BusinessSoundStudio.tsx");
+  assert.doesNotMatch(studio, /<audio|\.dispose\(\)|new Controller|new FadingAudio|\.pause\(\)/);
+  assert.match(studio, /useEffect\(\(\) => attachStudio\(\), \[attachStudio\]\)/);
+  const playback = read("src/components/business-app/sound/BusinessGuestPlayback.tsx");
+  assert.equal((playback.match(/<audio /g) ?? []).length, 1);
+  assert.match(playback, /return \(\) => setStudios\(\(n\) => n - 1\);/, "detaching the page only moves the bar");
+  assert.match(read("src/components/business-app/BusinessAppShell.tsx"), /<BusinessGuestPlaybackProvider initialLimit=\{initialGuestLimit \?\? "ok"\}>/);
+  const { showGuestShellBar } = await import("../src/components/business-app/sound/BusinessGuestPlayback");
+  const meta = { title: "Трек", coverSrc: null, duration: 120 };
+  assert.equal(showGuestShellBar({ studioMounted: false, meta, current: {}, dismissed: false, status: "playing" }), true);
+  assert.equal(showGuestShellBar({ studioMounted: true, meta, current: {}, dismissed: false, status: "playing" }), false);
+  assert.equal(showGuestShellBar({ studioMounted: false, meta, current: {}, dismissed: true, status: "playing" }), false);
+  assert.equal(showGuestShellBar({ studioMounted: false, meta, current: {}, dismissed: false, status: "idle" }), false);
+  console.log("# business-guest-start-music-unit: ok");
+}
+
+{
+  // Sergey 07.11.2026: after «Начать бесплатно» the home opens and the guest music keeps playing.
+  const { guestStartClientNavigation } = await import("../src/components/business-app/BusinessGuestStartCta");
+  assert.equal(guestStartClientNavigation("/cabinet"), "push", "coffee home: client move, music goes on");
+  assert.equal(guestStartClientNavigation("/"), "push", "business home: client move");
+  assert.equal(guestStartClientNavigation("/auth/business-return?site=coffee"), "assign", "registered gift path: full load");
+  assert.equal(guestStartClientNavigation("https://audiolad.ru/auth/business-return"), "assign", "cross-origin: full load");
+  for (const url of GUEST_START_REDIRECTS) assert.ok(["push", "assign"].includes(guestStartClientNavigation(url)));
+  const cta = readFileSync(new URL("../src/components/business-app/BusinessGuestStartCta.tsx", import.meta.url), "utf8");
+  assert.match(cta, /from "next\/navigation"/);
+  assert.match(cta, /=== "push"\) \{\s*(?:\/\/.*\n\s*)*router\.push\(outcome\.url\);\s*router\.refresh\(\);\s*\} else \{\s*window\.location\.assign\(outcome\.url\);/);
+  assert.equal((cta.match(/window\.location\.assign\(/g) ?? []).length, 1, "assign only on the full-load branch");
+
+  // The same <audio> lives in the shell provider; leaving the music page never pauses or disposes it.
+  const { showGuestShellBar } = await import("../src/components/business-app/sound/BusinessGuestPlayback");
+  const studio = readFileSync(new URL("../src/components/business-app/sound/BusinessSoundStudio.tsx", import.meta.url), "utf8");
+  const provider = readFileSync(new URL("../src/components/business-app/sound/BusinessGuestPlayback.tsx", import.meta.url), "utf8");
+  const shell = readFileSync(new URL("../src/components/business-app/BusinessAppShell.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(studio, /<audio\b/, "no second element on the music page");
+  assert.doesNotMatch(studio, /\.dispose\(\)|\.pause\(\)|new Controller\(|new FadingAudio\(/, "the music page owns no playback to tear down");
+  assert.match(studio, /useBusinessGuestPlayback\(\)/);
+  assert.match(studio, /useEffect\(\(\) => attachStudio\(\), \[attachStudio\]\)/);
+  const attach = provider.slice(provider.indexOf("const attachStudio"), provider.indexOf("const value = useMemo"));
+  assert.doesNotMatch(attach, /dispose|pause|toggle|removeAttribute/, "detaching the page only moves the bar");
+  assert.match(provider, /\{children\}[\s\S]*<audio ref=\{audioRef\}/, "the element sits outside the routed page");
+  assert.match(shell, /<BusinessGuestPlaybackProvider[^>]*>[\s\S]*\{children\}[\s\S]*<BusinessBottomNav \/>\s*<\/BusinessGuestPlaybackProvider>/);
+  // Home after the start: the page is gone, music plays → the shell draws the familiar bar.
+  const playing = { studioMounted: false, meta: { title: "Трек", coverSrc: null, duration: 120 }, current: { audioItemId: "a" }, dismissed: false, status: "playing" as const };
+  assert.equal(showGuestShellBar(playing), true);
+  assert.equal(showGuestShellBar({ ...playing, studioMounted: true }), false, "music page draws its own bar, never two");
+  assert.equal(showGuestShellBar({ ...playing, dismissed: true }), false, "closed bar stays closed");
+  assert.equal(showGuestShellBar({ ...playing, status: "idle" }), false);
+  console.log("business-guest-start-music-keep-unit: ok");
 }
