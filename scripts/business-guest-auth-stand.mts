@@ -367,7 +367,7 @@ await scenario("stage 3: guest start creates one point with a 7-day gift", async
   const client = freshClient();
   const result = await guestStart(client, startIp);
   assert.equal(result.status, 200, JSON.stringify(result.body));
-  assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.deepEqual(result.body, { ok: true, redirect: "/cabinet" });
   const { data } = await client.auth.getUser();
   assert.ok(data.user);
   startedId = data.user.id;
@@ -469,7 +469,7 @@ await scenario("stage 1C: manager of another owner's organization: start goes on
   psql(`INSERT INTO public.business_organization_members (organization_id, user_id, role) VALUES ('${orgId}', '${managerId}', 'manager')`);
   const result = await guestStart(client, "203.0.113.78");
   assert.equal(result.status, 200, JSON.stringify(result.body));
-  assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.deepEqual(result.body, { ok: true, redirect: "/cabinet" });
   assert.equal(psql(`SELECT count(*) FROM public.business_offer_edition_acceptances WHERE user_id = '${managerId}'`), "0");
   assert.equal(psql(`SELECT count(*) || '|' || string_agg(role, ',') FROM public.business_organization_members WHERE user_id = '${managerId}'`), "1|manager");
 });

@@ -174,7 +174,7 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   // the start goes on to the cabinet instead of failing forever.
   const h = harness(); h.setUser({ id: "manager-user" }); h.setNotParty();
   const result = await handleBusinessGuestStart(request(), h.deps);
-  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/");
+  assert.equal(result.status, 200); assert.equal(result.body.redirect, "/cabinet");
   assert.equal(h.calls.accept, 1); assert.deepEqual(h.calls.acceptedBy, []);
   assert.deepEqual(h.calls.logs, ["guest_start_offer_not_party"]);
   assert.equal(h.calls.bootstrap, 0); assert.equal(h.calls.reserve, 0);
@@ -187,11 +187,18 @@ for (const [failure, status] of [["limit", 429], ["reserve", 503], ["auth", 503]
   assert.equal((await handleBusinessGuestStart(request(), h.deps)).status, 503);
   assert.equal(h.calls.bootstrap, 1); assert.equal(h.calls.clear, 0);
 }
+{
+  // After the start the guest lands on the owner home: /cabinet on coffee, "/" on business.
+  const h = harness();
+  const onBusiness = await handleBusinessGuestStart(request(payload, { ...baseHeaders, origin: "https://business.audiolad.ru" }), h.deps);
+  assert.equal(onBusiness.status, 200); assert.deepEqual(onBusiness.body, { ok: true, redirect: "/" });
+  assert.ok(GUEST_START_REDIRECTS.includes("/")); assert.ok(GUEST_START_REDIRECTS.includes("/cabinet"));
+}
 assert.match(BUSINESS_GUEST_START_COPY.offerChanged, /Обновите страницу/);
 for (const failure of ["", "clear"]) {
   const h = harness(); h.setFail(failure);
   const result = await handleBusinessGuestStart(request(), h.deps);
-  assert.equal(result.status, 200); assert.deepEqual(result.body, { ok: true, redirect: "/" });
+  assert.equal(result.status, 200); assert.deepEqual(result.body, { ok: true, redirect: "/cabinet" });
   for (const privateValue of ["private-ticket", "auth-user-id", "token", "ticket", "a".repeat(64)]) assert.ok(!JSON.stringify(result.body).includes(privateValue));
 }
 {
@@ -281,6 +288,8 @@ console.log("business-guest-start-unit: ok");
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(409, { ok: false, code: "offer_changed" }) }), { kind: "error", message: c.offerChanged });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/auth/business-return?site=coffee" }) }), { kind: "redirect", url: "/auth/business-return?site=coffee" });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/" }) }), { kind: "redirect", url: "/" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/cabinet" }) }), { kind: "redirect", url: "/cabinet" });
+  assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "/cabinet/evil" }) }), { kind: "error", message: c.failed });
   assert.deepEqual(await requestGuestStart({}, { fetchImpl: json(200, { ok: true, redirect: "https://evil.example/" }) }), { kind: "error", message: c.failed });
   // Request shape is unchanged: same endpoint, JSON body, same-origin cookies.
   let seen: { url: string; init: RequestInit } | null = null;

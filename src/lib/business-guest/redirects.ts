@@ -8,5 +8,13 @@ export const GUEST_START_REGISTERED_REDIRECT = {
   coffee: "/auth/business-return?site=coffee",
   business: "https://audiolad.ru/auth/business-return",
 } as const;
+/**
+ * Where a guest goes after a successful start: the owner home, where the hall is named. On the
+ * coffee host "/" is the guest player, so the home is /cabinet; on the business host "/" is home.
+ */
+export const GUEST_START_HOME_REDIRECT = {
+  coffee: "/cabinet",
+  business: "/",
+} as const;
 /** Every redirect the start can answer with; the client follows only these. */
-export const GUEST_START_REDIRECTS: readonly string[] = ["/", GUEST_START_REGISTERED_REDIRECT.coffee, GUEST_START_REGISTERED_REDIRECT.business];
+export const GUEST_START_REDIRECTS: readonly string[] = ["/", GUEST_START_HOME_REDIRECT.coffee, GUEST_START_REGISTERED_REDIRECT.coffee, GUEST_START_REGISTERED_REDIRECT.business];

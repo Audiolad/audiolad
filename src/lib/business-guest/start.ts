@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { BUSINESS_GIFT_MS } from "../business/plan";
 import type { GuestStartConfig } from "./start-config";
-import { GUEST_START_REGISTERED_REDIRECT } from "./redirects";
+import { GUEST_START_HOME_REDIRECT, GUEST_START_REGISTERED_REDIRECT } from "./redirects";
 import { isCurrentBusinessOfferEdition } from "../business/offer";
 import { isVenueTimezone, type VenueTimezoneId } from "../business-app/venue-timezones";
 import { sanitizeBusinessTrialAttribution, type BusinessTrialAttribution } from "../business-trial-attribution/attribution";
@@ -38,8 +38,11 @@ async function recordOwnerOffer(deps: GuestStartDeps, userId: string): Promise<v
 }
 
 export async function handleBusinessGuestStart(req: GuestStartRequest, deps: GuestStartDeps): Promise<GuestStartResponse> {
+  // Success opens the owner home (not the coffee guest player at "/").
+  const home = req.headers.get("origin") === "https://coffee.audiolad.ru"
+    ? GUEST_START_HOME_REDIRECT.coffee : GUEST_START_HOME_REDIRECT.business;
   const response = (status: number, code?: string): GuestStartResponse => ({
-    status, body: code ? { ok: false, code } : { ok: true, redirect: "/" }, headers: { "Cache-Control": "no-store" },
+    status, body: code ? { ok: false, code } : { ok: true, redirect: home }, headers: { "Cache-Control": "no-store" },
   });
   if (!deps.config.enabled) return response(404, "unavailable");
   if (!deps.config.available) return response(503, "unavailable");
