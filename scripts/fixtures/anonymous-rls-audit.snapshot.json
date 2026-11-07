@@ -6494,6 +6494,36 @@
       "file": "supabase/migrations/20270226140000_business_shared_venue_renewal.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_venue_slot_limit_internal(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_venue_slot_limit(uuid) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.activate_business_pilot_location(uuid, integer) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_venue_paid_until(uuid, uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_subscription_order(uuid) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
     }
   ]
 }

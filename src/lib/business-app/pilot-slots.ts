@@ -1,12 +1,50 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Optional, expand-only capability: old schemas and failed reads stay on the legacy path. */
-export async function loadBusinessPilotSlots(db: Pick<SupabaseClient, "from">, organizationId: string): Promise<boolean> {
+/**
+ * Venue slots are the same for every Business organization: one hall at start, the owner
+ * adds the next one himself up to the system limit. The limit lives in one database row
+ * (`business_venue_slot_settings.default_limit`, 3 now) and is read through
+ * `business_venue_slot_limit`, so raising it to 5 or 10 needs no rebuild and no per-client setup.
+ */
+export const BUSINESS_VENUE_SLOT_HARD_MAX = 10;
+
+export type BusinessVenueSlots = {
+  /** How many halls this organization may have. 1 = add button hidden. */
+  limit: number;
+  /** More than one hall exists: per-hall selection, playback and paid periods apply. */
+  multiVenue: boolean;
+};
+
+export const BUSINESS_VENUE_SLOTS_SINGLE: BusinessVenueSlots = { limit: 1, multiVenue: false };
+
+export function normalizeBusinessVenueSlotLimit(value: unknown): number | null {
+  const limit = typeof value === "string" && value.trim() ? Number(value) : value;
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1) return null;
+  return Math.min(limit, BUSINESS_VENUE_SLOT_HARD_MAX);
+}
+
+/** Expand-only: an old schema, a failed read or a transport error keep the single-hall path. */
+export async function loadBusinessVenueSlots(
+  db: Pick<SupabaseClient, "from" | "rpc">,
+  organizationId: string,
+): Promise<BusinessVenueSlots> {
   try {
-    const { data, error } = await db.from("business_organizations")
-      .select("pilot_location_limit").eq("id", organizationId).maybeSingle();
-    return !error && data?.pilot_location_limit === 3;
+    const { data, error } = await db.rpc("business_venue_slot_limit", { p_organization_id: organizationId });
+    const limit = error ? null : normalizeBusinessVenueSlotLimit(data);
+    if (!limit) return BUSINESS_VENUE_SLOTS_SINGLE;
+    const { count, error: countError } = await db.from("business_locations")
+      .select("id", { count: "exact", head: true }).eq("organization_id", organizationId);
+    if (countError) return BUSINESS_VENUE_SLOTS_SINGLE;
+    return { limit, multiVenue: (count ?? 0) > 1 };
   } catch {
-    return false;
+    return BUSINESS_VENUE_SLOTS_SINGLE;
   }
+}
+
+/** True once an organization has more than one hall. */
+export async function loadBusinessPilotSlots(
+  db: Pick<SupabaseClient, "from" | "rpc">,
+  organizationId: string,
+): Promise<boolean> {
+  return (await loadBusinessVenueSlots(db, organizationId)).multiVenue;
 }

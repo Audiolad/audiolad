@@ -1,7 +1,6 @@
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { createClient } from "@/lib/supabase/server";
-import BusinessPointSlots from "@/components/business-app/BusinessPointSlots";
 import { businessGuestStartConfig } from "@/lib/business-guest/start-config";
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
@@ -110,7 +109,7 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}><BusinessPointSlots />{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

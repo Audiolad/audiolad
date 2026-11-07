@@ -57,13 +57,15 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
           (root/'supabase/tests/business_pilot_three_locations_smoke.sql').read_text(),
           (root/'scripts/fixtures/business-shared-billing-schema.sql').read_text(),
           migration('20270226140000_business_shared_venue_renewal.sql'),
-          (root/'supabase/tests/business_shared_venue_renewal_smoke.sql').read_text()]
+          (root/'supabase/tests/business_shared_venue_renewal_smoke.sql').read_text(),
+          migration('20270227120000_business_venue_slots_systemic.sql'),
+          (root/'supabase/tests/business_venue_slots_systemic_smoke.sql').read_text()]
 with tempfile.TemporaryDirectory(prefix='audiolad-three-points-') as tmp:
     data = Path(tmp)/'data'
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
     sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in blocks)+'\n'
     result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
-    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'three-point pilot: PASS' not in result.stdout or 'shared-venue billing: PASS' not in result.stdout:
+    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'three-point pilot: PASS' not in result.stdout or 'shared-venue billing: PASS' not in result.stdout or 'venue slots systemic: PASS' not in result.stdout:
         print(result.stdout, result.stderr)
         raise SystemExit(1)
-    print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency: PASS')
+    print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')
