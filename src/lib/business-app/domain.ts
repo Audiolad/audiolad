@@ -1,5 +1,5 @@
 import { loadPilotBillingSummary } from "./pilot-billing.server";
-import { loadBusinessPilotSlots } from "./pilot-slots";
+import { loadBusinessVenueSlots } from "./pilot-slots";
 import { cookies } from "next/headers";
 import { BUSINESS_LOCATION_COOKIE, selectBusinessLocation } from "./location-selection";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +39,10 @@ export type BusinessOwnerHomeContext =
       owner: BusinessDomainOwner;
       location: BusinessDomainLocation | null;
       locations?: Array<{ id: string; name: string; status: string }>;
+      /** More than one hall exists in the organization. */
       pilotSlots?: boolean;
+      /** Same system limit for every organization (3 now); 1 hides the add button. */
+      venueSlotLimit?: number;
       pilotBilling?: { paidUntil: string | null; renewalBlocked: boolean };
       organizationName: string | null;
       organizationId: string | null;
@@ -133,7 +136,9 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     throw new Error(`business_domain_org_read_failed:${orgError.message}`);
   }
 
-  const pilotSlots = await loadBusinessPilotSlots(supabase, organizationId);
+  const venueSlots = await loadBusinessVenueSlots(supabase, organizationId);
+  const pilotSlots = venueSlots.multiVenue;
+  const venueSlotLimit = venueSlots.limit;
 
   const { data: locations, error: locationError } = await supabase
     .from("business_locations")
@@ -165,6 +170,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       location: null,
       locations: locations ?? [],
       pilotSlots,
+      venueSlotLimit,
       pilotBilling,
       organizationName: org?.name ?? null,
       organizationId,
@@ -200,6 +206,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     owner: { userId: user.id, firstName },
     locations: locations ?? [],
     pilotSlots,
+    venueSlotLimit,
     pilotBilling,
     organizationName: org?.name ?? null,
     organizationId,
