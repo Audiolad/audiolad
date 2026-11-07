@@ -109,6 +109,8 @@ export default function VenueControlPanel({
   };
 
   return (
+    <>
+      <PointPairingCard locationId={locationId} />
     <section className="business-app-card space-y-4" data-testid="biz-venue-control" aria-labelledby="venue-control-title">
       <h2 id="venue-control-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
         Музыка в зале
@@ -189,7 +191,7 @@ export default function VenueControlPanel({
           onNo={() => setConfirm(null)}
         />
       ) : null}
-      <PointPairingCard locationId={locationId} />
     </section>
+    </>
   );
 }

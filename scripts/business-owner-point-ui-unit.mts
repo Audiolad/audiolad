@@ -91,7 +91,7 @@ assert.doesNotMatch(player, /seenVersion = sound\.version;\s*return/);
 assert.match(player, /inFlight/);
 assert.doesNotMatch(panel, /владел/);
 const pairing = readFileSync(new URL("../src/components/business-app/PointPairingCard.tsx", import.meta.url), "utf8");
-assert.match(pairing, /Получить код для устройства/);
+assert.match(pairing, /Показать QR-код/);
 assert.match(pairing, /Отключить устройство/);
 const shell = readFileSync(new URL("../src/components/business-app/BusinessAppShell.tsx", import.meta.url), "utf8");
 assert.match(shell, /BusinessEntrySwitcher/);

@@ -116,12 +116,20 @@ assert.match(page, /Добавьте на экран «Домой», чтобы 
 
 // Owner card: Web Share first, local QR, fallbacks.
 const card = readFileSync(new URL("../src/components/business-app/PointPairingCard.tsx", import.meta.url), "utf8");
-assert.match(card, /Поделиться ссылкой на устройство/);
-assert.match(card, /nav\.share\(/);
+assert.match(card, /Поделиться ссылкой/);
+assert.match(card, /navigator\.share\(/);
 assert.match(card, /Скопировать ссылку/);
 assert.match(card, /pointTelegramShareUrl/);
 assert.match(card, /pointMailtoUrl/);
 assert.match(card, /<PointQrCode/);
+assert.doesNotMatch(card, /setMore|Другие способы/);
+for (const id of ["share", "copy", "telegram", "show-qr"]) {
+  assert.ok(card.indexOf(`data-testid="biz-point-${id}"`) < card.indexOf('{live ? (', card.indexOf('<div className="flex flex-wrap gap-2">')), "primary actions precede live-only controls");
+}
+assert.match(card, /showQr \? \(/);
+assert.match(card, /withCode\(\(\) => setShowQr\(true\)\)/);
+assert.match(card, /issued\.deadlineMs > Date\.now\(\)/);
+assert.doesNotMatch(card, /https?:\/\/max\.ru/);
 assert.match(card, /pointCodeDeadline\(json\.expiresIn/);
 assert.match(card, /скопируйте её вручную/);
 const qr = readFileSync(new URL("../src/components/business-app/PointQrCode.tsx", import.meta.url), "utf8");

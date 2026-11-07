@@ -33,7 +33,8 @@ export default function PointPairingCard({ locationId }: { locationId: string })
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirm, setConfirm] = useState<"create" | "revoke" | null>(null);
-  const [more, setMore] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const actionGuard = useRef(false);
   const [copied, setCopied] = useState(false);
   const [copyByHand, setCopyByHand] = useState(false);
   const linkField = useRef<HTMLInputElement | null>(null);
@@ -77,26 +78,30 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     : pointDeviceLink(window.location.origin, window.location.hostname, live?.code ?? null);
   const shareText = pointShareText(live?.code ?? null);
 
-  const createCode = () => {
-    setPending(true);
+  const createCode = async (): Promise<Issued | null> => {
     setError(null);
     setCopied(false);
-    void fetch("/api/business/point", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ action: "create", locationId }),
-    })
-      .then((res) => res.json())
-      .then((json: { ok?: boolean; code?: string; expiresAt?: string; expiresIn?: number; error?: string }) => {
-        if (json.ok === true && json.code) {
-          const receivedAt = Date.now();
-          setNow(receivedAt);
-          setIssued({ code: json.code, deadlineMs: pointCodeDeadline(json.expiresIn, json.expiresAt, receivedAt) });
-        } else setError(json.error ?? "Не удалось создать код. Попробуйте ещё раз.");
-      })
-      .catch(() => setError("Не удалось создать код. Попробуйте ещё раз."))
-      .finally(() => setPending(false));
+    try {
+      const res = await fetch("/api/business/point", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "create", locationId }),
+      });
+      const json: { ok?: boolean; code?: string; expiresAt?: string; expiresIn?: number; error?: string } = await res.json();
+      if (json.ok !== true || !json.code) {
+        setError(json.error ?? "Не удалось создать код. Попробуйте ещё раз.");
+        return null;
+      }
+      const receivedAt = Date.now();
+      const next = { code: json.code, deadlineMs: pointCodeDeadline(json.expiresIn, json.expiresAt, receivedAt) };
+      setNow(receivedAt);
+      setIssued(next);
+      return next;
+    } catch {
+      setError("Не удалось создать код. Попробуйте ещё раз.");
+      return null;
+    }
   };
 
   const revoke = () => {
@@ -119,21 +124,35 @@ export default function PointPairingCard({ locationId }: { locationId: string })
       .finally(() => setPending(false));
   };
 
-  const share = () => {
-    const nav = typeof navigator === "undefined" ? null : navigator;
-    if (!nav || typeof nav.share !== "function") {
-      setMore(true);
-      return;
+  // First use issues the code as part of the chosen action, without a separate confirmation.
+  const withCode = async (run: (url: string, text: string) => void | Promise<void>) => {
+    if (actionGuard.current) return;
+    actionGuard.current = true;
+    setPending(true);
+    setError(null);
+    try {
+      const current = issued && issued.deadlineMs > Date.now() ? issued : await createCode();
+      if (!current) return;
+      await run(pointDeviceLink(window.location.origin, window.location.hostname, current.code), pointShareText(current.code));
+    } finally {
+      actionGuard.current = false;
+      setPending(false);
     }
-    // Opens the phone share sheet: MAX, Telegram, почта, Quick Share, AirDrop, Bluetooth.
-    nav.share({ title: POINT_SHARE_TITLE, text: shareText, url: deviceUrl }).catch((err: unknown) => {
-      if ((err as { name?: string } | null)?.name !== "AbortError") setMore(true);
-    });
   };
 
-  // Without the Clipboard API (old browsers, plain http) the link field is selected for a manual copy.
+  const replaceCode = async () => {
+    if (actionGuard.current) return;
+    actionGuard.current = true;
+    setPending(true);
+    try { await createCode(); }
+    finally {
+      actionGuard.current = false;
+      setPending(false);
+    }
+  };
+
+  // Manual copying also covers browsers that lose clipboard permission after issuing a code.
   const copyByHandNow = () => {
-    setMore(true);
     setCopyByHand(true);
     window.setTimeout(() => {
       linkField.current?.focus();
@@ -141,11 +160,46 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     }, 0);
   };
 
-  const copy = () => {
+  const share = () => withCode(async (url, text) => {
+    if (typeof navigator.share !== "function") {
+      copyByHandNow();
+      return;
+    }
+    // Native phone share sheet includes installed apps such as MAX and Telegram.
+    try {
+      await navigator.share({ title: POINT_SHARE_TITLE, text, url });
+    } catch (err) {
+      if ((err as { name?: string } | null)?.name !== "AbortError") {
+        setError("Ссылка готова. Нажмите «Поделиться ссылкой» ещё раз или скопируйте её.");
+        copyByHandNow();
+      }
+    }
+  });
+
+  const copy = () => withCode(async (url) => {
     setCopyByHand(false);
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(deviceUrl).then(() => setCopied(true), copyByHandNow);
-    } else copyByHandNow();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      copyByHandNow();
+    }
+  });
+
+  const telegram = () => {
+    if (actionGuard.current) return;
+    // Reserve the tab during the tap, before the code request, to avoid popup blocking.
+    const tab = window.open("about:blank", "_blank");
+    if (tab) tab.opener = null;
+    let navigated = false;
+    void withCode((url, text) => {
+      const target = pointTelegramShareUrl(url, text);
+      navigated = true;
+      if (tab) tab.location.replace(target);
+      else window.location.assign(target);
+    }).finally(() => {
+      if (tab && !navigated) tab.close();
+    });
   };
 
   return (
@@ -163,7 +217,7 @@ export default function PointPairingCard({ locationId }: { locationId: string })
             const action = confirm;
             setConfirm(null);
             if (action === "revoke") revoke();
-            else createCode();
+            else void replaceCode();
           }}
           onNo={() => setConfirm(null)}
         />
@@ -200,97 +254,55 @@ export default function PointPairingCard({ locationId }: { locationId: string })
         <p className="business-app-alert" data-tone="warn" role="alert">{error}</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
+        <button type="button" className="business-app-btn business-app-btn-primary business-app-focus-ring"
+          onClick={() => void share()} disabled={pending || confirm !== null} data-testid="biz-point-share">
+          Поделиться ссылкой
+        </button>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+          onClick={() => void copy()} disabled={pending || confirm !== null} data-testid="biz-point-copy">
+          {copied ? "Ссылка скопирована" : "Скопировать ссылку"}
+        </button>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+          onClick={telegram} disabled={pending || confirm !== null} data-testid="biz-point-telegram">
+          Телеграм
+        </button>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+          onClick={() => void withCode(() => setShowQr(true))} disabled={pending || confirm !== null}
+          aria-expanded={Boolean(showQr && live)} aria-controls="point-qr-panel" data-testid="biz-point-show-qr">
+          Показать QR-код
+        </button>
         {live ? (
-          <button
-            type="button"
-            className="business-app-btn business-app-btn-primary business-app-focus-ring"
-            onClick={share}
-            data-testid="biz-point-share"
-          >
-            Поделиться ссылкой на устройство
+          <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            onClick={() => ask("create")} disabled={pending || confirm !== null} data-testid="biz-point-create">
+            Новый код
           </button>
         ) : null}
-        <button
-          type="button"
-          className={`business-app-btn ${live ? "business-app-btn-secondary" : "business-app-btn-primary"} business-app-focus-ring`}
-          onClick={() => ask("create")}
-          disabled={pending || confirm !== null}
-          data-testid="biz-point-create"
-        >
-          {live ? "Новый код" : "Получить код для устройства"}
-        </button>
         {link?.linked ? (
-          <button
-            type="button"
-            className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-            onClick={() => ask("revoke")}
-            disabled={pending || confirm !== null}
-            data-testid="biz-point-revoke"
-          >
+          <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            onClick={() => ask("revoke")} disabled={pending || confirm !== null} data-testid="biz-point-revoke">
             Отключить устройство
           </button>
         ) : null}
       </div>
+      <p className="text-sm text-[var(--biz-text-muted)]">
+        Через «Поделиться ссылкой» можно отправить ссылку в Макс или другой мессенджер на телефоне.
+      </p>
       {live ? (
-        <div className="space-y-3">
-          {more ? null : (
-            <button
-              type="button"
-              className="text-sm font-medium text-[var(--biz-text-muted)] underline business-app-focus-ring"
-              onClick={() => setMore(true)}
-              data-testid="biz-point-share-more"
-            >
-              Другие способы: ссылка, Телеграм, почта, код для камеры
-            </button>
-          )}
-          {more ? (
-            <div className="space-y-3" data-testid="biz-point-share-fallback">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-                  onClick={copy}
-                  data-testid="biz-point-copy"
-                >
-                  {copied ? "Ссылка скопирована" : "Скопировать ссылку"}
-                </button>
-                <a
-                  className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-                  href={pointTelegramShareUrl(deviceUrl, shareText)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="biz-point-telegram"
-                >
-                  Телеграм
-                </a>
-                <a
-                  className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-                  href={pointMailtoUrl(deviceUrl, shareText)}
-                  data-testid="biz-point-mail"
-                >
-                  Почта
-                </a>
-              </div>
-              {copyByHand ? (
-                <p className="text-sm text-[var(--biz-text-muted)]" role="status" data-testid="biz-point-copy-hand">
-                  Ссылка выделена в поле ниже – скопируйте её вручную.
-                </p>
-              ) : null}
-              <input
-                ref={linkField}
-                readOnly
-                className="business-app-input w-full text-sm"
-                value={deviceUrl}
-                aria-label="Ссылка на страницу подключения"
-                onFocus={(event) => event.currentTarget.select()}
-                data-testid="biz-point-link"
-              />
-              <div className="space-y-1">
-                <PointQrCode value={deviceUrl} label="Код для камеры со ссылкой на страницу подключения" />
-                <p className="text-sm text-[var(--biz-text-muted)]">
-                  Наведите камеру устройства у колонки на этот код – откроется страница подключения.
-                </p>
-              </div>
+        <div className="space-y-3" data-testid="biz-point-share-fallback">
+          <a className="text-sm underline business-app-focus-ring" href={pointMailtoUrl(deviceUrl, shareText)} data-testid="biz-point-mail">Почта</a>
+          {copyByHand ? (
+            <p className="text-sm text-[var(--biz-text-muted)]" role="status" data-testid="biz-point-copy-hand">
+              Ссылка выделена в поле ниже – скопируйте её вручную.
+            </p>
+          ) : null}
+          <input ref={linkField} readOnly className="business-app-input w-full text-sm" value={deviceUrl}
+            aria-label="Ссылка на страницу подключения" onFocus={(event) => event.currentTarget.select()} data-testid="biz-point-link" />
+          {showQr ? (
+            <div id="point-qr-panel" className="space-y-2">
+              <PointQrCode value={deviceUrl} size={240} label="QR-код со ссылкой на страницу подключения" />
+              <p className="text-sm text-[var(--biz-text-muted)]">
+                Отсканируйте этот QR-код другим телефоном в зале – откроется страница подключения устройства.
+              </p>
             </div>
           ) : null}
         </div>

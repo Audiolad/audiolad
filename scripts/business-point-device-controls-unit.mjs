@@ -25,7 +25,7 @@ assert.match(player, /if \(!stop && refreshPending\) {\s*refreshPending = false;
 assert.match(player, /setPointCanEdit\(pointMusicAllowed\(json\)\)/);
 assert.match(player, /window.addEventListener\(POINT_SOUND_CHANGED_EVENT, refresh\)/);
 assert.match(player, /window.removeEventListener\(POINT_SOUND_CHANGED_EVENT, refresh\)/);
-// 2: confirmations are the only callers of the mutating pairing actions.
+// 2: revoke and replacement still require confirmation; first-use actions issue directly.
 const pairing = read("src/components/business-app/PointPairingCard.tsx");
 assert.match(pairing, /onClick={\(\) => ask\("revoke"\)}/);
 assert.match(pairing, /onNo={\(\) => setConfirm\(null\)}/);

@@ -76,6 +76,9 @@ const at = (html: string, testid: string) => {
   const known = inRouter(
     <VenueControlPanel locationId="loc-1" pointCanEdit atmosphereSummary="Уютная, Джаз" soundSlot={<p data-testid="slot">picker</p>} />,
   );
+  assert.ok(at(closed, "biz-point-pairing") < at(closed, "biz-atmosphere-rebuild"));
+  for (const action of ["share", "copy", "telegram", "show-qr"]) assert.ok(at(closed, `biz-point-${action}`) >= 0, "actions visible before issuing a code");
+  assert.doesNotMatch(closed, /data-testid="biz-point-qr"/);
   assert.match(known, /data-testid="biz-atmosphere-current"[^>]*>Сейчас: Уютная, Джаз\.</);
 
   const open = inRouter(
@@ -84,10 +87,10 @@ const at = (html: string, testid: string) => {
   const openToggle = at(open, "biz-venue-atmosphere-toggle");
   const panel = at(open, "biz-venue-sound-panel");
   const slot = at(open, "slot");
-  const pairing = open.indexOf("Получить код для устройства");
+  const pairing = at(open, "biz-point-pairing");
   assert.ok(openToggle < panel && panel < slot, "builder renders right under «Пересобрать атмосферу»");
   assert.doesNotMatch(open.slice(openToggle, panel), /<p[ >]/, "nothing between the button and the picker");
-  assert.ok(pairing < 0 || slot < pairing, "picker comes before the device pairing card");
+  assert.ok(pairing >= 0 && pairing < at(open, "biz-atmosphere-rebuild"), "pairing comes before atmosphere and its picker");
 
   const home = inRouter(<VenueControlPanel locationId="loc-1" pointCanEdit />);
   assert.match(home, /href="\/preferences\?sound=open"[^>]*data-testid="biz-venue-atmosphere-link"[^>]*>Пересобрать атмосферу</);
@@ -182,6 +185,7 @@ const at = (html: string, testid: string) => {
   assert.match(page, /\{canRebuild && locationId \? \(/);
   assert.match(page, /atmosphereSummary=\{saved \? atmosphereChoiceLabel\(saved\) : null\}/);
   assert.match(page, /Управление кофейней/);
+  assert.ok(page.indexOf("<BusinessVenuePlaceForm") < page.indexOf("<VenueControlPanel"), "name and address precede device pairing");
 }
 
 // 5. Rebuild copy: names the current and the new atmosphere, en dash only.
