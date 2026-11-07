@@ -5,6 +5,7 @@ import { BusinessPayControls, useBusinessHomePay } from "./BusinessHomeAccessCar
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { activateBusinessPoint, selectBusinessPoint } from "@/app/business-app/actions";
 import { useBusinessDomain } from "./BusinessDomainProvider";
 import { useBusinessCabinetMode } from "./BusinessPointMode";
@@ -12,6 +13,7 @@ import { emptyBusinessOwnerHomeSignals, type BusinessOwnerHomeSignals } from "@/
 import { businessPilotSlots } from "@/lib/business-app/location-selection";
 
 export default function BusinessPointSlots() {
+  const router = useRouter();
   const domain = useBusinessDomain();
   const access = useBusinessChromeAccess();
   const payment = useBusinessHomePay();
@@ -65,10 +67,9 @@ export default function BusinessPointSlots() {
         setError("Не удалось выбрать или активировать точку. Обновите страницу и повторите.");
         return;
       }
-      // A full navigation disposes preview audio, pending commands and all location-local forms.
-      // This preference belongs to this owner browser only; paired devices keep their own sessions.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- dispose pending audio/commands and location-local forms
-      window.location.assign("/preferences");
+      // The action sets the selected hall cookie and revalidates the layout, including cached forms.
+      // Keep shell playback mounted; only location-local settings should reset for a different hall.
+      router.push("/preferences");
     });
   }
   return <section className="business-app-card mx-auto mb-4 max-w-3xl space-y-3" aria-label="Точки организации">
