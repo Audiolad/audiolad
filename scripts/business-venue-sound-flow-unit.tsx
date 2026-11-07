@@ -77,7 +77,8 @@ const at = (html: string, testid: string) => {
     <VenueControlPanel locationId="loc-1" pointCanEdit atmosphereSummary="Уютная, Джаз" soundSlot={<p data-testid="slot">picker</p>} />,
   );
   assert.ok(at(closed, "biz-point-pairing") < at(closed, "biz-atmosphere-rebuild"));
-  for (const action of ["share", "copy", "telegram", "show-qr"]) assert.ok(at(closed, `biz-point-${action}`) >= 0, "actions visible before issuing a code");
+  for (const action of ["share", "copy", "show-qr"]) assert.ok(at(closed, `biz-point-${action}`) >= 0, "actions visible before issuing a code");
+  assert.doesNotMatch(closed, /biz-point-telegram|biz-point-mail|mailto:/, "no separate Telegram or mail");
   assert.doesNotMatch(closed, /data-testid="biz-point-qr"/);
   assert.match(known, /data-testid="biz-atmosphere-current"[^>]*>Сейчас: Уютная, Джаз\.</);
 
