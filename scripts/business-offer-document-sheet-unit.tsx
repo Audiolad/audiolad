@@ -60,7 +60,7 @@ assert.doesNotMatch(sheetSrc, /rgb\(0_0_0\/0\.5\)/, "rgba backdrop for older Web
 const themed = renderToStaticMarkup(h(BusinessOfferDocumentSheet, { onClose() {}, initialSource: BUSINESS_OFFER_SOURCE, theme: "jazz-coffee" }));
 assert.match(themed, /data-biz-theme="jazz-coffee"/);
 assert.match(themed, /bg-\[rgba\(0,0,0,0\.5\)\]/);
-assert.match(themed, /business-app-card bg-\[var\(--biz-surface,#fffaf3\)\]/, "opaque card even without inherited tokens");
+assert.match(themed, /business-app-card bg-\[var\(--biz-surface\)\]/, "opaque card from theme tokens");
 
 // Link affordance: default and guest-start offer/privacy titles are underlined.
 assert.match(link, /class="[^"]*underline[^"]*"/);

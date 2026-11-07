@@ -124,7 +124,7 @@ export function BusinessOfferDocumentSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="business-app-card bg-[var(--biz-surface,#fffaf3)] text-[var(--biz-text)] flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-b-none sm:rounded-b-[inherit]"
+        className="business-app-card bg-[var(--biz-surface)] text-[var(--biz-text)] flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-b-none sm:rounded-b-[inherit]"
         data-document-id={BUSINESS_OFFER_EDITION.documentKey}
         data-document-version={BUSINESS_OFFER_EDITION.version}
         data-document-sha256={BUSINESS_OFFER_EDITION.contentHash}
