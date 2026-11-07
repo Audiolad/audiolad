@@ -13,7 +13,6 @@ import styles from "./design-preview.module.css";
 const screens = [
   ["home", "Главная"],
   ["music", "Музыка"],
-  ["locations", "Точки"],
   ["more", "Ещё"],
   ["license", "Лицензия и документы"],
   ["alerts", "Уведомления"],
@@ -21,7 +20,7 @@ const screens = [
   ["support", "Поддержка"],
 ] as const;
 type Screen = (typeof screens)[number][0];
-type Tab = "home" | "music" | "locations" | "more";
+type Tab = "home" | "music" | "more";
 const tabOf = (s: Screen): Tab => (s === "license" || s === "alerts" || s === "company" || s === "support" ? "more" : s);
 
 const POINT = "Спа «Тихий сад»";
@@ -66,7 +65,6 @@ const Icon = ({ name }: { name: Tab }) => {
   const d = {
     home: "M4 11 12 4l8 7v9h-5v-6H9v6H4z",
     music: "M9 18a3 3 0 1 1-2-2.8V5l11-2v12a3 3 0 1 1-2-2.8V6.4L9 7.7z",
-    locations: "M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zm0-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
     more: "M4 7h16M4 12h16M4 17h10",
   }[name];
   return (
@@ -283,8 +281,8 @@ export default function SpaDesignPreview() {
     </section>
   );
 
-  const tabs: [Tab, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["more", "Ещё"]];
-  const sideNav: [Screen, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["license", "Лицензия и документы"], ["alerts", "Уведомления"], ["company", "Компания и оплата"], ["support", "Поддержка"]];
+  const tabs: [Tab, string][] = [["home", "Главная"], ["music", "Музыка"], ["more", "Ещё"]];
+  const sideNav: [Screen, string][] = [["home", "Главная"], ["music", "Музыка"], ["license", "Лицензия и документы"], ["alerts", "Уведомления"], ["company", "Компания и оплата"], ["support", "Поддержка"]];
 
   return (
     <section className={styles.preview} aria-label="Согласование дизайна кабинета владельца">
@@ -330,16 +328,15 @@ export default function SpaDesignPreview() {
           <div className={styles.content}>
             {screen === "home" && (
               frame === "phone" ? (
-                <div className={styles.stack}>{statusCard}{nowPlaying}{atmosphereCard}{nextChange}{historyLink}</div>
+                <div className={styles.stack}>{locationsCard}{statusCard}{nowPlaying}{atmosphereCard}{nextChange}{historyLink}</div>
               ) : (
                 <div className={styles.grid}>
-                  <div className={styles.main}>{statusCard}{nowPlaying}</div>
+                  <div className={styles.main}>{locationsCard}{statusCard}{nowPlaying}</div>
                   <div className={styles.side}>{needsAction && alertsCard}{atmosphereCard}{nextChange}{historyLink}</div>
                 </div>
               )
             )}
             {screen === "music" && <div className={styles.stack}>{dayFull}{atmosphereCard}{historyCard}</div>}
-            {screen === "locations" && <div className={styles.stack}>{locationsCard}</div>}
             {screen === "more" && <div className={styles.stack}>{moreCard}</div>}
             {screen === "license" && <div className={styles.stack}>{licenseCard}</div>}
             {screen === "alerts" && <div className={styles.stack}>{alertsCard}</div>}

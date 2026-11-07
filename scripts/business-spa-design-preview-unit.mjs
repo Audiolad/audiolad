@@ -16,7 +16,7 @@ assert.match(route, /export const dynamic = ["']force-dynamic["']/);
 assert.match(route, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(route, /googleBot:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(client, /<strong>Макет – не реальные данные<\/strong>/);
-for (const id of ["home", "music", "locations", "more", "license", "alerts", "company", "support"]) {
+for (const id of ["home", "music", "more", "license", "alerts", "company", "support"]) {
   assert.ok(client.includes(`["${id}",`), `missing screen ${id}`);
 }
 for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
@@ -37,7 +37,7 @@ assert.match(client, /closed: \{[^}]*tone: "closed"/);
 assert.match(client, /failed: \{[^}]*tone: "bad"/);
 assert.equal((client.match(/"bad"/g) || []).length, 2, "only confirmed playback failure may be red (tone + sound signal)");
 // Bottom nav on phone; side nav on desktop lists every section.
-assert.match(client, /\["home", "Главная"\], \["music", "Музыка"\], \["locations", "Точки"\], \["more", "Ещё"\]/);
+assert.match(client, /\["home", "Главная"\], \["music", "Музыка"\], \["more", "Ещё"\]/);
 assert.match(client, /className=\{styles\.bottomNav\}/);
 assert.match(client, /className=\{styles\.sideNav\}/);
 assert.doesNotMatch(css, /overflow-x:\s*auto/, "no horizontally scrolling tabs");

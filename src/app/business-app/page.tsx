@@ -1,6 +1,7 @@
 import { after } from "next/server";
 
 import BusinessHomePage from "@/components/business-app/BusinessHomePage";
+import BusinessPointSlots from "@/components/business-app/BusinessPointSlots";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
 import { loadBusinessPointLinked } from "@/lib/business-app/point-link.server";
@@ -25,5 +26,10 @@ export default async function BusinessAppHomePage() {
     after(() => recordBusinessTrialVisit(locationId));
   }
   const pointLinked = await loadBusinessPointLinked(locationId);
-  return <BusinessHomePage pointLinked={pointLinked} />;
+  return (
+    <>
+      <BusinessPointSlots />
+      <BusinessHomePage pointLinked={pointLinked} />
+    </>
+  );
 }
