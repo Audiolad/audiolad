@@ -32,6 +32,12 @@ import type {
   HomeProduct,
 } from "./types";
 
+export const HOME_ACTIVE_PROGRAMS_LIMIT = 5;
+
+export function takeHomeActivePrograms<T>(programs: readonly T[]): T[] {
+  return programs.slice(0, HOME_ACTIVE_PROGRAMS_LIMIT);
+}
+
 type PracticeAuthorRow = {
   name: string;
   slug: string;
