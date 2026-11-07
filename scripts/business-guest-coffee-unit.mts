@@ -205,7 +205,7 @@ assert.equal(clampGuestCoffeeCredit("15"), null);
   m.sample(100, true);
   assert.equal(Math.round(m.pendingSeconds * 10) / 10, 1.5);
 }
-const cabinet = read("src/components/business-app/sound/BusinessSoundStudio.tsx");
+const cabinet = read("src/components/business-app/sound/BusinessSoundStudio.tsx") + read("src/components/business-app/sound/BusinessGuestPlayback.tsx");
 const copy = read("src/lib/business-app/guest-coffee/copy.ts");
 assert.doesNotMatch(cabinet + copy, /осталось\s+\d|осталось\s*\{|remaining/i, "no countdown in the UI");
 assert.match(cabinet, /GUEST_COFFEE_REPORT_INTERVAL_MS/);
@@ -398,6 +398,7 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
 for (const file of [
   "src/lib/business-app/guest-coffee/copy.ts",
   "src/components/business-app/sound/BusinessSoundStudio.tsx",
+  "src/components/business-app/sound/BusinessGuestPlayback.tsx",
   "src/components/business-app/sound/BusinessSoundSettings.tsx",
   "src/components/business-app/sound/BusinessMusicSection.tsx",
   "src/components/business-app/BusinessGuestStatus.tsx",

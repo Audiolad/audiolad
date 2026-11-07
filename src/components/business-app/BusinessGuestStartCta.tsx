@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useAttributionEnabled, useGuestStartEnabled } from "./BusinessDomainProvider";
 import { BUSINESS_GUEST_START_COPY as copy } from "@/lib/business-guest/copy";
 import { GUEST_START_TIMEOUT_MS, requestGuestStart } from "@/lib/business-guest/start-request";
@@ -8,6 +9,15 @@ import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
 import { BUSINESS_OFFER_LINK_ATTR, BusinessOfferDocumentLink } from "./BusinessOfferDocumentLink";
 import { BusinessPrivacyDocumentLink } from "./BusinessPrivacyDocumentLink";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
+
+/**
+ * The owner home after a start stays in this tab without a reload (router.push), so the guest
+ * music keeps playing (BusinessGuestPlaybackProvider). Registered accounts and other hosts
+ * (/auth/business-return…) still load the page fully.
+ */
+export function guestStartClientNavigation(url: string): "push" | "assign" {
+  return url === "/cabinet" || url === "/" ? "push" : "assign";
+}
 
 const STORAGE_KEY = "audiolad.business.guest-start.v1";
 
@@ -25,6 +35,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
 }) {
   const enabled = useGuestStartEnabled();
   const attributionEnabled = useAttributionEnabled();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -55,7 +66,13 @@ export default function BusinessGuestStartCta({ href, className, children, testI
         try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
         key.current = null;
         navigating = true;
-        window.location.assign(outcome.url);
+        if (guestStartClientNavigation(outcome.url) === "push") {
+          // The start set the session cookies: refresh so the home renders for the new owner.
+          router.push(outcome.url);
+          router.refresh();
+        } else {
+          window.location.assign(outcome.url);
+        }
         // If the page is still here (navigation blocked or cancelled), give the button back.
         window.setTimeout(() => setLoading(false), GUEST_START_TIMEOUT_MS);
         return;

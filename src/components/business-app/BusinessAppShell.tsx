@@ -25,6 +25,7 @@ import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
+import { BusinessGuestPlaybackProvider } from "@/components/business-app/sound/BusinessGuestPlayback";
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
@@ -101,6 +102,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
       <BusinessLiveRefresh enabled={signedIn || pointReports} />
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider pointReports={pointReports}>
+        <BusinessGuestPlaybackProvider>
         <div className="business-app-main">
           <header className="business-app-topbar">
             <BusinessBrandLockup testId="biz-brand-topbar" />
@@ -112,6 +114,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
           {children}
         </div>
         <BusinessBottomNav />
+        </BusinessGuestPlaybackProvider>
       </BusinessCabinetPlayerProvider>
     </div>
   );

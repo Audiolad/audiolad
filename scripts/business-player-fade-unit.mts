@@ -853,7 +853,7 @@ for (const select of [(p: SpaOnlinePlayer) => p.previous(), (p: SpaOnlinePlayer)
 // volume through it (cabinet / hall device, guest /guest/coffee).
 for (const file of [
   "src/components/business-app/workspace/BusinessCabinetPlayer.tsx",
-  "src/components/business-app/sound/BusinessSoundStudio.tsx",
+  "src/components/business-app/sound/BusinessGuestPlayback.tsx",
 ]) {
   const src = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
   assert.match(src, /new FadingAudio\(audio\)/, file);
@@ -872,7 +872,7 @@ for (const file of [
   assert.equal((src.match(/positionSec: (?:audio|audioRef)/g) ?? []).length, 1, "only the guarded timeupdate write reads the element time");
 }
 {
-  const src = readFileSync(new URL("../src/components/business-app/sound/BusinessSoundStudio.tsx", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../src/components/business-app/sound/BusinessGuestPlayback.tsx", import.meta.url), "utf8");
   assert.match(src, /if \(ctl\.fadingOutPrevious\) return;\n\s*setClock\(/);
   assert.match(src, /if \(ctlRef\.current\?\.fadingOutPrevious\) return;\n\s*audio\.currentTime = /);
 }
