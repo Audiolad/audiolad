@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { BUSINESS_OFFER_LINK_CLASS, BusinessOfferDocumentLink, BusinessOfferDocumentSheet } from "../src/components/business-app/BusinessOfferDocumentLink";
+import { BUSINESS_OFFER_LINK_ATTR, BusinessOfferDocumentLink, BusinessOfferDocumentSheet } from "../src/components/business-app/BusinessOfferDocumentLink";
 import { BUSINESS_OFFER_SOURCE } from "../src/lib/business-app/business-offer-content";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 
@@ -65,9 +65,9 @@ assert.match(themed, /business-app-card bg-\[var\(--biz-surface,#fffaf3\)\]/, "o
 // Link affordance: default and guest-start offer/privacy titles are underlined.
 assert.match(link, /class="[^"]*underline[^"]*"/);
 const guestSrc = readFileSync("src/components/business-app/BusinessGuestStartCta.tsx", "utf8");
-assert.match(guestSrc, /<BusinessOfferDocumentLink testId=\{`\$\{testId\}-offer-link`\} className=\{BUSINESS_OFFER_LINK_CLASS\} \/>/);
-assert.match(guestSrc, /<Link href="\/documents\/privacy" className=\{BUSINESS_OFFER_LINK_CLASS\}/);
-assert.match(BUSINESS_OFFER_LINK_CLASS, /\bunderline\b/);
+assert.match(guestSrc, /<BusinessOfferDocumentLink testId=\{`\$\{testId\}-offer-link`\} className=\{BUSINESS_OFFER_LINK_ATTR\} \/>/);
+assert.match(guestSrc, /<Link href="\/documents\/privacy" className=\{BUSINESS_OFFER_LINK_ATTR\}/);
+assert.match(BUSINESS_OFFER_LINK_ATTR, /\bunderline\b/);
 const homeSrc = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
 assert.match(homeSrc, /BusinessOfferDocumentLink\s+className="[^"]*\bunderline\b/);
 

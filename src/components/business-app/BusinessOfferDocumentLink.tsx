@@ -21,7 +21,7 @@ function bodyWithoutTitle(markdown: string): string {
  * standalone PWA window (logo splash), no navigation, so payment form state and the music
  * keep going. href stays the real document page for modifier clicks, crawlers and no-JS.
  */
-export const BUSINESS_OFFER_LINK_CLASS = "font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring";
+export const BUSINESS_OFFER_LINK_ATTR = "font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring";
 
 function sheetHost(): HTMLElement {
   return document.querySelector<HTMLElement>(".business-app-root") ?? document.body;
@@ -53,7 +53,7 @@ export function BusinessOfferDocumentLink({
     <>
       <a
         href={BUSINESS_OFFER_HREF}
-        className={className ?? BUSINESS_OFFER_LINK_CLASS}
+        className={className ?? BUSINESS_OFFER_LINK_ATTR}
         data-testid={testId}
         data-offer-version={BUSINESS_OFFER_EDITION.version}
         aria-haspopup="dialog"
