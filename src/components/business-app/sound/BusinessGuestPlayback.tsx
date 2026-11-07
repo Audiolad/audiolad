@@ -69,7 +69,7 @@ export function showGuestShellBar(input: { studioMounted: boolean; meta: GuestBa
   return !input.studioMounted && input.meta !== null && Boolean(input.current) && !input.dismissed && input.status !== "idle";
 }
 
-export function BusinessGuestPlaybackProvider({ children }: { children: ReactNode }) {
+export function BusinessGuestPlaybackProvider({ children, initialLimit = "ok" }: { children: ReactNode; initialLimit?: GuestCoffeeLimitState }) {
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
@@ -80,7 +80,7 @@ export function BusinessGuestPlaybackProvider({ children }: { children: ReactNod
   const [clock, setClock] = useState({ current: 0, duration: 0 });
   const [volume, setVolumeState] = useState(1);
   const [barDismissed, setBarDismissed] = useState(false);
-  const [limit, setLimit] = useState<GuestCoffeeLimitState>("ok");
+  const [limit, setLimit] = useState<GuestCoffeeLimitState>(initialLimit);
   const [atmosphere, setAtmosphere] = useState<GuestCoffeeAtmosphere | null>(null);
   const [studios, setStudios] = useState(0);
   const [barTracks, setBarMeta] = useState<GuestBarTracks | null>(null);

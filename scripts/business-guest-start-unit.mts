@@ -323,7 +323,7 @@ console.log("business-guest-start-unit: ok");
   const playback = read("src/components/business-app/sound/BusinessGuestPlayback.tsx");
   assert.equal((playback.match(/<audio /g) ?? []).length, 1);
   assert.match(playback, /return \(\) => setStudios\(\(n\) => n - 1\);/, "detaching the page only moves the bar");
-  assert.match(read("src/components/business-app/BusinessAppShell.tsx"), /<BusinessGuestPlaybackProvider>/);
+  assert.match(read("src/components/business-app/BusinessAppShell.tsx"), /<BusinessGuestPlaybackProvider initialLimit=\{initialGuestLimit \?\? "ok"\}>/);
   const { showGuestShellBar } = await import("../src/components/business-app/sound/BusinessGuestPlayback");
   const meta = { title: "Трек", coverSrc: null, duration: 120 };
   assert.equal(showGuestShellBar({ studioMounted: false, meta, current: {}, dismissed: false, status: "playing" }), true);
@@ -358,7 +358,7 @@ console.log("business-guest-start-unit: ok");
   const attach = provider.slice(provider.indexOf("const attachStudio"), provider.indexOf("const value = useMemo"));
   assert.doesNotMatch(attach, /dispose|pause|toggle|removeAttribute/, "detaching the page only moves the bar");
   assert.match(provider, /\{children\}[\s\S]*<audio ref=\{audioRef\}/, "the element sits outside the routed page");
-  assert.match(shell, /<BusinessGuestPlaybackProvider>[\s\S]*\{children\}[\s\S]*<BusinessBottomNav \/>\s*<\/BusinessGuestPlaybackProvider>/);
+  assert.match(shell, /<BusinessGuestPlaybackProvider[^>]*>[\s\S]*\{children\}[\s\S]*<BusinessBottomNav \/>\s*<\/BusinessGuestPlaybackProvider>/);
   // Home after the start: the page is gone, music plays → the shell draws the familiar bar.
   const playing = { studioMounted: false, meta: { title: "Трек", coverSrc: null, duration: 120 }, current: { audioItemId: "a" }, dismissed: false, status: "playing" as const };
   assert.equal(showGuestShellBar(playing), true);
