@@ -9,9 +9,7 @@ import {
   POINT_SHARE_TITLE,
   pointCodeDeadline,
   pointDeviceLink,
-  pointMailtoUrl,
   pointShareText,
-  pointTelegramShareUrl,
 } from "@/lib/business-app/point-share";
 
 type LinkState = { linked: boolean; playerCode: string | null };
@@ -76,7 +74,6 @@ export default function PointPairingCard({ locationId }: { locationId: string })
   const deviceUrl = typeof window === "undefined"
     ? ""
     : pointDeviceLink(window.location.origin, window.location.hostname, live?.code ?? null);
-  const shareText = pointShareText(live?.code ?? null);
 
   const createCode = async (): Promise<Issued | null> => {
     setError(null);
@@ -186,22 +183,6 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     }
   });
 
-  const telegram = () => {
-    if (actionGuard.current) return;
-    // Reserve the tab during the tap, before the code request, to avoid popup blocking.
-    const tab = window.open("about:blank", "_blank");
-    if (tab) tab.opener = null;
-    let navigated = false;
-    void withCode((url, text) => {
-      const target = pointTelegramShareUrl(url, text);
-      navigated = true;
-      if (tab) tab.location.replace(target);
-      else window.location.assign(target);
-    }).finally(() => {
-      if (tab && !navigated) tab.close();
-    });
-  };
-
   return (
     <section
       id={POINT_PAIRING_ANCHOR_ID}
@@ -253,23 +234,22 @@ export default function PointPairingCard({ locationId }: { locationId: string })
       {error ? (
         <p className="business-app-alert" data-tone="warn" role="alert">{error}</p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col items-start gap-2">
         <button type="button" className="business-app-btn business-app-btn-primary business-app-focus-ring"
           onClick={() => void share()} disabled={pending || confirm !== null} data-testid="biz-point-share">
           Поделиться ссылкой
         </button>
+        <p className="w-full text-sm text-[var(--biz-text-muted)]" data-testid="biz-point-share-hint">
+          Нажмите «Поделиться ссылкой» и выберите, куда отправить.
+        </p>
         <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
           onClick={() => void copy()} disabled={pending || confirm !== null} data-testid="biz-point-copy">
           {copied ? "Ссылка скопирована" : "Скопировать ссылку"}
         </button>
         <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          onClick={telegram} disabled={pending || confirm !== null} data-testid="biz-point-telegram">
-          Телеграм
-        </button>
-        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
           onClick={() => void withCode(() => setShowQr(true))} disabled={pending || confirm !== null}
           aria-expanded={Boolean(showQr && live)} aria-controls="point-qr-panel" data-testid="biz-point-show-qr">
-          Показать QR-код
+          Поделиться через QR-код
         </button>
         {live ? (
           <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring"
@@ -284,19 +264,17 @@ export default function PointPairingCard({ locationId }: { locationId: string })
           </button>
         ) : null}
       </div>
-      <p className="text-sm text-[var(--biz-text-muted)]">
-        Через «Поделиться ссылкой» можно отправить ссылку в Макс или другой мессенджер на телефоне.
-      </p>
       {live ? (
         <div className="space-y-3" data-testid="biz-point-share-fallback">
-          <a className="text-sm underline business-app-focus-ring" href={pointMailtoUrl(deviceUrl, shareText)} data-testid="biz-point-mail">Почта</a>
           {copyByHand ? (
-            <p className="text-sm text-[var(--biz-text-muted)]" role="status" data-testid="biz-point-copy-hand">
-              Ссылка выделена в поле ниже – скопируйте её вручную.
-            </p>
+            <>
+              <p className="text-sm text-[var(--biz-text-muted)]" role="status" data-testid="biz-point-copy-hand">
+                Ссылка выделена в поле ниже – скопируйте её вручную.
+              </p>
+              <input ref={linkField} readOnly className="business-app-input w-full text-sm" value={deviceUrl}
+                aria-label="Ссылка на страницу подключения" onFocus={(event) => event.currentTarget.select()} data-testid="biz-point-link" />
+            </>
           ) : null}
-          <input ref={linkField} readOnly className="business-app-input w-full text-sm" value={deviceUrl}
-            aria-label="Ссылка на страницу подключения" onFocus={(event) => event.currentTarget.select()} data-testid="biz-point-link" />
           {showQr ? (
             <div id="point-qr-panel" className="space-y-2">
               <PointQrCode value={deviceUrl} size={240} label="QR-код со ссылкой на страницу подключения" />

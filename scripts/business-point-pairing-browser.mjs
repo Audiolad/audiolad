@@ -9,7 +9,7 @@ const { outputFiles } = await build({
 });
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 try {
-  for (const action of ["show-qr", "copy", "share", "telegram", "failure", "clipboard-fallback", "share-denied"]) {
+  for (const action of ["show-qr", "copy", "share", "failure", "clipboard-fallback", "share-denied"]) {
     console.log(`pairing browser: ${action}`);
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     page.setDefaultTimeout(10000);
@@ -34,7 +34,11 @@ try {
     }, { action });
     await page.goto("https://coffee.audiolad.ru/preferences");
     await page.addScriptTag({ content: outputFiles[0].text });
-    for (const id of ["share", "copy", "telegram", "show-qr"]) await page.getByTestId(`biz-point-${id}`).waitFor({ state: "visible" });
+    for (const id of ["share", "share-hint", "copy", "show-qr"]) await page.getByTestId(`biz-point-${id}`).waitFor({ state: "visible" });
+    assert.equal(await page.getByTestId("biz-point-telegram").count(), 0);
+    assert.equal(await page.getByTestId("biz-point-mail").count(), 0);
+    assert.equal(await page.locator('a[href^="mailto:"]').count(), 0);
+    assert.equal(await page.getByTestId("biz-point-show-qr").innerText(), "Поделиться через QR-код");
     assert.equal(await page.getByTestId("biz-point-qr").count(), 0);
     const click = action === "failure" ? "show-qr" : action === "clipboard-fallback" ? "copy" : action === "share-denied" ? "share" : action;
     await page.getByTestId(`biz-point-${click}`).click();
@@ -54,7 +58,7 @@ try {
       const values = await page.evaluate(() => ({ shares: window.shares, copies: window.copies, targets: window.targets }));
       if (action === "copy") assert.match(values.copies[0], /#4719$/);
       if (action === "share") assert.match(values.shares[0].url, /#4719$/);
-      if (action === "telegram") assert.match(values.targets[0], /^https:\/\/t.me\/share\/url\?.*%234719/);
+      assert.equal(await page.getByTestId("biz-point-link").count(), action === "clipboard-fallback" || action === "share-denied" ? 1 : 0);
       // Replacing a live code still asks, cancelling does not issue another code.
       await page.getByTestId("biz-point-create").click();
       await page.getByRole("dialog").waitFor();
@@ -63,7 +67,7 @@ try {
     assert.equal(await page.evaluate(() => window.calls.filter(x => x === "create").length), 1, "one code, no prerequisite tap or duplicate issue");
     await page.close();
   }
-  console.log("business-point-pairing-browser: ok (QR, share, copy, Telegram, API error, clipboard fallback, share denied)");
+  console.log("business-point-pairing-browser: ok (QR, share, copy, API error, clipboard fallback, share denied)");
 } finally {
   await browser.close();
 }
