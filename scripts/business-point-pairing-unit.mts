@@ -119,12 +119,19 @@ const card = readFileSync(new URL("../src/components/business-app/PointPairingCa
 assert.match(card, /Поделиться ссылкой/);
 assert.match(card, /navigator\.share\(/);
 assert.match(card, /Скопировать ссылку/);
-assert.match(card, /pointTelegramShareUrl/);
-assert.match(card, /pointMailtoUrl/);
+assert.doesNotMatch(card, /pointTelegramShareUrl|pointMailtoUrl|mailto:|biz-point-telegram|biz-point-mail|Телеграм|>Почта</);
+assert.match(card, /Поделиться через QR-код/);
+assert.doesNotMatch(card, /Показать QR-код|Через «Поделиться ссылкой»/);
+{
+  const order = ['data-testid="biz-point-share"', 'data-testid="biz-point-share-hint"', 'data-testid="biz-point-copy"', 'data-testid="biz-point-show-qr"'].map((x) => card.indexOf(x));
+  assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), "share, hint, copy, QR order");
+  assert.match(card, /Нажмите «Поделиться ссылкой» и выберите, куда отправить\./);
+  assert.match(card, /\{copyByHand \? \([\s\S]*data-testid="biz-point-link"/, "link field only for manual copy");
+}
 assert.match(card, /<PointQrCode/);
 assert.doesNotMatch(card, /setMore|Другие способы/);
-for (const id of ["share", "copy", "telegram", "show-qr"]) {
-  assert.ok(card.indexOf(`data-testid="biz-point-${id}"`) < card.indexOf('{live ? (', card.indexOf('<div className="flex flex-wrap gap-2">')), "primary actions precede live-only controls");
+for (const id of ["share", "copy", "show-qr"]) {
+  assert.ok(card.indexOf(`data-testid="biz-point-${id}"`) < card.indexOf('{live ? (', card.indexOf('<div className="flex flex-col items-start gap-2">')), "primary actions precede live-only controls");
 }
 assert.match(card, /showQr \? \(/);
 assert.match(card, /withCode\(\(\) => setShowQr\(true\)\)/);
