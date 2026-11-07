@@ -21,6 +21,17 @@ function bodyWithoutTitle(markdown: string): string {
  * standalone PWA window (logo splash), no navigation, so payment form state and the music
  * keep going. href stays the real document page for modifier clicks, crawlers and no-JS.
  */
+export const BUSINESS_OFFER_LINK_CLASS = "font-semibold text-[var(--biz-text)] underline underline-offset-2 business-app-focus-ring";
+
+function sheetHost(): HTMLElement {
+  return document.querySelector<HTMLElement>(".business-app-root") ?? document.body;
+}
+
+/** Fallback when the sheet ends up on document.body: carry the live theme id so tokens apply. */
+function themeOfRoot(): string | undefined {
+  return document.querySelector<HTMLElement>(".business-app-root")?.dataset.bizTheme;
+}
+
 export function BusinessOfferDocumentLink({
   testId,
   className,
@@ -42,7 +53,7 @@ export function BusinessOfferDocumentLink({
     <>
       <a
         href={BUSINESS_OFFER_HREF}
-        className={className}
+        className={className ?? BUSINESS_OFFER_LINK_CLASS}
         data-testid={testId}
         data-offer-version={BUSINESS_OFFER_EDITION.version}
         aria-haspopup="dialog"
@@ -50,8 +61,10 @@ export function BusinessOfferDocumentLink({
       >
         {children}
       </a>
-      {/* Portal: the link sits inside <p>/<label> text, a <div> sheet must not nest there. */}
-      {open ? createPortal(<BusinessOfferDocumentSheet onClose={close} testId={testId ? `${testId}-sheet` : undefined} />, document.body) : null}
+      {/* Portal: the link sits inside <p>/<label> text, a <div> sheet must not nest there.
+          Theme tokens (--biz-surface etc.) live on .business-app-root, so the sheet goes there:
+          on document.body the card had no background and the contract mixed with the page. */}
+      {open ? createPortal(<BusinessOfferDocumentSheet onClose={close} testId={testId ? `${testId}-sheet` : undefined} theme={themeOfRoot()} />, sheetHost()) : null}
     </>
   );
 }
@@ -60,8 +73,11 @@ export function BusinessOfferDocumentSheet({
   onClose,
   testId = "biz-offer-sheet",
   initialSource = null,
+  theme,
 }: {
   onClose: () => void;
+  /** data-biz-theme of the cabinet, so the card keeps its opaque surface wherever it is mounted. */
+  theme?: string;
   testId?: string;
   /** For tests and server render; the client loads the text on demand to keep the cabinet bundle small. */
   initialSource?: OfferSource | null;
@@ -99,7 +115,8 @@ export function BusinessOfferDocumentSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-end justify-center bg-[rgb(0_0_0/0.5)] sm:items-center"
+      className="fixed inset-0 z-[1000] flex items-end justify-center bg-[rgba(0,0,0,0.5)] sm:items-center"
+      data-biz-theme={theme}
       data-testid={testId}
       onClick={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) onClose(); }}
     >
@@ -107,7 +124,7 @@ export function BusinessOfferDocumentSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="business-app-card flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-b-none sm:rounded-b-[inherit]"
+        className="business-app-card bg-[var(--biz-surface,#fffaf3)] text-[var(--biz-text)] flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-b-none sm:rounded-b-[inherit]"
         data-document-id={BUSINESS_OFFER_EDITION.documentKey}
         data-document-version={BUSINESS_OFFER_EDITION.version}
         data-document-sha256={BUSINESS_OFFER_EDITION.contentHash}

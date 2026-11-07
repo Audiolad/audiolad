@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { BusinessOfferDocumentLink, BusinessOfferDocumentSheet } from "../src/components/business-app/BusinessOfferDocumentLink";
+import { BUSINESS_OFFER_LINK_CLASS, BusinessOfferDocumentLink, BusinessOfferDocumentSheet } from "../src/components/business-app/BusinessOfferDocumentLink";
 import { BUSINESS_OFFER_SOURCE } from "../src/lib/business-app/business-offer-content";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 
@@ -52,5 +52,23 @@ const sheetSrc = readFileSync("src/components/business-app/BusinessOfferDocument
 assert.match(sheetSrc, /createPortal\(/);
 assert.match(sheetSrc, /event\.preventDefault\(\)/);
 assert.doesNotMatch(sheetSrc, /window\.open|router\.push|location\.(assign|href)/, "no navigation: form state and music stay");
+
+// Theme: the sheet is hosted on the themed root (tokens live there), never bare on body.
+assert.match(sheetSrc, /querySelector<HTMLElement>\("\.business-app-root"\)/);
+assert.doesNotMatch(sheetSrc, /,\s*document\.body\)\s*:/, "no bare document.body portal");
+assert.doesNotMatch(sheetSrc, /rgb\(0_0_0\/0\.5\)/, "rgba backdrop for older WebKit");
+const themed = renderToStaticMarkup(h(BusinessOfferDocumentSheet, { onClose() {}, initialSource: BUSINESS_OFFER_SOURCE, theme: "jazz-coffee" }));
+assert.match(themed, /data-biz-theme="jazz-coffee"/);
+assert.match(themed, /bg-\[rgba\(0,0,0,0\.5\)\]/);
+assert.match(themed, /business-app-card bg-\[var\(--biz-surface,#fffaf3\)\]/, "opaque card even without inherited tokens");
+
+// Link affordance: default and guest-start offer/privacy titles are underlined.
+assert.match(link, /class="[^"]*underline[^"]*"/);
+const guestSrc = readFileSync("src/components/business-app/BusinessGuestStartCta.tsx", "utf8");
+assert.match(guestSrc, /<BusinessOfferDocumentLink testId=\{`\$\{testId\}-offer-link`\} className=\{BUSINESS_OFFER_LINK_CLASS\} \/>/);
+assert.match(guestSrc, /<Link href="\/documents\/privacy" className=\{BUSINESS_OFFER_LINK_CLASS\}/);
+assert.match(BUSINESS_OFFER_LINK_CLASS, /\bunderline\b/);
+const homeSrc = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
+assert.match(homeSrc, /BusinessOfferDocumentLink\s+className="[^"]*\bunderline\b/);
 
 console.log("business-offer-document-sheet-unit: ok");
