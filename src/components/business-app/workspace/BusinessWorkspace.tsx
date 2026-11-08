@@ -224,7 +224,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     ? ahead
     : cafeUpcomingIndices(playOrder, currentIndex);
   const upcoming = queueRows(model.tracks, previewOrder);
-  const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(ahead.length));
+  const aheadTotal = typeof player.queueAheadCount === "number" && player.queueAheadCount >= ahead.length ? player.queueAheadCount : ahead.length;
+  const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(aheadTotal));
 
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>

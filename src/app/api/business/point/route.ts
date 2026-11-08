@@ -52,6 +52,7 @@ async function writeHallNowPlaying(
       p_position_ms: nowPlaying.positionMs,
       p_duration_ms: nowPlaying.durationMs,
       p_queue: nowPlaying.queue,
+      p_queue_ahead: nowPlaying.aheadCount ?? nowPlaying.queue.length,
     });
     if (!rpcError) return;
   } catch { /* fall through to the service-role write */ }
@@ -73,6 +74,7 @@ async function writeHallNowPlaying(
       position_ms: nowPlaying.positionMs,
       duration_ms: nowPlaying.durationMs,
       queue_audio_item_ids: nowPlaying.queue,
+      queue_ahead_count: nowPlaying.aheadCount ?? nowPlaying.queue.length,
       reported_at: new Date().toISOString(),
     }, { onConflict: "player_id" });
   } catch { /* best effort */ }

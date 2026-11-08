@@ -21,7 +21,7 @@ import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrd
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
-import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingIds, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
+import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -81,6 +81,7 @@ type CabinetPlayerApi = {
   saveNote: string | null;
   /** Catalog indices in play order. Null until the cafe queue answers: catalog order. */
   queueOrder: readonly number[] | null;
+  queueAheadCount: number | null;
   setQueueOrder: (indices: readonly number[]) => void;
   /** Replace upcoming tracks; move the cursor only when the player is inactive. */
   applyAtmosphereQueue: (indices: readonly number[]) => void;
@@ -318,12 +319,14 @@ export function BusinessCabinetPlayerProvider({
     const fading = ctl.fadingOutPrevious;
     const time = fading ? 0 : audio.currentTime;
     const index = fading ? tracks.findIndex((t) => t.audioItemId === audible) : ctl.index;
+    const upcoming = index >= 0 ? hallUpcomingSnapshot(tracks, playOrderRef.current, index) : { ids: [], aheadCount: 0 };
     const nowPlaying = {
       positionMs: Number.isFinite(time) && time > 0 ? Math.min(86_400_000, Math.floor(time * 1000)) : 0,
       durationMs: !fading && Number.isFinite(audio.duration) && audio.duration > 0
         ? Math.min(86_400_000, Math.round(audio.duration * 1000))
         : (tracks[index]?.durationSeconds ? Math.round(tracks[index].durationSeconds! * 1000) : null),
-      queue: index >= 0 ? hallUpcomingIds(tracks, playOrderRef.current, index) : [],
+      queue: upcoming.ids,
+      aheadCount: upcoming.aheadCount,
     };
     sendSpaLiveReport(
       (live) => {
@@ -1086,6 +1089,7 @@ export function BusinessCabinetPlayerProvider({
     volume: playback.volume,
     saveNote,
     queueOrder: mirror ? mirror.queueOrder : queueOrder,
+    queueAheadCount: mirror ? mirror.aheadCount : null,
     setQueueOrder: pointReports ? () => {} : setQueueOrder,
     applyAtmosphereQueue: pointReports ? () => {} : applyAtmosphereQueue,
     rebuildFromProfile: pointReports ? async () => "deferred" : rebuildFromProfile,

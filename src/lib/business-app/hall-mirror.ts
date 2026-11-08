@@ -1,3 +1,5 @@
+import { cafeUniqueAhead } from "./cafe-queue/order";
+
 /**
  * Owner mirror of the hall device (Sergey 2026-11-08, t1283u): what the paired hall device
  * plays is the truth for the owner's «Музыка» tab and for the owner-phone hall view – the same
@@ -24,6 +26,7 @@ export type HallNowPlayingReport = {
   positionMs: number;
   durationMs: number | null;
   queue: string[];
+  aheadCount?: number;
 };
 
 /** Report body part from the hall device (route validation). */
@@ -33,30 +36,37 @@ export function isHallNowPlayingReport(value: unknown): value is HallNowPlayingR
   return Number.isSafeInteger(r.positionMs) && Number(r.positionMs) >= 0 && Number(r.positionMs) <= 86_400_000
     && (r.durationMs === null || (Number.isSafeInteger(r.durationMs) && Number(r.durationMs) > 0 && Number(r.durationMs) <= 86_400_000))
     && Array.isArray(r.queue) && r.queue.length <= 20
-    && r.queue.every((id) => typeof id === "string" && UUID_RE.test(id));
+    && r.queue.every((id) => typeof id === "string" && UUID_RE.test(id))
+    && (r.aheadCount === undefined || (Number.isSafeInteger(r.aheadCount)
+      && Number(r.aheadCount) >= r.queue.length && Number(r.aheadCount) <= 100_000));
 }
 
-/** Upcoming track ids after `currentIndex` in play order (no repeats, never the current one). */
+/** Preview ids and total from the same no-repeat, no-wrap list as the hall UI. */
+export function hallUpcomingSnapshot(
+  tracks: readonly { audioItemId: string }[],
+  order: readonly number[] | null,
+  currentIndex: number,
+  max = HALL_QUEUE_REPORT_MAX,
+): { ids: string[]; aheadCount: number } {
+  const play = order && order.length > 0 ? order : tracks.map((_, index) => index);
+  const ahead = cafeUniqueAhead(tracks, play, currentIndex);
+  const limit = Math.max(0, Math.min(HALL_QUEUE_REPORT_MAX, Math.floor(max)));
+  return { ids: ahead.slice(0, limit).map((index) => tracks[index].audioItemId), aheadCount: ahead.length };
+}
+
 export function hallUpcomingIds(
   tracks: readonly { audioItemId: string }[],
   order: readonly number[] | null,
   currentIndex: number,
   max = HALL_QUEUE_REPORT_MAX,
 ): string[] {
-  const play = order && order.length > 0 ? order : tracks.map((_, index) => index);
-  const pos = play.indexOf(currentIndex);
-  const rotated = pos < 0 ? [...play] : [...play.slice(pos + 1), ...play.slice(0, pos)];
-  const current = tracks[currentIndex]?.audioItemId ?? null;
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const index of rotated) {
-    const id = tracks[index]?.audioItemId;
-    if (!id || id === current || seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-    if (out.length >= max) break;
-  }
-  return out;
+  return hallUpcomingSnapshot(tracks, order, currentIndex, max).ids;
+}
+
+/** Old clients / rows may only have preview ids; never report fewer than that preview. */
+export function hallQueueAheadCount(value: unknown, queueLength: number): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= queueLength && value <= 100_000
+    ? value : queueLength;
 }
 
 export type HallNowPlaying = {
@@ -65,6 +75,7 @@ export type HallNowPlaying = {
   positionSec: number;
   durationSec: number | null;
   queue: string[];
+  aheadCount: number;
   /** Seconds since the hall reported this position (server clock). */
   ageSec: number;
 };
@@ -81,7 +92,7 @@ export function parseHallNowPlaying(value: unknown): HallNowPlaying | null {
   const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : fallback);
   const duration = typeof h.durationSec === "number" && Number.isFinite(h.durationSec) && h.durationSec > 0 ? h.durationSec : null;
   const queue = Array.isArray(h.queue) ? h.queue.filter((id): id is string => typeof id === "string" && UUID_RE.test(id)) : [];
-  return { state, audioItemId, positionSec: num(h.positionSec, 0), durationSec: duration, queue, ageSec: num(h.ageSec, 0) };
+  return { state, audioItemId, positionSec: num(h.positionSec, 0), durationSec: duration, queue, aheadCount: hallQueueAheadCount(h.aheadCount, queue.length), ageSec: num(h.ageSec, 0) };
 }
 
 export type HallMirrorView = {
@@ -91,6 +102,7 @@ export type HallMirrorView = {
   duration: number;
   /** Catalog indices in hall play order: the hall's current track first, then its queue. */
   queueOrder: number[];
+  aheadCount: number;
 };
 
 /**
@@ -117,7 +129,7 @@ export function hallMirrorView(
     const i = byId.get(id);
     if (i !== undefined && !queueOrder.includes(i)) queueOrder.push(i);
   }
-  return { status: playing ? "playing" : "paused", index, currentTime, duration, queueOrder };
+  return { status: playing ? "playing" : "paused", index, currentTime, duration, queueOrder, aheadCount: hall.aheadCount };
 }
 
 export type HallPending = { status: "playing" | "paused"; until: number; from: string };
