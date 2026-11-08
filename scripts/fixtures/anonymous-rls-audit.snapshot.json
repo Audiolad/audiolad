@@ -6524,6 +6524,11 @@
       "file": "supabase/migrations/20270227120000_business_venue_slots_systemic.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270228120000_business_point_now_playing.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.report_business_point_now_playing(text, uuid, integer, integer, uuid[]) TO anon, authenticated, service_role;"
     }
   ]
 }
