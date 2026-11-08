@@ -27,6 +27,12 @@
  * cut. The player therefore also calls `nudge()` on the element's own `timeupdate`
  * (media events are not timer-throttled, ~4 per second while it plays), so the ramp
  * advances smoothly in a hidden tab too.
+ *
+ * iPhone / iPad (Sergey 2026-11-08, t1285u): newer iOS may let a `volume` assignment stick,
+ * so the writable probe alone could switch fades on. With the screen locked JS is suspended:
+ * a fade-in that started at 0 stays at 0 and the next track «plays» silently. Apple touch
+ * devices therefore never fade via `volume`, and `prepareForBackground()` (pagehide, freeze,
+ * hidden) snaps any running fade-in to the chosen volume before the page is suspended.
  */
 
 /** Normal fade-in and soft pause fade-out (ms). */
@@ -50,8 +56,10 @@ export type FadeMedia = {
 export type FadeOptions = {
   fadeMs?: number;
   tickMs?: number;
-  /** Null: detect (writable `volume`). */
+  /** Null: detect (writable `volume`, never on iPhone / iPad). */
   enabled?: boolean | null;
+  /** Browser identity for the Apple touch check (tests). Default: globalThis.navigator. */
+  navigator?: FadeNavigator | null;
   now?: () => number;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (t: unknown) => void;
@@ -83,6 +91,28 @@ export function mediaVolumeWritable(media: Pick<FadeMedia, "volume">): boolean {
   } catch {
     return false;
   }
+}
+
+export type FadeNavigator = { userAgent?: string; platform?: string; maxTouchPoints?: number };
+
+/** iPhone / iPad / iPod, including iPadOS that reports itself as a Mac with a touch screen. */
+export function isAppleTouchDevice(nav: FadeNavigator | null | undefined): boolean {
+  if (!nav) return false;
+  const ua = typeof nav.userAgent === "string" ? nav.userAgent : "";
+  const platform = typeof nav.platform === "string" ? nav.platform : "";
+  if (/iPhone|iPad|iPod/i.test(ua) || /iPhone|iPad|iPod/i.test(platform)) return true;
+  const touch = typeof nav.maxTouchPoints === "number" ? nav.maxTouchPoints : 0;
+  return touch > 1 && (/Macintosh/i.test(ua) || /^MacIntel$/i.test(platform));
+}
+
+/** Fades via `volume` only where it sticks and never on Apple touch devices (locked screen). */
+export function playerFadeSupported(media: Pick<FadeMedia, "volume">, nav: FadeNavigator | null | undefined): boolean {
+  if (isAppleTouchDevice(nav)) return false;
+  return mediaVolumeWritable(media);
+}
+
+function defaultNavigator(): FadeNavigator | null {
+  return typeof navigator === "undefined" ? null : (navigator as FadeNavigator);
 }
 
 /**
@@ -121,7 +151,7 @@ export class FadingAudio {
     this.nowFn = options.now ?? (() => Date.now());
     this.setTimer = options.setInterval ?? ((fn, ms) => setInterval(fn, ms));
     this.clearTimer = options.clearInterval ?? ((t) => clearInterval(t as ReturnType<typeof setInterval>));
-    this.enabled = options.enabled ?? mediaVolumeWritable(media);
+    this.enabled = options.enabled ?? playerFadeSupported(media, options.navigator === undefined ? defaultNavigator() : options.navigator);
     try {
       this.target = clamp01(media.volume);
     } catch {
@@ -207,6 +237,24 @@ export class FadingAudio {
    */
   nudge(): void {
     if (this.dir !== 0) this.tick();
+  }
+
+  /**
+   * Page about to be suspended (screen lock, pagehide, freeze, hidden tab): timers may not run
+   * again until the user comes back. A fade-in snaps to the chosen volume (never stuck silent);
+   * a fade-out the user started finishes now (pauses). A switch hold that is already silent
+   * and paused stays as it is: the next source starts through play / playInstant.
+   */
+  prepareForBackground(): void {
+    if (this.dir < 0) {
+      this.finishFadeOut();
+      return;
+    }
+    if (this.silentHeld) return;
+    this.dir = 0;
+    this.stopTimer();
+    this.level = 1;
+    this.apply();
   }
 
   /** Advance the ramp to `now`. Public for tests; the interval calls it. */

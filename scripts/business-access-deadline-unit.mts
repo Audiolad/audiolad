@@ -450,12 +450,16 @@ for (const autoplayBlocked of [false, true]) {
   await ctl.onEnded();
   assert.equal(ctl.status, "no_access");
   assert.equal(audio.paused, true);
-  assert.deepEqual(signed, ["track-1", "track-3"]);
+  // t1285u: track-3 was pre-signed at play start; the old pre-sign starts it at once and the
+  // background access re-check (track-3 again) stops it with no_access. track-1 is the pre-sign
+  // of the following track, refused as well.
+  assert.deepEqual(signed, ["track-1", "track-3", "track-3", "track-1"]);
+  assert.equal(plays, 2, "the old pre-sign started, then the access re-check stopped it");
   // Navigation/model effects alone must never clear a denial or lose the intent.
   await ctl.applyManifest(workspaceItems(renewed.tracks, workspaceAudioDeadline(renewed)));
   await ctl.toggle();
   assert.equal(ctl.status, "no_access");
-  assert.equal(plays, 1);
+  assert.equal(plays, 2, "no play while denied");
   allowed = true;
   blocked = autoplayBlocked;
   w.respond(renewed);
@@ -464,8 +468,12 @@ for (const autoplayBlocked of [false, true]) {
   assert.equal(w.stops, 0);
   assert.equal(workspaceControllerKey(initial), workspaceControllerKey(renewed));
   assert.equal(ctl.current?.audioItemId, "track-3", "resume the denied queue successor");
-  assert.deepEqual(signed, ["track-1", "track-3", "track-3"], "renewal re-signs automatically");
-  assert.equal(plays, 2, "no user click is needed to resume");
+  assert.deepEqual(
+    signed,
+    ["track-1", "track-3", "track-3", "track-1", "track-3", ...(autoplayBlocked ? [] : ["track-1"])],
+    "renewal re-signs automatically (then pre-signs the following track once playing)",
+  );
+  assert.equal(plays, 3, "no user click is needed to resume");
   assert.equal(ctl.status, autoplayBlocked ? "paused" : "playing");
   if (autoplayBlocked) {
     assert.equal(audio.paused, true);

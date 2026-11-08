@@ -70,10 +70,18 @@ export const RECOVERY_MAX_MS = 30_000;
 export const RECOVERY_STALL_MS = 10_000;
 /** Outage shorter than this: resume the same track at its position; longer: next track. */
 export const RECOVERY_RESUME_WINDOW_MS = 3 * 60_000;
-/** Pre-sign the next track this many seconds before the current one ends. */
+/**
+ * Legacy lead (s). The next track is now pre-signed as soon as the current one plays
+ * (t1285u: a locked iPhone may suspend JS, so a sign in the last 45 s may never run). A
+ * pre-signed start is re-checked by the server in the background (stops on no_access).
+ */
 export const PRESIGN_LEAD_SEC = 45;
 /** Pre-signed URLs are used only while younger than this (server TTL is 1 hour). */
 export const PRESIGN_MAX_AGE_MS = 30 * 60_000;
+/** A pre-signed URL older than this is signed again while the current track plays. */
+export const PRESIGN_REFRESH_AGE_MS = 20 * 60_000;
+/** After a failed pre-sign, try again no sooner than this (progress events come ~4/s). */
+export const PRESIGN_RETRY_MS = 10_000;
 /** Audio errors on one track while the browser is online before the track is skipped. */
 export const RECOVERY_SKIP_AFTER_ERRORS = 4;
 export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
@@ -128,7 +136,9 @@ export class SpaOnlinePlayer {
   private lastPosition = 0;
   /** Position where the current track last (re)started; errors are forgiven after healthy play. */
   private healthyFrom = 0;
-  private presignedFor: string | null = null;
+  /** Next track whose pre-sign is in flight (null when none); a failure clears it for a retry. */
+  private presigning: string | null = null;
+  private presignRetryAt = 0;
   private presigned: { audioItemId: string; url: string; at: number } | null = null;
 
   constructor(
@@ -281,6 +291,9 @@ export class SpaOnlinePlayer {
     this.healthyFrom = Number.isFinite(this.d.audio.currentTime) ? this.d.audio.currentTime : 0;
     this.armDeadline(id, op);
     this.set("playing");
+    // Sign the next track now, while the page is awake: on a locked screen "ended" must be
+    // able to switch the source without waiting for the network.
+    this.prefetchNext();
   }
 
   /**
@@ -361,31 +374,80 @@ export class SpaOnlinePlayer {
 
   /**
    * <audio> "timeupdate"/"playing": remembers the position, ends a stall watch when the
-   * playhead moves, and pre-signs the next track shortly before the boundary.
+   * playhead moves, and keeps a fresh pre-signed URL for the next track.
    */
   onProgress(positionSec: number, durationSec: number): void {
     if (this.disposed || this.status !== "playing" || this.fadingOutPrevious) return;
     if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
     if (this.errorRetries > 0 && positionSec - this.healthyFrom >= RECOVERY_HEALTHY_SEC) this.errorRetries = 0;
     if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
+    void durationSec;
+    this.prefetchNext();
+  }
+
+  /**
+   * Pre-sign the next track (once per next track, refreshed when the URL ages). A failed sign
+   * is retried after PRESIGN_RETRY_MS; the boundary still signs on its own when none is ready.
+   */
+  private prefetchNext(): void {
+    if (this.disposed || this.status !== "playing") return;
     const cur = this.current;
-    if (!cur || !Number.isFinite(durationSec) || durationSec <= 0) return;
-    if (durationSec - positionSec > PRESIGN_LEAD_SEC || this.presignedFor === cur.audioItemId) return;
-    this.presignedFor = cur.audioItemId;
+    if (!cur) return;
     const target = this.nextTarget();
     const next = target >= 0 ? this.items[target] : null;
     if (!next || next.audioItemId === cur.audioItemId) return;
-    void this.d.sign(next.audioItemId).then((r) => {
-      if (this.disposed || !r.ok) return;
-      this.presigned = { audioItemId: next.audioItemId, url: r.data.url, at: this.now() };
-    }, () => { /* the boundary signs again */ });
+    const id = next.audioItemId;
+    const now = this.now();
+    const ready = this.presigned;
+    if (ready && ready.audioItemId === id && now - ready.at < PRESIGN_REFRESH_AGE_MS) return;
+    if (this.presigning === id || now < this.presignRetryAt) return;
+    this.presigning = id;
+    const failed = () => {
+      if (this.presigning === id) this.presigning = null;
+      this.presignRetryAt = this.now() + PRESIGN_RETRY_MS;
+    };
+    let pending: Promise<OnlineSignResult>;
+    try {
+      pending = this.d.sign(id);
+    } catch {
+      failed();
+      return;
+    }
+    void pending.then((r) => {
+      if (this.disposed) return;
+      if (!r.ok) return failed();
+      if (this.presigning === id) this.presigning = null;
+      this.presignRetryAt = 0;
+      this.presigned = { audioItemId: id, url: r.data.url, at: this.now() };
+    }, failed);
   }
 
-  private takePresigned(id: string): string | null {
+  private takePresigned(id: string): { url: string; at: number } | null {
     const p = this.presigned;
+    if (!p) return null;
+    // A reconnect of the current track keeps the next track's pre-sign; used or stale: dropped.
+    if (p.audioItemId !== id && this.now() - p.at <= PRESIGN_MAX_AGE_MS) return null;
     this.presigned = null;
-    if (!p || p.audioItemId !== id || this.now() - p.at > PRESIGN_MAX_AGE_MS) return null;
-    return p.url;
+    if (p.audioItemId !== id || this.now() - p.at > PRESIGN_MAX_AGE_MS) return null;
+    return { url: p.url, at: p.at };
+  }
+
+  /**
+   * A pre-signed URL started the track without a fresh access check: ask the server again in
+   * the background (the music is already playing, nothing waits for the network) and stop at
+   * once when it says the access is gone. Network trouble here changes nothing.
+   */
+  private verifyAccessAfterPresign(id: string, op: number): void {
+    let pending: Promise<OnlineSignResult>;
+    try {
+      pending = this.d.sign(id);
+    } catch {
+      return;
+    }
+    void pending.then((r) => {
+      if (op !== this.op || this.disposed || r.ok) return;
+      if (r.reason === "no_access") this.denied();
+    }, () => { /* network: keep playing, the next boundary checks again */ });
   }
 
   private stopAudio() {
@@ -410,6 +472,7 @@ export class SpaOnlinePlayer {
     }
     this.op++;
     this.stopAudio();
+    this.presigned = null;
     this.resumePoint = null;
     this.needsGesture = false;
     this.items = [];
@@ -461,11 +524,22 @@ export class SpaOnlinePlayer {
       await fade;
       if (op !== this.op || this.disposed) return;
     }
-    this.stopAudio();
+    if (instant) {
+      // Natural advance after "ended" (t1285u): never pause / drop the source / load() here.
+      // Tearing the element down ends the iOS media session; on a locked iPhone the next track
+      // then «starts» without sound. The ended element simply gets the next src below.
+      this.switching = false;
+      this.leaving = false;
+      this.soundingId = null;
+    } else {
+      this.stopAudio();
+    }
     const pre = this.takePresigned(item.audioItemId);
+    // Every started track is still checked by the server: a pre-signed start re-asks it below.
+    const recheck = pre !== null;
     let r: OnlineSignResult;
     try {
-      r = pre ? { ok: true, data: { url: pre } } : await this.d.sign(item.audioItemId);
+      r = pre ? { ok: true, data: { url: pre.url } } : await this.d.sign(item.audioItemId);
     } catch {
       r = { ok: false, reason: "network" };
     }
@@ -497,7 +571,7 @@ export class SpaOnlinePlayer {
     if (!fresh || this.expired(fresh)) return this.onDeadline(false);
     this.d.audio.src = r.data.url;
     this.soundingId = item.audioItemId;
-    this.presignedFor = null;
+    this.presignRetryAt = 0;
     const seek = this.resumePoint?.audioItemId === item.audioItemId ? this.resumePoint.positionSec : 0;
     if (seek > 0.5) {
       try { this.d.audio.currentTime = seek; } catch { /* applied again after play() */ }
@@ -507,6 +581,7 @@ export class SpaOnlinePlayer {
       else await this.d.audio.play();
       if (op !== this.op || this.disposed) return;
       this.failures = 0;
+      if (recheck) this.verifyAccessAfterPresign(item.audioItemId, op);
       return this.afterPlay(item.audioItemId, op);
     } catch (error) {
       if (op !== this.op || this.disposed) return;

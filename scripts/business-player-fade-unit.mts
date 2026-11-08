@@ -6,8 +6,10 @@ import {
   FadingAudio,
   PLAYER_FADE_MS,
   PLAYER_SKIP_FADE_OUT_MS,
+  isAppleTouchDevice,
   mediaVolumeWritable,
   playerFadeGain,
+  playerFadeSupported,
 } from "../src/lib/business-app/player-fade";
 import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
 import { runPointCommands } from "../src/lib/business-app/point-commands";
@@ -1030,6 +1032,92 @@ for (const file of [
   assert.match(poll, /toggle: \(signal\) => commandTransport\(signal, \(\) => toggleRef\.current\(\)\)/);
   assert.match(poll, /next: \(signal\) => commandTransport\(signal, \(\) => nextRef\.current\(signal\)\)/);
   assert.doesNotMatch(poll, /\.pause\(\)|location\.reload|removeAttribute/, "remote apply never hard-stops or reloads");
+}
+
+// 45. iPhone / iPad (t1285u): never fade via `volume`, even where newer iOS lets it stick.
+{
+  const iphone = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1", platform: "iPhone", maxTouchPoints: 5 };
+  const ipados = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 };
+  const mac = { userAgent: ipados.userAgent, platform: "MacIntel", maxTouchPoints: 0 };
+  const android = { userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36", platform: "Linux armv8l", maxTouchPoints: 5 };
+  assert.equal(isAppleTouchDevice(iphone), true);
+  assert.equal(isAppleTouchDevice(ipados), true, "iPadOS masquerading as a Mac");
+  assert.equal(isAppleTouchDevice(mac), false);
+  assert.equal(isAppleTouchDevice(android), false);
+  assert.equal(isAppleTouchDevice(null), false);
+  assert.equal(playerFadeSupported(media(), iphone), false, "writable volume on iOS still no fade");
+  assert.equal(playerFadeSupported(media(), android), true);
+  assert.equal(playerFadeSupported(media({ readOnlyVolume: true }), android), false);
+  for (const nav of [iphone, ipados]) {
+    const m = media();
+    const c = clock();
+    const f = new FadingAudio(m, { now: c.now, setInterval: c.setInterval, clearInterval: c.clearInterval, navigator: nav });
+    assert.equal(f.enabled, false);
+    f.setVolume(0.8);
+    await f.play();
+    near(m.volume, 0.8, 1e-9);
+    assert.equal(c.running, false, "no ramp on iOS");
+    const out = await f.fadeOut();
+    assert.equal(out, true);
+    assert.equal(m.paused, true, "pause at once");
+  }
+  const m = media();
+  const c = clock();
+  const f = new FadingAudio(m, { now: c.now, setInterval: c.setInterval, clearInterval: c.clearInterval, navigator: android });
+  assert.equal(f.enabled, true, "Android keeps the fade");
+}
+
+// 46. prepareForBackground (screen lock, pagehide, freeze): a fade-in snaps to the chosen volume.
+{
+  const { m, c, f } = rig();
+  f.setVolume(0.6);
+  await f.play();
+  c.advance(PLAYER_FADE_MS / 4);
+  assert.ok(m.volume < 0.6 * 0.5, "mid fade-in");
+  f.prepareForBackground();
+  near(m.volume, 0.6, 1e-9);
+  assert.equal(f.ramping, false);
+  assert.equal(c.running, false, "no timer left that a locked screen would freeze");
+  assert.equal(m.paused, false, "keeps playing");
+  // a soft pause in progress completes now (the user asked to pause)
+  const fading = f.fadeOut();
+  c.advance(PLAYER_FADE_MS / 4);
+  f.prepareForBackground();
+  assert.equal(await fading, true);
+  assert.equal(m.paused, true);
+  near(m.volume, 0.6, 1e-9);
+  // read-only volume: harmless no-op
+  const ro = rig({ readOnlyVolume: true });
+  await ro.f.play();
+  ro.f.prepareForBackground();
+  assert.equal(ro.m.volume, 1);
+  assert.equal(ro.m.paused, false);
+}
+
+// 47. Natural advance keeps the element (iOS media session): no pause / load / src removal.
+{
+  const { m, c, p } = player();
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  await flush();
+  const from = m.events.length;
+  m.paused = true; // ended
+  await p.onEnded();
+  const kinds = m.events.slice(from).map((e) => e.kind);
+  assert.deepEqual(kinds, ["src"], `only the new src: ${kinds.join(",")}`);
+  assert.equal(p.current?.title, "T2");
+  assert.equal(m.volume, 1);
+  assert.equal(m.paused, false);
+}
+
+// 48. Wiring: the cabinet player snaps the fade on pagehide / freeze / hidden.
+{
+  const src = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
+  assert.match(src, /else fader\.prepareForBackground\(\);/);
+  assert.match(src, /window\.addEventListener\("pagehide", onBackground\)/);
+  assert.match(src, /document\.addEventListener\("freeze", onBackground\)/);
+  assert.match(src, /window\.removeEventListener\("pagehide", onBackground\)/);
+  assert.match(src, /document\.removeEventListener\("freeze", onBackground\)/);
 }
 
 console.log("business-player-fade-unit: ok");

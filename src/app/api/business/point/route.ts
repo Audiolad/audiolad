@@ -15,7 +15,7 @@ import { pointClientIpCollapsed, pointJoinResult } from "@/lib/business-app/poin
 import { pointCodeSecondsLeft } from "@/lib/business-app/point-share";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
-import { isHallNowPlayingReport } from "@/lib/business-app/hall-mirror";
+import { isHallNowPlayingReport, type HallNowPlayingReport } from "@/lib/business-app/hall-mirror";
 import { loadHallNowPlaying } from "@/lib/business-app/hall-now-playing.server";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
@@ -38,6 +38,46 @@ function pointTokenHashHex(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
+/** Owner mirror snapshot of the hall: RPC first, service-role upsert as the fallback. Never throws. */
+async function writeHallNowPlaying(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  token: string,
+  audioItemId: string | null,
+  nowPlaying: HallNowPlayingReport,
+): Promise<void> {
+  try {
+    const { error: rpcError } = await supabase.rpc("report_business_point_now_playing", {
+      p_token: token,
+      p_audio_item_id: audioItemId,
+      p_position_ms: nowPlaying.positionMs,
+      p_duration_ms: nowPlaying.durationMs,
+      p_queue: nowPlaying.queue,
+    });
+    if (!rpcError) return;
+  } catch { /* fall through to the service-role write */ }
+  try {
+    const admin = createServiceRoleClient();
+    const { data: session, error: sessionError } = await admin
+      .from("business_point_sessions")
+      .select("player_id, organization_id, location_id")
+      .eq("token_hash", `\\x${pointTokenHashHex(token)}`)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (sessionError || !session) return;
+    const row = session as { player_id: string; organization_id: string; location_id: string };
+    await admin.from("business_player_now_playing").upsert({
+      player_id: row.player_id,
+      organization_id: row.organization_id,
+      location_id: row.location_id,
+      audio_item_id: audioItemId,
+      position_ms: nowPlaying.positionMs,
+      duration_ms: nowPlaying.durationMs,
+      queue_audio_item_ids: nowPlaying.queue,
+      reported_at: new Date().toISOString(),
+    }, { onConflict: "player_id" });
+  } catch { /* best effort */ }
+}
+
 function json(body: unknown, status = 200, extra?: { token?: string; secure?: boolean }) {
   const response = NextResponse.json(body, { status, headers: NO_STORE });
   if (extra?.token) {
@@ -54,7 +94,7 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try {
     const text = await request.text();
-    if (text.length > 4096) return json({ ok: false, reason: "invalid_request" }, 413);
+    if (text.length > 16384) return json({ ok: false, reason: "invalid_request" }, 413);
     const parsed = JSON.parse(text) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return json({ ok: false, reason: "invalid_request" }, 400);
@@ -345,18 +385,13 @@ export async function POST(request: Request) {
       p_playing_confirmed: report?.playingConfirmed ?? false,
       p_error_code: report?.errorCode ?? null,
     });
-    // Owner mirror snapshot (position, upcoming queue). Best effort: a missing migration or a
-    // failed write never fails the playback report itself.
+    // Owner mirror snapshot (position, upcoming queue). Best effort: a failed write never fails the
+    // playback report itself. supabase-js does not throw on RPC errors, so the returned error is
+    // checked; if the RPC is not reachable (PostgREST schema cache not reloaded after the migration,
+    // t1284u: the table stayed empty), the same row is written with the service role by this
+    // browser's own device session.
     if (!error && report && isHallNowPlayingReport(body.nowPlaying)) {
-      try {
-        await supabase.rpc("report_business_point_now_playing", {
-          p_token: token,
-          p_audio_item_id: report.audioItemId,
-          p_position_ms: body.nowPlaying.positionMs,
-          p_duration_ms: body.nowPlaying.durationMs,
-          p_queue: body.nowPlaying.queue,
-        });
-      } catch { /* not migrated yet */ }
+      await writeHallNowPlaying(supabase, token, report.audioItemId, body.nowPlaying);
     }
     if (!error && report?.playingConfirmed && report.audioItemId && body.sample && typeof body.sample === "object") {
       const sample = body.sample as Record<string, unknown>;
