@@ -347,7 +347,7 @@ function world(opts: {
   assert.match(provider, /ctl\.onProgress\(audio\.currentTime, audio\.duration\)/);
   assert.match(provider, /signal: abort\.signal/);
   assert.match(provider, /preload="auto"/);
-  assert.match(provider, /ctaLabel=\{view\.needsGesture \? ENABLE_MUSIC_LABEL : null\}/);
+  assert.match(provider, /ctaLabel=\{(?:view|shownView)\.needsGesture \? ENABLE_MUSIC_LABEL : null\}/);
   assert.match(provider, /export const ENABLE_MUSIC_LABEL = "Включить музыку";/);
   const bar = read("src/components/business-app/workspace/BusinessCabinetMiniBar.tsx");
   assert.match(bar, /business-app-btn-cta[^"]*business-cabinet-player__cta/);

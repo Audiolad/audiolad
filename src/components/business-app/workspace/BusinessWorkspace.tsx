@@ -310,8 +310,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {open && current ? (
         <>
-          <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
-            <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
+          <section className="business-app-card" data-testid="biz-now-playing" aria-label={player.hallMirror ? HALL_NOW_TITLE : "Сейчас играет"} data-hall-mirror={player.hallMirror ? "true" : "false"}>
+            <h2 className="text-[1.05rem] font-bold">{player.hallMirror ? HALL_NOW_TITLE : "Сейчас играет"}</h2>
             <div className="business-now__head">
               <span className="business-now__cover" data-has-image={nowCover && failedNowCover !== nowCover ? "true" : "false"} data-testid="biz-now-cover">
                 {nowCover && failedNowCover !== nowCover ? (
@@ -341,7 +341,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             >
               <span style={{ width: `${ratio * 100}%` }} />
             </div>
-            <div className="business-now__volume">
+            {player.hallMirror ? null : <div className="business-now__volume">
               <p className="business-now__volume-title" id="biz-now-volume-caption">Громкость</p>
               <div className="business-now__volume-ends">
                 <button
@@ -376,7 +376,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 aria-valuemax={1}
                 aria-valuenow={player.volume}
               />
-            </div>
+            </div>}
             <p className="business-cabinet-player__time" data-testid="biz-now-time">
               {formatPlaybackClock(player.view.currentTime)} / {formatPlaybackClock(duration)}
             </p>
@@ -387,7 +387,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               nowTitle={null}
               onToggle={() => void player.toggle()}
               previousDisabled={!player.canChangeMusic}
-              nextDisabled={!player.canChangeMusic}
+              nextDisabled={!player.canNext}
               onPrevious={() => void player.previous()}
               onNext={() => void player.next()}
               appearance="round"
@@ -451,6 +451,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     </div>
   );
 }
+
+/** Owner screens while a live hall device plays: the card shows the hall, not this phone. */
+export const HALL_NOW_TITLE = "Сейчас играет в зале";
 
 function showEmpty(model: WorkspacePageModel): boolean {
   return workspacePlayerOpen(model) && model.tracks.length === 0;

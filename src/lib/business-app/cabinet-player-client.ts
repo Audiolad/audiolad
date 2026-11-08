@@ -1,3 +1,4 @@
+import type { HallNowPlayingReport } from "@/lib/business-app/hall-mirror";
 import type { SpaLiveReport } from "@/lib/business-app/spa-live-report";
 
 type Fetch = typeof fetch;
@@ -41,7 +42,13 @@ export function getCabinetDeviceSecret(
  * The route writes the venue player tables; it does not call the spa allowlist RPCs.
  */
 export async function postPointReport(
-  payload: { kind: "heartbeat" } | { kind: "playback"; report: SpaLiveReport; sample?: { eventId: string; sessionId: string; seq: number; positionMs: number } | null },
+  payload: { kind: "heartbeat" } | {
+    kind: "playback";
+    report: SpaLiveReport;
+    sample?: { eventId: string; sessionId: string; seq: number; positionMs: number } | null;
+    /** Owner mirror snapshot (hall-mirror.ts). */
+    nowPlaying?: HallNowPlayingReport;
+  },
   f: Fetch = fetch,
 ): Promise<Result> {
   try {

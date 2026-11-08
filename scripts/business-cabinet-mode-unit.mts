@@ -116,7 +116,7 @@ assert.match(read("src/app/business-app/profile/page.tsx"), /requireBusinessCabi
 assert.match(read("src/app/business-app/onboarding/page.tsx"), /requireBusinessCabinetPermission\("sectionOnboarding"\)/);
 assert.match(read("src/app/business-app/settings/page.tsx"), /businessCabinetCan\(\{ mode: cabinet\.mode, pointCanEdit \}, "sectionSettings"\)\) redirect\(BUSINESS_VENUE_FALLBACK_PATH\)/);
 const route = read("src/app/api/business/point/route.ts");
-assert.match(route, /OWNER_ACTIONS = new Set\(\["owner-state", "create", "revoke", "link", "permission", "enqueue"\]\)/);
+assert.match(route, /OWNER_ACTIONS = new Set\(\["owner-state", "hall-now", "create", "revoke", "link", "permission", "enqueue"\]\)/);
 assert.match(route, /OWNER_ACTIONS\.has\(body\.action\) && \(await businessHallDeviceLocked\(\)\)/);
 assert.match(route, /body\.action === "disconnect-self"/);
 assert.match(route, /\.eq\("token_hash", `\\\\x\$\{pointTokenHashHex\(token\)\}`\)/, "disconnect closes only this device's session");

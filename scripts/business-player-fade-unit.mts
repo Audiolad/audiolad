@@ -10,6 +10,7 @@ import {
   playerFadeGain,
 } from "../src/lib/business-app/player-fade";
 import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
+import { runPointCommands } from "../src/lib/business-app/point-commands";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
 
 type Media = {
@@ -865,7 +866,7 @@ for (const file of [
 // never stored, reported or sought as the chosen track's (timeupdate, toggle, seek).
 {
   const src = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
-  assert.match(src, /const onTime = \(\) => \{\n(?:\s*\/\/[^\n]*\n)*\s*if \(ctl\.fadingOutPrevious\) return;/);
+  assert.match(src, /const onTime = \(\) => \{\n(?:\s*\/\/[^\n]*\n|\s*fader\.nudge\(\);\n)*\s*if \(ctl\.fadingOutPrevious\) return;/);
   assert.match(src, /const positionSec = ctl\.fadingOutPrevious \? 0 : \(audioRef\.current\?\.currentTime \?\? 0\);\n\s*remember\(\{ index: ctl\.index < 0 \? index : ctl\.index, positionSec \}/);
   assert.match(src, /if \(ctlRef\.current\?\.fadingOutPrevious\) return;\n\s*const nextTime/);
   assert.match(src, /const audible = ctl\.audibleItemId;/);
@@ -902,6 +903,133 @@ for (const file of [
   const src = readFileSync(new URL("../src/lib/business-app/spa-online-player.ts", import.meta.url), "utf8");
   assert.match(src, /if \(this\.d\.audio\.fadeOut && !this\.expired\(cur\)\) \{\n\s+void this\.d\.audio\.fadeOut\(\);/);
   assert.match(src, /return this\.advance\(true\);/);
+}
+
+// 42. Hidden hall tab (Sergey 2026-11-08): timers are throttled to one wake-up a minute.
+// Media `timeupdate` nudges keep the fade-in and fade-out smooth instead of one jump.
+{
+  const { m, c, f } = rig();
+  f.setVolume(1);
+  await f.play();
+  assert.equal(m.volume, 0);
+  let prev = 0;
+  let maxStep = 0;
+  // No interval tick at all: only media events (~4 per second) advance the ramp.
+  for (let t = 0; t < PLAYER_FADE_MS; t += 250) {
+    c.advance(250, 250 + 1); // wall time moves, the throttled interval does not fire
+    f.nudge();
+    maxStep = Math.max(maxStep, m.volume - prev);
+    assert.ok(m.volume >= prev - 1e-9, "fade-in never steps down");
+    prev = m.volume;
+  }
+  near(m.volume, 1, 1e-9);
+  assert.ok(maxStep < 0.3, `fade-in rises in small steps (max ${maxStep})`);
+  const done = f.fadeOut();
+  prev = 1;
+  for (let t = 0; t < PLAYER_FADE_MS && !m.paused; t += 250) {
+    c.advance(250, 251);
+    f.nudge();
+    if (!m.paused) assert.ok(prev - m.volume < 0.5, "fade-out falls in steps, no cut");
+    prev = m.volume;
+  }
+  assert.equal(await done, true);
+  assert.equal(m.paused, true);
+  assert.ok(m.events.filter((e) => e.kind === "pause").every((e) => e.volume === 0), "paused only at silence");
+  f.nudge(); // idle: no-op
+  assert.equal(f.ramping, false);
+}
+
+// 43. «Пауза в зале» / «Продолжить в зале» / «Следующий трек в зале» go through the same
+// soft controller paths as the on-screen player: fade-out then pause, fade-in from silence,
+// skip fade-out with silence held through the source replacement. Never a hard cut.
+{
+  const { m, c, f, p } = player();
+  f.setVolume(0.9);
+  await p.toggle();
+  c.advance(PLAYER_FADE_MS);
+  near(m.volume, 0.9, 1e-9);
+  m.currentTime = 30;
+  const fromPlaying = m.events.length;
+  const command = (type: string) => ({
+    id: "6f1e8c0a-4b2d-4c3e-8a11-0b9c7d6e5f40", type,
+    claim_id: "7f1e8c0a-4b2d-4c3e-8a11-0b9c7d6e5f40",
+    claim_until: new Date(Date.now() + 30_000).toISOString(),
+  });
+  const acks: string[] = [];
+  const hardPauses: number[] = [];
+  const origPause = f.pause.bind(f);
+  f.pause = () => { hardPauses.push(f.fadeLevel); origPause(); };
+  const runner = {
+    ready: () => true,
+    status: () => p.status,
+    stopped: () => false,
+    toggle: () => p.toggle(),
+    next: () => p.next(),
+    applied: async (type: string) => {
+      if (type === "pause" && f.fadingOut) await f.fadeOut();
+      return type === "pause" ? p.status === "paused" && m.paused : p.status === "playing" && !m.paused;
+    },
+    ack: async (row: { type: string }) => { acks.push(row.type); },
+  };
+  const drive = async (run: Promise<void>, ms: number) => {
+    let settled = false;
+    void run.finally(() => { settled = true; });
+    for (let t = 0; t < ms && !settled; t += 40) { c.advance(40); await flush(); }
+    await run;
+  };
+  // Pause in the hall: still audible right after the command, silent and paused after ~2 s.
+  const pausing = runPointCommands([command("pause")], runner);
+  await flush();
+  assert.equal(p.status, "paused");
+  assert.equal(m.paused, false, "pause fades, no instant cut");
+  c.advance(PLAYER_FADE_MS / 2); await flush();
+  assert.ok(m.volume > 0 && m.volume < 0.9, "half-way through the fade-out");
+  await drive(pausing, PLAYER_FADE_MS + 500);
+  assert.equal(m.paused, true);
+  assert.deepEqual(acks, ["pause"]);
+  // Resume in the hall: same source, starts from silence and rises over ~2 s.
+  const src = m.src;
+  const resuming = runPointCommands([command("resume")], runner);
+  await flush(); await flush();
+  assert.equal(m.src, src, "resume keeps the loaded track (no re-sign / new autoplay)");
+  assert.ok(m.volume < 0.05, "resume starts silent");
+  await resuming;
+  assert.deepEqual(acks, ["pause", "resume"]);
+  c.advance(PLAYER_FADE_MS / 2);
+  assert.ok(m.volume > 0.1 && m.volume < 0.9, "resume fades in");
+  c.advance(PLAYER_FADE_MS / 2 + 40);
+  near(m.volume, 0.9, 1e-9);
+  // Next track in the hall: ~1 s fade-out, silence through the swap, then a fade-in.
+  const before = m.events.length;
+  const skipping = runPointCommands([command("next_track")], runner);
+  await flush();
+  assert.equal(m.src, src, "old track keeps sounding while it fades out");
+  c.advance(PLAYER_SKIP_FADE_OUT_MS / 2); await flush();
+  assert.ok(m.volume > 0 && m.volume < 0.9, "skip fade-out in progress");
+  await drive(skipping, PLAYER_SKIP_FADE_OUT_MS + PLAYER_FADE_MS);
+  assert.notEqual(m.src, src);
+  assert.deepEqual(acks, ["pause", "resume", "next_track"]);
+  const swap = m.events.slice(before).filter((e) => e.kind === "pause" || e.kind === "src" || e.kind === "load");
+  assert.ok(swap.length > 0 && swap.every((e) => e.volume === 0), "source replaced only at silence (no click)");
+  assert.ok(hardPauses.every((level) => level === 0), "no hard pause at audible level");
+  c.advance(PLAYER_FADE_MS + 40);
+  near(m.volume, 0.9, 1e-9);
+  assert.ok(m.events.slice(fromPlaying).filter((e) => e.kind === "pause").every((e) => e.volume === 0), "never paused audibly");
+}
+
+// 44. Wiring: the cabinet / hall player nudges the fade from media events, polls commands
+// with the worker-backed ticker and wakes on visible; remote apply never hard-stops.
+{
+  const src = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
+  const onTime = src.slice(src.indexOf("const onTime = () => {"), src.indexOf("const sendReport"));
+  assert.match(onTime, /fader\.nudge\(\);[\s\S]*if \(ctl\.fadingOutPrevious\) return;/, "nudge before the skip early return");
+  assert.match(src, /const onPlaying = \(\) => \{\n\s+fader\.nudge\(\);/);
+  const poll = src.slice(src.indexOf('body: JSON.stringify({ action: "commands" })'), src.indexOf("const playIndex = useCallback"));
+  assert.match(poll, /startWakeTicker\(\(\) => void tick\(\), 5_000\)/);
+  assert.match(poll, /visibilitychange/);
+  assert.match(poll, /toggle: \(signal\) => commandTransport\(signal, \(\) => toggleRef\.current\(\)\)/);
+  assert.match(poll, /next: \(signal\) => commandTransport\(signal, \(\) => nextRef\.current\(signal\)\)/);
+  assert.doesNotMatch(poll, /\.pause\(\)|location\.reload|removeAttribute/, "remote apply never hard-stops or reloads");
 }
 
 console.log("business-player-fade-unit: ok");
