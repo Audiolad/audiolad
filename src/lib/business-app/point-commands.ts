@@ -23,6 +23,19 @@ export function pointCommandAction(
   return playing ? "none" : "toggle";
 }
 
+/** Resume / next may still be loading (track URL, reconnect) when the apply returns. */
+export const POINT_RESUME_SETTLE_MS = 12_000;
+
+/** Wait until the player leaves "loading" (or `maxMs` passes). */
+export async function waitWhileLoading(
+  status: () => string,
+  maxMs: number,
+  stepMs = 200,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<void> {
+  for (let waited = 0; status() === "loading" && waited < maxMs; waited += stepMs) await sleep(stepMs);
+}
+
 export type ClaimedPointCommand = {
   id: string;
   type: PointCommandType;

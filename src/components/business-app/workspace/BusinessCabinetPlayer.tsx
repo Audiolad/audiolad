@@ -16,10 +16,11 @@ import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
-import { runPointCommands } from "@/lib/business-app/point-commands";
+import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
+import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { atmosphereQueuePlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
@@ -376,6 +377,8 @@ export function BusinessCabinetPlayerProvider({
     );
     ctlRef.current = ctl;
     const onTime = () => {
+      // Hidden hall tab: timers may wake once a minute; media events keep the fade smooth.
+      fader.nudge();
       // Skip fade-out: these updates belong to the previous track, not the chosen one.
       if (ctl.fadingOutPrevious) return;
       evidenceRef.current.onTimeUpdate(audio.currentTime, Date.now(), audio.paused);
@@ -390,6 +393,7 @@ export function BusinessCabinetPlayerProvider({
     };
     const sendReport = () => reportRef.current();
     const onPlaying = () => {
+      fader.nudge();
       evidenceRef.current.onPlaying(audio.currentTime);
       sendReport();
     };
@@ -598,6 +602,9 @@ export function BusinessCabinetPlayerProvider({
           applied: async (type) => {
             // Soft pause resolves before the fade has actually silenced the element.
             if (type === "pause" && fadeRef.current?.fadingOut) await fadeRef.current.fadeOut();
+            // Resume / next while a track is still loading (sign, reconnect): wait for it here
+            // instead of failing and waiting out the 30 s lease.
+            if (type !== "pause") await waitWhileLoading(() => ctlRef.current?.status ?? "idle", POINT_RESUME_SETTLE_MS);
             const status = ctlRef.current?.status;
             const audio = audioRef.current;
             return !!audio && (type === "pause"
@@ -624,10 +631,18 @@ export function BusinessCabinetPlayerProvider({
       }
     };
     void tick();
-    const timer = window.setInterval(() => void tick(), 5_000);
+    // Worker-backed: a paused hall tab in the background still polls every 5 s.
+    const stopTicker = startWakeTicker(() => void tick(), 5_000);
+    const wake = () => { if (document.visibilityState === "visible") void tick(); };
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
+    document.addEventListener("visibilitychange", wake);
     return () => {
       stop = true;
-      window.clearInterval(timer);
+      stopTicker();
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
+      document.removeEventListener("visibilitychange", wake);
     };
   }, [canBeat]);
 

@@ -18,6 +18,15 @@
  * Rapid toggles reverse the ramp from the current level: no jump, no stuck silence.
  * Ticks are wall-clock based (setInterval, not requestAnimationFrame), so a fade-out
  * in a background tab still completes and pauses even when timers are throttled.
+ *
+ * Hall device (Sergey 2026-11-08): a venue device usually runs with the screen off or the
+ * tab hidden. There Chrome throttles timers to once a second and, once the page has been
+ * silent for a while, to once a MINUTE – and a fade-in starts at volume 0, so the page
+ * counts as silent. One late tick then jumps the whole ramp: «Продолжить в зале» stayed
+ * silent for about a minute and then started at full volume, pause / next sounded like a
+ * cut. The player therefore also calls `nudge()` on the element's own `timeupdate`
+ * (media events are not timer-throttled, ~4 per second while it plays), so the ramp
+ * advances smoothly in a hidden tab too.
  */
 
 /** Normal fade-in and soft pause fade-out (ms). */
@@ -185,6 +194,19 @@ export class FadingAudio {
     this.dir = dir;
     this.last = this.nowFn();
     if (this.timer === null) this.timer = this.setTimer(() => this.tick(), this.tickMs);
+  }
+
+  /** Ramping now (fade-in or fade-out in progress). */
+  get ramping(): boolean {
+    return this.dir !== 0;
+  }
+
+  /**
+   * Media `timeupdate` / `playing`: advance a running ramp. Timers in a hidden tab may be
+   * throttled to one wake-up per minute; media events keep the fade smooth there.
+   */
+  nudge(): void {
+    if (this.dir !== 0) this.tick();
   }
 
   /** Advance the ramp to `now`. Public for tests; the interval calls it. */

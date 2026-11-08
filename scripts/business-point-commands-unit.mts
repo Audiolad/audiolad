@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
-import { isPointCommandId, isPointCommandType, pointCommandAction, runPointCommands } from "../src/lib/business-app/point-commands";
+import { isPointCommandId, isPointCommandType, pointCommandAction, runPointCommands, waitWhileLoading } from "../src/lib/business-app/point-commands";
+import { startWakeTicker } from "../src/lib/business-app/wake-ticker";
 
 assert.equal(isPointCommandType("pause"), true);
 assert.equal(isPointCommandType("set_atmosphere"), false);
@@ -78,6 +79,52 @@ for (const failure of ["throw", "result", "timeout", "stop", "not-ready", "expir
   assert.deepEqual(log, []);
 }
 
+// Resume / next while the hall is still loading the track: wait for it, do not fail into the lease.
+{
+  let st = "loading";
+  let slept = 0;
+  await waitWhileLoading(() => st, 1_000, 100, async (ms) => { slept += ms; if (slept >= 300) st = "playing"; });
+  assert.equal(slept, 300);
+  st = "loading"; slept = 0;
+  await waitWhileLoading(() => st, 500, 100, async (ms) => { slept += ms; });
+  assert.equal(slept, 500, "bounded wait");
+  slept = 0;
+  await waitWhileLoading(() => "paused", 500, 100, async (ms) => { slept += ms; });
+  assert.equal(slept, 0);
+}
+
+// Command poll ticker: worker-backed wake-ups plus a fallback interval, one call per period.
+{
+  let t = 0;
+  let intervalFn: (() => void) | null = null;
+  let cleared = false;
+  let terminated = false;
+  const worker = { onmessage: null as ((e: unknown) => void) | null, period: 0, postMessage(v: unknown) { this.period = Number(v); }, terminate() { terminated = true; } };
+  let calls = 0;
+  const stop = startWakeTicker(() => { calls++; }, 5_000, {
+    now: () => t,
+    createWorker: () => worker,
+    setInterval: (fn) => { intervalFn = fn; return 1; },
+    clearInterval: () => { cleared = true; },
+  });
+  assert.equal(worker.period, 5_000);
+  t = 5_000; worker.onmessage?.({}); intervalFn!();
+  assert.equal(calls, 1, "worker and interval share one gap guard");
+  t = 10_000; worker.onmessage?.({});
+  assert.equal(calls, 2, "worker alone keeps polling (hidden tab)");
+  t = 15_000; intervalFn!();
+  assert.equal(calls, 3, "interval alone keeps polling (no worker)");
+  stop();
+  assert.ok(cleared && terminated && worker.onmessage === null);
+  let fallbackCalls = 0;
+  let fallback: (() => void) | null = null;
+  startWakeTicker(() => { fallbackCalls++; }, 5_000, {
+    now: () => 0, createWorker: () => { throw new Error("blocked"); }, setInterval: (fn) => { fallback = fn; return 1; }, clearInterval: () => {},
+  });
+  fallback!();
+  assert.equal(fallbackCalls, 1, "no worker: plain interval");
+}
+
 const route = await import("node:fs").then((fs) =>
   fs.readFileSync(new URL("../src/app/api/business/point/route.ts", import.meta.url), "utf8"),
 );
@@ -97,5 +144,14 @@ assert.match(player, /status === "playing" && !audio.paused/);
 assert.match(player, /await fadeRef.current.fadeOut\(\)/);
 assert.match(route, /p_claim_id: body.claimId/);
 assert.doesNotMatch(player, /audiolad\.point\.applied-commands/);
+// A command triggers a sound-settings refresh in parallel: it may only reorder upcoming
+// tracks (keepCurrent), never touch the sounding source (no hard cut mid-fade).
+{
+  const take = player.slice(player.indexOf("const take = (sound: PointSoundUpdate) => {"), player.indexOf("const tick = async () => {", player.indexOf("const take = (sound")));
+  assert.match(take, /keepCurrent: true/);
+  const rebuild = player.slice(player.indexOf("const rebuildFromProfile = useCallback"), player.indexOf("}, [applyAtmosphereQueue]);"));
+  assert.match(rebuild, /if \(input\.keepCurrent\) \{[^}]*return "applied";\n\s*\}\n\s*applyAtmosphereQueue\(indices\);/);
+  assert.match(player, /await waitWhileLoading\(\(\) => ctlRef\.current\?\.status \?\? "idle", POINT_RESUME_SETTLE_MS\)/);
+}
 
 console.log("business-point-commands-unit: ok");
