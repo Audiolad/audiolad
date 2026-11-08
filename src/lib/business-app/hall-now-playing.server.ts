@@ -1,6 +1,6 @@
 import "server-only";
 
-import { HALL_MIRROR_FRESH_SECONDS, type HallNowPlaying } from "@/lib/business-app/hall-mirror";
+import { HALL_MIRROR_FRESH_SECONDS, hallQueueAheadCount, type HallNowPlaying } from "@/lib/business-app/hall-mirror";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 /**
@@ -33,20 +33,30 @@ export async function loadHallNowPlaying(input: { organizationId: string; locati
     const playbackState = state.playback_state;
     if (playbackState !== "playing" && playbackState !== "paused" && playbackState !== "stopped" && playbackState !== "error") return null;
     const audioItemId = typeof state.audio_item_id === "string" ? state.audio_item_id : null;
-    const { data: now } = await service
+    const columns = "audio_item_id, position_ms, duration_ms, queue_audio_item_ids, reported_at";
+    const readSnapshot = (select: string) => service
       .from("business_player_now_playing")
-      .select("audio_item_id, position_ms, duration_ms, queue_audio_item_ids, reported_at")
+      .select(select)
       .eq("player_id", session.player_id)
       .eq("location_id", input.locationId)
       .maybeSingle();
+    let snapshot = await readSnapshot(`${columns}, queue_ahead_count`);
+    // An application rollback / pending migration still reads the existing preview.
+    if (snapshot.error?.code === "42703" || snapshot.error?.code === "PGRST204") {
+      snapshot = await readSnapshot(columns);
+    }
+    const now = snapshot.data as Record<string, unknown> | null;
     const sameTrack = !!now && now.audio_item_id === audioItemId;
     const reportedAt = Date.parse(String(sameTrack ? now.reported_at : state.reported_at));
+    const queue = sameTrack && Array.isArray(now.queue_audio_item_ids)
+      ? now.queue_audio_item_ids.filter((id: unknown): id is string => typeof id === "string") : [];
     return {
       state: playbackState,
       audioItemId,
       positionSec: sameTrack && typeof now.position_ms === "number" ? now.position_ms / 1000 : 0,
       durationSec: sameTrack && typeof now.duration_ms === "number" ? now.duration_ms / 1000 : null,
-      queue: now && Array.isArray(now.queue_audio_item_ids) ? now.queue_audio_item_ids.filter((id: unknown): id is string => typeof id === "string") : [],
+      queue,
+      aheadCount: sameTrack ? hallQueueAheadCount(now.queue_ahead_count, queue.length) : 0,
       ageSec: Number.isFinite(reportedAt) ? Math.max(0, (nowMs - reportedAt) / 1000) : 0,
     };
   } catch {
