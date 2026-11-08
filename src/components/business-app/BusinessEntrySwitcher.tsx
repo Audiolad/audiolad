@@ -7,7 +7,6 @@ import { useBusinessHostname, useBusinessDomain } from "@/components/business-ap
 import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 import Link from "next/link";
-import { selectBusinessPoint } from "@/app/business-app/actions";
 import { businessHeaderHallOptions, openBusinessHeaderHall } from "@/lib/business-app/header-halls";
 
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
@@ -152,6 +151,8 @@ export default function BusinessEntrySwitcher() {
           setHint("Это устройство в зале. Чтобы вернуть его в режим точки, нажмите «Вернуть режим точки».");
           return;
         }
+        // Load the server action only when choosing a hall, so tests that render the shell stay client-only.
+        const { selectBusinessPoint } = await import("@/app/business-app/actions");
         const opened = await openBusinessHeaderHall(hallOption.hall, currentLocationId, selectBusinessPoint, () => {
           setHint(null);
           switchTo("venue");

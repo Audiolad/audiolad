@@ -123,7 +123,7 @@ assert.match(bizCss, /\.business-entry-switcher__menu \{[^}]*max-width: min\(20r
 
 assert.match(switcher, /const halls = domain\.locations \?\? \[\];/);
 assert.match(switcher, /businessHeaderHallOptions\(halls, domain\.location\.id, venueOn\)/);
-assert.match(switcher, /import \{ selectBusinessPoint \} from "@\/app\/business-app\/actions"/);
+assert.match(switcher, /const \{ selectBusinessPoint \} = await import\("@\/app\/business-app\/actions"\)/);
 assert.match(switcher, /openBusinessHeaderHall\(hallOption\.hall, currentLocationId, selectBusinessPoint, \(\) => \{\s+setHint\(null\);\s+switchTo\("venue"\);/);
 assert.match(switcher, /if \(!opened\) setHint\(/);
 assert.match(switcher, /data-location-id=\{option\.locationId\}/);
