@@ -7,6 +7,8 @@ import { useBusinessHostname, useBusinessDomain } from "@/components/business-ap
 import { businessCabinetHomePath, normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 import Link from "next/link";
+import { selectBusinessPoint } from "@/app/business-app/actions";
+import { businessHeaderHallOptions, openBusinessHeaderHall } from "@/lib/business-app/header-halls";
 
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
 import { BUSINESS_OWNER_UNLOCK_PATH } from "@/lib/business-app/cabinet-mode";
@@ -18,7 +20,9 @@ import {
 } from "@/lib/business-app/profile";
 
 type EntryOption = {
-  id: "person" | "venue";
+  id: string;
+  locationId?: string;
+  disabled?: boolean;
   label: string;
   /** Screen reader name when the visible label is a placeholder. */
   ariaLabel?: string;
@@ -27,11 +31,11 @@ type EntryOption = {
   testId: string;
   selected: boolean;
   /** `true` – focus moved elsewhere (the profile name field); do not return it to the trigger. */
-  onSelect: () => boolean | void;
+  onSelect: () => boolean | void | Promise<boolean | void>;
 };
 
 /**
- * Header dropdown: the person's name and the venue name. Guests do not see it.
+ * Header dropdown: the person's name and all existing halls. Guests do not see it.
  * The trigger shows the current choice (cut with an ellipsis); the list shows full names.
  */
 export default function BusinessEntrySwitcher() {
@@ -46,6 +50,8 @@ export default function BusinessEntrySwitcher() {
   const [hint, setHint] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [pending, setPending] = useState(false);
+  const choosingRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -55,7 +61,7 @@ export default function BusinessEntrySwitcher() {
   const close = useCallback((focusTrigger: boolean) => {
     setOpen(false);
     if (focusTrigger) triggerRef.current?.focus();
-  }, []);
+  }, [setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -106,7 +112,8 @@ export default function BusinessEntrySwitcher() {
   };
 
   const person = domain.owner.firstName.trim();
-  const venue = domain.location.name.trim() || "Кофейня";
+  const halls = domain.locations ?? [];
+  const currentLocationId = domain.location.id;
   const personOn = point || entry === "person";
   const venueOn = !point && entry === "venue";
 
@@ -135,37 +142,46 @@ export default function BusinessEntrySwitcher() {
         switchTo("person");
       },
     },
-    {
-      id: "venue",
-      label: venue,
-      // Owner phone: the venue side is a preview of the hall device menu (same table, no reports).
-      ariaLabel: `${venue} – как видит точка`,
-      testId: "biz-entry-venue",
-      selected: venueOn,
-      onSelect: () => {
+    ...businessHeaderHallOptions(halls, domain.location.id, venueOn).map((hallOption): EntryOption => ({
+      ...hallOption,
+      // Owner phone: each venue side previews that hall device menu (same table, no reports).
+      ariaLabel: `${hallOption.label} – как видит точка`,
+      testId: `biz-entry-venue-${hallOption.locationId}`,
+      onSelect: async () => {
         if (point) {
           setHint("Это устройство в зале. Чтобы вернуть его в режим точки, нажмите «Вернуть режим точки».");
           return;
         }
-        setHint(null);
-        switchTo("venue");
+        const opened = await openBusinessHeaderHall(hallOption.hall, currentLocationId, selectBusinessPoint, () => {
+          setHint(null);
+          switchTo("venue");
+        });
+        if (!opened) setHint("Не удалось выбрать точку. Обновите страницу и повторите.");
       },
-    },
+    })),
   ];
   const current = options.find((option) => option.selected) ?? options[0];
   const currentIndex = Math.max(0, options.indexOf(current));
 
   const openList = (index: number) => {
+    if (choosingRef.current) return;
     setActiveIndex(index);
     setOpen(true);
   };
 
-  const choose = (index: number) => {
+  const choose = async (index: number) => {
     const option = options[index];
-    if (!option) return;
-    // The name field keeps the focus: returning it to the trigger would stop typing.
-    const focusMoved = option.onSelect() === true;
-    close(!focusMoved);
+    if (!option || option.disabled || choosingRef.current) return;
+    choosingRef.current = true;
+    setPending(true);
+    try {
+      // The name field keeps the focus: returning it to the trigger would stop typing.
+      const focusMoved = (await option.onSelect()) === true;
+      close(!focusMoved);
+    } finally {
+      choosingRef.current = false;
+      setPending(false);
+    }
   };
 
   const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -197,7 +213,7 @@ export default function BusinessEntrySwitcher() {
       case "Enter":
       case " ":
         event.preventDefault();
-        choose(activeIndex);
+        void choose(activeIndex);
         break;
       case "Escape":
         event.preventDefault();
@@ -218,12 +234,17 @@ export default function BusinessEntrySwitcher() {
         type="button"
         className="business-entry-switcher__trigger"
         data-testid="biz-entry-trigger"
+        aria-disabled={pending || undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-label={`Что открыто: ${current.ariaLabel ?? current.label}`}
         title={current.ariaLabel ?? current.label}
-        onClick={() => (open ? close(false) : openList(currentIndex))}
+        onClick={() => {
+          if (choosingRef.current) return;
+          if (open) close(false);
+          else openList(currentIndex);
+        }}
         onKeyDown={onTriggerKeyDown}
       >
         <span className="business-entry-switcher__value" data-placeholder={current.placeholder ? "true" : undefined}>{current.label}</span>
@@ -244,6 +265,7 @@ export default function BusinessEntrySwitcher() {
           id={listId}
           role="listbox"
           tabIndex={-1}
+          aria-busy={pending}
           aria-label="Что открыто"
           aria-activedescendant={`${baseId}-opt-${options[activeIndex]?.id ?? current.id}`}
           className="business-entry-switcher__menu"
@@ -256,13 +278,15 @@ export default function BusinessEntrySwitcher() {
               id={`${baseId}-opt-${option.id}`}
               role="option"
               aria-selected={option.selected}
+              aria-disabled={option.disabled || pending || undefined}
               aria-label={option.ariaLabel}
               className="business-entry-switcher__option"
               data-checked={option.selected ? "true" : "false"}
               data-active={index === activeIndex ? "true" : "false"}
               data-testid={option.testId}
+              data-location-id={option.locationId}
               onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => choose(index)}
+              onClick={() => void choose(index)}
             >
               <span className="business-entry-switcher__option-label" data-placeholder={option.placeholder ? "true" : undefined}>
                 {option.label}
