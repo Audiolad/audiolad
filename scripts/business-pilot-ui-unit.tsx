@@ -48,19 +48,37 @@ assert.equal(render(0, false, false, undefined, 1, [locations[0]]), "", "limit 1
 assert.equal(render(0, true, true), "", "staff device cannot switch owner locations");
 const tenLimit = render(0, true, false, undefined, 10);
 assert.match(tenLimit, /\+ Добавить точку 3/, "ten-hall setting still offers only the next hall");
-assert.doesNotMatch(tenLimit, /biz-more-points|Точек:|из 10/);
+assert.doesNotMatch(tenLimit, /biz-more-points|Точек:|из 10|biz-tenth-point-notice|Написать|десятую точку/);
 const tenHalls = Array.from({ length: 10 }, (_, index) => ({ id: `hall-${index}`, name: `Зал ${index + 1}`, status: "active" }));
 for (let count = 3; count < 10; count++) {
   const next = render(0, true, false, undefined, 10, tenHalls.slice(0, count));
   assert.match(next, new RegExp(`\\+ Добавить точку ${count + 1}`), "one sequential add button through hall ten");
   assert.equal((next.match(/data-testid="biz-add-point"/g) ?? []).length, 1);
+  if (count === 9) {
+    assert.match(next, /data-testid="biz-tenth-point-notice"/);
+    assert.match(next, /Сейчас вы подключаете десятую точку/);
+    assert.match(next, /В этой конфигурации точек десять/);
+    assert.match(next, /Одиннадцатую так же подключить нельзя/);
+    assert.match(next, /напишите заранее/);
+    assert.match(next, /href="\/profile#kontakty"/);
+    assert.match(next, />Написать</);
+    assert.doesNotMatch(next, /data-testid="biz-more-points"/);
+  } else {
+    assert.doesNotMatch(next, /biz-tenth-point-notice|biz-more-points-write|Сейчас вы подключаете десятую точку|data-testid="biz-more-points"/);
+  }
 }
 const tenFull = render(0, true, false, undefined, 10, tenHalls);
 assert.equal((tenFull.match(/aria-pressed=/g) ?? []).length, 10, "all existing halls remain selectable");
-assert.doesNotMatch(tenFull, /biz-add-point|Добавить точку 11|Точек:|из 10|лимит|https?:|—/);
-assert.match(tenFull, /<details[^>]*data-testid="biz-more-points"><summary[^>]*>Добавить ещё точку<\/summary>/, "native in-cabinet disclosure opens without creating a hall");
+assert.doesNotMatch(tenFull, /biz-add-point|Добавить точку 11|Точек:|из 10|лимит|https?:|—|<details|Добавить ещё точку/);
+assert.match(tenFull, /data-testid="biz-more-points"/, "visible thank-you after ten, without creating a hall");
 assert.match(tenFull, /Спасибо, что вы с нами и развиваете сеть/);
+assert.match(tenFull, /В этой конфигурации можно подключить десять точек/);
+assert.match(tenFull, /одиннадцатую так же добавить нельзя/);
+assert.match(tenFull, /напишите заранее/);
 assert.match(tenFull, /именно под вашу ситуацию/);
+assert.match(tenFull, /href="\/profile#kontakty"/);
+assert.match(tenFull, /data-testid="biz-more-points-write"/);
+assert.match(tenFull, />Написать</);
 assert.match(tenFull, /7990/, "ten active halls keep the same billing math");
 assert.match(first, /Активных точек:/);
 assert.match(first, /Одна оплата за все активные точки/);
@@ -75,6 +93,9 @@ assert.doesNotMatch(blockedRenewal, /data-testid="biz-home-pay"/, "no mid-period
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const slots = read("src/components/business-app/BusinessPointSlots.tsx");
 assert.doesNotMatch(slots, /location\.(?:assign|replace|reload)|location\.href/);
+assert.match(slots, /href="\/profile#kontakty"/);
+assert.match(slots, />Написать</);
+assert.match(read("src/components/business-app/ProfileHelpContact.tsx"), /id="kontakty"/);
 assert.match(slots, /import \{ useRouter \} from "next\/navigation"/);
 assert.match(slots, /const router = useRouter\(\)/);
 assert.match(slots, /slot\.location \? await selectBusinessPoint\(slot\.location\.id\) : await activateBusinessPoint\(slot\.number\)/);
