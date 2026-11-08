@@ -81,7 +81,10 @@ assert.doesNotMatch(switcher, /label: person \|\| "–"/);
 assert.match(switcher, /router\.push\(BUSINESS_PROFILE_NAME_HREF\)/);
 assert.match(switcher, /if \(!person\) return openNameField\(\);/);
 // On /profile the name field keeps the focus: the menu must not hand it back to the trigger.
-assert.match(switcher, /const focusMoved = option\.onSelect\(\) === true;\s*close\(!focusMoved\);/);
+assert.match(switcher, /const focusMoved = \(await option\.onSelect\(\)\) === true;\s*close\(!focusMoved\);/);
+// Pending uses ARIA rather than a disabled trigger so close() can still restore keyboard focus.
+assert.match(switcher, /aria-disabled=\{pending \|\| undefined\}/);
+assert.doesNotMatch(switcher, /\sdisabled=\{pending\}/);
 assert.match(switcher, /focusBusinessOwnerNameField\(\)\) return true;/);
 const subscription = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.match(subscription, /useBusinessHomePay\(\)/);

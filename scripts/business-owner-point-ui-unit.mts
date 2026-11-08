@@ -107,7 +107,7 @@ assert.match(switcher, /case "Escape"/);
 assert.match(switcher, /addEventListener\("pointerdown"/);
 assert.match(switcher, /switchTo\("person"\)/);
 // Owner phone: the venue side is the preview «как видит точка»; an unlocked hall device stays put.
-assert.match(switcher, /setHint\(null\);\n        switchTo\("venue"\);/);
+assert.match(switcher, /setHint\(null\);\s+switchTo\("venue"\);/);
 assert.match(switcher, /if \(point\) \{\n          setHint\("Это устройство в зале/);
 // Hall device: the venue name and the way into the owner cabinet, with the password again.
 assert.match(switcher, /if \(cabinet\.mode === "point"\)/);
@@ -120,4 +120,18 @@ assert.match(bizCss, /\.business-entry-switcher__value \{[^}]*text-overflow: ell
 assert.match(bizCss, /\.business-entry-switcher__option-label \{[^}]*white-space: normal/);
 assert.match(bizCss, /\.business-entry-switcher__menu \{[^}]*max-width: min\(20rem, calc\(100vw - 1\.5rem\)\)/);
 
+
+assert.match(switcher, /const halls = domain\.locations \?\? \[\];/);
+assert.match(switcher, /businessHeaderHallOptions\(halls, domain\.location\.id, venueOn\)/);
+assert.match(switcher, /const \{ selectBusinessPoint \} = await import\("@\/app\/business-app\/actions"\)/);
+assert.match(switcher, /openBusinessHeaderHall\(hallOption\.hall, currentLocationId, selectBusinessPoint, \(\) => \{\s+setHint\(null\);\s+switchTo\("venue"\);/);
+assert.match(switcher, /if \(!opened\) setHint\(/);
+assert.match(switcher, /data-location-id=\{option\.locationId\}/);
+assert.match(switcher, /choosingRef\.current = true/);
+assert.match(switcher, /option\.disabled \|\| choosingRef\.current/);
+assert.match(switcher, /aria-disabled=\{option\.disabled \|\| pending \|\| undefined\}/);
+assert.doesNotMatch(switcher, /activateBusinessPoint|router\.push\("\/preferences"\)/);
+
+// Keep the behavioral hall cases in the existing business point UI test entrypoint.
+await import("./business-header-halls-unit.mjs");
 console.log("business-owner-point-ui-unit: ok");
