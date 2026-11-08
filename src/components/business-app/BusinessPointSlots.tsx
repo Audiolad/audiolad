@@ -6,6 +6,7 @@ import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { activateBusinessPoint, selectBusinessPoint } from "@/app/business-app/actions";
 import { useBusinessDomain } from "./BusinessDomainProvider";
 import { useBusinessCabinetMode } from "./BusinessPointMode";
@@ -72,6 +73,11 @@ export default function BusinessPointSlots() {
       router.push("/preferences");
     });
   }
+  const addingTenth = limit >= 10 && halls.length === 9;
+  const atCap = halls.length >= limit;
+  const writeLink = (
+    <Link className="business-app-btn business-app-btn-primary business-app-focus-ring mt-3 inline-flex" href="/profile#kontakty" data-testid="biz-more-points-write">Написать</Link>
+  );
   return <section className="business-app-card mx-auto mb-4 max-w-3xl space-y-3" aria-label="Точки организации">
     <h2 className="text-lg font-bold">Мои точки</h2>
     <div className="flex flex-wrap gap-2">
@@ -84,7 +90,16 @@ export default function BusinessPointSlots() {
         {slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`}
       </button>)}
     </div>
-    <p className="text-sm text-[var(--biz-text-muted)]">Точек: {halls.length} из {limit}. {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за каждую активную точку в 30 дней, пустые места не оплачиваются.</p>
+    {addingTenth ? <div className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-tenth-point-notice">
+      <p className="text-sm text-[var(--biz-text-muted)]">Сейчас вы подключаете десятую точку. В этой конфигурации точек десять. Одиннадцатую так же подключить нельзя – нужно чуть изменить конфигурацию. Если планируете подключать ещё, напишите заранее – подберём под вас отдельную структуру.</p>
+      {writeLink}
+    </div> : null}
+    {atCap ? <div className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-more-points">
+      <p className="text-sm text-[var(--biz-text-muted)]">{limit >= 10
+        ? "Спасибо, что вы с нами и развиваете сеть. В этой конфигурации можно подключить десять точек; одиннадцатую так же добавить нельзя. Если планируете больше, напишите заранее – подберём более удобную схему именно под вашу ситуацию."
+        : "Спасибо, что вы с нами и развиваете сеть. Для большей сети мы подберём более удобную схему именно под вашу ситуацию."}</p>
+      {writeLink}
+    </div> : null}
     {multi ? <>
     <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
     {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}

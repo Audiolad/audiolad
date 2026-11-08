@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * Venue slots are the same for every Business organization: one hall at start, the owner
  * adds the next one himself up to the system limit. The limit lives in one database row
- * (`business_venue_slot_settings.default_limit`, 3 now) and is read through
- * `business_venue_slot_limit`, so raising it to 5 or 10 needs no rebuild and no per-client setup.
+ * (`business_venue_slot_settings.default_limit`, 10 after the self-serve migration)
+ * and is read through `business_venue_slot_limit`, with no per-client setup.
  */
 export const BUSINESS_VENUE_SLOT_HARD_MAX = 10;
 
