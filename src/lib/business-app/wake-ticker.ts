@@ -25,7 +25,7 @@ export type WakeTickerEnv = {
 };
 
 /** Worker body: tick every `ms` (sent as the first message). */
-export const WAKE_TICKER_WORKER_SOURCE =
+export const WAKE_TICKER_WORKER_CODE =
   "let t=null;onmessage=function(e){if(t!==null)clearInterval(t);t=setInterval(function(){postMessage(0)},Number(e.data)||5000)};";
 
 function browserWorker(source: string): WakeTickerWorker | null {
@@ -71,7 +71,7 @@ export function startWakeTicker(fn: () => void, ms: number, env: WakeTickerEnv =
   const create = env.createWorker ?? browserWorker;
   let worker: WakeTickerWorker | null = null;
   try {
-    worker = create(WAKE_TICKER_WORKER_SOURCE);
+    worker = create(WAKE_TICKER_WORKER_CODE);
     if (worker) {
       worker.onmessage = run;
       worker.postMessage(ms);

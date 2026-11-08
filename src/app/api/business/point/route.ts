@@ -15,6 +15,8 @@ import { pointClientIpCollapsed, pointJoinResult } from "@/lib/business-app/poin
 import { pointCodeSecondsLeft } from "@/lib/business-app/point-share";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
+import { isHallNowPlayingReport } from "@/lib/business-app/hall-mirror";
+import { loadHallNowPlaying } from "@/lib/business-app/hall-now-playing.server";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { businessTrialActivityConfig } from "@/lib/business-trial-activity/config";
 import { recordBusinessTrialPointListen } from "@/lib/business-trial-activity/record.server";
@@ -29,7 +31,7 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store" };
 
 /** Owner actions. The hall device without a fresh owner password gets 403 (cabinet-mode.ts). */
-const OWNER_ACTIONS = new Set(["owner-state", "create", "revoke", "link", "permission", "enqueue"]);
+const OWNER_ACTIONS = new Set(["owner-state", "hall-now", "create", "revoke", "link", "permission", "enqueue"]);
 
 /** Same hash as the database stores: sha256 of the token text (business_point_sessions.token_hash). */
 function pointTokenHashHex(token: string): string {
@@ -196,6 +198,18 @@ export async function POST(request: Request) {
     return json({ ok: true, locationId: location.id, signals });
   }
 
+  if (body.action === "hall-now") {
+    // Owner mirror (t1283u): what the live hall device plays, for «Музыка» and the hall view.
+    if (!isPointCommandId(body.locationId)) return json({ ok: false }, 400);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return json({ ok: false }, 401);
+    const { data: location, error } = await supabase.from("business_locations")
+      .select("id, organization_id").eq("id", body.locationId).eq("status", "active").maybeSingle();
+    if (error || !location) return json({ ok: false }, 403);
+    const hall = await loadHallNowPlaying({ organizationId: location.organization_id, locationId: location.id });
+    return json({ ok: true, hall });
+  }
+
   if (body.action === "permission") {
     const locationId = typeof body.locationId === "string" ? body.locationId : "";
     if (typeof body.allowed !== "boolean" || !locationId) {
@@ -331,6 +345,19 @@ export async function POST(request: Request) {
       p_playing_confirmed: report?.playingConfirmed ?? false,
       p_error_code: report?.errorCode ?? null,
     });
+    // Owner mirror snapshot (position, upcoming queue). Best effort: a missing migration or a
+    // failed write never fails the playback report itself.
+    if (!error && report && isHallNowPlayingReport(body.nowPlaying)) {
+      try {
+        await supabase.rpc("report_business_point_now_playing", {
+          p_token: token,
+          p_audio_item_id: report.audioItemId,
+          p_position_ms: body.nowPlaying.positionMs,
+          p_duration_ms: body.nowPlaying.durationMs,
+          p_queue: body.nowPlaying.queue,
+        });
+      } catch { /* not migrated yet */ }
+    }
     if (!error && report?.playingConfirmed && report.audioItemId && body.sample && typeof body.sample === "object") {
       const sample = body.sample as Record<string, unknown>;
       if (!isPointCommandId(sample.eventId) || !isPointCommandId(sample.sessionId)

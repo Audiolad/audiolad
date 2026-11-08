@@ -41,6 +41,8 @@ export type WorkspacePageStatus =
  */
 export type WorkspacePageModel = {
   playbackScope?: string;
+  /** Owner cabinet: the selected venue. Its live hall device is mirrored on «Музыка» (hall-mirror.ts). */
+  locationId?: string | null;
   soundSettings?: LocationSoundSettings | null;
   spaceId: BusinessSpaceId;
   spaceTitle: string;

@@ -587,6 +587,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       ...model,
       status,
       playbackScope: selectedDomain.pilotSlots ? selectedLocationId ?? undefined : undefined,
+      locationId: selectedLocationId ?? null,
       soundSettings: selectedDomain.pilotSlots && selectedLocationId ? await loadLocationSoundSettings(selectedLocationId) : null,
       daysLeft: activation.access.daysLeft,
       endsAtLabel,

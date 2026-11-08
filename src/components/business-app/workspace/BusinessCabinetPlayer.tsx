@@ -21,6 +21,8 @@ import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrd
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
+import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingIds, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
+import type { PointCommandType } from "@/lib/business-app/point-commands";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { atmosphereQueuePlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
@@ -58,6 +60,13 @@ type CabinetPlayerApi = {
   accessModel: WorkspacePageModel | null;
   pointDevice: boolean;
   canChangeMusic: boolean;
+  /**
+   * Owner screens while a live hall device plays (hall-mirror.ts): `view`, `queueOrder` and
+   * the mini bar show the hall; play / pause / next send the hall commands; nothing plays here.
+   */
+  hallMirror: boolean;
+  /** Next is offered: the hall command in the mirror, otherwise the music-change right. */
+  canNext: boolean;
   adopt: (model: WorkspacePageModel) => void;
   release: () => void;
   view: View;
@@ -137,6 +146,10 @@ function writeLocal(spaceId: string, playback: WorkspacePlayback, locationId?: s
   }
 }
 
+function hallKey(hall: HallNowPlaying): string {
+  return `${hall.state}:${hall.audioItemId ?? ""}`;
+}
+
 export function BusinessCabinetPlayerProvider({
   initialModel = null,
   pointReports = false,
@@ -188,6 +201,7 @@ export function BusinessCabinetPlayerProvider({
   const playOrderRef = useRef<number[] | null>(null);
   const savedPlaceRef = useRef(false);
   const rebuildGen = useRef(0);
+  const hallMirrorRef = useRef(false);
 
   const adopt = useCallback((next: WorkspacePageModel) => {
     const current = modelRef.current;
@@ -299,13 +313,25 @@ export function BusinessCabinetPlayerProvider({
     const audible = ctl.audibleItemId;
     const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible), ctl.recovering);
     const report = evidenceRef.current.report(state, audible, Date.now());
+    // Owner mirror (t1283u): position and the upcoming queue of what the hall really plays.
+    const tracks = modelRef.current?.tracks ?? [];
+    const fading = ctl.fadingOutPrevious;
+    const time = fading ? 0 : audio.currentTime;
+    const index = fading ? tracks.findIndex((t) => t.audioItemId === audible) : ctl.index;
+    const nowPlaying = {
+      positionMs: Number.isFinite(time) && time > 0 ? Math.min(86_400_000, Math.floor(time * 1000)) : 0,
+      durationMs: !fading && Number.isFinite(audio.duration) && audio.duration > 0
+        ? Math.min(86_400_000, Math.round(audio.duration * 1000))
+        : (tracks[index]?.durationSeconds ? Math.round(tracks[index].durationSeconds! * 1000) : null),
+      queue: index >= 0 ? hallUpcomingIds(tracks, playOrderRef.current, index) : [],
+    };
     sendSpaLiveReport(
       (live) => {
         if (!usageSession.current) usageSession.current = crypto.randomUUID();
         return postPointReport({ kind: "playback", report: live, sample: live.playingConfirmed && audioRef.current ? {
           eventId: crypto.randomUUID(), sessionId: usageSession.current, seq: ++usageSeq.current,
           positionMs: Math.floor(audioRef.current.currentTime * 1000),
-        } : null });
+        } : null, nowPlaying });
       },
       report,
     );
@@ -646,6 +672,99 @@ export function BusinessCabinetPlayerProvider({
     };
   }, [canBeat]);
 
+  // Owner mirror of the live hall device (t1283u). Owner browser only; the hall device itself
+  // is the source of truth and never reads this.
+  const [hall, setHall] = useState<{ data: HallNowPlaying; at: number; locationId: string } | null>(null);
+  const [hallPending, setHallPending] = useState<HallPending | null>(null);
+  /** Wall clock for the mirror, set from timers and answers (render stays pure). */
+  const [hallNow, setHallNow] = useState(0);
+  const hallLocation = !pointReports && open ? (model?.locationId ?? null) : null;
+  const hallPollRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!hallLocation) return;
+    let stop = false;
+    let inFlight = false;
+    const poll = async () => {
+      if (stop || inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch("/api/business/point", {
+          ...JSON_POST,
+          body: JSON.stringify({ action: "hall-now", locationId: hallLocation }),
+          signal: AbortSignal.timeout(5_000),
+        });
+        const data = parseHallNowPlaying(await res.json());
+        if (stop) return;
+        const at = Date.now();
+        setHall(data ? { data, at, locationId: hallLocation } : null);
+        setHallNow(at);
+        // The hall reported something new: its own state wins over the pending button state.
+        const key = data ? hallKey(data) : "";
+        setHallPending((pending) => (pending && pending.from !== key ? null : pending));
+      } catch {
+        /* Keep the last snapshot; it ends when the hall stops answering (server freshness). */
+      } finally {
+        inFlight = false;
+      }
+    };
+    hallPollRef.current = () => void poll();
+    void poll();
+    const timer = window.setInterval(() => void poll(), HALL_MIRROR_POLL_MS);
+    const wake = () => { if (document.visibilityState === "visible") void poll(); };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      stop = true;
+      hallPollRef.current = () => {};
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, [hallLocation]);
+  // A snapshot of another venue (selection changed) or a closed player never shows.
+  const liveHall = hallLocation && hall?.locationId === hallLocation ? hall : null;
+  const mirror = liveHall && model ? hallMirrorView(liveHall.data, model.tracks, (hallNow - liveHall.at) / 1000) : null;
+  const hallMirror = mirror !== null;
+  useLayoutEffect(() => {
+    hallMirrorRef.current = hallMirror;
+  }, [hallMirror]);
+  const mirrorPlaying = mirror?.status === "playing";
+  useEffect(() => {
+    if (!mirrorPlaying) return;
+    // The hall moves on: the shown position follows it between snapshots.
+    const timer = window.setInterval(() => setHallNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [mirrorPlaying]);
+  useEffect(() => {
+    if (!hallMirror) return;
+    // A live hall device took over the owner screens: no second copy plays on this phone.
+    const ctl = ctlRef.current;
+    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) void toggleRef.current();
+  }, [hallMirror]);
+  const hallSnapshotKey = liveHall ? hallKey(liveHall.data) : "";
+  const sendHall = useCallback(async (type: PointCommandType) => {
+    const locationId = modelRef.current?.locationId;
+    if (!locationId) return;
+    if (type !== "next_track") {
+      const at = Date.now();
+      setHallNow(at);
+      setHallPending({ status: type === "pause" ? "paused" : "playing", until: at + HALL_MIRROR_PENDING_MS, from: hallSnapshotKey });
+    }
+    try {
+      const res = await fetch("/api/business/point", {
+        ...JSON_POST,
+        body: JSON.stringify({ action: "enqueue", id: crypto.randomUUID(), locationId, type }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (json.ok !== true) throw new Error(json.error ?? "enqueue_failed");
+      setSaveNote(null);
+    } catch {
+      setHallPending(null);
+      setSaveNote("Не удалось отправить команду в зал. Попробуйте ещё раз.");
+    }
+    window.setTimeout(() => hallPollRef.current(), 2_000);
+  }, [hallSnapshotKey]);
+
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
     if (!current || !accessRef.current?.allowsPlayback()) return;
@@ -890,6 +1009,8 @@ export function BusinessCabinetPlayerProvider({
   const seek = useCallback((ratio: number) => {
     // Seek is local. The owner accepts a stale-permission window of ~5 s within
     // the current track: this does not change the music. Commands refresh it sooner.
+    // Hall mirror: the bar shows the hall; there is no hall seek command.
+    if (hallMirrorRef.current) return;
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
     // The previous track is fading out after a skip: the bar already shows the chosen one.
@@ -900,11 +1021,15 @@ export function BusinessCabinetPlayerProvider({
     remember({ positionSec: nextTime }, false, true);
   }, [remember]);
 
-  const track = model?.tracks[view.index] ?? model?.tracks[playback.index] ?? null;
+  const shownView: View = hallShownView(view, mirror, hallPending, hallNow);
+  const shownToggle = mirror
+    ? async () => { await sendHall(shownView.status === "playing" ? "pause" : "resume"); }
+    : toggle;
+  const track = mirror ? (model?.tracks[mirror.index] ?? null) : (model?.tracks[view.index] ?? model?.tracks[playback.index] ?? null);
   const author = track?.authorName?.trim() || "";
   const nowTitle = track ? (author ? `${track.title} – ${author}` : track.title) : null;
-  const duration = view.duration > 0 ? view.duration : (track?.durationSeconds ?? 0);
-  const playing = view.status === "playing" || view.status === "loading";
+  const duration = shownView.duration > 0 ? shownView.duration : (track?.durationSeconds ?? 0);
+  const playing = shownView.status === "playing" || shownView.status === "loading";
 
   const authorizeMusicChange = async (): Promise<boolean> => {
     if (!pointReports) return true;
@@ -924,18 +1049,25 @@ export function BusinessCabinetPlayerProvider({
       return false;
     }
   };
-  const deviceNext = async () => { if (await authorizeMusicChange()) await next(); };
-  const devicePrevious = async () => { if (await authorizeMusicChange()) await previous(); };
-  const devicePlayIndex = async (index: number) => { if (await authorizeMusicChange()) await playIndex(index); };
+  const deviceNext = async () => {
+    if (mirror) return sendHall("next_track");
+    if (await authorizeMusicChange()) await next();
+  };
+  // Mirror: the hall has no «previous» / «play this one» command; the queue is the hall's.
+  const devicePrevious = async () => { if (!mirror && await authorizeMusicChange()) await previous(); };
+  const devicePlayIndex = async (index: number) => { if (!mirror && await authorizeMusicChange()) await playIndex(index); };
 
   const api: CabinetPlayerApi = {
     accessModel: model,
     pointDevice: pointReports,
-    canChangeMusic: !pointReports || pointCanEdit,
+    // Mirror: only pause / resume / next exist as hall commands; the queue is the hall's.
+    canChangeMusic: !mirror && (!pointReports || pointCanEdit),
+    hallMirror,
+    canNext: mirror ? true : !pointReports || pointCanEdit,
     adopt,
     release,
-    view,
-    toggle,
+    view: shownView,
+    toggle: shownToggle,
     next: deviceNext,
     previous: devicePrevious,
     playIndex: devicePlayIndex,
@@ -943,7 +1075,7 @@ export function BusinessCabinetPlayerProvider({
     seek: pointReports && !pointCanEdit ? () => {} : seek,
     volume: playback.volume,
     saveNote,
-    queueOrder,
+    queueOrder: mirror ? mirror.queueOrder : queueOrder,
     setQueueOrder: pointReports ? () => {} : setQueueOrder,
     applyAtmosphereQueue: pointReports ? () => {} : applyAtmosphereQueue,
     rebuildFromProfile: pointReports ? async () => "deferred" : rebuildFromProfile,
@@ -963,21 +1095,21 @@ export function BusinessCabinetPlayerProvider({
             if (coverSrc) setFailedCover(coverSrc);
           }}
           playing={playing}
-          loading={view.status === "loading"}
-          onToggle={() => void toggle()}
+          loading={shownView.status === "loading"}
+          onToggle={() => void shownToggle()}
           onNext={() => void deviceNext()}
           nextDisabled={pointReports && !pointCanEdit}
           onClose={() => void dismissBar()}
           onOpen={revealNowPlaying}
           onSeek={pointReports && !pointCanEdit ? undefined : seek}
-          currentTime={view.currentTime}
+          currentTime={shownView.currentTime}
           duration={duration}
-          timeLabel={`${formatPlaybackClock(view.currentTime)} / ${formatPlaybackClock(duration)}`}
+          timeLabel={`${formatPlaybackClock(shownView.currentTime)} / ${formatPlaybackClock(duration)}`}
           volume={playback.volume}
-          onVolume={setVolume}
-          message={view.message ? musicPlayerMessage(view.message) : null}
-          ctaLabel={view.needsGesture ? ENABLE_MUSIC_LABEL : null}
-          onCta={() => void toggle()}
+          onVolume={mirror ? undefined : setVolume}
+          message={shownView.message ? musicPlayerMessage(shownView.message) : null}
+          ctaLabel={shownView.needsGesture ? ENABLE_MUSIC_LABEL : null}
+          onCta={() => void shownToggle()}
           ctaTestId="biz-workspace-enable-music"
           messageTestId="biz-workspace-player-message"
           note={saveNote}
