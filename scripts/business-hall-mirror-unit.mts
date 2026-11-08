@@ -106,6 +106,20 @@ assert.deepEqual(hall.queue, [id(5), id(1)]);
   assert.match(route, /"hall-now"/);
   assert.match(route, /isHallNowPlayingReport\(body\.nowPlaying\)/);
   assert.match(route, /report_business_point_now_playing/);
+  // t1284u: the RPC error is checked (supabase-js does not throw) and falls back to a
+  // service-role upsert of the same row by this device's own session; never fails the report.
+  const write = route.slice(route.indexOf("async function writeHallNowPlaying"), route.indexOf("export async function POST"));
+  assert.match(write, /const \{ error: rpcError \} = await supabase\.rpc\("report_business_point_now_playing"/);
+  assert.match(write, /if \(!rpcError\) return;/);
+  assert.match(write, /createServiceRoleClient\(\)/);
+  assert.match(write, /\.from\("business_point_sessions"\)[\s\S]*\.eq\("token_hash", `\\\\x\$\{pointTokenHashHex\(token\)\}`\)[\s\S]*\.is\("revoked_at", null\)/);
+  assert.match(write, /\.from\("business_player_now_playing"\)\.upsert\(/);
+  assert.match(write, /onConflict: "player_id"/);
+  for (const col of ["player_id", "organization_id", "location_id", "audio_item_id", "position_ms", "duration_ms", "queue_audio_item_ids", "reported_at"]) {
+    assert.match(write, new RegExp(`${col}:`), col);
+  }
+  assert.match(route, /await writeHallNowPlaying\(supabase, token, report\.audioItemId, body\.nowPlaying\)/);
+  assert.match(route, /text\.length > 16384/, "a 12-id queue + usage sample fits the body limit");
   const sql = readFileSync(new URL("../supabase/migrations/20270228120000_business_point_now_playing.sql", import.meta.url), "utf8");
   assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
   assert.match(sql, /REVOKE ALL ON TABLE public\.business_player_now_playing FROM PUBLIC, anon, authenticated/);

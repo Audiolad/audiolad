@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 
 import {
   PRESIGN_MAX_AGE_MS,
+  PRESIGN_REFRESH_AGE_MS,
+  PRESIGN_RETRY_MS,
   RECONNECTING_MESSAGE,
   RECOVERY_MAX_MS,
   RECOVERY_RESUME_WINDOW_MS,
@@ -108,7 +110,8 @@ function world(opts: {
   assert.equal(w.p.status, "playing", "resumes without a tap");
   assert.equal(w.p.current?.audioItemId, "track-1", "same track");
   assert.equal(w.audio.currentTime, 42, "same position");
-  assert.match(w.audio.src, /track-1\?sig=3/, "freshly signed URL");
+  // sig=2 is the pre-sign of track-2 at play start (t1285u), sig=3 the offline retry.
+  assert.match(w.audio.src, /track-1\?sig=4/, "freshly signed URL");
   assert.equal(w.p.message, null);
   assert.equal(w.p.recovering, false);
   assert.equal(w.timers.length, 0, "no stray retry timers");
@@ -194,7 +197,7 @@ function world(opts: {
   await w.p.toggle(); // «Включить музыку» tap
   assert.equal(w.p.status, "playing");
   assert.equal(w.p.needsGesture, false);
-  assert.equal(w.signs.length, 1, "the already signed source is used inside the gesture");
+  assert.equal(w.signs.filter((id) => id === "track-1").length, 1, "the already signed source is used inside the gesture");
 }
 
 // 6. Autoplay refusal after a reconnect (e.g. the browser dropped the gesture): gesture state.
@@ -242,15 +245,18 @@ function world(opts: {
   await flush();
   assert.equal(w.p.status, "playing");
   assert.equal(w.audio.currentTime, 30);
-  assert.equal(w.signs.length, 2);
+  // track-1, the pre-sign of track-2 (t1285u), the reconnect of track-1; the pre-sign is kept.
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-1"]);
 }
 
-// 9. Pre-sign: the next track's URL is requested shortly before the boundary and used once.
+// 9. Pre-sign (t1285u): the next track's URL is requested as soon as the current one plays
+//    (a locked iPhone suspends JS, the last 45 s may never run) and used once at "ended".
 {
   const w = world();
   await w.p.toggle();
-  w.p.onProgress(100, 200);
-  assert.equal(w.signs.length, 1, "too early to pre-sign");
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2"], "pre-signed at play start");
+  w.p.onProgress(10, 200);
   w.p.onProgress(160, 200);
   w.p.onProgress(161, 200);
   await flush();
@@ -260,16 +266,91 @@ function world(opts: {
   await flush();
   assert.equal(w.p.status, "playing", "the next track starts from the pre-signed URL");
   assert.equal(w.p.current?.audioItemId, "track-2");
-  assert.equal(w.signs.length, 2);
-  // stale pre-sign is not used
-  w.setNet(true);
-  w.p.onProgress(170, 200);
+  // the background access re-check of track-2 fails offline: it keeps playing;
+  // offline: the pre-sign of track-3 fails and is retried later, not blocked forever
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2", "track-3"]);
+  assert.equal(w.p.status, "playing", "a failed re-check (network) never stops the music");
+  w.p.onProgress(1, 200);
   await flush();
-  assert.equal(w.signs.at(-1), "track-3");
+  assert.equal(w.signs.length, 4, "no retry storm right after a failure");
+  w.setNet(true);
+  w.tick(PRESIGN_RETRY_MS + 1);
+  w.p.onProgress(12, 200);
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2", "track-3", "track-3"], "failed pre-sign is retried");
+  w.p.onProgress(13, 200);
+  await flush();
+  assert.equal(w.signs.length, 5, "a ready pre-sign is not repeated");
+  // an aging pre-sign is refreshed while the track still plays
+  w.tick(PRESIGN_REFRESH_AGE_MS + 1);
+  w.p.onProgress(14, 200);
+  await flush();
+  assert.equal(w.signs.length, 6, "aging pre-sign refreshed");
+  // stale pre-sign is not used at the boundary
   w.tick(PRESIGN_MAX_AGE_MS + 1);
   await w.p.onEnded();
   await flush();
-  assert.equal(w.signs.length, 4, "expired pre-sign is re-signed (access re-checked)");
+  assert.equal(w.p.current?.audioItemId, "track-3");
+  assert.equal(w.signs.at(-1 - 1), "track-3", "expired pre-sign is re-signed (access re-checked)");
+  assert.equal(w.signs.length, 8, "boundary sign + pre-sign of the following track");
+}
+
+// 9b. Instant advance ("ended") keeps the element: no pause / src removal / load() before the
+//     next source (t1285u: that tore down the iOS media session on a locked iPhone).
+{
+  const w = world();
+  const log: string[] = [];
+  const a = w.audio as typeof w.audio & { playInstant?: () => Promise<void> };
+  const origPause = a.pause.bind(a);
+  const origRemove = a.removeAttribute.bind(a);
+  a.pause = () => { log.push("pause"); origPause(); };
+  a.removeAttribute = () => { log.push("removeAttribute"); origRemove(); };
+  a.load = () => { log.push("load"); };
+  let srcAtInstant = "";
+  a.playInstant = async () => { log.push("playInstant"); srcAtInstant = a.src; a.paused = false; };
+  await w.p.toggle();
+  await flush();
+  log.length = 0;
+  a.paused = true; // the element ended by itself
+  await w.p.onEnded();
+  assert.deepEqual(log, ["playInstant"], "only playInstant at the boundary (pre-signed)");
+  assert.match(srcAtInstant, /track-2/);
+  assert.equal(w.p.status, "playing");
+  // without a pre-signed URL: still no teardown while signing
+  const w2 = world({ sign: (id) => ({ ok: true, data: { url: `https://s/${id}` } }) });
+  const a2 = w2.audio as typeof w2.audio & { playInstant?: () => Promise<void> };
+  const log2: string[] = [];
+  a2.load = () => { log2.push("load"); };
+  const p2 = a2.pause.bind(a2);
+  a2.pause = () => { log2.push("pause"); p2(); };
+  a2.playInstant = async () => { log2.push("playInstant:" + a2.src); a2.paused = false; };
+  await w2.p.toggle();
+  await w2.p.applyManifest([item(1), item(3), item(2)]); // next target changes, pre-sign misses
+  await flush();
+  log2.length = 0;
+  await w2.p.onEnded();
+  assert.ok(!log2.includes("pause") && !log2.includes("load"), log2.join(","));
+  assert.ok(log2.some((x) => x.startsWith("playInstant:")), log2.join(","));
+}
+
+// 9c. A pre-sign starts the next track at once, then access is re-checked in the background;
+//     a no_access answer stops it (the hall never plays on after access ends).
+{
+  let denied = false;
+  const w = world({ sign: (id) => (denied ? { ok: false, reason: "no_access" } : { ok: true, data: { url: `https://s/${id}` } }) });
+  await w.p.toggle();
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2"]);
+  await w.p.onEnded();
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-2");
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2", "track-3"], "re-check, then pre-sign ahead");
+  w.tick(5 * 60_000);
+  denied = true;
+  await w.p.onEnded();
+  await flush();
+  assert.equal(w.p.status, "no_access", "background re-check stops on no_access");
+  assert.equal(w.audio.paused, true);
 }
 
 // 10. Access ends while reconnecting: no_access wins, retries stop.

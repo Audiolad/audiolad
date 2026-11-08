@@ -44,11 +44,15 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   assert.equal(p.status, "playing");
   assert.equal(p.current.title, "T1");
   assert.match(audio.src, /0001/);
-  assert.deepEqual(calls, [item(1).audioItemId]);
-  // ended -> next, re-signed per track; loops
-  await p.onEnded(); assert.equal(p.current.title, "T2");
-  await p.onEnded(); await p.onEnded(); assert.equal(p.current.title, "T1");
-  assert.equal(calls.length, 4);
+  // t1285u: the next track is pre-signed as soon as the current one plays.
+  await flush();
+  assert.deepEqual(calls, [item(1).audioItemId, item(2).audioItemId]);
+  // ended -> next from the pre-signed URL (no network at the boundary); loops
+  await p.onEnded(); await flush(); assert.equal(p.current.title, "T2");
+  await p.onEnded(); await flush(); await p.onEnded(); await flush(); assert.equal(p.current.title, "T1");
+  // Each start from a pre-sign is re-checked by the server in the background (access), then
+  // the following track is pre-signed: 2 (re-check) 3 (ahead), 3 1, 1 2.
+  assert.deepEqual(calls, [1, 2, 2, 3, 3, 1, 1, 2].map((n) => item(n).audioItemId));
   // pause/resume
   await p.toggle(); assert.equal(p.status, "paused"); assert.equal(audio.paused, true);
   await p.toggle(); assert.equal(p.status, "playing");
@@ -166,7 +170,8 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   for (let k = 0; k < 8; k++) await p.onError();
   assert.equal(p.status, "loading");
   assert.equal(p.recovering, true);
-  assert.equal(calls.length, 1, `signs=${calls.length}`);
+  // One sign of the playing track plus the one pre-sign of the next (t1285u); no storm.
+  assert.deepEqual(calls, [item(1).audioItemId, item(2).audioItemId], `signs=${calls.length}`);
   // a fresh track (user press) cancels the pending reconnect and plays
   await p.playIndex(1);
   assert.equal(p.status, "playing");

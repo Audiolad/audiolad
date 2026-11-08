@@ -429,11 +429,19 @@ export function BusinessCabinetPlayerProvider({
     // back, is handled by the controller (backoff retries, resume at the position).
     const onWaiting = () => ctl.onWaiting();
     const onOnline = () => void ctl.onOnline();
-    const onVisible = () => { if (document.visibilityState === "visible") void ctl.onOnline(); };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void ctl.onOnline();
+      else fader.prepareForBackground();
+    };
+    // Screen lock / background (t1285u): timers and the ramp may freeze there; never leave the
+    // hall music at a mid-fade (or zero) volume. A user pause in its fade-out completes now.
+    const onBackground = () => fader.prepareForBackground();
     audio.addEventListener("waiting", onWaiting);
     audio.addEventListener("stalled", onWaiting);
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pagehide", onBackground);
+    document.addEventListener("freeze", onBackground);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", sendReport);
@@ -446,6 +454,8 @@ export function BusinessCabinetPlayerProvider({
       audio.removeEventListener("stalled", onWaiting);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pagehide", onBackground);
+      document.removeEventListener("freeze", onBackground);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", sendReport);

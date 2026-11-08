@@ -36,10 +36,12 @@ for (const phase of ["paused", "playing", "loading"] as const) {
   const waiting = new Promise<void>((resolve) => { finishSign = resolve; });
   let order = [0, 1, 2];
   let signCount = 0;
+  let currentSigns = 0;
   const ctl = new SpaOnlinePlayer({
     audio, onChange() {},
     sign: async (id) => {
       signCount++;
+      if (id === "t1") currentSigns++;
       if (phase === "loading" && signCount === 1) await waiting;
       return { ok: true, data: { url: `https://audiolad.ru/test/${id}` } };
     },
@@ -62,7 +64,8 @@ for (const phase of ["paused", "playing", "loading"] as const) {
     assert.equal(ctl.status, "playing");
     assert.equal(ctl.index, 1);
     assert.equal(audio.currentTime, 42);
-    assert.equal(signCount, 1, "resume uses the same track source");
+    // The other sign is the pre-sign of the next track (t1285u).
+    assert.equal(currentSigns, 1, "resume uses the same track source");
   }
   await ctl.next();
   assert.equal(ctl.index, 2, "new atmosphere starts from next track");
