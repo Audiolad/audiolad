@@ -1,8 +1,9 @@
 -- PREPARE ONLY. Human Gate: backup, staging smoke, explicit approval before apply.
 -- Venue slots for every Business organization, not a per-client opt-in.
 -- Every organization starts with one physical Location; the owner adds the next one
--- himself, up to one system-wide limit (3 now). Raising it later to 5 or 10 is a single
--- UPDATE of business_venue_slot_settings, no code rebuild and no per-client setup.
+-- himself, up to one system-wide limit (initially 3; raised to 10 by
+-- 20270301120000). This is a single UPDATE of business_venue_slot_settings,
+-- no code rebuild and no per-client setup.
 -- Money rules are unchanged: 79900 × active Locations per shared 30-day period,
 -- empty slots are not billed, one owner gift, no mid-period top-up.
 BEGIN;
@@ -555,5 +556,5 @@ GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO 
 
 COMMIT;
 -- Safe application changes no organization row: the override column stays NULL for everyone.
--- Raise the system limit later (e.g. to 5): UPDATE public.business_venue_slot_settings SET default_limit = 5, updated_at = clock_timestamp();
+-- Raise to 10 through the additive 20270301120000_business_venue_self_serve_ten.sql migration.
 -- Rollback: hide the add button first, then set default_limit = 1. Keep Locations, scopes, periods and evidence. No data deletion.

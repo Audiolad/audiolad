@@ -27,7 +27,7 @@ assert.equal((first.match(/aria-pressed=/g) ?? []).length, 2, "two existing hall
 assert.equal((first.match(/data-testid="biz-add-point"/g) ?? []).length, 1, "one add button for the next hall");
 assert.match(first, /\+ Добавить точку 3/);
 assert.doesNotMatch(first, /резерв/, "no fake reserve slot");
-assert.match(first, /Точек: <!-- -->2<!-- --> из <!-- -->3|Точек: 2 из 3/);
+assert.doesNotMatch(first, /Точек:|из 3|пустые места|за каждую активную точку/, "no capacity sentence");
 assert.match(first, /1598/, "two active venues billed, empty reserve excluded");
 assert.match(first, /Jazz first/);
 assert.doesNotMatch(first, /Jazz second/);
@@ -46,7 +46,25 @@ const raised = render(0, true, false, undefined, 5, [...locations, { id: "three"
 assert.match(raised, /\+ Добавить точку 4/, "raised system limit offers the fourth hall");
 assert.equal(render(0, false, false, undefined, 1, [locations[0]]), "", "limit 1 (old schema) keeps the legacy cabinet");
 assert.equal(render(0, true, true), "", "staff device cannot switch owner locations");
-console.log("business-pilot-ui-unit: add button for every account, cap 3, raisable cap, owner switching/status, legacy, staff: PASS");
+const tenLimit = render(0, true, false, undefined, 10);
+assert.match(tenLimit, /\+ Добавить точку 3/, "ten-hall setting still offers only the next hall");
+assert.doesNotMatch(tenLimit, /biz-more-points|Точек:|из 10/);
+const tenHalls = Array.from({ length: 10 }, (_, index) => ({ id: `hall-${index}`, name: `Зал ${index + 1}`, status: "active" }));
+for (let count = 3; count < 10; count++) {
+  const next = render(0, true, false, undefined, 10, tenHalls.slice(0, count));
+  assert.match(next, new RegExp(`\\+ Добавить точку ${count + 1}`), "one sequential add button through hall ten");
+  assert.equal((next.match(/data-testid="biz-add-point"/g) ?? []).length, 1);
+}
+const tenFull = render(0, true, false, undefined, 10, tenHalls);
+assert.equal((tenFull.match(/aria-pressed=/g) ?? []).length, 10, "all existing halls remain selectable");
+assert.doesNotMatch(tenFull, /biz-add-point|Добавить точку 11|Точек:|из 10|лимит|https?:|—/);
+assert.match(tenFull, /<details[^>]*data-testid="biz-more-points"><summary[^>]*>Добавить ещё точку<\/summary>/, "native in-cabinet disclosure opens without creating a hall");
+assert.match(tenFull, /Спасибо, что вы с нами и развиваете сеть/);
+assert.match(tenFull, /именно под вашу ситуацию/);
+assert.match(tenFull, /7990/, "ten active halls keep the same billing math");
+assert.match(first, /Активных точек:/);
+assert.match(first, /Одна оплата за все активные точки/);
+console.log("business-pilot-ui-unit: sequential self-serve through ten, personal proposal, no capacity copy, billing, legacy, staff: PASS");
 
 const blockedRenewal = render(1, true, false, { paidUntil: "2026-12-06T12:00:00Z", renewalBlocked: true });
 assert.match(blockedRenewal, /Следующее продление/);

@@ -84,7 +84,10 @@ export default function BusinessPointSlots() {
         {slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`}
       </button>)}
     </div>
-    <p className="text-sm text-[var(--biz-text-muted)]">Точек: {halls.length} из {limit}. {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за каждую активную точку в 30 дней, пустые места не оплачиваются.</p>
+    {halls.length >= limit ? <details className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-more-points">
+      <summary className="business-app-focus-ring cursor-pointer font-semibold">Добавить ещё точку</summary>
+      <p className="mt-3 text-sm text-[var(--biz-text-muted)]">Спасибо, что вы с нами и развиваете сеть. Для большого числа залов мы подберём более удобную схему именно под вашу ситуацию.</p>
+    </details> : null}
     {multi ? <>
     <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
     {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}
