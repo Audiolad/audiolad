@@ -2,13 +2,12 @@
 // tracks are kept on the device (2 hours at most, never past the access end) so a short internet
 // outage does not stop the hall. Option A: technical buffer, not the multi-day offline mode.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import {
   HALL_BUFFER_MAX_AGE_MS,
   HALL_BUFFER_TRACKS,
   HallOfflineBuffer,
-  hallBufferLine,
   hallBufferPlan,
   type BufferStore,
   type HallBufferDeps,
@@ -16,7 +15,7 @@ import {
 import { createHallBufferStore } from "../src/lib/business-app/hall-offline-buffer-store";
 import { HALL_REPORT_QUEUE_MAX, HallReportQueue, type HallUsageSample } from "../src/lib/business-app/hall-report-queue";
 import { postPointUsage } from "../src/lib/business-app/cabinet-player-client";
-import { hallBufferedCount, isHallNowPlayingReport, parseHallNowPlaying } from "../src/lib/business-app/hall-mirror";
+import { isHallNowPlayingReport, parseHallNowPlaying } from "../src/lib/business-app/hall-mirror";
 import { LOCAL_STALL_MS, SpaOnlinePlayer, type OnlineSignResult } from "../src/lib/business-app/spa-online-player";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
 
@@ -113,16 +112,9 @@ function bufferWorld(opts: { store?: BufferStore | null; until?: number | null; 
   assert.deepEqual(hallBufferPlan([], 0, seq), []);
 }
 
-// --- 2. Owner line copy (en dash rule: no hyphen-as-dash, Russian plural).
-{
-  assert.equal(hallBufferLine(10), "В запасе 10 треков на случай пропадания интернета");
-  assert.equal(hallBufferLine(1), "В запасе 1 трек на случай пропадания интернета");
-  assert.equal(hallBufferLine(3), "В запасе 3 трека на случай пропадания интернета");
-  assert.equal(hallBufferLine(0), null, "nothing buffered: hidden");
-  assert.equal(hallBufferLine(null), null, "unsupported: hidden");
-}
+// --- 2. (removed t1333u: owner buffer line)
 
-// --- 3. Capability fallback: no window / no storage → streaming only; a throwing Cache Storage
+// --- 2. Capability fallback: no window / no storage → streaming only; a throwing Cache Storage
 //        falls through; a working one is used.
 {
   assert.equal(await createHallBufferStore(), null, "server / no window: streaming only");
@@ -552,23 +544,23 @@ function playThrough(w: ReturnType<typeof playerWorld>, from: number, to: number
   assert.equal(await postPointUsage({ eventId: "e", sessionId: "s", seq: 1, positionMs: 0, audioItemId: "a" }, (async () => ({ status: 200, json: async () => ({ ok: false, reason: "usage_report_failed" }) }) as Response) as typeof fetch), "drop");
 }
 
-// --- 15. Mirror carries the buffered count (optional, bounded); the owner dot is never faked.
+// --- 15. Offline usage samples never fake a green owner dot; no owner buffer line / DB column.
 {
-  const ok = { positionMs: 0, durationMs: null, queue: [], aheadCount: 0, bufferedCount: 10 };
+  const ok = { positionMs: 0, durationMs: null, queue: [], aheadCount: 0 };
   assert.equal(isHallNowPlayingReport(ok), true);
-  assert.equal(isHallNowPlayingReport({ ...ok, bufferedCount: 51 }), false);
-  assert.equal(isHallNowPlayingReport({ ...ok, bufferedCount: -1 }), false);
   assert.equal(isHallNowPlayingReport({ positionMs: 0, durationMs: null, queue: [] }), true, "old clients still valid");
-  assert.equal(hallBufferedCount(undefined), null);
-  const hall = parseHallNowPlaying({ ok: true, hall: { state: "playing", audioItemId: null, queue: [], bufferedCount: 7 } });
-  assert.equal(hall?.bufferedCount, 7);
+  const hall = parseHallNowPlaying({ ok: true, hall: { state: "playing", audioItemId: null, queue: [] } });
+  assert.equal(hall?.aheadCount, 0);
+  assert.ok(!("bufferedCount" in (hall ?? {})), "t1333u: no bufferedCount on owner mirror");
 
   const route = readFileSync("src/app/api/business/point/route.ts", "utf8");
   const usage = route.slice(route.indexOf('if (body.kind === "usage")'), route.indexOf('const kind = body.kind === "playback"'));
   assert.ok(usage.includes("apply_business_point_usage_sample"));
   assert.ok(!usage.includes("report_business_point_player"), "a late sample never refreshes live state / last_seen (no fake green)");
+  assert.ok(!route.includes("buffered_count"), "t1333u: no buffered_count DB write");
+  assert.ok(!route.includes("writeHallBufferedCount"), "t1333u: no buffered count writer");
   const player = readFileSync("src/components/business-app/workspace/BusinessCabinetPlayer.tsx", "utf8");
-  assert.match(player, /bufferedCount: mirror \? mirror\.bufferedCount : \(pointReports && online \? bufferedCount : null\)/);
+  assert.ok(!player.includes("bufferedCount"), "t1333u: hall does not report bufferedCount");
   assert.match(player, /if \(current\.status === "no_access"\) \{\n\s+void bufferRef\.current\?\.purge\(\);/);
   assert.ok(!player.includes("SPA_OFFLINE_ENABLED"), "multi-day offline stays off");
   assert.match(player, /onNoAccess: \(\) => \{\n\s+void ctlRef\.current\?\.applyManifest\(null\);/, "review #1 F3: buffer no_access stops the hall");
@@ -576,7 +568,13 @@ function playThrough(w: ReturnType<typeof playerWorld>, from: number, to: number
   const sw = readFileSync("public/sw.js", "utf8");
   assert.ok(sw.includes('"/storage/v1/"') && sw.includes('request.headers.get("range")'), "service worker still bypasses audio");
   const ws = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");
-  assert.match(ws, /data-testid="biz-now-offline-buffer"/);
+  assert.ok(!ws.includes("biz-now-offline-buffer"), "t1333u: no owner buffer line");
+  assert.ok(!ws.includes("В запасе"), "t1333u: no «В запасе» copy");
+  assert.equal(existsSync("supabase/migrations/20270304120000_business_point_now_playing_buffered_count.sql"), false, "t1333u: migration dropped");
+  const buf = readFileSync("src/lib/business-app/hall-offline-buffer.ts", "utf8");
+  assert.ok(!buf.includes("hallBufferLine"), "t1333u: hallBufferLine removed");
+  assert.ok(!buf.includes("В запасе"), "t1333u: no owner copy in buffer module");
 }
+
 
 console.log("business hall offline buffer: ok");

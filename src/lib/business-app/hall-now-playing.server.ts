@@ -1,6 +1,6 @@
 import "server-only";
 
-import { HALL_MIRROR_FRESH_SECONDS, hallBufferedCount, hallQueueAheadCount, type HallNowPlaying } from "@/lib/business-app/hall-mirror";
+import { HALL_MIRROR_FRESH_SECONDS, hallQueueAheadCount, type HallNowPlaying } from "@/lib/business-app/hall-mirror";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 /**
@@ -40,12 +40,8 @@ export async function loadHallNowPlaying(input: { organizationId: string; locati
       .eq("player_id", session.player_id)
       .eq("location_id", input.locationId)
       .maybeSingle();
-    // t1331u: buffered_count comes with its own optional migration; without it the line is hidden.
-    let snapshot = await readSnapshot(`${columns}, queue_ahead_count, buffered_count`);
-    if (snapshot.error?.code === "42703" || snapshot.error?.code === "PGRST204") {
-      snapshot = await readSnapshot(`${columns}, queue_ahead_count`);
-    }
-    // An application rollback / pending migration still reads the existing preview.
+    // queue_ahead_count is optional on older schemas; fall back to the preview ids alone.
+    let snapshot = await readSnapshot(`${columns}, queue_ahead_count`);
     if (snapshot.error?.code === "42703" || snapshot.error?.code === "PGRST204") {
       snapshot = await readSnapshot(columns);
     }
@@ -61,7 +57,6 @@ export async function loadHallNowPlaying(input: { organizationId: string; locati
       durationSec: sameTrack && typeof now.duration_ms === "number" ? now.duration_ms / 1000 : null,
       queue,
       aheadCount: sameTrack ? hallQueueAheadCount(now.queue_ahead_count, queue.length) : 0,
-      bufferedCount: now ? hallBufferedCount(now.buffered_count) : null,
       ageSec: Number.isFinite(reportedAt) ? Math.max(0, (nowMs - reportedAt) / 1000) : 0,
     };
   } catch {

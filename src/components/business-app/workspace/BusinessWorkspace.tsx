@@ -28,7 +28,6 @@ import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queu
 import { voteCafeFeedback, type CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
 import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import { hallBufferLine } from "@/lib/business-app/hall-offline-buffer";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
@@ -228,9 +227,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const upcoming = queueRows(model.tracks, previewOrder);
   const aheadTotal = typeof player.queueAheadCount === "number" && player.queueAheadCount >= ahead.length ? player.queueAheadCount : ahead.length;
   const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(aheadTotal));
-  // t1331u: hall device copies for an internet outage (hidden when there are none / no support).
-  const bufferLine = hallBufferLine(player.bufferedCount);
-
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
       {model.status === "anonymous" ? (
@@ -465,11 +461,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             {moreLabel ? (
               <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-more">
                 {moreLabel}
-              </p>
-            ) : null}
-            {bufferLine ? (
-              <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-offline-buffer">
-                {bufferLine}
               </p>
             ) : null}
           </section>

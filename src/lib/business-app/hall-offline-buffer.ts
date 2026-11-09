@@ -123,15 +123,6 @@ export function hallBufferPlan(
   return out;
 }
 
-/** «В запасе 10 треков на случай пропадания интернета». Null: nothing to say (unsupported / 0). */
-export function hallBufferLine(count: number | null | undefined): string | null {
-  if (typeof count !== "number" || !Number.isInteger(count) || count <= 0) return null;
-  const n = Math.abs(count) % 100;
-  const last = n % 10;
-  const word = n > 10 && n < 20 ? "треков" : last === 1 ? "трек" : last >= 2 && last <= 4 ? "трека" : "треков";
-  return `В запасе ${count} ${word} на случай пропадания интернета`;
-}
-
 export class HallOfflineBuffer {
   private entries = new Map<string, Entry>();
   /** Tracks the buffer should hold, in play order (the next tracks after the current one). */

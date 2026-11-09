@@ -95,11 +95,6 @@ type CabinetPlayerApi = {
   /** Catalog indices in play order. Null until the cafe queue answers: catalog order. */
   queueOrder: readonly number[] | null;
   queueAheadCount: number | null;
-  /**
-   * t1331u: next tracks the hall device keeps for an internet outage (the hall's own count in the
-   * owner mirror, this device's on the hall itself while online). Null: no buffer / unknown.
-   */
-  bufferedCount: number | null;
   setQueueOrder: (indices: readonly number[]) => void;
   /** Replace upcoming tracks; move the cursor only when the player is inactive. */
   applyAtmosphereQueue: (indices: readonly number[]) => void;
@@ -209,7 +204,6 @@ function subscribeOnline(cb: () => void): () => void {
 }
 
 /** The hall reports its buffered count when it changes, else at most this often. */
-const BUFFER_REPORT_EVERY_MS = 60_000;
 
 function readLocal(spaceId: string, trackCount: number, locationId?: string): WorkspacePlayback | null {
   try {
@@ -291,8 +285,6 @@ export function BusinessCabinetPlayerProvider({
   const hallMirrorRef = useRef(false);
   /** t1331u: hall device only – copies of the next tracks for a short outage. */
   const bufferRef = useRef<HallOfflineBuffer | null>(null);
-  const [bufferedCount, setBufferedCount] = useState<number | null>(null);
-  const bufferSentRef = useRef<{ count: number; at: number } | null>(null);
   const reportQueueRef = useRef<HallReportQueue | null>(null);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine !== false, () => true);
 
@@ -412,12 +404,7 @@ export function BusinessCabinetPlayerProvider({
     const time = fading ? 0 : audio.currentTime;
     const index = fading ? tracks.findIndex((t) => t.audioItemId === audible) : ctl.index;
     const upcoming = index >= 0 ? hallUpcomingSnapshot(tracks, playOrderRef.current, index) : { ids: [], aheadCount: 0 };
-    // t1331u: the buffered count goes along when it changed, or once a minute.
-    const buffer = bufferRef.current;
-    const buffered = buffer ? (buffer.supported ? buffer.readyCount : 0) : null;
-    const sentBuffer = bufferSentRef.current;
-    const sendBuffered = buffered !== null
-      && (!sentBuffer || sentBuffer.count !== buffered || Date.now() - sentBuffer.at >= BUFFER_REPORT_EVERY_MS);
+    // t1333u: buffer stays on the device only – never reported to the owner / DB.
     const nowPlaying = {
       positionMs: Number.isFinite(time) && time > 0 ? Math.min(86_400_000, Math.floor(time * 1000)) : 0,
       durationMs: !fading && Number.isFinite(audio.duration) && audio.duration > 0
@@ -425,7 +412,6 @@ export function BusinessCabinetPlayerProvider({
         : (tracks[index]?.durationSeconds ? Math.round(tracks[index].durationSeconds! * 1000) : null),
       queue: upcoming.ids,
       aheadCount: upcoming.aheadCount,
-      ...(sendBuffered && buffered !== null ? { bufferedCount: buffered } : {}),
     };
     sendSpaLiveReport(
       (live) => {
@@ -442,7 +428,6 @@ export function BusinessCabinetPlayerProvider({
         }
         return postPointReport({ kind: "playback", report: live, sample: backlog ? null : sample, nowPlaying }).then((result) => {
           if (result.ok) {
-            if (sendBuffered && buffered !== null) bufferSentRef.current = { count: buffered, at: Date.now() };
             if (queue && queue.size > 0) void queue.flush((s) => postPointUsage(s));
           } else if (result.reason === "network" && sample && !backlog && queue && live.audioItemId) {
             queue.push({ ...sample, audioItemId: live.audioItemId, at: Date.now() });
@@ -603,8 +588,7 @@ export function BusinessCabinetPlayerProvider({
           (fadeRef.current ?? audioRef.current)?.pause();
         },
         onChange: () => {
-          const current = bufferRef.current;
-          setBufferedCount(current && current.supported ? current.readyCount : null);
+          /* t1333u: count stays local; owner UI no longer shows a buffer line. */
         },
       });
       bufferRef.current = buffer;
@@ -620,7 +604,6 @@ export function BusinessCabinetPlayerProvider({
         buffer.dispose();
         if (bufferRef.current === buffer) bufferRef.current = null;
       }
-      setBufferedCount(null);
     };
   }, [bufferOwner]);
 
@@ -1401,7 +1384,6 @@ export function BusinessCabinetPlayerProvider({
     saveNote,
     queueOrder: mirror ? mirror.queueOrder : queueOrder,
     queueAheadCount: mirror ? mirror.aheadCount : null,
-    bufferedCount: mirror ? mirror.bufferedCount : (pointReports && online ? bufferedCount : null),
     setQueueOrder: pointReports ? () => {} : setQueueOrder,
     applyAtmosphereQueue: pointReports ? () => {} : applyAtmosphereQueue,
     rebuildFromProfile: pointReports ? async () => "deferred" : rebuildFromProfile,
