@@ -19,15 +19,19 @@
 --   3. A trigger on business_partner_codes never lets reserved_until move past the account's
 --      end. This covers create_business_subscription_order, which used to push the hold to
 --      now + 72 hours when a payment link was opened.
+--   4. A trigger on business_subscription_order_scopes refuses a NEW personal-price link for the
+--      first payment after the account end (partner_terms_changed, the cabinet re-reads the
+--      quote and offers the ordinary price). A link opened in time stays payable.
 -- What does not change: prices, the quote, binding on the first real payment, revoke, another
 -- account taking a code whose hold ran out (existing behaviour), every order and payment.
 --
--- Existing rows: every currently held, not bound code gets a window with its current
--- reserved_until as the fixed end (start = end - 72 hours). Nothing is shortened or extended.
+-- Existing rows: every currently held, not bound code gets a window; the account end is the
+-- earliest current reserved_until of the account's held codes (start = end - 72 hours). With one
+-- held code per account (production: 1 row) nothing is shortened or extended.
 --
 -- Rollback (restores the previous restart-on-every-visit behaviour; no money data is touched),
 -- one transaction, full SQL in supabase/rollbacks/20270304120000_business_partner_code_window_once.rollback.sql:
---   drop trigger business_partner_codes_window_cap and function business_partner_codes_window_cap();
+--   drop triggers business_partner_scope_window_guard, business_partner_codes_window_cap and their functions;
 --   re-create reserve_business_partner_code(text) exactly as in 20270302120000 section 6
 --   (grants: authenticated only); drop table business_partner_code_windows;
 --   delete version 20270304120000 from supabase_migrations.schema_migrations.
@@ -49,13 +53,19 @@ GRANT SELECT ON public.business_partner_code_windows TO service_role;
 COMMENT ON TABLE public.business_partner_code_windows IS
   'Task 8142d69a t1338u: the 72-hour hold of a partner code, counted once per business account from its first entry. Service role only.';
 
--- Existing holds keep exactly their current end.
+-- Existing holds: one account end = the earliest current end among the account's held codes
+-- (one held code per account, as in production: exactly its current end). Never extended.
+WITH held AS (
+  SELECT c.id AS code_id, public.business_partner_owner_organization(c.reserved_by_user_id) AS organization_id,
+    c.reserved_by_user_id AS user_id, c.reserved_until
+  FROM public.business_partner_codes c
+  WHERE c.reserved_by_user_id IS NOT NULL AND c.bound_organization_id IS NULL
+), account AS (
+  SELECT organization_id, min(reserved_until) AS account_end FROM held WHERE organization_id IS NOT NULL GROUP BY organization_id
+)
 INSERT INTO public.business_partner_code_windows(code_id, organization_id, first_user_id, first_reserved_at, expires_at)
-SELECT c.id, public.business_partner_owner_organization(c.reserved_by_user_id), c.reserved_by_user_id,
-  c.reserved_until - interval '72 hours', c.reserved_until
-FROM public.business_partner_codes c
-WHERE c.reserved_by_user_id IS NOT NULL AND c.bound_organization_id IS NULL
-  AND public.business_partner_owner_organization(c.reserved_by_user_id) IS NOT NULL
+SELECT h.code_id, h.organization_id, h.user_id, a.account_end - interval '72 hours', a.account_end
+FROM held h JOIN account a ON a.organization_id = h.organization_id
 ON CONFLICT (code_id, organization_id) DO NOTHING;
 
 -- The hold of an account never ends later than its first 72 hours (earliest end of the account).
@@ -77,6 +87,32 @@ REVOKE ALL ON FUNCTION public.business_partner_codes_window_cap() FROM PUBLIC, a
 CREATE TRIGGER business_partner_codes_window_cap
   BEFORE INSERT OR UPDATE OF reserved_by_user_id, reserved_until ON public.business_partner_codes
   FOR EACH ROW EXECUTE FUNCTION public.business_partner_codes_window_cap();
+-- A later hold of the same account (two owners) is brought down to the account end. Only lowers.
+UPDATE public.business_partner_codes c SET reserved_until = w.expires_at
+FROM public.business_partner_code_windows w
+WHERE w.code_id = c.id AND w.organization_id = public.business_partner_owner_organization(c.reserved_by_user_id)
+  AND c.bound_organization_id IS NULL AND c.reserved_until > w.expires_at;
+
+-- After the account end no NEW personal-price link for the first payment can be opened (also when the
+-- checkout RPC is called directly or an open link is replaced). A link opened in time stays payable.
+CREATE FUNCTION public.business_partner_scope_window_guard() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_end timestamptz;
+BEGIN
+  IF NEW.partner_code_id IS NULL
+     OR EXISTS (SELECT 1 FROM public.business_partner_entitlements e WHERE e.organization_id = NEW.organization_id) THEN
+    RETURN NEW;
+  END IF;
+  SELECT min(w.expires_at) INTO v_end FROM public.business_partner_code_windows w WHERE w.organization_id = NEW.organization_id;
+  IF v_end IS NOT NULL AND v_end <= clock_timestamp() THEN
+    RAISE EXCEPTION 'partner_terms_changed' USING ERRCODE = 'P0001';
+  END IF;
+  RETURN NEW;
+END; $$;
+REVOKE ALL ON FUNCTION public.business_partner_scope_window_guard() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER business_partner_scope_window_guard
+  BEFORE INSERT ON public.business_subscription_order_scopes
+  FOR EACH ROW EXECUTE FUNCTION public.business_partner_scope_window_guard();
 
 -- Same checks as 20270302120000 section 6; only the countdown is counted once per account.
 CREATE OR REPLACE FUNCTION public.reserve_business_partner_code(p_code text) RETURNS jsonb
@@ -136,7 +172,7 @@ BEGIN
     -- This owner's own open link at the personal price, opened in time, can still be paid.
     IF v_w.code_id IS NOT NULL AND v_c.reserved_by_user_id = v_user AND EXISTS (
       SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
-      WHERE s.partner_code_id = v_c.id AND o.user_id = v_user AND o.status = 'pending'
+      WHERE s.partner_code_id = v_c.id AND o.user_id = v_user AND o.status = 'pending' AND o.created_at <= v_account_end
         AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)) THEN
       RETURN jsonb_build_object('ok', true, 'already', true, 'reserved_until', v_c.reserved_until,
         'quote', public.business_partner_quote_json(v_user));
@@ -170,9 +206,10 @@ BEGIN
       AND public.business_partner_owner_organization(c.reserved_by_user_id) IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM public.business_partner_code_windows w
         WHERE w.code_id = c.id AND w.expires_at = c.reserved_until
-          AND w.organization_id = public.business_partner_owner_organization(c.reserved_by_user_id))
+          AND w.organization_id = public.business_partner_owner_organization(c.reserved_by_user_id)
+          AND w.expires_at = (SELECT min(x.expires_at) FROM public.business_partner_code_windows x WHERE x.organization_id = w.organization_id))
   ) THEN
-    RAISE EXCEPTION 'Post-check failed: a held partner code has no window with its current end';
+    RAISE EXCEPTION 'Post-check failed: a held partner code has no window with the account end';
   END IF;
   IF has_table_privilege('authenticated', 'public.business_partner_code_windows', 'SELECT')
      OR has_table_privilege('anon', 'public.business_partner_code_windows', 'SELECT') THEN

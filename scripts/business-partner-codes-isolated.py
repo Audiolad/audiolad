@@ -78,6 +78,8 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
 # t1338u: the 72-hour hold counted once per account (20270304120000).
 window_once = migration('20270304120000_business_partner_code_window_once.sql')
 window_smoke = (root/'supabase/tests/business_partner_code_window_once_smoke.sql').read_text()
+backfill_fixture = (root/'supabase/tests/business_partner_code_window_once_backfill_fixture.sql').read_text()
+backfill_smoke = (root/'supabase/tests/business_partner_code_window_once_backfill_smoke.sql').read_text()
 
 def single_user(data, run_blocks, markers):
     sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
@@ -98,7 +100,8 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     data = Path(tmp)/'data'
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
     # Production order: rows created under 20270302120000, then the window migration backfills them.
-    single_user(data, blocks + [window_once, window_smoke], markers + ['partner code window once: PASS'])
+    single_user(data, blocks + [backfill_fixture, window_once, backfill_smoke, window_smoke],
+                markers + ['partner code window backfill: PASS', 'partner code window once: PASS'])
     # Parallel redemption with two real sessions: exactly one owner gets the code.
     sock = Path(tmp)/'sock'; sock.mkdir()
     server = subprocess.Popen([str(pg/'postgres'), '-D', str(data), '-k', str(sock), '-c', 'listen_addresses=', '-p', '55433'],
@@ -124,6 +127,6 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     finally:
         server.terminate(); server.wait(timeout=30)
     print('partner codes: two parallel sessions, exactly one reservation and one 72-hour window: PASS')
-    print('partner codes: 72 hours counted once per account from the first entry (repeat visits, payment link, re-reserve, another code and back, second owner, end with and without an open link, existing holds kept): PASS')
+    print('partner codes: 72 hours counted once per account from the first entry (repeat visits, payment link, re-reserve, another code and back, second owner, end with and without an open link, no new personal-price link after the end, existing holds reconciled to one account end): PASS')
     print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote, an earlier 79900 payment then the code (window from the first code payment), 72-hour hold end in the quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')

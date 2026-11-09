@@ -4,6 +4,8 @@
 -- Restores the previous behaviour: every reserve_business_partner_code call restarts 72 hours.
 -- No orders, payments, periods, codes or entitlements are changed or deleted.
 BEGIN;
+DROP TRIGGER IF EXISTS business_partner_scope_window_guard ON public.business_subscription_order_scopes;
+DROP FUNCTION IF EXISTS public.business_partner_scope_window_guard();
 DROP TRIGGER IF EXISTS business_partner_codes_window_cap ON public.business_partner_codes;
 DROP FUNCTION IF EXISTS public.business_partner_codes_window_cap();
 CREATE OR REPLACE FUNCTION public.reserve_business_partner_code(p_code text) RETURNS jsonb

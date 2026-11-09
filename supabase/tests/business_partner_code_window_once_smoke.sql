@@ -57,10 +57,23 @@ INSERT INTO wo(k, v) SELECT 'o2', order_id FROM public.create_business_subscript
 UPDATE business_partner_code_windows SET first_reserved_at=first_reserved_at-interval '70 hours', expires_at=expires_at-interval '70 hours'
   WHERE code_id=(SELECT v FROM wo WHERE k='code');
 UPDATE business_partner_codes SET reserved_until=reserved_until-interval '70 hours' WHERE code='JJJJJJJJJJJJ';
+UPDATE orders SET created_at=created_at-interval '70 hours' WHERE id=(SELECT v FROM wo WHERE k='o2');
 UPDATE wo SET t=(SELECT expires_at FROM business_partner_code_windows WHERE code_id=(SELECT v FROM wo WHERE k='code')) WHERE k='end';
 SELECT public.check_test((public.reserve_business_partner_code('JJJJJJJJJJJJ')->>'already')::boolean, 'after the end with an open link: same window');
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'after the end with an open link: no restart');
 SELECT public.check_test((public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=39900, 'the open link keeps its price');
+-- But no NEW personal-price link for the first payment after the end, whatever path opens it
+-- (the guard fires before the scope row exists, so a made-up order id is enough here).
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO business_subscription_order_scopes(order_id, organization_id, location_ids, unit_price_minor, partner_code_id, partner_period_index)
+    SELECT gen_random_uuid(), (SELECT v FROM wo WHERE k='org'), ARRAY[]::uuid[], 39900, (SELECT v FROM wo WHERE k='code'), 1;
+    RAISE EXCEPTION 'late personal-price link opened';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_terms_changed' THEN RAISE; END IF; END;
+END; $$;
+SELECT public.check_test((SELECT status='pending' FROM orders WHERE id=(SELECT v FROM wo WHERE k='o2')), 'the link opened in time stays open and payable');
+SELECT public.check_test((SELECT count(*)=0 FROM business_subscription_order_scopes s JOIN orders o ON o.id=s.order_id
+  WHERE s.partner_code_id=(SELECT v FROM wo WHERE k='code') AND o.status='pending' AND o.created_at > (SELECT t FROM wo WHERE k='end')), 'no open personal-price link from after the end');
 -- Without an open link the same account cannot start the 72 hours again.
 UPDATE orders SET status='cancelled' WHERE id=(SELECT v FROM wo WHERE k='o2');
 DO $$ BEGIN

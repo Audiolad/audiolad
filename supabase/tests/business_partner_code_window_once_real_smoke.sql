@@ -78,6 +78,12 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF;
   END;
+  BEGIN
+    PERFORM * FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+    v_refused := false;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'partner_terms_changed' THEN RAISE; END IF;
+  END;
   RESET ROLE;
   IF NOT v_refused OR (SELECT reserved_until FROM public.business_partner_codes WHERE id = v_code) IS DISTINCT FROM v_end THEN
     RAISE EXCEPTION 'an ended hold was restarted for the same account';
