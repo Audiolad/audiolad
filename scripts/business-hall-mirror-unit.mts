@@ -211,7 +211,8 @@ assert.equal(hall.aheadCount, 2);
   assert.match(player, /queue: upcoming\.ids,[\s\S]*aheadCount: upcoming\.aheadCount,/);
   assert.match(player, /queueAheadCount: number \| null/);
   assert.match(player, /queueAheadCount: mirror \? mirror\.aheadCount : null,/);
-  assert.match(player, /\} : null, nowPlaying \}\);/);
+  // t1331u: the sample is built first (offline samples queue ahead of it), then sent with nowPlaying.
+  assert.match(player, /sample: backlog \? null : sample, nowPlaying \}\)/);
   const workspace = readFileSync(new URL("../src/components/business-app/workspace/BusinessWorkspace.tsx", import.meta.url), "utf8");
   assert.match(workspace, /const currentIndex = player\.view\.index;/);
   assert.match(workspace, /const playOrder = player\.queueOrder \?\? model\.tracks\.map/);

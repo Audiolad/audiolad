@@ -27,7 +27,21 @@ export type HallNowPlayingReport = {
   durationMs: number | null;
   queue: string[];
   aheadCount?: number;
+  /** t1331u: next tracks the hall holds on the device for an outage (omitted: no buffer here). */
+  bufferedCount?: number;
 };
+
+/** Largest buffered count a hall may report (the buffer keeps 10). */
+export const HALL_BUFFERED_MAX = 50;
+
+function bufferedCountOk(value: unknown): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= HALL_BUFFERED_MAX;
+}
+
+/** Owner side: a buffered count from the server, or null (none reported / not migrated). */
+export function hallBufferedCount(value: unknown): number | null {
+  return bufferedCountOk(value) ? Number(value) : null;
+}
 
 /** Report body part from the hall device (route validation). */
 export function isHallNowPlayingReport(value: unknown): value is HallNowPlayingReport {
@@ -38,7 +52,8 @@ export function isHallNowPlayingReport(value: unknown): value is HallNowPlayingR
     && Array.isArray(r.queue) && r.queue.length <= 20
     && r.queue.every((id) => typeof id === "string" && UUID_RE.test(id))
     && (r.aheadCount === undefined || (Number.isSafeInteger(r.aheadCount)
-      && Number(r.aheadCount) >= r.queue.length && Number(r.aheadCount) <= 100_000));
+      && Number(r.aheadCount) >= r.queue.length && Number(r.aheadCount) <= 100_000))
+    && (r.bufferedCount === undefined || bufferedCountOk(r.bufferedCount));
 }
 
 /** Preview ids and total from the same no-repeat, no-wrap list as the hall UI. */
@@ -76,6 +91,8 @@ export type HallNowPlaying = {
   durationSec: number | null;
   queue: string[];
   aheadCount: number;
+  /** t1331u: next tracks kept on the hall device for an outage; null / omitted when unknown. */
+  bufferedCount?: number | null;
   /** Seconds since the hall reported this position (server clock). */
   ageSec: number;
 };
@@ -92,7 +109,7 @@ export function parseHallNowPlaying(value: unknown): HallNowPlaying | null {
   const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : fallback);
   const duration = typeof h.durationSec === "number" && Number.isFinite(h.durationSec) && h.durationSec > 0 ? h.durationSec : null;
   const queue = Array.isArray(h.queue) ? h.queue.filter((id): id is string => typeof id === "string" && UUID_RE.test(id)) : [];
-  return { state, audioItemId, positionSec: num(h.positionSec, 0), durationSec: duration, queue, aheadCount: hallQueueAheadCount(h.aheadCount, queue.length), ageSec: num(h.ageSec, 0) };
+  return { state, audioItemId, positionSec: num(h.positionSec, 0), durationSec: duration, queue, aheadCount: hallQueueAheadCount(h.aheadCount, queue.length), bufferedCount: hallBufferedCount(h.bufferedCount), ageSec: num(h.ageSec, 0) };
 }
 
 export type HallMirrorView = {
@@ -103,6 +120,7 @@ export type HallMirrorView = {
   /** Catalog indices in hall play order: the hall's current track first, then its queue. */
   queueOrder: number[];
   aheadCount: number;
+  bufferedCount: number | null;
 };
 
 /**
@@ -129,7 +147,7 @@ export function hallMirrorView(
     const i = byId.get(id);
     if (i !== undefined && !queueOrder.includes(i)) queueOrder.push(i);
   }
-  return { status: playing ? "playing" : "paused", index, currentTime, duration, queueOrder, aheadCount: hall.aheadCount };
+  return { status: playing ? "playing" : "paused", index, currentTime, duration, queueOrder, aheadCount: hall.aheadCount, bufferedCount: hall.bufferedCount ?? null };
 }
 
 export type HallPending = { status: "playing" | "paused"; until: number; from: string };

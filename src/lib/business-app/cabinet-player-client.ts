@@ -75,7 +75,31 @@ export async function postPointReport(
     }
     return { ok: false, reason: "report_failed" };
   } catch {
-    return { ok: false, reason: "report_failed" };
+    // No answer at all (offline): the hall device keeps its usage sample for later (t1331u).
+    return { ok: false, reason: "network" };
+  }
+}
+
+/**
+ * t1331u: one listening sample recorded while the hall was offline (hall-report-queue.ts). Never
+ * touches the live state / heartbeat of the hall. `retry` only when the request got no answer.
+ */
+export async function postPointUsage(
+  sample: { eventId: string; sessionId: string; seq: number; positionMs: number; audioItemId: string },
+  f: Fetch = fetch,
+): Promise<"sent" | "drop" | "retry"> {
+  try {
+    const res = await f("/api/business/point", {
+      ...JSON_POST,
+      body: JSON.stringify({ action: "report", kind: "usage", usage: { ...sample, offline: true } }),
+    });
+    const json = (await res.json().catch(() => null)) as { ok?: unknown; reason?: unknown } | null;
+    if (json?.ok === true) return "sent";
+    // A gateway / server failure without our JSON: try again later; a refusal: drop it.
+    if (!json || res.status >= 500) return "retry";
+    return "drop";
+  } catch {
+    return "retry";
   }
 }
 

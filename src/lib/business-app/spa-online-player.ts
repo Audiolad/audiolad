@@ -4,11 +4,12 @@
  * Manual switches fade the old source out before pause / load / replacement: cutting
  * an audible waveform there causes a click. Natural advance still starts instantly.
  *
- * Plays the current ELIGIBLE manifest track by track from short-lived signed URLs.
- * No offline cache: nothing is downloaded or stored on the device. Every track start
- * asks the server for a fresh signed URL (server re-checks pilot access + manifest), so a
- * user without access never receives audio. The offline engine (spa-player-engine.ts)
- * stays in the repo with its tests for the next stage and is not used here.
+ * Plays the current ELIGIBLE manifest track by track from short-lived signed URLs. The hall
+ * device may add a short technical buffer (t1331u, hall-offline-buffer.ts, optional
+ * `localSource`): copies of the next tracks, usable for at most 2 hours and never past the
+ * access end; a start from a copy is re-checked by the server in the background like a
+ * pre-signed one. Without it nothing is stored on the device. The multi-day offline engine
+ * (spa-player-engine.ts) stays in the repo with its tests and is not used here.
  *
  * Network recovery (P0-3): transient failures (sign network errors, <audio> errors, a stall
  * that does not recover) never end in a dead state while the hall is meant to play. The
@@ -78,6 +79,15 @@ export type OnlineDeps = {
    * to the start (`onSeeking` / `onProgress`). Omitted: false ("ended" moves on as before).
    */
   loopAdvance?: () => boolean;
+  /**
+   * t1331u (hall offline buffer, hall-offline-buffer.ts): blob: URL of a device copy of this track
+   * that may still sound for `durationSec`, or null. A copy is preferred over the network at every
+   * start (and counts as a ready next track for the early / loop handoff); a start from a copy is
+   * re-checked by the server in the background like a pre-signed one. Omitted: streaming only.
+   */
+  localSource?: (audioItemId: string, durationSec: number | null) => string | null;
+  /** The element now sounds this track (`local`: from the device copy). */
+  onSource?: (audioItemId: string | null, local: boolean) => void;
 };
 
 export const RECOVERY_BASE_MS = 1_000;
@@ -126,6 +136,8 @@ export const LOOP_WRAP_END_SLACK_SEC = 5;
 /** A seek made by the user / the player itself is never taken for a loop wrap for this long. */
 export const LOOP_MANUAL_SEEK_GUARD_MS = 1_500;
 export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
+/** A stream that stalls while a device copy of the same track exists: switch to the copy this soon. */
+export const LOCAL_STALL_MS = 3_000;
 
 /** Browser autoplay policy refusal: only a user gesture helps, retries would loop. */
 export function isAutoplayRefusal(error: unknown): boolean {
@@ -193,6 +205,8 @@ export class SpaOnlinePlayer {
   private wrapPendingOp = -1;
   /** Autoplay refusal happened while the page was hidden: retried once when it is visible. */
   private refusedHidden = false;
+  /** The loaded source is a device copy (hall offline buffer), not the network stream. */
+  private sourceLocal = false;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -371,11 +385,14 @@ export class SpaOnlinePlayer {
         since: this.now(),
       };
     }
+    // The stream failed but this device holds a copy of the same track: continue from the copy at
+    // the same position at once (no backoff). A failing copy itself waits like any other source.
+    const copy = !this.sourceLocal && this.local(item) !== null;
     const op = ++this.op;
     this.stopAudio();
-    const n = this.retryAttempt++;
+    const n = copy ? 0 : this.retryAttempt++;
     const base = Math.min(RECOVERY_BASE_MS * 2 ** Math.min(n, 10), RECOVERY_MAX_MS);
-    const delay = Math.round(base * (0.75 + 0.5 * (this.d.random ?? Math.random)()));
+    const delay = copy ? 0 : Math.round(base * (0.75 + 0.5 * (this.d.random ?? Math.random)()));
     this.retryTimer = this.timer(() => {
       this.retryTimer = null;
       if (op !== this.op || this.disposed) return;
@@ -389,6 +406,17 @@ export class SpaOnlinePlayer {
     this.clearRetry();
     const resume = this.resumePoint;
     const i = resume ? this.items.findIndex((x) => x.audioItemId === resume.audioItemId) : -1;
+    // Offline, this track has no device copy but the next one has: move on to it now instead of
+    // waiting out the resume window in silence (t1331u).
+    if (resume && i >= 0 && !this.online() && this.d.localSource && this.local(this.items[i]) === null) {
+      this.index = i;
+      const target = this.nextTarget();
+      const next = target >= 0 ? this.items[target] : null;
+      if (next && next.audioItemId !== resume.audioItemId && this.local(next) !== null) {
+        this.resumePoint = null;
+        return this.playIndex(target);
+      }
+    }
     if (resume && i >= 0 && this.now() - resume.since <= RECOVERY_RESUME_WINDOW_MS) {
       return this.playIndex(i);
     }
@@ -419,11 +447,13 @@ export class SpaOnlinePlayer {
     if (this.disposed || this.status !== "playing" || this.stallTimer !== null) return;
     const op = this.op;
     this.stallAt = this.d.audio.currentTime;
+    const cur = this.current;
+    const copy = !this.sourceLocal && !!cur && this.local(cur) !== null;
     this.stallTimer = this.timer(() => {
       this.stallTimer = null;
       if (op !== this.op || this.disposed || this.status !== "playing") return;
       this.recover();
-    }, RECOVERY_STALL_MS);
+    }, copy ? LOCAL_STALL_MS : RECOVERY_STALL_MS);
   }
 
   /**
@@ -577,10 +607,42 @@ export class SpaOnlinePlayer {
     }
   }
 
-  /** Fresh pre-signed URL for this track, without taking it. */
+  /** Fresh pre-signed URL or a usable device copy for this track, without taking it. */
   private readyFor(id: string): boolean {
     const p = this.presigned;
-    return !!p && p.audioItemId === id && this.now() - p.at <= PRESIGN_MAX_AGE_MS;
+    if (p && p.audioItemId === id && this.now() - p.at <= PRESIGN_MAX_AGE_MS) return true;
+    const item = this.fresh(id);
+    return !!item && this.local(item) !== null;
+  }
+
+  /** Device copy of this track (hall offline buffer) that lasts the whole track, or null. */
+  private local(item: SpaManifestItem): string | null {
+    if (!this.d.localSource) return null;
+    try {
+      return this.d.localSource(item.audioItemId, item.durationSeconds ?? null);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Track the element plays from the device copy now (null: none / streaming). */
+  get localItemId(): string | null {
+    return this.sourceLocal ? this.soundingId : null;
+  }
+
+  /**
+   * The device copy that sounds now may not sound any more (2 h age or access end, buffer sweep).
+   * Stop it; the reconnect re-signs the stream at the same position (online) or waits (offline).
+   */
+  localExpired(audioItemId: string): void {
+    if (this.disposed || !this.sourceLocal || this.soundingId !== audioItemId) return;
+    if (this.status !== "playing" && this.status !== "loading") {
+      this.op++;
+      this.stopAudio();
+      if (this.status === "paused") this.d.onChange();
+      return;
+    }
+    this.recover();
   }
 
   /**
@@ -684,6 +746,8 @@ export class SpaOnlinePlayer {
     this.switching = false;
     this.leaving = false;
     this.soundingId = null;
+    if (this.sourceLocal) this.d.onSource?.(null, false);
+    this.sourceLocal = false;
     this.d.audio.pause();
     this.d.audio.removeAttribute("src");
     this.d.audio.load();
@@ -764,11 +828,13 @@ export class SpaOnlinePlayer {
       this.stopAudio();
     }
     const pre = this.takePresigned(item.audioItemId);
-    // Every started track is still checked by the server: a pre-signed start re-asks it below.
-    const recheck = pre !== null;
+    // t1331u: a device copy wins over the network (no request at the boundary, plays offline).
+    const copy = this.local(item);
+    // Every started track is still checked by the server: a pre-signed or copied start re-asks it.
+    const recheck = pre !== null || copy !== null;
     let r: OnlineSignResult;
     try {
-      r = pre ? { ok: true, data: { url: pre.url } } : await this.d.sign(item.audioItemId);
+      r = copy ? { ok: true, data: { url: copy } } : pre ? { ok: true, data: { url: pre.url } } : await this.d.sign(item.audioItemId);
     } catch {
       r = { ok: false, reason: "network" };
     }
@@ -803,6 +869,8 @@ export class SpaOnlinePlayer {
     if (instant && this.loopMode()) this.d.audio.pause();
     this.d.audio.src = r.data.url;
     this.soundingId = item.audioItemId;
+    this.sourceLocal = copy !== null && r.data.url === copy;
+    this.d.onSource?.(item.audioItemId, this.sourceLocal);
     this.presignRetryAt = 0;
     const seek = this.resumePoint?.audioItemId === item.audioItemId ? this.resumePoint.positionSec : 0;
     if (seek > 0.5) {

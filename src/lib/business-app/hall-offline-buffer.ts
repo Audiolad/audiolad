@@ -1,0 +1,480 @@
+/**
+ * t1331u / t1332u (Sergey 09.11.2026, widget t1332s9582): short technical buffer of the next hall
+ * tracks, so a hall keeps playing through a short internet outage.
+ *
+ * Option A – NOT the multi-day offline mode of the agreement (2.1): no offline_storage_cache grant,
+ * SPA_OFFLINE_ENABLED stays off, the service worker never sees audio. The hall device downloads
+ * the next HALL_BUFFER_TRACKS queue tracks (fetch of the same short-lived signed URL the player
+ * uses) into Cache Storage, IndexedDB where Cache Storage is missing, or nothing (streaming only,
+ * as before: in-app WebViews, private windows, very small quotas).
+ *
+ * Every copy is usable only until the EARLIER of HALL_BUFFER_MAX_AGE_MS after its download and the
+ * track's playable_until (the account access end, `workspaceItems`). Expired copies are deleted on
+ * every start check and on a timer; a copy that expires while it sounds is reported through
+ * `onExpired` (the player stops it / goes back to streaming). no_access / unpaired: `purge()`
+ * deletes everything. The same <audio> element plays a blob: URL of the copy, so Media Session,
+ * the lock screen, the iPhone loop handoff (#1196), the build reload (#1200) and the queue top-up
+ * (#1201) are unchanged.
+ */
+
+import type { OnlineSignResult } from "./spa-online-player";
+
+/** Sergey t1332s9582: «Делай запас из 10 треков». */
+export const HALL_BUFFER_TRACKS = 10;
+/** Soft cap on the bytes kept for the buffer (10 tracks are ~60 MB). */
+export const HALL_BUFFER_SOFT_CAP_BYTES = 100 * 1024 * 1024;
+/** A copy is a short technical reserve, never older than this. */
+export const HALL_BUFFER_MAX_AGE_MS = 2 * 60 * 60_000;
+/** Downloads at once: one, so the buffer never competes with the sounding stream. */
+export const HALL_BUFFER_CONCURRENCY = 1;
+/** Size assumed for a track before the first one is downloaded. */
+export const HALL_BUFFER_ASSUMED_TRACK_BYTES = 8 * 1024 * 1024;
+/** Free space always left to the browser / other site data. */
+export const HALL_BUFFER_FREE_MARGIN_BYTES = 50 * 1024 * 1024;
+/** After a failed download, the buffer tries again no sooner than this. */
+export const HALL_BUFFER_RETRY_MS = 30_000;
+/** Expiry check while nothing else happens. */
+export const HALL_BUFFER_SWEEP_MS = 30_000;
+/** Without a known length a copy has to stay usable at least this long to be started. */
+export const HALL_BUFFER_DEFAULT_TRACK_MS = 5 * 60_000;
+/** Cache Storage name (never "audiolad-pwa-*": public/sw.js deletes those on activate). */
+export const HALL_BUFFER_CACHE = "audiolad-hall-buffer-v1";
+export const HALL_BUFFER_IDB = "audiolad-hall-buffer";
+/**
+ * Copies held in memory as Blob objects (the sounding track and the next ones): the rest stays on
+ * disk only, so a phone never keeps ~60 MB of audio in memory.
+ */
+export const HALL_BUFFER_WARM = 2;
+/** localStorage: whose buffer this is (`space:location`). A different hall wipes it. */
+export const HALL_BUFFER_OWNER_KEY = "audiolad.hall-buffer.owner";
+
+export type BufferStoreKind = "cache" | "idb";
+
+export type BufferStore = {
+  kind: BufferStoreKind;
+  get(id: string): Promise<{ blob: Blob; downloadedAt: number } | null>;
+  put(id: string, blob: Blob, downloadedAt: number): Promise<void>;
+  delete(id: string): Promise<void>;
+  keys(): Promise<string[]>;
+  clear(): Promise<void>;
+};
+
+export type BufferTrack = { audioItemId: string; durationSeconds: number | null };
+
+export type HallBufferDeps = {
+  /** null: this browser cannot keep tracks – streaming only, the buffer stays empty. */
+  store: BufferStore | null;
+  sign(audioItemId: string): Promise<OnlineSignResult>;
+  fetchBlob(url: string, signal: AbortSignal): Promise<Blob>;
+  createUrl(blob: Blob): string;
+  revokeUrl(url: string): void;
+  /**
+   * The track's current manifest window: null = not allowed any more (left the manifest);
+   * `until` = playable_until in ms (account access end), null = no end known.
+   */
+  window(audioItemId: string): { until: number | null } | null;
+  isOnline(): boolean;
+  /** Free space hint (navigator.storage.estimate). Omitted / null: only the soft cap applies. */
+  estimate?(): Promise<{ quota?: number; usage?: number } | null>;
+  /** A copy that is no longer usable while it sounds (age / access end). */
+  onExpired?(audioItemId: string): void;
+  /** The server refused the account: the buffer has already purged itself. */
+  onNoAccess?(): void;
+  onChange?(): void;
+  now?: () => number;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (t: unknown) => void;
+  maxTracks?: number;
+  softCapBytes?: number;
+  concurrency?: number;
+};
+
+/** `blob`: loaded from the store (warm) or null (on disk only). */
+type Entry = { blob: Blob | null; size: number; downloadedAt: number; url: string | null };
+
+/**
+ * Next `n` distinct tracks the player will really play after `currentIndex`, following the same
+ * `nextIndex` the controller uses (wrap included). The current track is not part of it.
+ */
+export function hallBufferPlan(
+  tracks: readonly { audioItemId: string }[],
+  currentIndex: number,
+  nextIndex: (current: number, length: number) => number,
+  n = HALL_BUFFER_TRACKS,
+): string[] {
+  const len = tracks.length;
+  if (len === 0 || n <= 0) return [];
+  const currentId = currentIndex >= 0 ? tracks[currentIndex]?.audioItemId ?? null : null;
+  const out: string[] = [];
+  const seen = new Set<string>(currentId ? [currentId] : []);
+  let cur = currentIndex;
+  for (let step = 0; step < len && out.length < n; step++) {
+    const next = nextIndex(cur, len);
+    if (!Number.isInteger(next) || next < 0 || next >= len) break;
+    // Back at the current track: the queue loops, nothing new follows.
+    if (next === currentIndex) break;
+    cur = next;
+    const id = tracks[next]?.audioItemId;
+    if (!id) break;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/** «В запасе 10 треков на случай пропадания интернета». Null: nothing to say (unsupported / 0). */
+export function hallBufferLine(count: number | null | undefined): string | null {
+  if (typeof count !== "number" || !Number.isInteger(count) || count <= 0) return null;
+  const n = Math.abs(count) % 100;
+  const last = n % 10;
+  const word = n > 10 && n < 20 ? "треков" : last === 1 ? "трек" : last >= 2 && last <= 4 ? "трека" : "треков";
+  return `В запасе ${count} ${word} на случай пропадания интернета`;
+}
+
+export class HallOfflineBuffer {
+  private entries = new Map<string, Entry>();
+  /** Tracks the buffer should hold, in play order (the next tracks after the current one). */
+  private plan: string[] = [];
+  /** Track the element plays now: kept (and its blob: URL alive) until another one sounds. */
+  private pinned: string | null = null;
+  private downloading = new Map<string, AbortController>();
+  private retryAt = 0;
+  private sweepTimer: unknown = null;
+  private disposed = false;
+  private avgSize = HALL_BUFFER_ASSUMED_TRACK_BYTES;
+  /** Bumped by purge(): downloads started before it never land. */
+  private generation = 0;
+  private wantsRefill = false;
+
+  constructor(private readonly d: HallBufferDeps) {}
+
+  get supported(): boolean {
+    return this.d.store !== null;
+  }
+
+  get storeKind(): BufferStoreKind | null {
+    return this.d.store?.kind ?? null;
+  }
+
+  private now(): number {
+    return this.d.now ? this.d.now() : Date.now();
+  }
+
+  private timer(fn: () => void, ms: number): unknown {
+    return (this.d.setTimer ?? ((f, t) => setTimeout(f, t)))(fn, ms);
+  }
+
+  private cancel(t: unknown) {
+    (this.d.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>)))(t);
+  }
+
+  private get maxTracks(): number {
+    return Math.max(0, this.d.maxTracks ?? HALL_BUFFER_TRACKS);
+  }
+
+  /** Last moment a copy may still sound (ms); -Infinity when the track is not allowed at all. */
+  usableUntil(id: string, downloadedAt: number): number {
+    const w = this.d.window(id);
+    if (!w) return -Infinity;
+    const age = downloadedAt + HALL_BUFFER_MAX_AGE_MS;
+    return w.until === null ? age : Math.min(age, w.until);
+  }
+
+  private usable(id: string, e: Entry, minMs = 0): boolean {
+    return this.usableUntil(id, e.downloadedAt) - this.now() > minMs;
+  }
+
+  /** Copies of the planned tracks that can be played now (what the owner line says). */
+  get readyCount(): number {
+    let n = 0;
+    for (const id of this.plan) {
+      const e = this.entries.get(id);
+      if (e && this.usable(id, e)) n++;
+    }
+    return n;
+  }
+
+  has(id: string): boolean {
+    const e = this.entries.get(id);
+    return !!e && this.usable(id, e);
+  }
+
+  /**
+   * blob: URL to start this track from the device copy, or null (stream it). The copy has to stay
+   * usable for the whole track (`durationSec`, else HALL_BUFFER_DEFAULT_TRACK_MS); an expired one is
+   * deleted here.
+   */
+  localSource(id: string, durationSec?: number | null): string | null {
+    if (this.disposed) return null;
+    const e = this.entries.get(id);
+    if (!e) return null;
+    if (!this.usable(id, e)) {
+      this.evict(id);
+      return null;
+    }
+    const need = typeof durationSec === "number" && Number.isFinite(durationSec) && durationSec > 0
+      ? durationSec * 1000 : HALL_BUFFER_DEFAULT_TRACK_MS;
+    if (!this.usable(id, e, need)) return null;
+    if (!e.url) {
+      if (!e.blob) {
+        void this.warm();
+        return null;
+      }
+      e.url = this.d.createUrl(e.blob);
+    }
+    return e.url;
+  }
+
+  /** Tracks whose copies are kept in memory: the sounding one and the next HALL_BUFFER_WARM. */
+  private warmIds(): string[] {
+    const ids = this.plan.slice(0, HALL_BUFFER_WARM);
+    return this.pinned ? [this.pinned, ...ids] : ids;
+  }
+
+  /**
+   * Loads the copies of the sounding / next tracks from the store into memory (works offline) and
+   * drops the others from memory (they stay on disk). Never touches a blob: URL the element plays.
+   */
+  async warm(): Promise<void> {
+    const store = this.d.store;
+    if (!store || this.disposed) return;
+    const want = this.warmIds();
+    for (const [id, e] of this.entries) {
+      if (want.includes(id) || id === this.pinned) continue;
+      if (e.url) {
+        this.d.revokeUrl(e.url);
+        e.url = null;
+      }
+      e.blob = null;
+    }
+    const gen = this.generation;
+    for (const id of want) {
+      const e = this.entries.get(id);
+      if (!e || e.blob) continue;
+      let got: { blob: Blob; downloadedAt: number } | null = null;
+      try {
+        got = await store.get(id);
+      } catch {
+        got = null;
+      }
+      if (this.disposed || gen !== this.generation) return;
+      const now = this.entries.get(id);
+      if (!now) continue;
+      if (!got) {
+        // Gone from the store (browser eviction): forget it, the refill downloads it again.
+        this.entries.delete(id);
+        this.d.onChange?.();
+        continue;
+      }
+      if (!now.blob) now.blob = got.blob;
+    }
+  }
+
+  /** The element now plays this track (null: nothing). The previous pinned copy may go. */
+  pin(id: string | null): void {
+    if (this.pinned === id) return;
+    const old = this.pinned;
+    this.pinned = id;
+    if (old && !this.plan.includes(old)) this.evict(old);
+    void this.warm();
+  }
+
+  /** The next tracks changed (advance, queue rebuild / top-up, manifest). Evicts the rest. */
+  setPlan(ids: readonly string[]): void {
+    if (this.disposed) return;
+    const max = this.maxTracks;
+    const next = [...new Set(ids)].slice(0, max);
+    this.plan = next;
+    for (const [id, ctl] of this.downloading) {
+      if (!next.includes(id)) {
+        ctl.abort();
+        this.downloading.delete(id);
+      }
+    }
+    for (const id of [...this.entries.keys()]) {
+      if (id !== this.pinned && !next.includes(id)) this.evict(id);
+    }
+    void this.warm();
+    this.d.onChange?.();
+  }
+
+  /** Reload: take over the copies already on the device (expired / foreign ones are deleted). */
+  async rehydrate(): Promise<void> {
+    const store = this.d.store;
+    if (!store || this.disposed) return;
+    const gen = this.generation;
+    let keys: string[] = [];
+    try {
+      keys = await store.keys();
+    } catch {
+      return;
+    }
+    for (const id of keys) {
+      if (this.disposed || gen !== this.generation) return;
+      if (this.entries.has(id)) continue;
+      let got: { blob: Blob; downloadedAt: number } | null = null;
+      try {
+        got = await store.get(id);
+      } catch {
+        got = null;
+      }
+      if (!got || !(got.downloadedAt > 0) || this.usableUntil(id, got.downloadedAt) <= this.now()) {
+        void store.delete(id).catch(() => {});
+        continue;
+      }
+      // On disk only; warm() loads the ones about to play.
+      this.entries.set(id, { blob: null, size: got.blob.size, downloadedAt: got.downloadedAt, url: null });
+    }
+    this.updateAvg();
+    await this.warm();
+    this.d.onChange?.();
+  }
+
+  /** Deletes expired copies; reports one that expired while it sounds. Re-arms itself. */
+  sweep(): void {
+    if (this.disposed) return;
+    if (this.sweepTimer !== null) this.cancel(this.sweepTimer);
+    this.sweepTimer = null;
+    let changed = false;
+    let nearest = Infinity;
+    for (const [id, e] of [...this.entries]) {
+      const until = this.usableUntil(id, e.downloadedAt);
+      if (until <= this.now()) {
+        const sounding = id === this.pinned;
+        this.evict(id);
+        changed = true;
+        if (sounding) this.d.onExpired?.(id);
+      } else nearest = Math.min(nearest, until);
+    }
+    if (changed) this.d.onChange?.();
+    const wait = Math.max(250, Math.min(HALL_BUFFER_SWEEP_MS, nearest - this.now()));
+    this.sweepTimer = this.timer(() => {
+      this.sweepTimer = null;
+      this.sweep();
+      if (this.wantsRefill) void this.refill();
+    }, wait);
+  }
+
+  private updateAvg() {
+    const sizes = [...this.entries.values()].map((e) => e.size).filter((s) => s > 0);
+    if (sizes.length > 0) this.avgSize = Math.max(256 * 1024, sizes.reduce((a, b) => a + b, 0) / sizes.length);
+  }
+
+  private bytes(): number {
+    let sum = 0;
+    for (const e of this.entries.values()) sum += e.size;
+    return sum;
+  }
+
+  /** Bytes the buffer may hold now: the soft cap, shrunk to the free space the browser reports. */
+  private async budget(): Promise<number> {
+    const cap = this.d.softCapBytes ?? HALL_BUFFER_SOFT_CAP_BYTES;
+    if (!this.d.estimate) return cap;
+    try {
+      const est = await this.d.estimate();
+      const quota = est?.quota;
+      const usage = est?.usage;
+      if (typeof quota !== "number" || !Number.isFinite(quota) || quota <= 0) return cap;
+      const free = quota - (typeof usage === "number" && Number.isFinite(usage) ? usage : 0) - HALL_BUFFER_FREE_MARGIN_BYTES;
+      return Math.max(0, Math.min(cap, this.bytes() + free));
+    } catch {
+      return cap;
+    }
+  }
+
+  /**
+   * Downloads missing planned tracks in play order while online, at most `concurrency` at once,
+   * within the byte budget. `active`: only while the hall is meant to play (an idle hall left open
+   * overnight must not download the same tracks every 2 hours).
+   */
+  async refill(active = true): Promise<void> {
+    if (this.disposed || !this.d.store) return;
+    this.wantsRefill = active;
+    if (!active) return;
+    this.sweep();
+    if (!this.d.isOnline() || this.now() < this.retryAt) return;
+    const limit = Math.max(1, this.d.concurrency ?? HALL_BUFFER_CONCURRENCY);
+    if (this.downloading.size >= limit) return;
+    const id = this.plan.find((x) => !this.downloading.has(x) && !this.has(x));
+    if (!id) return;
+    const budget = await this.budget();
+    if (this.disposed || this.downloading.has(id) || this.has(id) || !this.plan.includes(id)) return;
+    if (this.bytes() + this.avgSize > budget) return; // N shrinks to what the device can hold
+    const gen = this.generation;
+    const abort = new AbortController();
+    this.downloading.set(id, abort);
+    try {
+      const signed = await this.d.sign(id);
+      if (!signed.ok) {
+        if (signed.reason === "no_access") {
+          await this.purge();
+          this.d.onNoAccess?.();
+          return;
+        }
+        throw new Error(signed.reason);
+      }
+      const fetched = await this.d.fetchBlob(signed.data.url, abort.signal);
+      if (this.disposed || gen !== this.generation || abort.signal.aborted) return;
+      if (!this.d.window(id) || !this.plan.includes(id)) return;
+      const blob = fetched.type ? fetched : new Blob([fetched], { type: "audio/mpeg" });
+      const downloadedAt = this.now();
+      await this.d.store.put(id, blob, downloadedAt);
+      if (this.disposed || gen !== this.generation) {
+        void this.d.store.delete(id).catch(() => {});
+        return;
+      }
+      const old = this.entries.get(id);
+      if (old?.url && id !== this.pinned) this.d.revokeUrl(old.url);
+      // Kept in memory only when it plays soon; otherwise on disk until warm() needs it.
+      const warmNow = this.warmIds().includes(id);
+      this.entries.set(id, {
+        blob: warmNow ? blob : null,
+        size: blob.size,
+        downloadedAt,
+        url: id === this.pinned ? old?.url ?? null : null,
+      });
+      this.updateAvg();
+      this.retryAt = 0;
+      this.d.onChange?.();
+    } catch {
+      if (!abort.signal.aborted) this.retryAt = this.now() + HALL_BUFFER_RETRY_MS;
+      return;
+    } finally {
+      if (this.downloading.get(id) === abort) this.downloading.delete(id);
+    }
+    void this.refill(active);
+  }
+
+  private evict(id: string): void {
+    const e = this.entries.get(id);
+    this.entries.delete(id);
+    if (e?.url) this.d.revokeUrl(e.url);
+    void this.d.store?.delete(id).catch(() => {});
+  }
+
+  /** no_access, unpaired, another hall: every copy goes now. */
+  async purge(): Promise<void> {
+    this.generation++;
+    for (const ctl of this.downloading.values()) ctl.abort();
+    this.downloading.clear();
+    for (const e of this.entries.values()) if (e.url) this.d.revokeUrl(e.url);
+    this.entries.clear();
+    this.plan = [];
+    try {
+      await this.d.store?.clear();
+    } catch { /* best effort */ }
+    this.d.onChange?.();
+  }
+
+  /** Page / player gone: blob: URLs released, copies stay for the reload (rehydrate). */
+  dispose(): void {
+    this.disposed = true;
+    if (this.sweepTimer !== null) this.cancel(this.sweepTimer);
+    this.sweepTimer = null;
+    for (const ctl of this.downloading.values()) ctl.abort();
+    this.downloading.clear();
+    for (const e of this.entries.values()) if (e.url) this.d.revokeUrl(e.url);
+    this.entries.clear();
+  }
+}

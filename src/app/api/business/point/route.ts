@@ -84,6 +84,32 @@ async function writeHallNowPlaying(
 }
 
 /**
+ * t1331u: how many next tracks the hall keeps on the device for an outage. Optional column
+ * (migration 20270304120000); before it exists the write fails quietly and the owner line stays
+ * hidden. The device sends it only when it changes or once a minute. Best effort, never throws.
+ */
+async function writeHallBufferedCount(token: string, bufferedCount: number): Promise<void> {
+  try {
+    const admin = createServiceRoleClient();
+    const { data: session, error: sessionError } = await admin
+      .from("business_point_sessions")
+      .select("player_id")
+      .eq("token_hash", `\\x${pointTokenHashHex(token)}`)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (sessionError || !session) return;
+    const playerId = (session as { player_id: string }).player_id;
+    if (!playerId) return;
+    await admin
+      .from("business_player_now_playing")
+      .update({ buffered_count: bufferedCount })
+      .eq("player_id", playerId);
+  } catch {
+    /* best effort */
+  }
+}
+
+/**
  * Persist the hall client's build id into business_player_runtime.app_version.
  * Column already exists (foundation migration) – no schema change. Best effort.
  */
@@ -409,6 +435,24 @@ export async function POST(request: Request) {
     const jar = request.headers.get("cookie") ?? "";
     const token = readCookie(jar, BUSINESS_POINT_COOKIE);
     if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
+    // t1331u: a listening sample the hall recorded while offline (played from its buffer). Only
+    // the usage RPC runs (session, assignment and eligibility re-checked there); live state and
+    // heartbeat are never written late, so the owner dot stays «нет связи» for the outage.
+    if (body.kind === "usage") {
+      const usage = body.usage && typeof body.usage === "object" && !Array.isArray(body.usage)
+        ? body.usage as Record<string, unknown> : null;
+      if (!usage || !isPointCommandId(usage.eventId) || !isPointCommandId(usage.sessionId)
+        || !isPointCommandId(usage.audioItemId)
+        || !Number.isSafeInteger(usage.seq) || Number(usage.seq) < 1
+        || !Number.isSafeInteger(usage.positionMs) || Number(usage.positionMs) < 0) {
+        return json({ ok: false, reason: "invalid_sample" }, 400);
+      }
+      const { error: usageError } = await supabase.rpc("apply_business_point_usage_sample", {
+        p_token: token, p_client_event_id: usage.eventId, p_playback_session_id: usage.sessionId,
+        p_sample_seq: usage.seq, p_audio_item_id: usage.audioItemId, p_position_ms: usage.positionMs,
+      });
+      return json(usageError ? { ok: false, reason: "usage_report_failed" } : { ok: true, data: null });
+    }
     const kind = body.kind === "playback" ? "playback" : body.kind === "heartbeat" ? "heartbeat" : null;
     if (!kind) return json({ ok: false, reason: "invalid_request" }, 400);
     const report = kind === "playback" && isSpaLiveReport(body.report) ? body.report : null;
@@ -428,6 +472,9 @@ export async function POST(request: Request) {
     // browser's own device session.
     if (!error && report && isHallNowPlayingReport(body.nowPlaying)) {
       await writeHallNowPlaying(supabase, token, report.audioItemId, body.nowPlaying);
+      if (typeof body.nowPlaying.bufferedCount === "number") {
+        await writeHallBufferedCount(token, body.nowPlaying.bufferedCount);
+      }
     }
     if (!error && report?.playingConfirmed && report.audioItemId && body.sample && typeof body.sample === "object") {
       const sample = body.sample as Record<string, unknown>;
