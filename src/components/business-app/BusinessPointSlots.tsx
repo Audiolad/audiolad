@@ -1,13 +1,13 @@
 "use client";
 
-import { useBusinessChromeAccess } from "./BusinessAccessLine";
+import { useBusinessChromeAccess, useHasLiveBusinessAccess } from "./BusinessAccessLine";
 import { BusinessPayControls, useBusinessHomePay } from "./BusinessHomeAccessCard";
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 import { partnerQuoteIsDiscounted } from "@/lib/business/partner-codes";
 import { BusinessStruckPrice } from "./BusinessPartnerPrice";
 import { usePartnerQuote } from "./partner-quote-store";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { activateBusinessPoint, selectBusinessPoint } from "@/app/business-app/actions";
@@ -15,11 +15,31 @@ import { useBusinessDomain } from "./BusinessDomainProvider";
 import { useBusinessCabinetMode } from "./BusinessPointMode";
 import { emptyBusinessOwnerHomeSignals, type BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { businessPilotSlots } from "@/lib/business-app/location-selection";
+import {
+  applyAccessToVenueDots,
+  VENUE_STATUS_LEGEND,
+  type VenueStatusDotRow,
+} from "@/lib/business-app/venue-status-dot";
+
+type LiveOwnerState = {
+  locationId: string;
+  signals: BusinessOwnerHomeSignals;
+  venues: VenueStatusDotRow[];
+};
+
+function isVenueRow(value: unknown): value is VenueStatusDotRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.locationId === "string"
+    && (row.color === "green" || row.color === "yellow" || row.color === "red" || row.color === "grey")
+    && typeof row.label === "string";
+}
 
 export default function BusinessPointSlots() {
   const router = useRouter();
   const domain = useBusinessDomain();
   const access = useBusinessChromeAccess();
+  const accessLive = useHasLiveBusinessAccess();
   const payment = useBusinessHomePay();
   const quote = usePartnerQuote(payment.canPay);
   const cabinet = useBusinessCabinetMode();
@@ -27,7 +47,7 @@ export default function BusinessPointSlots() {
   const [error, setError] = useState("");
   const locationId = domain.status === "authenticated" ? domain.location?.id : undefined;
   const enabled = domain.status === "authenticated" && domain.pilotSlots && cabinet.side !== "venue";
-  const [live, setLive] = useState<{ locationId: string; signals: BusinessOwnerHomeSignals } | null>(null);
+  const [live, setLive] = useState<LiveOwnerState | null>(null);
   useEffect(() => {
     if (!enabled || !locationId) return;
     let stopped = false;
@@ -44,9 +64,21 @@ export default function BusinessPointSlots() {
           headers: { "Content-Type": "application/json" }, signal: controller.signal,
           body: JSON.stringify({ action: "owner-state", locationId }) });
         const result = await response.json();
-        if (!stopped) setLive(response.ok && result.ok && result.locationId === locationId ? result : { locationId, signals: emptyBusinessOwnerHomeSignals() });
-      } catch { if (!stopped) setLive({ locationId, signals: emptyBusinessOwnerHomeSignals() }); }
-      finally { window.clearTimeout(timeout); activeRequest = null; busy = false; }
+        if (!stopped) {
+          if (response.ok && result.ok && result.locationId === locationId) {
+            const venues = Array.isArray(result.venues) ? result.venues.filter(isVenueRow) : [];
+            setLive({ locationId, signals: result.signals ?? emptyBusinessOwnerHomeSignals(), venues });
+          } else {
+            setLive({ locationId, signals: emptyBusinessOwnerHomeSignals(), venues: [] });
+          }
+        }
+      } catch {
+        if (!stopped) setLive({ locationId, signals: emptyBusinessOwnerHomeSignals(), venues: [] });
+      } finally {
+        window.clearTimeout(timeout);
+        activeRequest = null;
+        busy = false;
+      }
     };
     void poll();
     const timer = window.setInterval(() => void poll(), 15_000);
@@ -55,6 +87,11 @@ export default function BusinessPointSlots() {
     return () => { stopped = true; activeRequest?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", wake); };
   }, [enabled, locationId]);
   const signals = live?.locationId === locationId ? live?.signals : domain.status === "authenticated" ? domain.signals : null;
+  const venueDots = useMemo(() => {
+    const rows = live?.locationId === locationId ? live.venues : [];
+    return applyAccessToVenueDots(rows, accessLive);
+  }, [live, locationId, accessLive]);
+  const statusById = useMemo(() => new Map(venueDots.map((row) => [row.locationId, row])), [venueDots]);
   const limit = domain.status === "authenticated" ? domain.venueSlotLimit ?? 1 : 1;
   // Same rule for every owner: one hall at start, «Добавить» up to the system limit.
   if (cabinet.side === "venue" || domain.status !== "authenticated" || limit < 2) return null;
@@ -85,15 +122,41 @@ export default function BusinessPointSlots() {
   return <section className="business-app-card mx-auto mb-4 max-w-3xl space-y-3" aria-label="Точки организации">
     <h2 className="text-lg font-bold">Мои точки</h2>
     <div className="flex flex-wrap gap-2">
-      {slots.map((slot) => <button key={slot.number} type="button"
-        className={slot.location ? "business-app-btn business-app-btn-secondary business-app-focus-ring" : "business-app-btn business-app-btn-primary business-app-focus-ring"}
-        aria-pressed={slot.location ? domain.location?.id === slot.location.id : undefined}
-        data-testid={slot.location ? undefined : "biz-add-point"}
-        disabled={pending || (!!slot.location && slot.location.status !== "active") || (!slot.location && !domain.canPay)}
-        onClick={() => run(slot)}>
-        {slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`}
-      </button>)}
+      {slots.map((slot) => {
+        const status = slot.location ? statusById.get(slot.location.id) : undefined;
+        const label = slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`;
+        const ariaLabel = status ? `${label} – ${status.label}` : label;
+        return <button key={slot.number} type="button"
+          className={slot.location
+            ? "business-app-btn business-app-btn-secondary business-app-focus-ring business-venue-status-btn"
+            : "business-app-btn business-app-btn-primary business-app-focus-ring"}
+          aria-pressed={slot.location ? domain.location?.id === slot.location.id : undefined}
+          aria-label={ariaLabel}
+          data-testid={slot.location ? `biz-venue-status-${status?.color ?? "pending"}` : "biz-add-point"}
+          disabled={pending || (!!slot.location && slot.location.status !== "active") || (!slot.location && !domain.canPay)}
+          onClick={() => run(slot)}>
+          {slot.location ? <>
+            <span
+              className={`business-venue-status-dot business-venue-status-dot--${status?.color ?? "grey"}`}
+              aria-hidden="true"
+              data-color={status?.color ?? "grey"}
+            />
+            <span>{label}</span>
+            <span className="sr-only">{status ? `Статус: ${status.label}` : "Статус пока неизвестен"}</span>
+          </> : label}
+        </button>;
+      })}
     </div>
+    {halls.length > 0 ? (
+      <ul className="business-venue-status-legend" aria-label="Обозначения статуса точек" data-testid="biz-venue-status-legend">
+        {VENUE_STATUS_LEGEND.map((item) => (
+          <li key={item.color}>
+            <span className={`business-venue-status-dot business-venue-status-dot--${item.color}`} aria-hidden="true" />
+            <span>{item.label}</span>
+          </li>
+        ))}
+      </ul>
+    ) : null}
     {addingTenth ? <div className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-tenth-point-notice">
       <p className="text-sm text-[var(--biz-text-muted)]">Сейчас вы подключаете десятую точку. В этой конфигурации точек десять. Одиннадцатую так же подключить нельзя – нужно чуть изменить конфигурацию. Если планируете подключать ещё, напишите заранее – подберём под вас отдельную структуру.</p>
       {writeLink}

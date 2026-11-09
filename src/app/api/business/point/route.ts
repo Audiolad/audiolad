@@ -1,4 +1,5 @@
 import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
+import { loadVenueStatusDots } from "@/lib/business-app/load-venue-status-dots.server";
 import { createHash } from "node:crypto";
 
 import { after, NextResponse } from "next/server";
@@ -236,8 +237,14 @@ export async function POST(request: Request) {
     const { data: location, error } = await supabase.from("business_locations")
       .select("id, organization_id").eq("id", body.locationId).eq("status", "active").maybeSingle();
     if (error || !location) return json({ ok: false }, 403);
-    const signals = await loadBusinessOwnerHomeSignals({ organizationId: location.organization_id, locationId: location.id, userId: user.id });
-    return json({ ok: true, locationId: location.id, signals });
+    const { data: orgLocations } = await supabase.from("business_locations")
+      .select("id").eq("organization_id", location.organization_id).eq("status", "active");
+    const locationIds = (orgLocations ?? []).map((row) => row.id as string);
+    const [signals, venues] = await Promise.all([
+      loadBusinessOwnerHomeSignals({ organizationId: location.organization_id, locationId: location.id, userId: user.id }),
+      loadVenueStatusDots({ organizationId: location.organization_id, locationIds }),
+    ]);
+    return json({ ok: true, locationId: location.id, signals, venues });
   }
 
   if (body.action === "hall-now") {

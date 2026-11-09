@@ -2238,3 +2238,53 @@
 .business-point-switch > .business-app-btn {
   justify-self: start;
 }
+
+
+/* t1309u – status circles on «Мои точки» (left of venue name so buttons stay aligned). */
+.business-venue-status-btn {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.business-venue-status-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: #9ca3af;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.business-venue-status-dot--green {
+  background: #22c55e;
+}
+
+.business-venue-status-dot--yellow {
+  background: #eab308;
+}
+
+.business-venue-status-dot--red {
+  background: #ef4444;
+}
+
+.business-venue-status-dot--grey {
+  background: #9ca3af;
+}
+
+.business-venue-status-legend {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--biz-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.business-venue-status-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
