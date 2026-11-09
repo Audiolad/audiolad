@@ -72,7 +72,7 @@ export default async function BusinessProfilePage() {
           </div>
         )}
         <section className="business-app-card space-y-3">
-          <BusinessProfileForm ownerName={ownerName} ownerSurname={ownerSurname} venueName={domain.location?.name ?? null} canEditVenue={membership?.role === "owner"} />
+          <BusinessProfileForm ownerName={ownerName} ownerSurname={ownerSurname} organizationName={domain.organizationId ? (domain.organizationName ?? "") : null} canEditOrganization={membership?.role === "owner"} />
           <dl className="space-y-2 text-sm">
             {email ? (
               <div>
