@@ -42,6 +42,8 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/workspace/queue",
   "/api/business/subscription/accept",
   "/api/business/subscription/checkout",
+  // 8142d69a: personal partner code (link and «У меня есть подарочный код»). Checks run in the handler.
+  "/api/business/partner-code",
   // ba344b7f: one signed preview track on the wizard atmosphere step.
   "/api/business/onboarding/preview",
   "/api/business/onboarding/preview/audio",

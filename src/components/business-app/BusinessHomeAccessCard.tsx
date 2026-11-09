@@ -17,6 +17,18 @@ import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-gr
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+import {
+  partnerConfirmedUnitPriceMinor,
+  parsePartnerQuote,
+  partnerQuoteIsDiscounted,
+} from "@/lib/business/partner-codes";
+import {
+  BusinessPartnerFinishedNotice,
+  BusinessPartnerLatePaymentNotice,
+  BusinessPartnerTerms,
+  BusinessStruckPrice,
+} from "@/components/business-app/BusinessPartnerPrice";
+import { getPartnerQuote, setPartnerQuote, usePartnerQuote } from "@/components/business-app/partner-quote-store";
 
 function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): string {
   if (domain.status !== "authenticated" || !domain.pilotSlots) return formatBusinessMonthlyPrice();
@@ -25,7 +37,7 @@ function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): str
 }
 function businessPaymentNote(domain: ReturnType<typeof useBusinessDomain>): string {
   return domain.status === "authenticated" && domain.pilotSlots
-    ? `${businessPaymentLabel(domain)} за 30 дней за все активные точки. Одна оплата, общая дата продления.`
+    ? `Тариф – ${BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за одну точку на 30 дней. Итого ${businessPaymentLabel(domain)} за все активные точки. Одна оплата, общая дата продления.`
     : businessGiftPriceNote();
 }
 
@@ -114,15 +126,23 @@ export function useBusinessHomePay() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Idempotency-Key": crypto.randomUUID(), "Content-Type": "application/json" },
-        body: JSON.stringify(typedEmail ? { receipt_email: typedEmail } : {}),
+        // The per-venue price shown next to the button; the server refuses any other one.
+        body: JSON.stringify({
+          ...(typedEmail ? { receipt_email: typedEmail } : {}),
+          confirmed_unit_price_minor: partnerConfirmedUnitPriceMinor(getPartnerQuote()),
+        }),
       });
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
         href?: string;
         payment_url?: string;
+        quote?: unknown;
       } | null;
       if (!response.ok || typeof payload?.payment_url !== "string") {
         const next = payErrorFromPayload(payload);
+        // A newer offer edition was published after this page loaded: show «Принять условия» again.
+        if (next.code === "offer_acceptance_required") setAccepted(false);
+        if (next.code === "partner_terms_changed") setPartnerQuote(parsePartnerQuote(payload?.quote));
         if (next.code === "receipt_email_required") setAskReceiptEmail(true);
         setError(next);
         setBusy(false);
@@ -157,9 +177,12 @@ export function useBusinessHomePay() {
 /** Owner payment before the first venue. A manager and a venue device do not see the button. */
 export default function BusinessHomeAccessCard() {
   const domain = useBusinessDomain();
-  const totalLabel = businessPaymentLabel(domain);
   const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay, askReceiptEmail, receiptEmail, setReceiptEmail } =
     useBusinessHomePay();
+  const quote = usePartnerQuote(canPay);
+  const totalLabel = partnerQuoteIsDiscounted(quote)
+    ? <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-home-offer-price" />
+    : businessPaymentLabel(domain);
 
   if (!hasTerm || !access.endsAt) {
     return null;
@@ -241,12 +264,21 @@ export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { tes
 
 /** Clear text above every «Принять условия»: what is accepted, once per account, with the document link. */
 export function BusinessOfferAcceptNote() {
+  const domain = useBusinessDomain();
+  const newEdition = domain.status === "authenticated" && Boolean(domain.offerNewEditionPending);
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
-      Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек. Нажимая «Принять
-      условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
+      {newEdition
+        ? "Опубликована новая редакция договора-оферты. Примите её перед следующей оплатой – один раз для всего аккаунта и всех точек. Музыка в точках играет как раньше."
+        : "Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек."}{" "}
+      Нажимая «Принять условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
     </p>
   );
+}
+
+/** In-page target of «Перейти и принять»: the «Принять условия» button next to it (unique per block). */
+export function useOfferAcceptAnchorId(): string {
+  return `biz-offer-accept-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
 /** Shown next to every «Оплатить»: the payment is made under this offer edition. */
@@ -321,12 +353,22 @@ export function BusinessPayControls({
   showAcceptedNote?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const quote = usePartnerQuote(canPay);
+  const acceptAnchorId = useOfferAcceptAnchorId();
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        {businessPaymentNote(domain)}
-      </p>
+      <BusinessPartnerLatePaymentNotice quote={quote} />
+      {partnerQuoteIsDiscounted(quote) ? (
+        <BusinessPartnerTerms quote={quote} />
+      ) : (
+        <>
+          <BusinessPartnerFinishedNotice quote={quote} />
+          <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+            {businessPaymentNote(domain)}
+          </p>
+        </>
+      )}
       {accepted ? (
         <>
           <BusinessOfferAcceptedNote />
@@ -349,22 +391,26 @@ export function BusinessPayControls({
             className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
             onClick={onAccept}
             disabled={busy}
+            id={acceptAnchorId}
             data-testid="biz-home-accept"
           >
             Принять условия
           </button>
         </>
       )}
-      {error ? <BusinessPayError error={error} /> : null}
+      {error ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
     </div>
   );
 }
 
-export function BusinessPayError({ error }: { error: PayError }) {
+export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; acceptAnchorId: string }) {
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
-        Сначала примите договор-оферту: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.
+        Для оплаты нужна текущая редакция договора-оферты: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.{" "}
+        <a href={`#${acceptAnchorId}`} className="font-semibold underline underline-offset-2 business-app-focus-ring" data-testid="biz-home-pay-error-accept-link">
+          Перейти и принять
+        </a>
       </p>
     );
   }
@@ -393,6 +439,20 @@ export function BusinessPayError({ error }: { error: PayError }) {
     return <p role="alert" data-testid="biz-home-pay-error">Оплата временно недоступна. Попробуйте ещё раз позже.</p>;
   }
   if (error.code === "venue_topup_not_available") return <p role="alert">Новая точка будет включена при следующем продлении. Доплата в текущем периоде пока недоступна.</p>;
+  if (error.code === "partner_terms_changed") {
+    return (
+      <p role="alert" data-testid="biz-home-pay-error">
+        Цена оплаты изменилась. Проверьте условия выше и нажмите кнопку оплаты ещё раз.
+      </p>
+    );
+  }
+  if (error.code === "partner_period_in_payment") {
+    return (
+      <p role="alert" data-testid="biz-home-pay-error">
+        Другой владелец аккаунта уже открыл оплату этого периода по персональной цене. Проверьте статус оплаты чуть позже.
+      </p>
+    );
+  }
   if (error.code === "pending_order_mismatch") return <p role="alert">Состав точек изменился. Не оплачивайте прежнюю ссылку; обратитесь в поддержку.</p>;
   return <p role="alert" data-testid="biz-home-pay-error">Не удалось перейти к оплате. Попробуйте ещё раз.</p>;
 }

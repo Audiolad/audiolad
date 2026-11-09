@@ -4,8 +4,9 @@
  * The offer is the document an owner accepts: at the gift start (checkbox) and in the
  * cabinet («Принять условия») before the first payment. One acceptance per account and
  * edition covers every point of that owner; the same edition is never asked twice.
- * Version and hash must match the seed row of business_offer_editions in
- * supabase/migrations/20270218120000_business_offer_editions.sql. A new text needs a new
+ * Version and hash must match a seed row of business_offer_editions (edition 1:
+ * 20270218120000_business_offer_editions.sql, edition 2: 20270303120000_business_offer_edition_2.sql).
+ * A new text needs a new
  * edition (version + hash + seed row); the owner then accepts it once more.
  *
  * The approved Business documents stay unchanged and are annexes of the offer.
@@ -23,7 +24,7 @@ export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_
 export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Бизнес»";
 
 export const BUSINESS_OFFER_SUMMARY =
-  "Основной договор: 7 дней в подарок, 799 ₽ за точку на 30 дней, разовые оплаты, продление и возврат. Остальные документы – его приложения.";
+  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Остальные документы – его приложения.";
 
 export const BUSINESS_ONBOARDING_HREF = "/onboarding";
 
@@ -43,9 +44,9 @@ export type BusinessOfferDocumentEdition = {
 /** Current edition of the offer text (docs/business/public/business-offer.md). */
 export const BUSINESS_OFFER_EDITION: BusinessOfferDocumentEdition = {
   documentKey: BUSINESS_OFFER_DOCUMENT_ID,
-  version: "offer-v1-2026-11-04",
-  contentHash: "9d4046f36c20f5702697eac0af26de1c3579c6929c61d8ac4441c0b39617c7dc",
-  label: "Редакция 1 от 04.11.2026",
+  version: "offer-v2-2026-11-09",
+  contentHash: "fb57866ccb90a333fd240bfcb2b3c85bacf12e8751bac1bbfab8946c6930105b",
+  label: "Редакция 2 от 09.11.2026",
 };
 
 export type BusinessOfferEdition = {
@@ -94,6 +95,19 @@ export function hasAcceptedCurrentBusinessOffer(rows: unknown): boolean {
     if (!row || typeof row !== "object") return false;
     const r = row as { document_key?: unknown; document_version?: unknown; content_hash?: unknown };
     return r.document_key === BUSINESS_OFFER_DOCUMENT_ID && isCurrentBusinessOfferEdition(r.document_version, r.content_hash);
+  });
+}
+
+/**
+ * An earlier edition is accepted, the current one is not yet: the cabinet says «новая редакция»
+ * instead of «перед первой оплатой». Only the pay controls use it; access is never gated on it.
+ */
+export function hasAcceptedEarlierBusinessOfferOnly(rows: unknown): boolean {
+  if (!Array.isArray(rows) || hasAcceptedCurrentBusinessOffer(rows)) return false;
+  return rows.some((row) => {
+    if (!row || typeof row !== "object") return false;
+    const r = row as { document_key?: unknown; document_version?: unknown };
+    return r.document_key === BUSINESS_OFFER_DOCUMENT_ID && typeof r.document_version === "string";
   });
 }
 
