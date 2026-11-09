@@ -17,7 +17,7 @@ import {
 import "./profile.css";
 
 /**
- * Owner name, optional surname, and the name of the venue shown in the header switcher.
+ * Owner name, required surname, and the name of the venue shown in the header switcher.
  * `venueName: null` – no venue yet. Only the organization owner may rename the venue.
  * Surname is required on save (Sergey, t1305s9421) and stored in auth user_metadata.last_name.
  * Existing accounts without a surname keep music; the home prompt asks them to fill it.
@@ -78,7 +78,7 @@ export default function BusinessProfileForm({ ownerName, ownerSurname, venueName
         aria-describedby="business-profile-limits" data-testid="biz-profile-owner-name" />
       <label htmlFor={BUSINESS_OWNER_SURNAME_FIELD_ID}>Фамилия владельца / хозяйки</label>
       <input id={BUSINESS_OWNER_SURNAME_FIELD_ID} name="ownerSurname" value={surname}
-        placeholder={BUSINESS_OWNER_SURNAME_PLACEHOLDER} autoComplete="family-name" disabled={busy}
+        placeholder={BUSINESS_OWNER_SURNAME_PLACEHOLDER} autoComplete="family-name" required disabled={busy}
         onChange={(e) => { setSurname(e.target.value); edit(); }}
         aria-describedby="business-profile-surname-hint business-profile-limits"
         data-testid="biz-profile-owner-surname" />

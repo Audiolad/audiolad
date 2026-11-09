@@ -35,7 +35,7 @@ async function syncSingleVenueOrganizationName(supabase: ServerSupabase, input: 
 }
 
 /**
- * Saves the owner name and optional surname (auth user_metadata.first_name / last_name) and the
+ * Saves the owner name and required surname (auth user_metadata.first_name / last_name) and the
  * name of the venue the cabinet shows right now (business_locations.name – the header switcher,
  * «Главная», the hall player). The venue is resolved on the server; ids and roles from the form
  * are never trusted. The rename goes through the existing owner-only `rename_business_location` RPC.

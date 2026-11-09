@@ -87,6 +87,11 @@ assert.match(form, /placeholder=\{BUSINESS_OWNER_SURNAME_PLACEHOLDER\}/);
 assert.match(form, />Фамилия владельца \/ хозяйки</);
 assert.match(form, /BUSINESS_OWNER_SURNAME_HINT/);
 assert.match(form, /data-testid="biz-profile-owner-surname"/);
+assert.match(form, /autoComplete="family-name" required disabled=\{busy\}/);
+assert.doesNotMatch(form, /optional surname/i);
+assert.match(readFileSync("src/app/business-app/profile/actions.ts", "utf8"), /required surname/);
+assert.doesNotMatch(readFileSync("src/app/business-app/profile/actions.ts", "utf8"), /optional surname/);
+
 assert.doesNotMatch(form, /Например, Анна|Организация/);
 assert.match(form, />Название кофейни</);
 assert.match(form, /edit !== "name" && edit !== "surname"/);
@@ -189,6 +194,20 @@ assert.equal(formatVenueOwnerLabel({ firstName: null, lastName: null }), null);
   assert.doesNotMatch(signUpAction, /!businessTrial && !lastName/);
 }
 
+
+{
+  const privacy = readFileSync("src/components/legal/PrivacyDocument.tsx", "utf8");
+  assert.match(privacy, /Последнее обновление: 9 ноября 2026 года/);
+  assert.match(privacy, /имя и фамилия \(для владельцев сервиса «АудиоЛад Бизнес» – имя и фамилия владельца \/ хозяйки\);/);
+  assert.match(privacy, /указанном заведении/);
+  assert.match(privacy, /этого заведения/);
+  assert.match(privacy, /странице подтверждения прав заведения;/);
+  assert.doesNotMatch(privacy, /имя или отображаемое имя/);
+  assert.doesNotMatch(privacy, /указанной точке|этой точки|прав точки/);
+  assert.doesNotMatch(privacy, /\u2014/);
+  const docs = readFileSync("src/lib/business-app/client-documents.ts", "utf8");
+  assert.match(docs, /editionLabel: "Последнее обновление: 9 ноября 2026 года"/);
+}
 console.log("business-app-profile-unit: OK");
 
 // Render the exact shared controls to verify the terms gate and the sole green action.

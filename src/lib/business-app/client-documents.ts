@@ -25,9 +25,9 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "privacy",
     title: "Политика обработки персональных данных",
-    version: "2026-11-03",
-    versionDate: "2026-11-03",
-    editionLabel: "Последнее обновление: 3 ноября 2026 года",
+    version: "2026-11-09",
+    versionDate: "2026-11-09",
+    editionLabel: "Последнее обновление: 9 ноября 2026 года",
     status: "approved",
     summary: "Обработка и защита персональных данных пользователей сайта «АудиоЛад».",
   },

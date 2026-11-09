@@ -100,7 +100,7 @@ console.log("business-offer-document-sheet-unit: ok");
   assert.doesNotMatch(loading, /bg-\[var\(--biz-surface,/, "no fallback colour on the card");
   assert.match(loading, /role="dialog"/);
   assert.match(loading, /<h2 id="[^"]+"[^>]*>Политика обработки персональных данных<\/h2>/, "title visible without scrolling");
-  assert.match(loading, /Последнее обновление: 3 ноября 2026 года/);
+  assert.match(loading, /Последнее обновление: 9 ноября 2026 года/);
   assert.match(loading, /Загружаем текст политики…/);
   assert.match(loading, /data-testid="biz-privacy-sheet-close"[^>]*>Закрыть</);
   assert.match(loading, /data-testid="biz-privacy-sheet-done"[^>]*>Закрыть</);
