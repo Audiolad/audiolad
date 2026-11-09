@@ -8,6 +8,7 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessHomeChecklist from "@/components/business-app/BusinessHomeChecklist";
+import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
 import BusinessHallHome from "@/components/business-app/BusinessHallHome";
 import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
@@ -141,6 +142,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
   }
 
   if (!domain.location) {
+    const needsSurname = !domain.owner.lastName.trim();
     return (
       <div className="mx-auto max-w-6xl">
         <header className="mb-5">
@@ -151,6 +153,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             {subtitle}
           </p>
         </header>
+        {needsSurname ? <div className="mb-4 max-w-xl"><BusinessOwnerSurnamePrompt /></div> : null}
         <BusinessHomeAccessCard />
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
@@ -176,6 +179,9 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
     );
   }
 
+  const needsSurname =
+    domain.status === "authenticated" && !domain.owner.lastName.trim();
+
   return (
     <div className="mx-auto max-w-3xl" data-testid="biz-home" data-entry="person">
       <header className="mb-5">
@@ -187,6 +193,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
         </p>
       </header>
       <div className="business-app-owner-home space-y-4">
+        {needsSurname ? <BusinessOwnerSurnamePrompt /> : null}
         <BusinessHomeChecklist steps={steps} showAccess />
       </div>
     </div>

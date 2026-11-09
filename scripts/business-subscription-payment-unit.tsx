@@ -68,7 +68,7 @@ assert.equal(resolveBusinessProxyAction("audiolad.ru", "/api/business/subscripti
 
 const ownerDomain: BusinessOwnerHomeContext = {
   status: "authenticated",
-  owner: { userId: "owner", firstName: "Анна" },
+  owner: { userId: "owner", firstName: "Анна", lastName: "Иванова" },
   organizationId: "org",
   organizationName: "Кафе",
   location: null,

@@ -48,6 +48,14 @@ export default function VenueLicencePage({ view }: { view: VenueLicenceView }) {
       <section className="business-app-card mt-5" data-testid="venue-place">
         <h2 className="text-lg font-bold text-[var(--biz-text)]">Точка</h2>
         <p className="mt-2 text-base font-semibold text-[var(--biz-text)]" data-testid="venue-name">{view.venueName}</p>
+        {view.ownerLabel ? (
+          <>
+            <h2 className="mt-4 text-lg font-bold text-[var(--biz-text)]">Лицензиат</h2>
+            <p className="mt-2 text-base text-[var(--biz-text)]" data-testid="venue-owner">
+              {view.ownerLabel}
+            </p>
+          </>
+        ) : null}
         <h2 className="mt-4 text-lg font-bold text-[var(--biz-text)]">Адрес точки</h2>
         <p className="mt-2 text-base text-[var(--biz-text)]" data-testid="venue-address">
           {view.address ?? "Адрес точки пока не указан."}

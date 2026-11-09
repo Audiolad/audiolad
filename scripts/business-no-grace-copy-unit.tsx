@@ -67,7 +67,7 @@ for (const file of scanned) {
 const END = "2026-11-22T14:11:37.000Z";
 const owner: BusinessOwnerHomeContext = {
   status: "authenticated",
-  owner: { userId: "owner", firstName: "Анна" },
+  owner: { userId: "owner", firstName: "Анна", lastName: "Иванова" },
   organizationId: "org",
   organizationName: "Кафе",
   location: null,

@@ -11,10 +11,11 @@ import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
+import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
 import BusinessTimezoneForm from "@/components/business-app/profile/BusinessTimezoneForm";
 import BusinessProfileSubscription from "@/components/business-app/profile/BusinessProfileSubscription";
 import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
-import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
+import { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
 import { createClient } from "@/lib/supabase/server";
 import { requireBusinessCabinetPermission } from "@/lib/business-app/cabinet-mode.server";
 
@@ -39,6 +40,7 @@ export default async function BusinessProfilePage() {
 
   const meta = user?.user_metadata ?? {};
   const ownerName = extractBusinessFirstName({ metadataFirstName: meta.first_name, fullName: meta.full_name });
+  const ownerSurname = extractBusinessLastName({ metadataLastName: meta.last_name });
   const { data: membership } = domain.status === "authenticated" && domain.organizationId && user
     ? await supabase.from("business_organization_members").select("role")
       .eq("organization_id", domain.organizationId).eq("user_id", user.id).maybeSingle()
@@ -63,8 +65,14 @@ export default async function BusinessProfilePage() {
           </div>
         </section>
       ) : (
+        <>
+        {ownerSurname.trim() ? null : (
+          <div className="mb-4">
+            <BusinessOwnerSurnamePrompt />
+          </div>
+        )}
         <section className="business-app-card space-y-3">
-          <BusinessProfileForm ownerName={ownerName} venueName={domain.location?.name ?? null} canEditVenue={membership?.role === "owner"} />
+          <BusinessProfileForm ownerName={ownerName} ownerSurname={ownerSurname} venueName={domain.location?.name ?? null} canEditVenue={membership?.role === "owner"} />
           <dl className="space-y-2 text-sm">
             {email ? (
               <div>
@@ -112,6 +120,7 @@ export default async function BusinessProfilePage() {
             </button>
           </SignOutForm>
         </section>
+        </>
       )}
 
       <section className="business-app-card space-y-3" data-testid="biz-profile-help-section">
