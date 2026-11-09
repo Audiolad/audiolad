@@ -104,30 +104,34 @@ export function pickHallBuildId(payload: {
 
 type Fetch = typeof fetch;
 
-let cachedClientBuild: { value: string | null; at: number } | null = null;
-const CLIENT_BUILD_TTL_MS = 5 * 60_000;
+/**
+ * Sticky per-tab client build id: captured once from /api/health/build when this
+ * JS session first loads. Must NOT refresh from later health polls – after a
+ * deploy the server returns the new SHA, and refreshing would hide the mismatch
+ * (old JS would claim to be the new build).
+ */
+let stickyClientBuild: { value: string | null; resolved: boolean } | null = null;
 
-/** Browser: cached /api/health/build → deployCommit or buildId. */
+/** Browser: one-shot /api/health/build → deployCommit or buildId for this tab. */
 export async function resolveHallClientBuildId(
   f: Fetch = fetch,
-  nowMs = Date.now(),
 ): Promise<string | null> {
-  if (cachedClientBuild && nowMs - cachedClientBuild.at < CLIENT_BUILD_TTL_MS) {
-    return cachedClientBuild.value;
+  if (stickyClientBuild?.resolved) {
+    return stickyClientBuild.value;
   }
   try {
     const res = await f("/api/health/build", { cache: "no-store" });
-    if (!res.ok) return cachedClientBuild?.value ?? null;
+    if (!res.ok) return stickyClientBuild?.value ?? null;
     const json = (await res.json()) as { deployCommit?: unknown; buildId?: unknown };
     const value = pickHallBuildId(json);
-    cachedClientBuild = { value, at: nowMs };
+    stickyClientBuild = { value, resolved: true };
     return value;
   } catch {
-    return cachedClientBuild?.value ?? null;
+    return stickyClientBuild?.value ?? null;
   }
 }
 
-/** Test helper: clear the client build cache. */
+/** Test helper: clear the sticky client build. */
 export function resetHallClientBuildCacheForTests(): void {
-  cachedClientBuild = null;
+  stickyClientBuild = null;
 }

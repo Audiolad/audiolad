@@ -91,6 +91,10 @@ assert.doesNotMatch(pointRoute, /CREATE TABLE|ALTER TABLE/, "no migration in the
 const client = readFileSync(new URL("../src/lib/business-app/cabinet-player-client.ts", import.meta.url), "utf8");
 assert.match(client, /appVersion/);
 assert.match(client, /serverBuildId/);
+const hallReload = readFileSync(new URL("../src/lib/business-app/hall-build-reload.ts", import.meta.url), "utf8");
+assert.match(hallReload, /stickyClientBuild|Sticky per-tab/);
+assert.doesNotMatch(hallReload, /CLIENT_BUILD_TTL/);
+
 
 const cabinet = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(cabinet, /shouldReloadForNewBuild/);
