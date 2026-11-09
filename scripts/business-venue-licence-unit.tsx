@@ -73,6 +73,7 @@ assert.equal(trial.status, "trial");
 assert.equal(trial.clock, "gift");
 assert.equal(trial.venueName, "Образец кофейни");
 assert.match(trial.address ?? "", /ул\. Примерная/);
+assert.equal(trial.ownerLabel, "Владелец: Анна Иванова");
 assert.ok(trial.periodStartLabel && trial.periodEndLabel);
 
 const paid = viewOf("paid");
@@ -87,6 +88,7 @@ assert.equal(grace.graceDaysLeft, 1);
 const expired = viewOf("expired");
 assert.equal(expired.status, "expired");
 assert.equal(expired.clock, "gift");
+assert.equal(expired.ownerLabel, "Владелец: Анна", "partial name still renders");
 
 const expiredPaid = viewOf("expiredSubscription");
 assert.equal(expiredPaid.status, "expired");
@@ -95,6 +97,7 @@ assert.equal(expiredPaid.clock, "subscription");
 const notStarted = viewOf("notStarted");
 assert.equal(notStarted.status, "not_started");
 assert.equal(notStarted.address, null);
+assert.equal(notStarted.ownerLabel, null, "missing surname/name must not break the page");
 assert.equal(notStarted.periodEndLabel, null);
 
 const manual = presentVenueLicence({
@@ -106,6 +109,29 @@ const manual = presentVenueLicence({
   paidPeriod: null,
 });
 assert.equal(manual.status, "not_started");
+
+
+{
+  const html = renderToStaticMarkup(<VenueLicencePage view={trial} />);
+  assert.match(html, /data-testid="venue-owner"/);
+  assert.match(html, /Владелец: Анна Иванова/);
+  assert.match(html, /Лицензиат/);
+  assert.equal(html.includes(secret), false);
+  assert.equal(html.includes(userId), false);
+  const emptyOwner = presentVenueLicence({
+    publicId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    place: { locationName: "Зал" },
+    now: new Date("2026-10-28T09:00:00.000Z"),
+    grant: null,
+    paidUntil: null,
+    paidPeriod: null,
+    ownerFirstName: null,
+    ownerLastName: null,
+  });
+  assert.equal(emptyOwner.ownerLabel, null);
+  const emptyHtml = renderToStaticMarkup(<VenueLicencePage view={emptyOwner} />);
+  assert.doesNotMatch(emptyHtml, /venue-owner|Лицензиат|Владелец/);
+}
 
 function htmlOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
   const html = renderToStaticMarkup(<VenueLicencePage view={viewOf(id)} />);

@@ -11,6 +11,7 @@ import {
   BUSINESS_OWNER_SURNAME_PLACEHOLDER,
   BUSINESS_PROFILE_LIMITS_TEXT,
   focusBusinessOwnerNameField,
+  focusBusinessOwnerSurnameField,
   validateBusinessProfile,
 } from "@/lib/business-app/profile";
 import "./profile.css";
@@ -18,7 +19,8 @@ import "./profile.css";
 /**
  * Owner name, optional surname, and the name of the venue shown in the header switcher.
  * `venueName: null` – no venue yet. Only the organization owner may rename the venue.
- * Surname is optional (Sergey, t1305u) and stored in auth user_metadata.last_name.
+ * Surname is required on save (Sergey, t1305s9421) and stored in auth user_metadata.last_name.
+ * Existing accounts without a surname keep music; the home prompt asks them to fill it.
  */
 export default function BusinessProfileForm({ ownerName, ownerSurname, venueName, canEditVenue }: {
   ownerName: string; ownerSurname: string; venueName: string | null; canEditVenue: boolean;
@@ -32,12 +34,14 @@ export default function BusinessProfileForm({ ownerName, ownerSurname, venueName
   const router = useRouter();
   const focusedFromLink = useRef(false);
 
-  // «Ваше имя» in the header switcher opens /profile?edit=name: put the cursor in the name field.
+  // Header / home prompts open /profile?edit=name or ?edit=surname: put the cursor in that field.
   useEffect(() => {
     if (focusedFromLink.current) return;
-    if (new URLSearchParams(window.location.search).get("edit") !== "name") return;
+    const edit = new URLSearchParams(window.location.search).get("edit");
+    if (edit !== "name" && edit !== "surname") return;
     focusedFromLink.current = true;
-    focusBusinessOwnerNameField();
+    if (edit === "surname") focusBusinessOwnerSurnameField();
+    else focusBusinessOwnerNameField();
   }, []);
 
   const edit = () => { setMessage(""); setError(""); };

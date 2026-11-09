@@ -37,6 +37,8 @@ const SAMPLES: Record<string, () => VenueLicenceView> = {
     grant: grant("2026-10-01T09:00:00.000Z", "2026-10-31T09:00:00.000Z"),
     paidUntil: null,
     paidPeriod: null,
+    ownerFirstName: "Анна",
+    ownerLastName: "Иванова",
   }),
   bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: () => presentVenueLicence({
     publicId: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -45,6 +47,8 @@ const SAMPLES: Record<string, () => VenueLicenceView> = {
     grant: grant("2026-09-01T09:00:00.000Z", "2026-10-01T09:00:00.000Z"),
     paidUntil: "2026-11-20T09:00:00.000Z",
     paidPeriod: { start: "2026-10-21T09:00:00.000Z", end: "2026-11-20T09:00:00.000Z" },
+    ownerFirstName: "Анна",
+    ownerLastName: "Иванова",
   }),
   cccccccccccccccccccccccccccccccc: () => presentVenueLicence({
     publicId: "cccccccccccccccccccccccccccccccc",
@@ -53,6 +57,8 @@ const SAMPLES: Record<string, () => VenueLicenceView> = {
     grant: grant("2026-09-26T09:00:00.000Z", "2026-10-26T09:00:00.000Z"),
     paidUntil: null,
     paidPeriod: null,
+    ownerFirstName: "Анна",
+    ownerLastName: "Иванова",
   }),
   dddddddddddddddddddddddddddddddd: () => presentVenueLicence({
     publicId: "dddddddddddddddddddddddddddddddd",
@@ -61,6 +67,8 @@ const SAMPLES: Record<string, () => VenueLicenceView> = {
     grant: grant("2026-09-20T09:00:00.000Z", "2026-10-20T09:00:00.000Z"),
     paidUntil: null,
     paidPeriod: null,
+    ownerFirstName: "Анна",
+    ownerLastName: null,
   }),
   eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee: () => presentVenueLicence({
     publicId: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -77,6 +85,8 @@ const SAMPLES: Record<string, () => VenueLicenceView> = {
     grant: grant("2026-08-01T09:00:00.000Z", "2026-08-31T09:00:00.000Z"),
     paidUntil: "2026-10-20T09:00:00.000Z",
     paidPeriod: { start: "2026-09-20T09:00:00.000Z", end: "2026-10-20T09:00:00.000Z" },
+    ownerFirstName: "Анна",
+    ownerLastName: "Иванова",
   }),
 };
 

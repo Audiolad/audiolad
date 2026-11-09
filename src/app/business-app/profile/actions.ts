@@ -39,7 +39,8 @@ async function syncSingleVenueOrganizationName(supabase: ServerSupabase, input: 
  * name of the venue the cabinet shows right now (business_locations.name – the header switcher,
  * «Главная», the hall player). The venue is resolved on the server; ids and roles from the form
  * are never trusted. The rename goes through the existing owner-only `rename_business_location` RPC.
- * Surname stays optional so existing accounts are not blocked (Sergey, t1305u).
+ * Surname is required on save (Sergey, t1305s9421). Existing empty surnames keep music;
+ * the home/profile prompt asks the owner to fill it without blocking playback.
  */
 export async function saveBusinessProfile(input: {
   ownerName: string; ownerSurname: string; venueName: string | null;
@@ -78,7 +79,7 @@ export async function saveBusinessProfile(input: {
   });
   if (error) {
     // Auth and public data cannot share a transaction. Be explicit about a partial save.
-    return { ok: false, error: "Имя не сохранено. Название кофейни могло сохраниться. Повторите попытку." } as const;
+    return { ok: false, error: "Имя и фамилия не сохранены. Название кофейни могло сохраниться. Повторите попытку." } as const;
   }
   // The client refreshes the RSC payload, including the layout domain provider, without
   // invalidating/remounting the persistent cabinet player.

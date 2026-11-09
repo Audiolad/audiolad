@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { BUSINESS_LOCATION_COOKIE, selectBusinessLocation } from "./location-selection";
 import { createClient } from "@/lib/supabase/server";
 
-import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
+import { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
 import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
@@ -30,6 +30,8 @@ export type BusinessDomainLocation = {
 export type BusinessDomainOwner = {
   userId: string;
   firstName: string;
+  /** Empty until the owner fills the required surname in the profile (t1305s9421). */
+  lastName: string;
 };
 
 export type BusinessOwnerHomeContext =
@@ -78,6 +80,9 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     fullName: typeof meta.full_name === "string" ? meta.full_name : null,
     email: user.email ?? null,
   });
+  const lastName = extractBusinessLastName({
+    metadataLastName: typeof meta.last_name === "string" ? meta.last_name : null,
+  });
 
   const { data: membershipRows, error: membershipError } = await supabase
     .from("business_organization_members")
@@ -113,7 +118,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   if (!membership?.organization_id) {
     return {
       status: "authenticated",
-      owner: { userId: user.id, firstName },
+      owner: { userId: user.id, firstName, lastName },
       location: null,
       organizationName: null,
       organizationId: null,
@@ -166,7 +171,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     });
     return {
       status: "authenticated",
-      owner: { userId: user.id, firstName },
+      owner: { userId: user.id, firstName, lastName },
       location: null,
       locations: locations ?? [],
       pilotSlots,
@@ -203,7 +208,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   return {
     status: "authenticated",
-    owner: { userId: user.id, firstName },
+    owner: { userId: user.id, firstName, lastName },
     locations: locations ?? [],
     pilotSlots,
     venueSlotLimit,

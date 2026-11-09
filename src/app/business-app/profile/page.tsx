@@ -11,6 +11,7 @@ import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
+import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
 import BusinessTimezoneForm from "@/components/business-app/profile/BusinessTimezoneForm";
 import BusinessProfileSubscription from "@/components/business-app/profile/BusinessProfileSubscription";
 import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
@@ -64,6 +65,12 @@ export default async function BusinessProfilePage() {
           </div>
         </section>
       ) : (
+        <>
+        {ownerSurname.trim() ? null : (
+          <div className="mb-4">
+            <BusinessOwnerSurnamePrompt />
+          </div>
+        )}
         <section className="business-app-card space-y-3">
           <BusinessProfileForm ownerName={ownerName} ownerSurname={ownerSurname} venueName={domain.location?.name ?? null} canEditVenue={membership?.role === "owner"} />
           <dl className="space-y-2 text-sm">
@@ -113,6 +120,7 @@ export default async function BusinessProfilePage() {
             </button>
           </SignOutForm>
         </section>
+        </>
       )}
 
       <section className="business-app-card space-y-3" data-testid="biz-profile-help-section">

@@ -146,8 +146,8 @@ export async function signUpAction(
   const lastName = input.lastName.trim();
   const password = input.password;
 
-  const businessTrial = isBusinessTrialNext(input.next);
-  if (!firstName || (!businessTrial && !lastName)) {
+  // Business trial used to skip surname; Sergey (t1305s9421) requires it for rights confirmation.
+  if (!firstName || !lastName) {
     return {
       ok: false,
       error: {

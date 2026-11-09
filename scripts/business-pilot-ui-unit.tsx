@@ -13,7 +13,7 @@ const fakeRouter = { push: noop, replace: noop, refresh: noop, back: noop, forwa
 
 const locations = [{ id: "one", name: "Стритфуд 1", status: "active" }, { id: "two", name: "Стритфуд 2", status: "active" }];
 function render(selected: number, pilot = true, point = false, billing?: { paidUntil: string | null; renewalBlocked: boolean }, limit = 3, halls = locations) {
-  const domain: BusinessOwnerHomeContext = { status: "authenticated", owner: { userId: "owner", firstName: "Тест" },
+  const domain: BusinessOwnerHomeContext = { status: "authenticated", owner: { userId: "owner", firstName: "Тест", lastName: "Иванова" },
     organizationId: "org", organizationName: "Пилот", canPay: true, offerAccepted: false, pilotSlots: pilot, venueSlotLimit: limit, pilotBilling: billing, locations: halls,
     location: { ...halls[selected], organizationId: "org", addressLine1: null, businessCategory: "cafe", countryCode: "RU", timezone: "Europe/Moscow", defaultZoneId: "zone" },
     signals: { ...emptyBusinessOwnerHomeSignals(), liveConnected: true, playbackConfirmedSecondsAgo: 3, playbackState: "playing", currentTrack: { title: selected === 0 ? "Jazz first" : "Jazz second" } } };
