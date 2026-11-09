@@ -9,18 +9,16 @@
 -- What changes:
 --   1. New service-only table business_partner_code_windows: one row per (code, account) with
 --      the moment the account first held the code and the fixed end of its 72 hours.
---   2. reserve_business_partner_code: the first entry opens the window; every later entry by
---      the same account keeps the original end. After the end the same account cannot hold
---      that code again (partner_code_expired), unless its own payment link at the personal
---      price opened inside the window is still open: then nothing changes and the link can
---      still be paid (existing rule «an open link keeps the price»).
---   3. A trigger on business_partner_codes never lets reserved_until move past the window end
---      of the holding account. This covers create_business_subscription_order, which used to
---      push the hold to now + 72 hours when a payment link was opened.
--- Scope of «once»: per (code, business account), as asked («from the first time the account enters
--- the code»). A different personal code issued to the same account has its own 72 hours from its own
--- first entry and never moves the first code's end; the existing rule «one personal price per account»
--- (entitlement on the first payment) is unchanged.
+--   2. reserve_business_partner_code: the account's first entry of a code opens its 72 hours;
+--      every later entry keeps the original end. The 72 hours belong to the account, not to one
+--      code (the existing rule «one personal price per account: a second code never extends or
+--      restarts it»): another code entered before the first payment gets the same end. After the
+--      end the account cannot hold a code again (partner_code_expired), unless its own payment
+--      link at the personal price for that code is still open: then nothing changes and the link
+--      can still be paid (existing rule «an open link keeps the price»).
+--   3. A trigger on business_partner_codes never lets reserved_until move past the account's
+--      end. This covers create_business_subscription_order, which used to push the hold to
+--      now + 72 hours when a payment link was opened.
 -- What does not change: prices, the quote, binding on the first real payment, revoke, another
 -- account taking a code whose hold ran out (existing behaviour), every order and payment.
 --
@@ -60,7 +58,7 @@ WHERE c.reserved_by_user_id IS NOT NULL AND c.bound_organization_id IS NULL
   AND public.business_partner_owner_organization(c.reserved_by_user_id) IS NOT NULL
 ON CONFLICT (code_id, organization_id) DO NOTHING;
 
--- The hold of an account never ends later than its first 72 hours.
+-- The hold of an account never ends later than its first 72 hours (earliest end of the account).
 CREATE FUNCTION public.business_partner_codes_window_cap() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_end timestamptz;
@@ -68,8 +66,8 @@ BEGIN
   IF NEW.reserved_by_user_id IS NULL OR NEW.reserved_until IS NULL OR NEW.bound_organization_id IS NOT NULL THEN
     RETURN NEW;
   END IF;
-  SELECT w.expires_at INTO v_end FROM public.business_partner_code_windows w
-  WHERE w.code_id = NEW.id AND w.organization_id = public.business_partner_owner_organization(NEW.reserved_by_user_id);
+  SELECT min(w.expires_at) INTO v_end FROM public.business_partner_code_windows w
+  WHERE w.organization_id = public.business_partner_owner_organization(NEW.reserved_by_user_id);
   IF v_end IS NOT NULL AND NEW.reserved_until > v_end THEN
     NEW.reserved_until := v_end;
   END IF;
@@ -86,7 +84,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_user uuid := auth.uid(); v_org uuid; v_code text; v_c public.business_partner_codes%ROWTYPE;
   v_e public.business_partner_entitlements%ROWTYPE; v_w public.business_partner_code_windows%ROWTYPE;
-  v_first boolean := false;
+  v_first boolean := false; v_account_end timestamptz;
 BEGIN
   IF public.business_consent_caller_in_support_mode() THEN
     RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
@@ -130,33 +128,36 @@ BEGIN
     RAISE EXCEPTION 'partner_code_already_applied' USING ERRCODE = 'P0001';
   END IF;
 
-  -- The account's 72 hours with this code: opened once, never restarted.
+  -- The account's 72 hours: opened once by its first entry of any code, never restarted.
+  SELECT min(w.expires_at) INTO v_account_end FROM public.business_partner_code_windows w WHERE w.organization_id = v_org;
   SELECT * INTO v_w FROM public.business_partner_code_windows
   WHERE code_id = v_c.id AND organization_id = v_org FOR UPDATE;
-  IF NOT FOUND THEN
-    INSERT INTO public.business_partner_code_windows(code_id, organization_id, first_user_id, first_reserved_at, expires_at)
-    VALUES (v_c.id, v_org, v_user, clock_timestamp(), clock_timestamp() + interval '72 hours')
-    RETURNING * INTO v_w;
-    v_first := true;
-  ELSIF v_w.expires_at <= clock_timestamp() THEN
+  IF v_account_end IS NOT NULL AND v_account_end <= clock_timestamp() THEN
     -- This owner's own open link at the personal price, opened in time, can still be paid.
-    IF v_c.reserved_by_user_id = v_user AND EXISTS (
+    IF v_w.code_id IS NOT NULL AND v_c.reserved_by_user_id = v_user AND EXISTS (
       SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
       WHERE s.partner_code_id = v_c.id AND o.user_id = v_user AND o.status = 'pending'
         AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)) THEN
-      RETURN jsonb_build_object('ok', true, 'already', true, 'reserved_until', v_w.expires_at,
+      RETURN jsonb_build_object('ok', true, 'already', true, 'reserved_until', v_c.reserved_until,
         'quote', public.business_partner_quote_json(v_user));
     END IF;
     RAISE EXCEPTION 'partner_code_expired' USING ERRCODE = 'P0001';
   END IF;
+  IF v_w.code_id IS NULL THEN
+    INSERT INTO public.business_partner_code_windows(code_id, organization_id, first_user_id, first_reserved_at, expires_at)
+    VALUES (v_c.id, v_org, v_user, clock_timestamp(), coalesce(v_account_end, clock_timestamp() + interval '72 hours'))
+    RETURNING * INTO v_w;
+    v_first := v_account_end IS NULL;
+  END IF;
+  v_account_end := least(coalesce(v_account_end, v_w.expires_at), v_w.expires_at);
 
   -- Only one code is held at a time. Its own window stays, so coming back to it does not restart it.
   UPDATE public.business_partner_codes SET reserved_by_user_id = NULL, reserved_until = NULL
   WHERE reserved_by_user_id = v_user AND id <> v_c.id AND bound_organization_id IS NULL;
   UPDATE public.business_partner_codes
-  SET reserved_by_user_id = v_user, reserved_until = v_w.expires_at
+  SET reserved_by_user_id = v_user, reserved_until = v_account_end
   WHERE id = v_c.id;
-  RETURN jsonb_build_object('ok', true, 'already', NOT v_first, 'reserved_until', v_w.expires_at,
+  RETURN jsonb_build_object('ok', true, 'already', NOT v_first, 'reserved_until', v_account_end,
     'quote', public.business_partner_quote_json(v_user));
 END; $$;
 REVOKE ALL ON FUNCTION public.reserve_business_partner_code(text) FROM PUBLIC, anon;
