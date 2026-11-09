@@ -20,7 +20,7 @@ import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/li
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
-import { lockedAppleScreen, syncPlayerMediaSession, type SessionAction } from "@/lib/business-app/hall-media-session";
+import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
@@ -1138,28 +1138,31 @@ export function BusinessCabinetPlayerProvider({
   // play / pause / next there. Owner mirror: nothing plays on this phone, the session is cleared.
   const sessionRunRef = useRef<(action: SessionAction) => void>(() => {});
   useLayoutEffect(() => {
-    sessionRunRef.current = (action) => {
-      const status = ctlRef.current?.status;
-      const active = status === "playing" || status === "loading";
-      if (action === "nexttrack") return void deviceNext();
-      if ((action === "play") !== active) void toggleRef.current();
-    };
+    sessionRunRef.current = (action) => runSessionAction(action, ctlRef.current?.status, {
+      toggle: () => toggleRef.current(),
+      next: () => deviceNext(),
+    });
   });
-  const localSessionCanNext = !pointReports || pointCanEdit;
-  const sessionTrack = open && !mirror && track ? track : null;
-  const sessionTitle = sessionTrack?.title ?? "";
-  const sessionArtist = sessionTrack?.authorName?.trim() || "";
-  const sessionArtwork = sessionTrack && coverSrc && failedCover !== coverSrc ? coverSrc : null;
-  const sessionPlaying = view.status === "playing" || view.status === "loading";
+  const session = playerSessionState({
+    open,
+    mirror: mirror !== null,
+    track,
+    artwork: coverSrc && failedCover !== coverSrc ? coverSrc : null,
+    status: view.status,
+    pointDevice: pointReports,
+    pointCanEdit,
+  });
+  const sessionKey = session ? JSON.stringify(session) : "";
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const state = sessionKey ? (JSON.parse(sessionKey) as PlayerSessionState) : null;
     syncPlayerMediaSession(
       navigator.mediaSession,
-      sessionTrack ? { title: sessionTitle, artist: sessionArtist, artwork: sessionArtwork, playing: sessionPlaying, canNext: localSessionCanNext } : null,
+      state,
       (action) => sessionRunRef.current(action),
       (init) => (typeof MediaMetadata === "undefined" ? null : new MediaMetadata(init)),
     );
-  }, [sessionTrack, sessionTitle, sessionArtist, sessionArtwork, sessionPlaying, localSessionCanNext]);
+  }, [sessionKey]);
   useEffect(() => () => {
     if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
       syncPlayerMediaSession(navigator.mediaSession, null, () => {}, () => null);

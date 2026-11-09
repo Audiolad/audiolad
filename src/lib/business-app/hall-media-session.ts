@@ -76,3 +76,42 @@ export function syncPlayerMediaSession(
     /* best effort */
   }
 }
+
+/**
+ * What the lock screen shows for this page. Null when nothing local plays: closed player, no
+ * track, or the owner's phone mirroring the live hall (the music is in the venue, not here).
+ * «Следующий трек» only where the page allows it: owner, or a hall device the owner lets
+ * change the music.
+ */
+export function playerSessionState(input: {
+  open: boolean;
+  mirror: boolean;
+  track: { title: string; authorName?: string | null } | null;
+  artwork: string | null;
+  status: string;
+  pointDevice: boolean;
+  pointCanEdit: boolean;
+}): PlayerSessionState | null {
+  if (!input.open || input.mirror || !input.track) return null;
+  return {
+    title: input.track.title,
+    artist: input.track.authorName?.trim() || "",
+    artwork: input.artwork,
+    playing: input.status === "playing" || input.status === "loading",
+    canNext: !input.pointDevice || input.pointCanEdit,
+  };
+}
+
+/** Lock screen button → player call. Play while playing / pause while paused do nothing. */
+export function runSessionAction(
+  action: SessionAction,
+  status: string | undefined,
+  player: { toggle: () => unknown; next: () => unknown },
+): void {
+  if (action === "nexttrack") {
+    void player.next();
+    return;
+  }
+  const active = status === "playing" || status === "loading";
+  if ((action === "play") !== active) void player.toggle();
+}
