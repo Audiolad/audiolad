@@ -34,6 +34,7 @@ import {
   partnerPeriodsLeft,
   partnerQuoteIsDiscounted,
   partnerQuoteTermsLines,
+  partnerQuoteToWire,
   ruPeriodsWord,
   simulatePartnerBilling,
 } from "../src/lib/business/partner-codes";
@@ -98,6 +99,32 @@ assert.ok(partnerQuoteIsDiscounted(reserved));
 assert.equal(partnerPeriodsLeft(reserved), 3);
 assert.equal(partnerConfirmedUnitPriceMinor(reserved), 39900);
 assert.equal(partnerConfirmedUnitPriceMinor(null), 79900);
+
+// t1335u: the route sends the quote in the same wire shape the browser parses again.
+// Sending the parsed camelCase object made every browser parse return null.
+assert.equal(parsePartnerQuote(JSON.parse(JSON.stringify(reserved))), null, "a parsed quote is not wire format");
+for (const raw of [
+  { source: "reserved", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 2, total_minor: 79800,
+    discount_periods: 3, period_index: 1, periods_used: 0, code_hint: "EUUV", discount_paid_until: null, late_payment: null,
+    reserved_until: "2026-11-12T15:31:06.832185+00:00" },
+  { source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39900,
+    discount_periods: 3, period_index: 2, periods_used: 1, code_hint: "EUUV", discount_paid_until: "2026-12-10T10:00:00+00:00",
+    late_payment: { reason: "partner_code_revoked", paid_at: "2026-11-10T10:00:00+00:00", period_end: "2026-12-10T10:00:00+00:00" },
+    reserved_until: null },
+  { source: "finished", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 0, total_minor: 79900,
+    discount_periods: 3, period_index: null, periods_used: 3, code_hint: null, discount_paid_until: null, late_payment: null,
+    reserved_until: null },
+  { source: "standard", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 79900,
+    discount_periods: null, period_index: null, periods_used: 0, code_hint: null, discount_paid_until: null, late_payment: null,
+    reserved_until: null },
+]) {
+  const parsed = parsePartnerQuote(raw);
+  assert.ok(parsed, `${raw.source}: server parse`);
+  const browser = parsePartnerQuote(JSON.parse(JSON.stringify({ quote: partnerQuoteToWire(parsed) })).quote);
+  assert.deepEqual(browser, parsed, `${raw.source}: the browser reads exactly the server quote`);
+}
+const heldWire = parsePartnerQuote(JSON.parse(JSON.stringify(partnerQuoteToWire(reserved))));
+assert.ok(partnerQuoteIsDiscounted(heldWire), "a held 399 ₽ stays discounted in the browser");
 assert.equal(parsePartnerQuote({ source: "reserved", unit_price_minor: 39950, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39950 }), null, "kopecks rejected");
 assert.equal(parsePartnerQuote({ source: "weird" }), null);
 const last = parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1,
@@ -307,6 +334,8 @@ assert.match(landing, /BusinessGuestStartCta/, "the free start stays the same");
 assert.match(landing, /Активировать скидку/, "signed-in CTA after reserve");
 assert.match(landing, /\/profile#podpiska/, "lands on subscription after activate");
 assert.match(landing, /Закрепляем скидку/, "waits for reserve before navigate");
+assert.match(landing, /Перейти в подписку/, "t1335u: an error that sends the owner to «Подписка» links straight there");
+assert.doesNotMatch(landing, /Скидка пока недоступна/, "t1335u: no dead disabled button after an error");
 const profileSub = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.match(profileSub, /id="podpiska"/);
 assert.doesNotMatch(profileSub, /window\.location/);
@@ -316,6 +345,7 @@ assert.match(quoteStore, /refreshPartnerQuoteFromCookie/, "pay UI refreshes quot
 const partnerRoute = readFileSync("src/app/api/business/partner-code/route.ts", "utf8");
 assert.match(partnerRoute, /checkAnalyticsRateLimit/, "the code endpoint is rate limited");
 assert.match(partnerRoute, /partnerCodeErrorIsFinal/, "the link cookie survives non-final errors");
+assert.match(partnerRoute, /quote: quote \? partnerQuoteToWire\(quote\) : null/, "t1335u: the route sends the wire quote");
 const revoke = readFileSync("src/app/(platform)/admin/business-partner-codes/actions.ts", "utf8");
 assert.match(revoke, /rpc\("revoke_business_partner_code"/, "revoke goes through the one transactional function");
 // t1320u: created code lives in the table/card row, not as a sticky result inside «Новый код».
