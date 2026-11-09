@@ -3,7 +3,7 @@
  * Pure helpers shared by the cabinet, the admin page and the tests. The server
  * (SQL) owns the price: nothing here decides what is charged.
  */
-import { BUSINESS_PAID_PERIOD_DAYS, BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
+import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS, BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 
 /** First campaign: 399 ₽ per venue for three paid 30-day periods. */
 export const PARTNER_CODE_DEFAULT_UNIT_PRICE_RUB = 399;
@@ -231,9 +231,15 @@ export function partnerReservationNoteLead(quote: PartnerQuote | null, now: Date
   return `Код закреплён за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа, до ${ruMoscowDateTime(quote.reservedUntil)} по московскому времени – оплатите сейчас, чтобы цена`;
 }
 
-/** Before the code is applied: the same rule in advance, for the entry field and the link page. */
+/** Days the personal-link cookie is kept in this browser (same as PARTNER_CODE_COOKIE_MAX_AGE_SECONDS). */
+export const PARTNER_CODE_COOKIE_DAYS = PARTNER_CODE_COOKIE_MAX_AGE_SECONDS / (60 * 60 * 24);
+
+/**
+ * Before payment: the code stays in this browser; the personal price applies on the first
+ * payment even if the owner starts with the free gift days (t1322u). No pressure to pay now.
+ */
 export const PARTNER_CODE_RESERVATION_HINT =
-  `После применения код закрепляется за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа – оплатите сразу, чтобы персональная цена сохранилась.`;
+  `Код сохранён в этом браузере на ${PARTNER_CODE_COOKIE_DAYS} дней – цена ${PARTNER_CODE_DEFAULT_UNIT_PRICE_RUB} ₽ применится при оплате, даже если сначала вы пройдёте ${BUSINESS_GIFT_DAYS} бесплатных дней.`;
 
 function ruMoscowDate(iso: string): string {
   const date = new Date(iso);

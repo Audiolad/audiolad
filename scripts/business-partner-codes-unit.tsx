@@ -131,7 +131,14 @@ assert.equal(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")),
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-12T08:00:00Z")), null, "no note after the hold");
 assert.equal(partnerReservationNoteLead(last), null, "no hold note once the code is bound");
 assert.equal(parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39900, reserved_until: "2026-11-12T07:05:00Z" })?.reservedUntil, null);
-assert.equal(PARTNER_CODE_RESERVATION_HINT, "После применения код закрепляется за вами на 72 часа – оплатите сразу, чтобы персональная цена сохранилась.");
+assert.equal(
+  PARTNER_CODE_RESERVATION_HINT,
+  "Код сохранён в этом браузере на 30 дней – цена 399 ₽ применится при оплате, даже если сначала вы пройдёте 7 бесплатных дней.",
+  "t1322u: gift-first hint, no pressure to pay now",
+);
+assert.doesNotMatch(PARTNER_CODE_RESERVATION_HINT, /оплатите сразу|оплатите сейчас/);
+assert.doesNotMatch(PARTNER_CODE_RESERVATION_HINT, /льготн|GRACE/i);
+
 // Rate-limit key: nginx X-Real-IP first, otherwise the last X-Forwarded-For hop (nginx appends it).
 assert.equal(partnerCodeClientIp(new Headers({ "x-real-ip": "203.0.113.7", "x-forwarded-for": "1.1.1.1, 203.0.113.7" })), "203.0.113.7");
 assert.equal(partnerCodeClientIp(new Headers({ "x-forwarded-for": "1.1.1.1, 198.51.100.2" })), "198.51.100.2", "a spoofed first hop is ignored");
@@ -246,6 +253,11 @@ const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "u
 assert.doesNotMatch(home, /BusinessPartnerCodePanel/, "no permanent code field on the home");
 const card = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
 assert.match(card, /confirmed_unit_price_minor: partnerConfirmedUnitPriceMinor\(getPartnerQuote\(\)\)/, "pay sends the price that was shown");
+assert.match(card, /refreshPartnerQuoteFromCookie/, "t1322u: stale partner quote re-reserves from cookie");
+assert.match(card, /partner_terms_changed[\s\S]*refreshPartnerQuoteFromCookie[\s\S]*checkoutOnce/, "t1322u: terms_changed retries pay once after refresh");
+const quoteStore = readFileSync("src/components/business-app/partner-quote-store.ts", "utf8");
+assert.match(quoteStore, /export async function refreshPartnerQuoteFromCookie/);
+assert.match(quoteStore, /body: "\{\}"/, "cookie re-reserve posts empty body");
 const route = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
 assert.match(route, /p_expected_unit_price_minor: confirmedUnitPriceMinor/);
 const landing = readFileSync("src/components/business-app/BusinessPartnerLanding.tsx", "utf8");
