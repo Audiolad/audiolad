@@ -26,6 +26,8 @@ export type PartnerLandingOffer = {
   discountPeriods: number;
 };
 
+type ReserveStatus = "idle" | "loading" | "ready" | "error";
+
 /**
  * Personal link landing (8142d69a / t1328u). Signed-in owners wait for the reservation
  * before «Активировать скидку» opens «Подписка», so the cabinet never shows a stale 799 ₽.
@@ -33,12 +35,10 @@ export type PartnerLandingOffer = {
 export default function BusinessPartnerLanding({ offer, signedIn }: { offer: PartnerLandingOffer; signedIn: boolean }) {
   const hostname = useBusinessHostname();
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(signedIn);
+  const [status, setStatus] = useState<ReserveStatus>(signedIn ? "loading" : "idle");
 
   useEffect(() => {
     let stopped = false;
-    setBusy(true);
     void fetch("/api/business/partner-code", {
       method: "POST",
       credentials: "same-origin",
@@ -51,21 +51,24 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
         if (stopped) return;
         if (!response.ok) {
           setError(partnerCodeErrorText(payload?.error ?? "internal_error"));
-          setReady(false);
+          if (signedIn) setStatus("error");
           return;
         }
         const quote = parsePartnerQuote(payload?.quote);
         if (quote) setPartnerQuote(quote);
-        setReady(Boolean(quote && (partnerQuoteIsDiscounted(quote) || !signedIn)));
-        if (signedIn && quote && !partnerQuoteIsDiscounted(quote)) {
-          setError("Скидку не удалось закрепить. Обновите страницу или введите код в разделе «Подписка».");
+        if (!signedIn) return;
+        if (quote && partnerQuoteIsDiscounted(quote)) {
+          setError(null);
+          setStatus("ready");
+          return;
         }
+        setError("Скидку не удалось закрепить. Обновите страницу или введите код в разделе «Подписка».");
+        setStatus("error");
       })
       .catch(() => {
-        if (!stopped) setError(partnerCodeErrorText("internal_error"));
-      })
-      .finally(() => {
-        if (!stopped) setBusy(false);
+        if (stopped) return;
+        setError(partnerCodeErrorText("internal_error"));
+        if (signedIn) setStatus("error");
       });
     return () => {
       stopped = true;
@@ -73,6 +76,8 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
   }, [offer.code, signedIn]);
 
   const periods = offer.discountPeriods;
+  const ready = status === "ready";
+  const busy = status === "loading";
   return (
     <section className="business-app-card mx-auto max-w-[640px] space-y-4" data-testid="biz-partner-landing">
       <p className="text-sm font-semibold uppercase tracking-wide text-[var(--biz-text-muted)]">Персональное предложение</p>

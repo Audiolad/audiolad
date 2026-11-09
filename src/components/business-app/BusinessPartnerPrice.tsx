@@ -101,7 +101,7 @@ export function BusinessPartnerReservationNote({ quote }: { quote: PartnerQuote 
     tick();
     const timer = window.setInterval(tick, 30_000);
     return () => window.clearInterval(timer);
-  }, [quote?.source, quote?.reservedUntil]);
+  }, [quote]);
 
   const lead = partnerReservationNoteLead(quote, now);
   const countdown = partnerReservationCountdownLabel(quote, now);
@@ -131,7 +131,7 @@ export function BusinessPartnerHomeBanner({ quote }: { quote: PartnerQuote | nul
   const progress = partnerDiscountProgressLine(quote);
   return (
     <div
-      className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface-muted,transparent)] p-3 text-sm leading-6"
+      className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface-soft)] p-3 text-sm leading-6"
       role="status"
       data-testid="biz-home-partner-banner"
     >
