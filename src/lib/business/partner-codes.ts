@@ -221,14 +221,41 @@ export function ruMoscowDateTime(iso: string): string {
 }
 
 /**
- * The first half of the reservation note, before the struck price (t1304u): the code is held
- * for 72 hours, pay now. Null when the code is not held or the hold is already over.
+ * Soft hold note before the struck price (t1328u/t1329u): no pressure wording.
+ * Null when the code is not held or the hold is already over.
  */
 export function partnerReservationNoteLead(quote: PartnerQuote | null, now: Date = new Date()): string | null {
   if (!quote || quote.source !== "reserved" || !quote.reservedUntil) return null;
   const until = new Date(quote.reservedUntil);
   if (Number.isNaN(until.getTime()) || until.getTime() <= now.getTime()) return null;
-  return `Код закреплён за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа, до ${ruMoscowDateTime(quote.reservedUntil)} по московскому времени – оплатите сейчас, чтобы цена`;
+  return `Код закреплён за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа, до ${ruMoscowDateTime(quote.reservedUntil)} по московскому времени – цена`;
+}
+
+/** Live «Код действует ещё ЧЧ:ММ» while the 72h reservation is open (t1328u). */
+export function partnerReservationCountdownLabel(quote: PartnerQuote | null, now: Date = new Date()): string | null {
+  if (!quote || quote.source !== "reserved" || !quote.reservedUntil) return null;
+  const until = new Date(quote.reservedUntil).getTime();
+  if (!Number.isFinite(until)) return null;
+  const ms = until - now.getTime();
+  if (ms <= 0) return null;
+  const totalMinutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  return `Код действует ещё ${hh}:${mm}`;
+}
+
+/**
+ * After the first payment: «Скидка на оплату N из M». Before payment (reserved): null –
+ * the countdown covers that state (t1330u).
+ */
+export function partnerDiscountProgressLine(quote: PartnerQuote | null): string | null {
+  if (!quote || quote.source !== "entitlement") return null;
+  const total = quote.discountPeriods;
+  const index = quote.periodIndex;
+  if (!total || !index) return null;
+  return `Скидка на оплату ${index} из ${total}`;
 }
 
 /** Days the personal-link cookie is kept in this browser (same as PARTNER_CODE_COOKIE_MAX_AGE_SECONDS). */

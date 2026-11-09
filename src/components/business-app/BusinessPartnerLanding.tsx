@@ -13,6 +13,7 @@ import {
   parsePartnerQuote,
   partnerCodeErrorText,
   partnerDiscountPercent,
+  partnerQuoteIsDiscounted,
   ruPeriodsWord,
   PARTNER_CODE_RESERVATION_HINT,
 } from "@/lib/business/partner-codes";
@@ -26,16 +27,18 @@ export type PartnerLandingOffer = {
 };
 
 /**
- * Personal link landing (8142d69a). The code is remembered on the server side of this
- * browser (httpOnly cookie) and reserved for the account only after sign-in; it binds on
- * the first successful payment. The free start stays exactly the same.
+ * Personal link landing (8142d69a / t1328u). Signed-in owners wait for the reservation
+ * before «Активировать скидку» opens «Подписка», so the cabinet never shows a stale 799 ₽.
  */
 export default function BusinessPartnerLanding({ offer, signedIn }: { offer: PartnerLandingOffer; signedIn: boolean }) {
   const hostname = useBusinessHostname();
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(signedIn);
 
   useEffect(() => {
     let stopped = false;
+    setBusy(true);
     void fetch("/api/business/partner-code", {
       method: "POST",
       credentials: "same-origin",
@@ -48,18 +51,26 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
         if (stopped) return;
         if (!response.ok) {
           setError(partnerCodeErrorText(payload?.error ?? "internal_error"));
+          setReady(false);
           return;
         }
         const quote = parsePartnerQuote(payload?.quote);
         if (quote) setPartnerQuote(quote);
+        setReady(Boolean(quote && (partnerQuoteIsDiscounted(quote) || !signedIn)));
+        if (signedIn && quote && !partnerQuoteIsDiscounted(quote)) {
+          setError("Скидку не удалось закрепить. Обновите страницу или введите код в разделе «Подписка».");
+        }
       })
       .catch(() => {
-        /* The link code is also read again by the payment block after sign-in. */
+        if (!stopped) setError(partnerCodeErrorText("internal_error"));
+      })
+      .finally(() => {
+        if (!stopped) setBusy(false);
       });
     return () => {
       stopped = true;
     };
-  }, [offer.code]);
+  }, [offer.code, signedIn]);
 
   const periods = offer.discountPeriods;
   return (
@@ -85,9 +96,25 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
       </ul>
       {error ? <p role="alert" data-testid="biz-partner-landing-error">{error}</p> : null}
       {signedIn ? (
-        <Link href="/profile" className="business-app-btn business-app-btn-cta business-app-focus-ring" data-testid="biz-partner-landing-pay">
-          Перейти к подписке
-        </Link>
+        ready ? (
+          <Link
+            href="/profile#podpiska"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring"
+            data-testid="biz-partner-landing-pay"
+          >
+            Активировать скидку
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring"
+            disabled
+            aria-busy={busy}
+            data-testid="biz-partner-landing-pay-pending"
+          >
+            {busy ? "Закрепляем скидку…" : "Скидка пока недоступна"}
+          </button>
+        )
       ) : (
         <BusinessGuestStartCta
           href={businessAuthHref(hostname, "sign-up", true)}

@@ -27,6 +27,8 @@ import {
   partnerCodeClientIp,
   partnerCodeErrorIsFinal,
   partnerReservationNoteLead,
+  partnerReservationCountdownLabel,
+  partnerDiscountProgressLine,
   partnerFinishedNotice,
   partnerLatePaymentNotice,
   partnerPeriodsLeft,
@@ -37,7 +39,7 @@ import {
 } from "../src/lib/business/partner-codes";
 import { buildPartnerCodeAdminRows } from "../src/lib/admin/business-partner-codes";
 import { mapBusinessSubscriptionRpcError, parseConfirmedUnitPriceMinor } from "../src/lib/business/subscription-checkout";
-import { BusinessPartnerTerms, BusinessStruckPrice } from "../src/components/business-app/BusinessPartnerPrice";
+import { BusinessPartnerHomeBanner, BusinessPartnerTerms, BusinessStruckPrice } from "../src/components/business-app/BusinessPartnerPrice";
 import { BusinessPayControls } from "../src/components/business-app/BusinessHomeAccessCard";
 import { resetPartnerQuoteStore } from "../src/components/business-app/partner-quote-store";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
@@ -127,9 +129,21 @@ const held = parsePartnerQuote({ source: "reserved", unit_price_minor: 39900, st
   total_minor: 39900, discount_periods: 3, period_index: 1, periods_used: 0, reserved_until: "2026-11-12T07:05:00Z" });
 assert.equal(held?.reservedUntil, "2026-11-12T07:05:00Z");
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")),
-  "Код закреплён за вами на 72 часа, до 12 ноября, 10:05 по московскому времени – оплатите сейчас, чтобы цена");
+  "Код закреплён за вами на 72 часа, до 12 ноября, 10:05 по московскому времени – цена");
+assert.doesNotMatch(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")) ?? "", /оплатите сейчас|оплатите сразу/);
+assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-09T08:00:00Z")), "Код действует ещё 71:05");
+assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-12T08:00:00Z")), null, "no countdown after the hold");
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-12T08:00:00Z")), null, "no note after the hold");
 assert.equal(partnerReservationNoteLead(last), null, "no hold note once the code is bound");
+assert.equal(partnerDiscountProgressLine(held), null, "countdown covers the reserved state");
+assert.equal(partnerDiscountProgressLine(last), "Скидка на оплату 3 из 3");
+const mid = parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 2,
+  total_minor: 79800, discount_periods: 3, period_index: 2, periods_used: 1 });
+assert.ok(mid);
+assert.equal(partnerDiscountProgressLine(mid), "Скидка на оплату 2 из 3");
+assert.ok(partnerQuoteIsDiscounted(mid));
+assert.equal(partnerDiscountProgressLine(finished), null, "finished: no discount progress");
+assert.equal(partnerQuoteIsDiscounted(finished), false);
 assert.equal(parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39900, reserved_until: "2026-11-12T07:05:00Z" })?.reservedUntil, null);
 assert.equal(
   PARTNER_CODE_RESERVATION_HINT,
@@ -189,7 +203,27 @@ const struck = renderToStaticMarkup(<BusinessStruckPrice standardRub={799} price
 assert.match(struck, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>/);
 const terms = renderToStaticMarkup(<BusinessPartnerTerms quote={reserved} />);
 const heldTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={{ ...held!, reservedUntil: "2099-01-01T09:00:00Z" }} />);
-assert.match(heldTerms, /data-testid="biz-partner-reservation"[^>]*>Код закреплён за вами на 72 часа, до 1 января, 12:00 по московскому времени – оплатите сейчас, чтобы цена <span[^>]*><s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong><\/span> сохранилась\./, "hold note keeps 799 struck through next to 399");
+assert.match(heldTerms, /data-testid="biz-partner-countdown"[^>]*>Код действует ещё/, "live countdown while reserved");
+assert.match(heldTerms, /data-testid="biz-partner-reservation"[^>]*>Код закреплён за вами на 72 часа, до 1 января, 12:00 по московскому времени – цена <span[^>]*><s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong><\/span> сохранится при оплате/, "soft hold note keeps 799 struck through next to 399");
+assert.doesNotMatch(heldTerms, /оплатите сейчас|оплатите сразу/);
+const midTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={mid!} />);
+assert.match(midTerms, /data-testid="biz-partner-progress"[^>]*>Скидка на оплату 2 из 3/);
+assert.match(midTerms, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>/);
+assert.match(midTerms, /<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/);
+assert.doesNotMatch(midTerms, /biz-partner-countdown|biz-partner-reservation/, "no reservation countdown after binding");
+const lastTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={last!} />);
+assert.match(lastTerms, /Скидка на оплату 3 из 3/);
+const finishedTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={finished!} />);
+// finished is not discounted – PayControls shows finished notice, not terms; still ensure helpers hide strike UI
+assert.equal(partnerQuoteIsDiscounted(finished), false);
+const finishedBanner = renderToStaticMarkup(<BusinessPartnerHomeBanner quote={finished} />);
+assert.equal(finishedBanner, "", "finished: no home banner");
+const reservedBanner = renderToStaticMarkup(<BusinessPartnerHomeBanner quote={reserved} />);
+assert.match(reservedBanner, /data-testid="biz-home-partner-banner"/);
+assert.match(reservedBanner, /Персональная скидка активна/);
+assert.doesNotMatch(reservedBanner, /biz-partner-countdown/, "countdown lives in terms, not duplicated in banner");
+const midBanner = renderToStaticMarkup(<BusinessPartnerHomeBanner quote={mid} />);
+assert.match(midBanner, /Скидка на оплату 2 из 3/);
 assert.doesNotMatch(terms, /biz-partner-reservation/, "no hold note without a hold end");
 assert.match(terms, /скидка 50%/);
 assert.match(terms, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>[\s\S]*за точку/);
@@ -204,7 +238,14 @@ resetPartnerQuoteStore({ status: "ready", quote: reserved });
 const discountedControls = renderToStaticMarkup(<BusinessPayControls {...controls} />);
 assert.match(discountedControls, /data-testid="biz-partner-terms"/);
 assert.match(discountedControls, /<s[^>]*>799\u00a0₽<\/s>/, "799 struck through before payment");
+assert.match(discountedControls, /data-testid="biz-home-pay-button-price"/, "pay button shows struck total");
+assert.match(discountedControls, /<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/, "two venues: ~~1598~~ 798 on the button");
 assert.doesNotMatch(discountedControls, /Автосписания нет[\s\S]*799 ₽ за 30 дней, картой/, "no plain 799 line next to the offer");
+resetPartnerQuoteStore({ status: "ready", quote: mid });
+const midControls = renderToStaticMarkup(<BusinessPayControls {...controls} />);
+assert.match(midControls, /Скидка на оплату 2 из 3/);
+assert.match(midControls, /biz-home-pay-button-price/);
+assert.doesNotMatch(midControls, /biz-partner-countdown/);
 resetPartnerQuoteStore({ status: "ready", quote: finished });
 const finishedControls = renderToStaticMarkup(<BusinessPayControls {...controls} />);
 assert.match(finishedControls, /data-testid="biz-partner-finished"/);
@@ -263,6 +304,14 @@ assert.match(route, /p_expected_unit_price_minor: confirmedUnitPriceMinor/);
 const landing = readFileSync("src/components/business-app/BusinessPartnerLanding.tsx", "utf8");
 assert.match(landing, /BusinessStruckPrice/, "the link landing shows the struck price");
 assert.match(landing, /BusinessGuestStartCta/, "the free start stays the same");
+assert.match(landing, /Активировать скидку/, "signed-in CTA after reserve");
+assert.match(landing, /\/profile#podpiska/, "lands on subscription after activate");
+assert.match(landing, /Закрепляем скидку/, "waits for reserve before navigate");
+const profileSub = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
+assert.match(profileSub, /id="podpiska"/);
+assert.match(profileSub, /BusinessPartnerHomeBanner/);
+assert.match(card, /BusinessPartnerHomeBanner/, "home shows discount banner");
+assert.match(quoteStore, /refreshPartnerQuoteFromCookie/, "pay UI refreshes quote on mount (t1328u race)");
 const partnerRoute = readFileSync("src/app/api/business/partner-code/route.ts", "utf8");
 assert.match(partnerRoute, /checkAnalyticsRateLimit/, "the code endpoint is rate limited");
 assert.match(partnerRoute, /partnerCodeErrorIsFinal/, "the link cookie survives non-final errors");

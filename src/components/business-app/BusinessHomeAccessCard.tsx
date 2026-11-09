@@ -25,6 +25,7 @@ import {
 } from "@/lib/business/partner-codes";
 import {
   BusinessPartnerFinishedNotice,
+  BusinessPartnerHomeBanner,
   BusinessPartnerLatePaymentNotice,
   BusinessPartnerTerms,
   BusinessStruckPrice,
@@ -220,15 +221,18 @@ export default function BusinessHomeAccessCard() {
 
   const label = formatMoscowDateTime(new Date(access.endsAt));
   const pay = (
-    <BusinessPayControls
-      canPay={canPay}
-      accepted={accepted}
-      busy={busy}
-      error={error}
-      onAccept={accept}
-      onPay={startPay}
-      receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null}
-    />
+    <>
+      <BusinessPartnerHomeBanner quote={quote} />
+      <BusinessPayControls
+        canPay={canPay}
+        accepted={accepted}
+        busy={busy}
+        error={error}
+        onAccept={accept}
+        onPay={startPay}
+        receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null}
+      />
+    </>
   );
 
   if (access.mode === "grace") {
@@ -387,11 +391,12 @@ export function BusinessPayControls({
   const quote = usePartnerQuote(canPay);
   const acceptAnchorId = useOfferAcceptAnchorId();
   const carryoverNote = businessEarlyPayCarryoverNote(access);
+  const discounted = partnerQuoteIsDiscounted(quote);
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
       <BusinessPartnerLatePaymentNotice quote={quote} />
-      {partnerQuoteIsDiscounted(quote) ? (
+      {discounted ? (
         <BusinessPartnerTerms quote={quote} />
       ) : (
         <>
@@ -417,7 +422,18 @@ export function BusinessPayControls({
             disabled={busy}
             data-testid="biz-home-pay-button"
           >
-            {payLabel}
+            {discounted ? (
+              <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                <span>{payLabel}</span>
+                <BusinessStruckPrice
+                  standardRub={quote.standardTotalRub}
+                  priceRub={quote.totalRub}
+                  testId="biz-home-pay-button-price"
+                />
+              </span>
+            ) : (
+              payLabel
+            )}
           </button>
         </>
       ) : (
