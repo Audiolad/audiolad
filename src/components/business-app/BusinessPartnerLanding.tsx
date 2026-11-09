@@ -57,12 +57,17 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
         const quote = parsePartnerQuote(payload?.quote);
         if (quote) setPartnerQuote(quote);
         if (!signedIn) return;
+        const finished = quote?.source === "finished";
         if (quote && partnerQuoteIsDiscounted(quote)) {
           setError(null);
           setStatus("ready");
           return;
         }
-        setError("Скидку не удалось закрепить. Обновите страницу или введите код в разделе «Подписка».");
+        setError(
+          finished
+            ? "Скидка по коду уже использована – дальше обычная цена."
+            : "Скидку не удалось закрепить. Обновите страницу или введите код в разделе «Подписка».",
+        );
         setStatus("error");
       })
       .catch(() => {
@@ -109,16 +114,25 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
           >
             Активировать скидку
           </Link>
-        ) : (
+        ) : busy ? (
           <button
             type="button"
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
             disabled
-            aria-busy={busy}
+            aria-busy
             data-testid="biz-partner-landing-pay-pending"
           >
-            {busy ? "Закрепляем скидку…" : "Скидка пока недоступна"}
+            Закрепляем скидку…
           </button>
+        ) : (
+          // Any message that sends the owner elsewhere links straight there (Sergey's rule).
+          <Link
+            href="/profile#podpiska"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring"
+            data-testid="biz-partner-landing-to-subscription"
+          >
+            Перейти в подписку
+          </Link>
         )
       ) : (
         <BusinessGuestStartCta

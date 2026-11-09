@@ -12,6 +12,7 @@ import {
   partnerCodeErrorIsFinal,
   normalizePartnerCode,
   parsePartnerQuote,
+  partnerQuoteToWire,
   type PartnerQuote,
 } from "@/lib/business/partner-codes";
 import { getSupabaseCookieOptions, hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
@@ -145,6 +146,10 @@ export async function POST(request: Request) {
   }
   // Bound (or used up): the link cookie has done its job.
   if (quote && (quote.source === "entitlement" || quote.source === "finished")) keepCookie = null;
-  const response = NextResponse.json({ quote, ...(reserveError ? { pending_error: reserveError } : {}) });
+  // The browser parses the same snake_case row again (parsePartnerQuote), never the parsed object.
+  const response = NextResponse.json({
+    quote: quote ? partnerQuoteToWire(quote) : null,
+    ...(reserveError ? { pending_error: reserveError } : {}),
+  });
   return code ? withPendingCookie(response, request, keepCookie) : response;
 }

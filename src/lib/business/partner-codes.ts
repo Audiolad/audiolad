@@ -162,6 +162,31 @@ export function parsePartnerQuote(raw: unknown): PartnerQuote | null {
   };
 }
 
+/**
+ * The quote as /api/business/partner-code sends it to the browser: the same snake_case
+ * row in kopecks that parsePartnerQuote reads. The route validates the RPC row with
+ * parsePartnerQuote and must send it back in this shape – sending the parsed camelCase
+ * object made every browser parse return null, so a reserved 399 ₽ never showed (t1335u).
+ */
+export function partnerQuoteToWire(quote: PartnerQuote): Record<string, unknown> {
+  return {
+    source: quote.source,
+    unit_price_minor: quote.unitPriceRub * 100,
+    standard_unit_price_minor: quote.standardUnitPriceRub * 100,
+    venue_count: quote.venueCount,
+    total_minor: quote.totalRub * 100,
+    discount_periods: quote.discountPeriods,
+    period_index: quote.periodIndex,
+    periods_used: quote.periodsUsed,
+    code_hint: quote.codeHint,
+    discount_paid_until: quote.discountPaidUntil,
+    late_payment: quote.latePayment
+      ? { reason: quote.latePayment.reason, paid_at: quote.latePayment.paidAt, period_end: quote.latePayment.periodEnd }
+      : null,
+    reserved_until: quote.reservedUntil,
+  };
+}
+
 /** The next payment is at the personal price: show 799 struck through next to it (Sergey, t1300u). */
 export function partnerQuoteIsDiscounted(quote: PartnerQuote | null): quote is PartnerQuote {
   return Boolean(quote && (quote.source === "reserved" || quote.source === "entitlement") && quote.unitPriceRub < quote.standardUnitPriceRub);
