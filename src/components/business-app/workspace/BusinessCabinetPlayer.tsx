@@ -627,7 +627,7 @@ export function BusinessCabinetPlayerProvider({
     fader.setVolume(playbackRef.current.volume);
     fadeRef.current = fader;
     // t1314u loop mode (hall-loop-audio.ts) is rolled back (t1335u): prepareLoopAudio returns false
-    // while HALL_LOOP_MODE_ENABLED is off, so iPhone uses the #1192 early handoff + "ended" again.
+    // while HALL_LOOP_MODE_ENABLED is off, so iPhone uses the PR 1192 early handoff + "ended" again.
     const loopMode = prepareLoopAudio(audio, navigator);
     const ctl = new Controller(
       {
