@@ -254,6 +254,31 @@ const isoOrNull = (v: unknown): string | null =>
   typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null;
 
 /**
+ * Whether a playback_state report is still current.
+ * Same rule as mapOwnerLiveState: a fresh reported_at always counts; pause/stop/error may also
+ * ride a fresh heartbeat (devices report on change). "playing" never rides heartbeat –
+ * connectivity alone is not proof of sound.
+ * Venue status dots pass errorNeedsFreshReport so overnight stale error stays yellow, not red.
+ */
+export function isPlaybackReportCurrent(input: {
+  playbackState: unknown;
+  reportedAgeSeconds: number | null;
+  heartbeatFresh: boolean;
+  /** Default: BUSINESS_LIVE_CONNECTIVITY_SECONDS. */
+  freshSeconds?: number;
+  /** When true, error also needs a fresh reported_at (venue status dots). */
+  errorNeedsFreshReport?: boolean;
+}): boolean {
+  const freshSeconds = input.freshSeconds ?? BUSINESS_LIVE_CONNECTIVITY_SECONDS;
+  const reportedAge = input.reportedAgeSeconds;
+  if (reportedAge == null || !Number.isFinite(reportedAge) || reportedAge < 0) return false;
+  if (reportedAge <= freshSeconds) return true;
+  if (input.playbackState === "playing") return false;
+  if (input.errorNeedsFreshReport && input.playbackState === "error") return false;
+  return input.heartbeatFresh;
+}
+
+/**
  * Maps get_business_owner_player_live_state rows. Heartbeat (connectivity), reported playback
  * state and confirmed playing are kept as separate fields. A playback state older than the
  * 5-minute window is dropped (unknown, neutral), never shown as current.
@@ -274,10 +299,11 @@ export function mapOwnerLiveState(raw: unknown, organizationId: string, nowMs = 
   const reportedAge = ageS(top.reported);
   const rawState = top.r.playback_state;
   const heartbeatFresh = lastSeenSeconds != null && lastSeenSeconds <= BUSINESS_LIVE_CONNECTIVITY_SECONDS;
-  // A recent report is current. A long pause/stop/error stays current while the device is still
-  // on the line (it only reports on change). "playing" itself never counts as sound here.
-  const stateFresh = (reportedAge != null && reportedAge <= BUSINESS_LIVE_CONNECTIVITY_SECONDS)
-    || (heartbeatFresh && reportedAge != null && rawState !== "playing");
+  const stateFresh = isPlaybackReportCurrent({
+    playbackState: rawState,
+    reportedAgeSeconds: reportedAge,
+    heartbeatFresh,
+  });
   const playbackState: SpaPlaybackState | null = stateFresh && typeof rawState === "string"
     && ["playing", "paused", "stopped", "error"].includes(rawState) ? rawState as SpaPlaybackState : null;
   const confirmedAt = isoOrNull(top.r.playing_confirmed_at);
