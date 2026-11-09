@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import AuthBottomNav, { CoffeeAuthProvider } from "../src/components/auth/AuthHostNavigation";
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
-import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
+import BusinessHomeAccessCard, { BusinessPayError } from "../src/components/business-app/BusinessHomeAccessCard";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-grants/policy";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
@@ -102,10 +102,31 @@ assert.doesNotMatch(graceHtml, /—/);
 assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
 assert.match(graceHtml, /один раз для всего аккаунта/);
 assert.match(graceHtml, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
-assert.match(graceHtml, /data-offer-version="offer-v1-2026-11-04"/);
-assert.match(graceHtml, /редакция 1 от 04\.11\.2026/);
+assert.match(graceHtml, /data-offer-version="offer-v2-2026-11-09"/);
+assert.match(graceHtml, /редакция 2 от 09\.11\.2026/);
+assert.match(graceHtml, /Перед первой оплатой примите договор-оферту/);
 assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
 
+{
+  // Edition 2 (09.11.2026): an owner who accepted edition 1 is asked once more, per account, before the next payment.
+  const pending = card({ ...ownerDomain, offerAccepted: false, offerNewEditionPending: true }, grace);
+  assert.match(pending, /Опубликована новая редакция договора-оферты\. Примите её перед следующей оплатой – один раз для всего аккаунта и всех точек\./);
+  assert.match(pending, /data-testid="biz-home-accept"/);
+  assert.doesNotMatch(pending, /data-testid="biz-home-pay-button"/, "checkout needs the current edition");
+  assert.doesNotMatch(pending, /Перед первой оплатой/);
+  assert.doesNotMatch(pending, /—/);
+  // Any warning to accept links straight to the «Принять условия» button next to it.
+  const err = renderToStaticMarkup(<BusinessPayError error={{ code: "offer_acceptance_required", href: "/documents/business-offer" }} acceptAnchorId="biz-offer-accept-x" />);
+  assert.match(err, /<a href="#biz-offer-accept-x"[^>]*data-testid="biz-home-pay-error-accept-link"[^>]*>Перейти и принять<\/a>/);
+  assert.match(pending, /id="biz-offer-accept-[A-Za-z0-9_-]+"[^>]*data-testid="biz-home-accept"/);
+  // The regular tariff per point is shown before payment, as section 4 item 1 of the offer says.
+  const multi = card({ ...ownerDomain, offerAccepted: true, pilotSlots: true, locations: [{ status: "active" }, { status: "active" }] } as unknown as BusinessOwnerHomeContext, grace);
+  assert.match(multi, /Тариф – 799 ₽ за одну точку на 30 дней\. Итого 1598 ₽ за все активные точки\./);
+  // Access is never gated on the offer: only the pay controls read it.
+  for (const f of ["src/lib/access-grants/policy.ts", "src/lib/business-app/proxy-policy.ts"]) {
+    assert.doesNotMatch(readFileSync(f, "utf8"), /offerAccepted|offerNewEditionPending|business_offer_edition/, f);
+  }
+}
 const accepted = card({ ...ownerDomain, offerAccepted: true }, grace);
 assert.doesNotMatch(accepted, /biz-home-receipt-email/, "account with email: no receipt field");
 const guestStart = card({ ...ownerDomain, offerAccepted: true, needsReceiptEmail: true }, grace);

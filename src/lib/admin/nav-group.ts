@@ -20,6 +20,7 @@ const CHILD_LABELS: Record<string, string> = {
   "/admin/business-track-review": "Прослушивание треков",
   "/admin/business-trials": "Подарочная неделя",
   "/admin/business-coffee-test-account": "Тестовый аккаунт кофейни",
+  "/admin/business-partner-codes": "Партнёрские коды",
 };
 
 export function isAudioladBusinessNavHref(href: string): boolean {

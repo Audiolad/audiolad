@@ -4,6 +4,9 @@ import { useBusinessChromeAccess } from "./BusinessAccessLine";
 import { BusinessPayControls, useBusinessHomePay } from "./BusinessHomeAccessCard";
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
+import { partnerQuoteIsDiscounted } from "@/lib/business/partner-codes";
+import { BusinessStruckPrice } from "./BusinessPartnerPrice";
+import { usePartnerQuote } from "./partner-quote-store";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +21,7 @@ export default function BusinessPointSlots() {
   const domain = useBusinessDomain();
   const access = useBusinessChromeAccess();
   const payment = useBusinessHomePay();
+  const quote = usePartnerQuote(payment.canPay);
   const cabinet = useBusinessCabinetMode();
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
@@ -101,7 +105,9 @@ export default function BusinessPointSlots() {
       {writeLink}
     </div> : null}
     {multi ? <>
-    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за 30 дней всего. Одна оплата за все активные точки.</p>
+    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {partnerQuoteIsDiscounted(quote)
+      ? <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-points-price" />
+      : `${active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽`} за 30 дней всего. Одна оплата за все активные точки.</p>
     {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}
     {domain.pilotBilling?.renewalBlocked ? <p role="status">Новая точка пока не оплачена. Она будет включена при следующем продлении; доплата в текущем периоде недоступна.</p> : null}
     <BusinessPayControls canPay={payment.canPay} accepted={payment.accepted} busy={payment.busy} error={payment.error}

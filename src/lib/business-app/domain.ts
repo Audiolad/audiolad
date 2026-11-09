@@ -9,7 +9,7 @@ import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
-import { hasAcceptedCurrentBusinessOffer } from "@/lib/business/offer";
+import { hasAcceptedCurrentBusinessOffer, hasAcceptedEarlierBusinessOfferOnly } from "@/lib/business/offer";
 
 export { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
 export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
@@ -52,6 +52,8 @@ export type BusinessOwnerHomeContext =
       canPay: boolean;
       /** Account-level B2B offer. One acceptance covers every point. */
       offerAccepted: boolean;
+      /** An earlier offer edition is accepted, the current one is not yet (pay controls copy only). */
+      offerNewEditionPending?: boolean;
       /** Owner account without email (guest start): payment asks for an email for the receipt. */
       needsReceiptEmail?: boolean;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
@@ -103,6 +105,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     await businessHallDeviceLocked(),
   );
   let offerAccepted = false;
+  let offerNewEditionPending = false;
   if (canPay) {
     // The current edition of the договор-оферта, not any older acceptance.
     // A read error is an error, never «not accepted»: otherwise an owner who already
@@ -112,6 +115,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       throw new Error(`business_domain_offer_read_failed:${acceptanceError.message}`);
     }
     offerAccepted = hasAcceptedCurrentBusinessOffer(acceptance);
+    offerNewEditionPending = hasAcceptedEarlierBusinessOfferOnly(acceptance);
   }
   const needsReceiptEmail = canPay && !(user.email?.trim() ?? "");
 
@@ -124,6 +128,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId: null,
       canPay,
       offerAccepted,
+      offerNewEditionPending,
       needsReceiptEmail,
       signals: null,
     };
@@ -181,6 +186,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId,
       canPay,
       offerAccepted,
+      offerNewEditionPending,
       needsReceiptEmail,
       signals,
     };
@@ -217,6 +223,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     organizationId,
     canPay,
     offerAccepted,
+    offerNewEditionPending,
     needsReceiptEmail,
     location: {
       id: location.id,

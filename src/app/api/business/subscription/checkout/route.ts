@@ -3,7 +3,13 @@ import { NextResponse } from "next/server";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { BUSINESS_OFFER_HREF, businessOfferPaymentGate } from "@/lib/business/offer";
-import { mapBusinessSubscriptionRpcError, resolveBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
+import { parsePartnerQuote } from "@/lib/business/partner-codes";
+import {
+  BUSINESS_STANDARD_UNIT_PRICE_MINOR,
+  mapBusinessSubscriptionRpcError,
+  parseConfirmedUnitPriceMinor,
+  resolveBusinessReceiptEmail,
+} from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import type { OrderRow } from "@/lib/payments/payment-api";
@@ -17,6 +23,10 @@ import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+function isMissingRpc(error: { code?: string; message?: string }): boolean {
+  return error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "");
+}
 
 /**
  * Owner account only. Creates one pending business_subscription order and the
@@ -41,7 +51,15 @@ export async function POST(request: Request) {
   }
 
   // Optional body { receipt_email }: only for an account without email (guest start).
-  const body = (await request.json().catch(() => null)) as { receipt_email?: unknown } | null;
+  // { confirmed_unit_price_minor }: the per-venue price shown next to «Оплатить» (8142d69a).
+  const body = (await request.json().catch(() => null)) as {
+    receipt_email?: unknown;
+    confirmed_unit_price_minor?: unknown;
+  } | null;
+  const confirmedUnitPriceMinor = parseConfirmedUnitPriceMinor(body?.confirmed_unit_price_minor);
+  if (confirmedUnitPriceMinor === null) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
   const customerEmail = resolveBusinessReceiptEmail(user.email, body?.receipt_email) ?? "";
   if (!customerEmail) {
     return NextResponse.json({ error: "receipt_email_required" }, { status: 400 });
@@ -66,11 +84,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "offer_acceptance_required", href: BUSINESS_OFFER_HREF }, { status: 409 });
   }
 
-  const { data, error } = await supabase.rpc("create_business_subscription_order", {
+  // The server computes the amount; the order is refused unless it matches the confirmed price.
+  let { data, error } = await supabase.rpc("create_business_subscription_order", {
     p_idempotency_key: idempotencyKey,
+    p_expected_unit_price_minor: confirmedUnitPriceMinor,
   });
+  if (error && isMissingRpc(error) && confirmedUnitPriceMinor === BUSINESS_STANDARD_UNIT_PRICE_MINOR) {
+    // Schema before the partner-code migration: the standard price path stays as it was.
+    ({ data, error } = await supabase.rpc("create_business_subscription_order", { p_idempotency_key: idempotencyKey }));
+  }
   if (error) {
     const mapped = mapBusinessSubscriptionRpcError(error.message);
+    if (mapped.error === "partner_terms_changed") {
+      const { data: quoteRow } = await supabase.rpc("business_partner_quote_for_caller");
+      return NextResponse.json({ error: mapped.error, quote: parsePartnerQuote(quoteRow) }, { status: mapped.status });
+    }
     return NextResponse.json(
       { error: mapped.error, ...(mapped.href ? { href: mapped.href } : {}) },
       { status: mapped.status },

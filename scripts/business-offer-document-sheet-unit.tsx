@@ -31,7 +31,8 @@ assert.match(sheet, new RegExp(BUSINESS_OFFER_EDITION.label));
 assert.match(sheet, /data-testid="biz-offer-sheet-close"[^>]*>Закрыть</);
 assert.match(sheet, /business-app-btn-secondary[^"]*"[^>]*data-testid="biz-offer-sheet-done"[^>]*>Закрыть</);
 assert.doesNotMatch(sheet, /business-app-btn-primary/, "the sheet adds no competing main CTA");
-assert.match(sheet, /Стоимость доступа – <strong>799 ₽ за одну точку на 30 дней<\/strong>/);
+assert.match(sheet, /Стоимость доступа к одной точке на 30 дней устанавливается действующими тарифами Сервиса/);
+assert.match(sheet, /<strong>персональные коды на скидку<\/strong>/);
 assert.doesNotMatch(sheet, /—/, "en dash only");
 assert.doesNotMatch(sheet, /<h1/);
 
