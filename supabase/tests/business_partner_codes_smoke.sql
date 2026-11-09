@@ -272,4 +272,22 @@ END; $$;
 -- Venue-less account with an active discount: quote and checkout agree on the standard single payment.
 UPDATE business_locations SET status='closed' WHERE organization_id=(SELECT v FROM pc WHERE k='orgF');
 SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='entitlement' AND (public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=79900, 'no active venue: quote shows the standard single payment');
+
+-- Window start (Sergey, t1304u): an account that already paid 79900 counts the three code periods
+-- from its first payment made with the code, not from its first payment.
+INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000000c9');
+INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000000c9');
+INSERT INTO business_partner_codes(code, purpose) VALUES ('HHHHHHHHHHHH','custdev');
+SET test.uid='00000000-0000-4000-8000-0000000000c9';
+INSERT INTO pc SELECT 'orgH', (public.create_business_organization_with_location('H','Зал 1','cafe','RU','Europe/Moscow')->>'organization_id')::uuid;
+INSERT INTO pc SELECT 'h799', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 79900);
+SELECT pg_temp.pay(v) FROM pc WHERE k='h799';
+SELECT public.check_test((public.reserve_business_partner_code('HHHH-HHHH-HHHH')->'quote'->>'reserved_until')::timestamptz > clock_timestamp() + interval '71 hours', 'reserved quote carries the 72-hour hold end');
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'period_index')::int=1 AND (public.business_partner_quote_for_caller()->>'periods_used')::int=0, 'earlier 79900 payment does not use a code period');
+INSERT INTO pc SELECT 'h1', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SELECT public.check_test(((pg_temp.pay((SELECT v FROM pc WHERE k='h1'))->'partner'->>'period_index')::int=1), 'first payment with the code is period 1 after an earlier 79900 payment');
+SELECT public.check_test((SELECT first_paid_at=(SELECT applied_at FROM business_subscription_periods WHERE order_id=(SELECT v FROM pc WHERE k='h1')) FROM business_partner_entitlements WHERE organization_id=(SELECT v FROM pc WHERE k='orgH')), 'countdown starts at the first payment with the code');
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='entitlement' AND (public.business_partner_quote_for_caller()->>'period_index')::int=2
+  AND (public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=39900 AND public.business_partner_quote_for_caller()->>'reserved_until' IS NULL, 'two more code periods at 39900 follow');
+SELECT public.check_test((SELECT p.period_start=(SELECT period_end FROM business_subscription_periods WHERE order_id=(SELECT v FROM pc WHERE k='h799')) FROM business_subscription_periods p WHERE p.order_id=(SELECT v FROM pc WHERE k='h1')), 'the code period follows the paid 79900 period');
 SELECT 'partner codes: PASS';

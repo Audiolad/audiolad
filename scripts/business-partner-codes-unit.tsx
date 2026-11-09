@@ -21,7 +21,10 @@ import {
   partnerCodeStatus,
   partnerConfirmedUnitPriceMinor,
   partnerDiscountPercent,
+  PARTNER_CODE_RESERVATION_HINT,
+  partnerCodeClientIp,
   partnerCodeErrorIsFinal,
+  partnerReservationNoteLead,
   partnerFinishedNotice,
   partnerLatePaymentNotice,
   partnerPeriodsLeft,
@@ -114,6 +117,20 @@ const replacedLate = parsePartnerQuote({ source: "reserved", unit_price_minor: 3
 assert.equal(partnerLatePaymentNotice(replacedLate), "Прежняя ссылка на оплату всё же была оплачена 9 ноября. Оплата засчитана полностью: доступ продлён до 9 декабря.");
 assert.equal(partnerLatePaymentNotice(reserved), null);
 assert.equal(parsePartnerQuote({ source: "standard", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 79900, late_payment: { reason: "x" } })?.latePayment, null);
+// 72-hour hold (t1304u): the exact end in Moscow time, only while the code is held.
+const held = parsePartnerQuote({ source: "reserved", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1,
+  total_minor: 39900, discount_periods: 3, period_index: 1, periods_used: 0, reserved_until: "2026-11-12T07:05:00Z" });
+assert.equal(held?.reservedUntil, "2026-11-12T07:05:00Z");
+assert.equal(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")),
+  "Код закреплён за вами на 72 часа, до 12 ноября, 10:05 по московскому времени – оплатите сейчас, чтобы цена");
+assert.equal(partnerReservationNoteLead(held, new Date("2026-11-12T08:00:00Z")), null, "no note after the hold");
+assert.equal(partnerReservationNoteLead(last), null, "no hold note once the code is bound");
+assert.equal(parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39900, reserved_until: "2026-11-12T07:05:00Z" })?.reservedUntil, null);
+assert.equal(PARTNER_CODE_RESERVATION_HINT, "После применения код закрепляется за вами на 72 часа – оплатите сразу, чтобы персональная цена сохранилась.");
+// Rate-limit key: nginx X-Real-IP first, otherwise the last X-Forwarded-For hop (nginx appends it).
+assert.equal(partnerCodeClientIp(new Headers({ "x-real-ip": "203.0.113.7", "x-forwarded-for": "1.1.1.1, 203.0.113.7" })), "203.0.113.7");
+assert.equal(partnerCodeClientIp(new Headers({ "x-forwarded-for": "1.1.1.1, 198.51.100.2" })), "198.51.100.2", "a spoofed first hop is ignored");
+assert.equal(partnerCodeClientIp(new Headers()), "unknown");
 // Only a final answer about the code drops the link cookie.
 assert.ok(partnerCodeErrorIsFinal("partner_code_invalid") && partnerCodeErrorIsFinal("partner_code_unavailable") && partnerCodeErrorIsFinal("partner_code_already_applied"));
 assert.ok(!partnerCodeErrorIsFinal("not_organization_owner") && !partnerCodeErrorIsFinal("support_mode_consent_forbidden") && !partnerCodeErrorIsFinal("internal_error"));
@@ -159,6 +176,9 @@ assert.equal(rows[0].codeDisplay, "ABCD-EFGH-JKMN");
 const struck = renderToStaticMarkup(<BusinessStruckPrice standardRub={799} priceRub={399} />);
 assert.match(struck, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>/);
 const terms = renderToStaticMarkup(<BusinessPartnerTerms quote={reserved} />);
+const heldTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={{ ...held!, reservedUntil: "2099-01-01T09:00:00Z" }} />);
+assert.match(heldTerms, /data-testid="biz-partner-reservation"[^>]*>Код закреплён за вами на 72 часа, до 1 января, 12:00 по московскому времени – оплатите сейчас, чтобы цена <span[^>]*><s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong><\/span> сохранилась\./, "hold note keeps 799 struck through next to 399");
+assert.doesNotMatch(terms, /biz-partner-reservation/, "no hold note without a hold end");
 assert.match(terms, /скидка 50%/);
 assert.match(terms, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>[\s\S]*за точку/);
 assert.match(terms, /Точек: 2\. Итого:[\s\S]*<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/);

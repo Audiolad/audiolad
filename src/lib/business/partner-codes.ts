@@ -96,6 +96,8 @@ export type PartnerQuote = {
   discountPaidUntil: string | null;
   /** A payment that still arrived on a link the cabinet no longer offered (replaced or revoked code). */
   latePayment: PartnerLatePayment | null;
+  /** While the code is held for this owner before the first payment (72 hours, renewed by an open link). */
+  reservedUntil: string | null;
 };
 
 export type PartnerLatePayment = {
@@ -146,6 +148,7 @@ export function parsePartnerQuote(raw: unknown): PartnerQuote | null {
     codeHint: typeof row.code_hint === "string" ? row.code_hint : null,
     discountPaidUntil: typeof row.discount_paid_until === "string" ? row.discount_paid_until : null,
     latePayment: parseLatePayment(row.late_payment),
+    reservedUntil: source === "reserved" && typeof row.reserved_until === "string" ? row.reserved_until : null,
   };
 }
 
@@ -195,6 +198,33 @@ export function partnerFinishedNotice(quote: PartnerQuote | null): string | null
   return `Персональная цена закончилась: оплачено ${quote.periodsUsed} ${ruPeriodsWord(quote.periodsUsed)}. Сейчас действует обычная цена – ${quote.standardUnitPriceRub} ₽ за точку за ${BUSINESS_PAID_PERIOD_DAYS} дней.`;
 }
 
+/** Reservation length, the same as reserve_business_partner_code. */
+export const PARTNER_CODE_RESERVATION_HOURS = 72;
+
+/** «12 ноября, 10:05» in Moscow time. */
+export function ruMoscowDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Europe/Moscow" });
+  const time = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Moscow" });
+  return `${day}, ${time}`;
+}
+
+/**
+ * The first half of the reservation note, before the struck price (t1304u): the code is held
+ * for 72 hours, pay now. Null when the code is not held or the hold is already over.
+ */
+export function partnerReservationNoteLead(quote: PartnerQuote | null, now: Date = new Date()): string | null {
+  if (!quote || quote.source !== "reserved" || !quote.reservedUntil) return null;
+  const until = new Date(quote.reservedUntil);
+  if (Number.isNaN(until.getTime()) || until.getTime() <= now.getTime()) return null;
+  return `Код закреплён за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа, до ${ruMoscowDateTime(quote.reservedUntil)} по московскому времени – оплатите сейчас, чтобы цена`;
+}
+
+/** Before the code is applied: the same rule in advance, for the entry field and the link page. */
+export const PARTNER_CODE_RESERVATION_HINT =
+  `После применения код закрепляется за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа – оплатите сразу, чтобы персональная цена сохранилась.`;
+
 function ruMoscowDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -227,6 +257,18 @@ export type PartnerCodeApiError =
   | "rate_limited"
   | "unauthorized"
   | "internal_error";
+
+/**
+ * Rate-limit key for /api/business/partner-code. nginx sets X-Real-IP to $remote_addr, so it
+ * comes first; X-Forwarded-For is appended by nginx, so only its last hop is trusted (the
+ * first values are whatever the client sent).
+ */
+export function partnerCodeClientIp(headers: Headers): string {
+  const real = headers.get("x-real-ip")?.trim();
+  if (real) return real;
+  const hops = (headers.get("x-forwarded-for") ?? "").split(",").map((hop) => hop.trim()).filter(Boolean);
+  return hops.at(-1) ?? "unknown";
+}
 
 /** Only these mean the code itself can never work for this account: the link cookie is dropped. */
 export function partnerCodeErrorIsFinal(code: PartnerCodeApiError | string): boolean {

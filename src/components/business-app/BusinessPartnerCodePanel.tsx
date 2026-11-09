@@ -10,6 +10,7 @@ import {
   parsePartnerQuote,
   partnerCodeErrorText,
   partnerQuoteIsDiscounted,
+  PARTNER_CODE_RESERVATION_HINT,
 } from "@/lib/business/partner-codes";
 
 /**
@@ -94,6 +95,9 @@ export default function BusinessPartnerCodePanel({ canPay }: { canPay: boolean }
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         Введите код из персонального приглашения. До оплаты вы увидите новую цену рядом с обычной – для всех точек
         аккаунта.
+      </p>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-partner-code-hold-hint">
+        {PARTNER_CODE_RESERVATION_HINT}
       </p>
       <input
         id={`${id}-input`}

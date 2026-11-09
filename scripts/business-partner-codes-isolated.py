@@ -107,5 +107,5 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     finally:
         server.terminate(); server.wait(timeout=30)
     print('partner codes: two parallel sessions, exactly one reservation: PASS')
-    print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote: PASS')
+    print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote, an earlier 79900 payment then the code (window from the first code payment), 72-hour hold end in the quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')

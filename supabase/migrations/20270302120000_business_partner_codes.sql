@@ -153,7 +153,7 @@ GRANT EXECUTE ON FUNCTION public.business_partner_owner_organization(uuid) TO se
 
 CREATE FUNCTION public.business_partner_quote_json(p_user_id uuid) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_org uuid; v_q record; v_count integer := 0; v_hint text; v_until timestamptz; v_late jsonb;
+DECLARE v_org uuid; v_q record; v_count integer := 0; v_hint text; v_until timestamptz; v_late jsonb; v_reserved_until timestamptz;
 BEGIN
   v_org := public.business_partner_owner_organization(p_user_id);
   IF v_org IS NOT NULL THEN
@@ -161,7 +161,8 @@ BEGIN
   END IF;
   SELECT * INTO v_q FROM public.business_partner_quote_internal(v_org, p_user_id);
   IF v_q.code_id IS NOT NULL THEN
-    SELECT right(c.code, 4) INTO v_hint FROM public.business_partner_codes c WHERE c.id = v_q.code_id;
+    SELECT right(c.code, 4), CASE WHEN v_q.source = 'reserved' THEN c.reserved_until END
+    INTO v_hint, v_reserved_until FROM public.business_partner_codes c WHERE c.id = v_q.code_id;
   END IF;
   IF v_org IS NOT NULL THEN
     SELECT max(p.period_end) INTO v_until FROM public.business_partner_entitlement_periods p WHERE p.organization_id = v_org;
@@ -192,7 +193,9 @@ BEGIN
     'periods_used', v_q.periods_used,
     'code_hint', v_hint,
     'discount_paid_until', v_until,
-    'late_payment', v_late);
+    'late_payment', v_late,
+    -- Shown next to the price while the code is held: «закреплён за вами до …».
+    'reserved_until', v_reserved_until);
 END; $$;
 REVOKE ALL ON FUNCTION public.business_partner_quote_json(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.business_partner_quote_json(uuid) TO service_role;
@@ -1641,4 +1644,11 @@ COMMIT;
 --   ALTER TABLE business_subscription_order_scopes DROP COLUMN partner_period_index, partner_code_id, unit_price_minor;
 --   DROP TABLE business_subscription_superseded_orders, business_partner_entitlement_periods,
 --   business_partner_entitlements, business_partner_codes.
+-- After such a rollback a late bank confirmation of a replaced link goes back to manual review
+--   (cancelled_order_late_approved), as before this migration.
+-- business_subscription_periods_amount_check stays relaxed (whole rubles up to 10 x 79900): the old
+--   amount_minor = 79900 check cannot be restored once any 39900-per-venue period exists.
+-- Lock order note: checkout and revoke lock the code row, then the order; the bank confirmation
+--   locks the order, then the code. A rare collision on the same link is a deadlock that PostgreSQL
+--   breaks; the webhook event is marked failed and retried, no money is lost.
 -- Never delete orders, payments or business_subscription_periods.

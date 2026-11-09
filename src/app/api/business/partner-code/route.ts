@@ -8,6 +8,7 @@ import {
   PARTNER_CODE_COOKIE,
   PARTNER_CODE_COOKIE_MAX_AGE_SECONDS,
   mapPartnerCodeRpcError,
+  partnerCodeClientIp,
   partnerCodeErrorIsFinal,
   normalizePartnerCode,
   parsePartnerQuote,
@@ -56,7 +57,7 @@ const PARTNER_CODE_RATE_LIMIT = 30;
 const PARTNER_CODE_RATE_WINDOW_MS = 60_000;
 
 function partnerCodeRateLimited(request: Request): boolean {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+  const ip = partnerCodeClientIp(request.headers);
   const key = `biz-partner-code:${createHash("sha256").update(ip).digest("hex").slice(0, 16)}`;
   return !checkAnalyticsRateLimit(key, PARTNER_CODE_RATE_LIMIT, PARTNER_CODE_RATE_WINDOW_MS);
 }

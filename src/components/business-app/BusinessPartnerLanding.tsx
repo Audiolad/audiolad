@@ -14,6 +14,7 @@ import {
   partnerCodeErrorText,
   partnerDiscountPercent,
   ruPeriodsWord,
+  PARTNER_CODE_RESERVATION_HINT,
 } from "@/lib/business/partner-codes";
 import { BUSINESS_PAID_PERIOD_DAYS, BUSINESS_PLAN_PERIOD_LABEL } from "@/lib/business/plan";
 
@@ -80,6 +81,7 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
           Затем – обычная цена {offer.standardUnitPriceRub} ₽ за точку {BUSINESS_PLAN_PERIOD_LABEL}. Автосписания нет.
         </li>
         <li>Сначала – {BUSINESS_GIFT_TITLE.toLowerCase()}: без карты, они не входят в эти оплаты.</li>
+        <li>{PARTNER_CODE_RESERVATION_HINT}</li>
       </ul>
       {error ? <p role="alert" data-testid="biz-partner-landing-error">{error}</p> : null}
       {signedIn ? (

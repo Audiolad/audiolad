@@ -2,6 +2,7 @@ import {
   partnerDiscountPercent,
   partnerFinishedNotice,
   partnerLatePaymentNotice,
+  partnerReservationNoteLead,
   partnerQuoteTermsLines,
   type PartnerQuote,
 } from "@/lib/business/partner-codes";
@@ -52,6 +53,7 @@ export function BusinessPartnerTerms({ quote }: { quote: PartnerQuote }) {
       {partnerQuoteTermsLines(quote).map((line) => (
         <p key={line} className="text-[var(--biz-text-muted)]">{line}</p>
       ))}
+      <BusinessPartnerReservationNote quote={quote} />
     </div>
   );
 }
@@ -72,6 +74,19 @@ export function BusinessPartnerLatePaymentNotice({ quote }: { quote: PartnerQuot
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" role="status" data-testid="biz-partner-late-payment">
       {notice}
+    </p>
+  );
+}
+
+/** While the code is held: 72 hours, the exact end in Moscow time, and 799 struck through next to 399. */
+export function BusinessPartnerReservationNote({ quote }: { quote: PartnerQuote | null }) {
+  const lead = partnerReservationNoteLead(quote);
+  if (!lead || !quote) return null;
+  return (
+    <p className="font-semibold text-[var(--biz-text)]" role="status" data-testid="biz-partner-reservation">
+      {lead}{" "}
+      <BusinessStruckPrice standardRub={quote.standardUnitPriceRub} priceRub={quote.unitPriceRub} testId="biz-partner-reservation-price" />{" "}
+      сохранилась.
     </p>
   );
 }
