@@ -23,17 +23,22 @@ export function BusinessStruckPrice({
   standardRub,
   priceRub,
   testId = "biz-partner-price",
+  tone = "default",
 }: {
   standardRub: number;
   priceRub: number;
   testId?: string;
+  /** onButton: white bold on the brown/green pay CTA (t1336u). Default keeps dark ink on cards. */
+  tone?: "default" | "onButton";
 }) {
+  const standardClass = tone === "onButton" ? "business-struck-on-button-standard" : "text-[var(--biz-text-muted)]";
+  const currentClass = tone === "onButton" ? "business-struck-on-button-current" : "text-[var(--biz-text)]";
   return (
     <span className="whitespace-nowrap" data-testid={testId}>
-      <s className="text-[var(--biz-text-muted)]" data-testid={`${testId}-standard`} aria-label={`Обычная цена ${standardRub} ₽`}>
+      <s className={standardClass} data-testid={`${testId}-standard`} aria-label={`Обычная цена ${standardRub} ₽`}>
         {`${standardRub}\u00a0₽`}
       </s>{" "}
-      <strong className="text-[var(--biz-text)]" data-testid={`${testId}-current`}>
+      <strong className={currentClass} data-testid={`${testId}-current`}>
         {`${priceRub}\u00a0₽`}
       </strong>
     </span>
@@ -41,7 +46,7 @@ export function BusinessStruckPrice({
 }
 
 /** What the next payment will be, shown before any link to the bank exists. */
-export function BusinessPartnerTerms({ quote }: { quote: PartnerQuote }) {
+export function BusinessPartnerTerms({ quote, now }: { quote: PartnerQuote; now?: Date }) {
   const venues = Math.max(quote.venueCount, 1);
   const progress = partnerDiscountProgressLine(quote);
   return (
@@ -67,7 +72,7 @@ export function BusinessPartnerTerms({ quote }: { quote: PartnerQuote }) {
       {partnerQuoteTermsLines(quote).map((line) => (
         <p key={line} className="text-[var(--biz-text-muted)]">{line}</p>
       ))}
-      <BusinessPartnerReservationNote quote={quote} />
+      <BusinessPartnerReservationNote quote={quote} now={now} />
     </div>
   );
 }
@@ -93,19 +98,37 @@ export function BusinessPartnerLatePaymentNotice({ quote }: { quote: PartnerQuot
 }
 
 /** While the code is held: live countdown + soft note with 799 struck through next to 399. */
-export function BusinessPartnerReservationNote({ quote }: { quote: PartnerQuote | null }) {
-  const [now, setNow] = useState(() => new Date());
+export function BusinessPartnerReservationNote({ quote, now: nowProp }: { quote: PartnerQuote | null; now?: Date }) {
+  // liveNow stays null on the server and the first client paint – no hydration mismatch (t1337u).
+  // A fixed nowProp (unit tests) skips the interval and is used as the clock directly.
+  const [liveNow, setLiveNow] = useState<Date | null>(null);
   useEffect(() => {
+    if (nowProp) return;
     if (!quote || quote.source !== "reserved" || !quote.reservedUntil) return;
-    const tick = () => setNow(new Date());
-    tick();
-    const timer = window.setInterval(tick, 30_000);
-    return () => window.clearInterval(timer);
-  }, [quote]);
+    let timer = 0;
+    const tick = () => {
+      const next = new Date();
+      setLiveNow(next);
+      const until = Date.parse(quote.reservedUntil!);
+      if (Number.isFinite(until) && until <= next.getTime() && timer) {
+        window.clearInterval(timer);
+        timer = 0;
+      }
+    };
+    // First tick after the effect body – avoids sync setState-in-effect lint.
+    const first = window.setTimeout(tick, 0);
+    timer = window.setInterval(tick, 1_000);
+    return () => {
+      window.clearTimeout(first);
+      if (timer) window.clearInterval(timer);
+    };
+  }, [quote, nowProp]);
 
+  const now = nowProp ?? liveNow;
+  if (!quote || now === null) return null;
   const lead = partnerReservationNoteLead(quote, now);
   const countdown = partnerReservationCountdownLabel(quote, now);
-  if ((!lead && !countdown) || !quote) return null;
+  if (!lead && !countdown) return null;
   return (
     <div className="space-y-1" data-testid="biz-partner-reservation-block">
       {countdown ? (
