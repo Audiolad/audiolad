@@ -18,11 +18,6 @@ export default function BusinessProfileSubscription({ timezone, nowIso }: { time
     const timer = window.setInterval(tick, 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.location.hash !== "#podpiska") return;
-    document.getElementById("podpiska")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
   const summary = businessProfileSubscription(access, timezone, now);
   return (
     <section id="podpiska" className="space-y-3 border-t pt-4" aria-labelledby="business-profile-subscription">
