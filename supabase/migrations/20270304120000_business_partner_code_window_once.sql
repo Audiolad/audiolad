@@ -25,9 +25,9 @@
 -- What does not change: prices, the quote, binding on the first real payment, revoke, another
 -- account taking a code whose hold ran out (existing behaviour), every order and payment.
 --
--- Existing rows: every currently held, not bound code gets a window; the account end is the
--- earliest current reserved_until of the account's held codes (start = end - 72 hours). With one
--- held code per account (production: 1 row) nothing is shortened or extended.
+-- Existing rows: every currently held, not bound code gets a window whose end is its current
+-- reserved_until (start = end - 72 hours); nothing is shortened or extended. The migration stops
+-- before any change on shapes it cannot keep exactly (see the pre-flight).
 --
 -- Rollback (restores the previous restart-on-every-visit behaviour; no money data is touched),
 -- one transaction, full SQL in supabase/rollbacks/20270304120000_business_partner_code_window_once.rollback.sql:
@@ -53,8 +53,36 @@ GRANT SELECT ON public.business_partner_code_windows TO service_role;
 COMMENT ON TABLE public.business_partner_code_windows IS
   'Task 8142d69a t1338u: the 72-hour hold of a partner code, counted once per business account from its first entry. Service role only.';
 
--- Existing holds: one account end = the earliest current end among the account's held codes
--- (one held code per account, as in production: exactly its current end). Never extended.
+-- Pre-flight: the backfill only takes data it can keep exactly. It stops (nothing applied) when an
+-- account holds codes with different ends (possible only with two owners holding two codes) or has an
+-- open first-payment personal-price link created after its hold end. Such rows need a manual decision;
+-- the migration never cancels or reprices a payment link. Production 09.11.2026: 1 held code, 0 such rows.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.business_partner_codes c
+    WHERE c.reserved_by_user_id IS NOT NULL AND c.bound_organization_id IS NULL
+      AND public.business_partner_owner_organization(c.reserved_by_user_id) IS NOT NULL
+    GROUP BY public.business_partner_owner_organization(c.reserved_by_user_id)
+    HAVING count(DISTINCT c.reserved_until) > 1
+  ) THEN
+    RAISE EXCEPTION 'Pre-check failed: an account holds partner codes with different ends; reconcile manually first';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.business_subscription_order_scopes s
+    JOIN public.orders o ON o.id = s.order_id
+    JOIN public.business_partner_codes c ON c.id = s.partner_code_id
+    WHERE o.status = 'pending' AND c.bound_organization_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)
+      AND NOT EXISTS (SELECT 1 FROM public.business_partner_entitlements e WHERE e.organization_id = s.organization_id)
+      AND c.reserved_until IS NOT NULL AND o.created_at > c.reserved_until
+  ) THEN
+    RAISE EXCEPTION 'Pre-check failed: an open personal-price link was created after its hold end; reconcile manually first';
+  END IF;
+END;
+$$;
+
+-- Existing holds: the account end is the current end of the account's held code. Never extended.
 WITH held AS (
   SELECT c.id AS code_id, public.business_partner_owner_organization(c.reserved_by_user_id) AS organization_id,
     c.reserved_by_user_id AS user_id, c.reserved_until
@@ -87,11 +115,6 @@ REVOKE ALL ON FUNCTION public.business_partner_codes_window_cap() FROM PUBLIC, a
 CREATE TRIGGER business_partner_codes_window_cap
   BEFORE INSERT OR UPDATE OF reserved_by_user_id, reserved_until ON public.business_partner_codes
   FOR EACH ROW EXECUTE FUNCTION public.business_partner_codes_window_cap();
--- A later hold of the same account (two owners) is brought down to the account end. Only lowers.
-UPDATE public.business_partner_codes c SET reserved_until = w.expires_at
-FROM public.business_partner_code_windows w
-WHERE w.code_id = c.id AND w.organization_id = public.business_partner_owner_organization(c.reserved_by_user_id)
-  AND c.bound_organization_id IS NULL AND c.reserved_until > w.expires_at;
 
 -- After the account end no NEW personal-price link for the first payment can be opened (also when the
 -- checkout RPC is called directly or an open link is replaced). A link opened in time stays payable.

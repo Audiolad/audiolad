@@ -79,7 +79,30 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
 window_once = migration('20270304120000_business_partner_code_window_once.sql')
 window_smoke = (root/'supabase/tests/business_partner_code_window_once_smoke.sql').read_text()
 backfill_fixture = (root/'supabase/tests/business_partner_code_window_once_backfill_fixture.sql').read_text()
-backfill_smoke = (root/'supabase/tests/business_partner_code_window_once_backfill_smoke.sql').read_text()
+# A late link: opened under the old rules, then its hold end moved before it (cannot be kept exactly).
+late_link_fixture = """
+INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000002b1');
+INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000002b1');
+INSERT INTO business_partner_codes(code, purpose) VALUES ('NNNNNNNNNNNN','custdev');
+SET test.uid='00000000-0000-4000-8000-0000000002b1';
+SELECT public.create_business_organization_with_location('N','Зал 1','cafe','RU','Europe/Moscow');
+SELECT public.reserve_business_partner_code('NNNNNNNNNNNN');
+SELECT * FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+UPDATE business_partner_codes SET reserved_until=clock_timestamp()-interval '1 hour' WHERE code='NNNNNNNNNNNN';
+"""
+
+def must_stop(name, run_blocks, expected):
+    with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-stop-') as tmp:
+        data = Path(tmp)/'data'
+        subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
+        sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
+        sql += "ROLLBACK;\n"
+        sql += "SELECT CASE WHEN to_regclass('public.business_partner_code_windows') IS NULL THEN 'window migration stopped: nothing applied' END;\n"
+        result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
+        if expected not in result.stderr or 'window migration stopped: nothing applied' not in result.stdout:
+            print(result.stdout[-3000:], result.stderr[-3000:])
+            raise SystemExit(name + ': FAIL')
+    print(name + ': PASS')
 
 def single_user(data, run_blocks, markers):
     sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
@@ -95,13 +118,16 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-window-') as tmp
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
     single_user(data, blocks[:-1] + [window_once, blocks[-1], window_smoke], markers + ['partner code window once: PASS'])
 print('partner codes: full smoke with the once-only 72-hour window applied first: PASS')
+must_stop('partner codes: window migration stops on two holds of one account with different ends',
+          blocks + [backfill_fixture, window_once], 'Pre-check failed: an account holds partner codes with different ends')
+must_stop('partner codes: window migration stops on an open link created after its hold end',
+          blocks + [late_link_fixture, window_once], 'Pre-check failed: an open personal-price link was created after its hold end')
 
 with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     data = Path(tmp)/'data'
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
     # Production order: rows created under 20270302120000, then the window migration backfills them.
-    single_user(data, blocks + [backfill_fixture, window_once, backfill_smoke, window_smoke],
-                markers + ['partner code window backfill: PASS', 'partner code window once: PASS'])
+    single_user(data, blocks + [window_once, window_smoke], markers + ['partner code window once: PASS'])
     # Parallel redemption with two real sessions: exactly one owner gets the code.
     sock = Path(tmp)/'sock'; sock.mkdir()
     server = subprocess.Popen([str(pg/'postgres'), '-D', str(data), '-k', str(sock), '-c', 'listen_addresses=', '-p', '55433'],
@@ -127,6 +153,6 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     finally:
         server.terminate(); server.wait(timeout=30)
     print('partner codes: two parallel sessions, exactly one reservation and one 72-hour window: PASS')
-    print('partner codes: 72 hours counted once per account from the first entry (repeat visits, payment link, re-reserve, another code and back, second owner, end with and without an open link, no new personal-price link after the end, existing holds reconciled to one account end): PASS')
+    print('partner codes: 72 hours counted once per account from the first entry (repeat visits, payment link, re-reserve, another code and back, second owner, end with and without an open link, no new personal-price link after the end, existing holds kept exactly): PASS')
     print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote, an earlier 79900 payment then the code (window from the first code payment), 72-hour hold end in the quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')
