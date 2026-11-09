@@ -5,14 +5,14 @@
  * a tiny write, because several browsers expose the API and then throw on use.
  */
 
-import { HALL_BUFFER_CACHE, HALL_BUFFER_IDB, HALL_BUFFER_OWNER_KEY, type BufferStore } from "./hall-offline-buffer";
+import { HALL_BUFFER_CACHE_NAME, HALL_BUFFER_IDB_STORAGE, HALL_BUFFER_OWNER_KEY, type BufferStore } from "./hall-offline-buffer";
 
 const cacheKey = (id: string) => `/__hall-buffer/${encodeURIComponent(id)}`;
-const PROBE = "__probe__";
-const IDB_STORE = "tracks";
+const PROBE_KEY = "__probe__";
+const IDB_TABLE = "tracks";
 
 function cacheStore(): BufferStore {
-  const open = () => caches.open(HALL_BUFFER_CACHE);
+  const open = () => caches.open(HALL_BUFFER_CACHE_NAME);
   return {
     kind: "cache",
     async get(id) {
@@ -31,10 +31,10 @@ function cacheStore(): BufferStore {
     async keys() {
       return (await (await open()).keys())
         .map((r) => decodeURIComponent(new URL(r.url).pathname.split("/").pop() ?? ""))
-        .filter((id) => id && id !== PROBE);
+        .filter((id) => id && id !== PROBE_KEY);
     },
     async clear() {
-      await caches.delete(HALL_BUFFER_CACHE);
+      await caches.delete(HALL_BUFFER_CACHE_NAME);
     },
   };
 }
@@ -48,9 +48,9 @@ function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
 
 function idbOpen(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(HALL_BUFFER_IDB, 1);
+    const req = indexedDB.open(HALL_BUFFER_IDB_STORAGE, 1);
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(IDB_STORE)) req.result.createObjectStore(IDB_STORE);
+      if (!req.result.objectStoreNames.contains(IDB_TABLE)) req.result.createObjectStore(IDB_TABLE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -62,7 +62,7 @@ function idbStore(): BufferStore {
   let db: Promise<IDBDatabase> | null = null;
   const tx = async (mode: IDBTransactionMode) => {
     db ??= idbOpen();
-    return (await db).transaction(IDB_STORE, mode).objectStore(IDB_STORE);
+    return (await db).transaction(IDB_TABLE, mode).objectStore(IDB_TABLE);
   };
   return {
     kind: "idb",
@@ -78,7 +78,7 @@ function idbStore(): BufferStore {
       await idbRequest((await tx("readwrite")).delete(id));
     },
     async keys() {
-      return (await idbRequest((await tx("readonly")).getAllKeys())).map(String).filter((id) => id !== PROBE);
+      return (await idbRequest((await tx("readonly")).getAllKeys())).map(String).filter((id) => id !== PROBE_KEY);
     },
     async clear() {
       await idbRequest((await tx("readwrite")).clear());
@@ -88,9 +88,9 @@ function idbStore(): BufferStore {
 
 async function probe(store: BufferStore): Promise<boolean> {
   try {
-    await store.put(PROBE, new Blob(["x"], { type: "audio/mpeg" }), 1);
-    const got = await store.get(PROBE);
-    await store.delete(PROBE);
+    await store.put(PROBE_KEY, new Blob(["x"], { type: "audio/mpeg" }), 1);
+    const got = await store.get(PROBE_KEY);
+    await store.delete(PROBE_KEY);
     return !!got && got.blob.size === 1;
   } catch {
     return false;
@@ -136,12 +136,12 @@ export function writeHallBufferOwner(owner: string | null): void {
 export async function purgeHallBufferStorage(): Promise<void> {
   writeHallBufferOwner(null);
   try {
-    if (typeof caches !== "undefined") await caches.delete(HALL_BUFFER_CACHE);
+    if (typeof caches !== "undefined") await caches.delete(HALL_BUFFER_CACHE_NAME);
   } catch { /* blocked */ }
   try {
     if (typeof indexedDB !== "undefined") {
       await new Promise<void>((resolve) => {
-        const req = indexedDB.deleteDatabase(HALL_BUFFER_IDB);
+        const req = indexedDB.deleteDatabase(HALL_BUFFER_IDB_STORAGE);
         req.onsuccess = req.onerror = req.onblocked = () => resolve();
       });
     }

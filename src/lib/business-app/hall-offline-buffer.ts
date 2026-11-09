@@ -38,8 +38,8 @@ export const HALL_BUFFER_SWEEP_MS = 30_000;
 /** Without a known length a copy has to stay usable at least this long to be started. */
 export const HALL_BUFFER_DEFAULT_TRACK_MS = 5 * 60_000;
 /** Cache Storage name (never "audiolad-pwa-*": public/sw.js deletes those on activate). */
-export const HALL_BUFFER_CACHE = "audiolad-hall-buffer-v1";
-export const HALL_BUFFER_IDB = "audiolad-hall-buffer";
+export const HALL_BUFFER_CACHE_NAME = "audiolad-hall-buffer-v1";
+export const HALL_BUFFER_IDB_STORAGE = "audiolad-hall-buffer";
 /**
  * Copies held in memory as Blob objects (the sounding track and the next ones): the rest stays on
  * disk only, so a phone never keeps ~60 MB of audio in memory.
