@@ -100,6 +100,37 @@ const at = (html: string, testid: string) => {
   assert.match(source, /scrollIntoView\(/);
 }
 
+// 2b. Hall music switch (Sergey 09.11.2026): a MAX Potok-style left-right switch, not a checkbox.
+{
+  const on = inRouter(<VenueControlPanel locationId="loc-1" pointCanEdit />);
+  assert.doesNotMatch(on, /type="checkbox"/, "no checkbox any more");
+  assert.match(on, /<button[^>]*role="switch"[^>]*aria-checked="true"[^>]*data-on="true"[^>]*data-testid="biz-point-can-edit"/);
+  assert.match(on, /id="biz-point-can-edit-label"[^>]*>Разрешить менять музыку с устройства в заведении</);
+  assert.match(on, /aria-labelledby="biz-point-can-edit-label"/);
+  assert.match(on, /business-point-switch__knob/);
+  assert.match(on, />Включено</);
+  assert.match(on, /Больше такой музыки/);
+  assert.doesNotMatch(on, /biz-point-enable/, "no extra button while on");
+
+  const off = inRouter(<VenueControlPanel locationId="loc-1" pointCanEdit={false} />);
+  assert.match(off, /<button[^>]*role="switch"[^>]*aria-checked="false"[^>]*data-on="false"[^>]*data-testid="biz-point-can-edit"/);
+  assert.match(off, />Выключено</, "the off state stays visible");
+  assert.match(off, /data-testid="biz-point-enable"[^>]*>Включить изменения</, "how to turn changes back on");
+  assert.match(off, /Музыку в зале меняете только вы из кабинета/);
+  assert.doesNotMatch(off, /\u2014/);
+  assert.doesNotMatch(on, /\u2014/);
+
+  // A tap only asks: both the switch and «Включить изменения» go through the same confirm.
+  const source = read("src/components/business-app/VenueControlPanel.tsx");
+  assert.match(source, /onClick=\{\(\) => saveFlag\(!allowed\)\}/);
+  assert.match(source, /onClick=\{\(\) => saveFlag\(true\)\}/);
+  assert.match(source, /ask\(next \? "Разрешить устройству в зале менять музыку\?" : "Запретить устройству в зале менять музыку\?", run\)/);
+  assert.match(source, /action: "permission", locationId, allowed: next/);
+  const css = read("src/components/business-app/business-app.css");
+  assert.match(css, /\.business-point-switch__toggle\[data-on="true"\] \{[^}]*flex-direction: row-reverse/, "knob slides right when on");
+  assert.match(css, /\.business-point-switch__toggle \{[^}]*min-height: 44px/);
+}
+
 // 3. Owner flow: «Пересобрать атмосферу» – confirm, owner-only save, then the same queue rebuild.
 {
   const source = read("src/components/business-app/BusinessPlayerSettings.tsx");
@@ -173,7 +204,7 @@ const at = (html: string, testid: string) => {
   assert.doesNotMatch(locked, /<a [^>]*href=/);
   assert.match(locked, /на телефоне владельца, не на этом устройстве/);
   assert.match(locked, /«Настройка» – «Управление кофейней»/);
-  assert.match(locked, /Разрешить менять музыку с устройства в заведении/);
+  assert.match(locked, /переключатель «Разрешить менять музыку с устройства в заведении»/);
   assert.doesNotMatch(locked, /—/);
 }
 

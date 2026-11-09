@@ -25,7 +25,7 @@ export function businessCabinetSide(mode: BusinessCabinetMode): BusinessCabinetS
   return mode === "owner" ? "owner" : "venue";
 }
 
-/** "if_allowed" = the owner's «Разрешить менять настройку на точке» switch decides. */
+/** "if_allowed" = the owner's «Разрешить менять музыку с устройства в заведении» switch decides (missing = on). */
 type Rule = boolean | "if_allowed";
 
 export const BUSINESS_CABINET_PERMISSIONS = {
@@ -47,7 +47,11 @@ export const BUSINESS_CABINET_PERMISSIONS = {
 
   // Music screen.
   playPause: { owner: true, venue: true },
-  trackRatings: { owner: true, venue: false },
+  /**
+   * «Больше / Меньше такой музыки» (Sergey 09.11.2026): staff in the hall steer the stream while the
+   * owner's «Разрешить менять музыку с устройства в заведении» is on (the default). Off – owner only.
+   */
+  trackRatings: { owner: true, venue: "if_allowed" },
   daypartSettings: { owner: true, venue: false },
 
   // Settings screen.
