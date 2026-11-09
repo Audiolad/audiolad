@@ -61,12 +61,14 @@ assert.equal(applyAccessToVenueDots(
 
 type Session = { location_id: string; player_id: string; last_seen_at: string };
 type Playback = { player_id: string; playback_state: string; reported_at: string | null };
+type Runtime = { player_id: string; app_version: string | null };
 
 type LoaderMod = typeof import("../src/lib/business-app/load-venue-status-dots.server");
 
 function loadWithMock(opts: {
   sessions: Session[];
   playback: Playback[];
+  runtime?: Runtime[];
   sessionError?: { message: string } | null;
 }): { mod: LoaderMod; restore: () => void } {
   const require = createRequire(import.meta.url);
@@ -81,6 +83,9 @@ function loadWithMock(opts: {
   };
 
   mock("server-only", {});
+  mock("../src/lib/business-app/hall-server-build.server.ts", {
+    readServerHallBuildId: async () => null,
+  });
   mock("../src/lib/supabase/service-role.ts", {
     createServiceRoleClient: () => ({
       from(table: string) {
@@ -93,6 +98,10 @@ function loadWithMock(opts: {
           }
           if (table === "business_player_playback_state") {
             const rows = opts.playback.filter((p) => !state.players || state.players.includes(p.player_id));
+            return Promise.resolve({ data: rows, error: null });
+          }
+          if (table === "business_player_runtime") {
+            const rows = (opts.runtime ?? []).filter((p) => !state.players || state.players.includes(p.player_id));
             return Promise.resolve({ data: rows, error: null });
           }
           return Promise.resolve({ data: null, error: { message: `unexpected table ${table}` } });
@@ -218,10 +227,50 @@ const isoAgo = (seconds: number) => new Date(nowMs - seconds * 1000).toISOString
   } finally { restore(); }
 }
 
+{
+  const SHA_OLD = "c".repeat(40);
+  const SHA_NEW = "d".repeat(40);
+  const { mod: { loadVenueStatusDots }, restore } = loadWithMock({
+    sessions: [{ location_id: LOC_A, player_id: PLAYER_A, last_seen_at: isoAgo(10) }],
+    playback: [{ player_id: PLAYER_A, playback_state: "playing", reported_at: isoAgo(15) }],
+    runtime: [{ player_id: PLAYER_A, app_version: SHA_OLD }],
+  });
+  try {
+    const rows = await loadVenueStatusDots({
+      organizationId: ORG, locationIds: [LOC_A], nowMs, serverBuildId: SHA_NEW,
+    });
+    assert.equal(rows[0]?.staleBuild, true, "older app_version → staleBuild");
+    assert.equal(rows[0]?.color, "green", "stale build does not override green playing");
+  } finally { restore(); }
+}
+
+{
+  const SHA = "e".repeat(40);
+  const { mod: { loadVenueStatusDots }, restore } = loadWithMock({
+    sessions: [{ location_id: LOC_A, player_id: PLAYER_A, last_seen_at: isoAgo(10) }],
+    playback: [{
+      player_id: PLAYER_A,
+      playback_state: "playing",
+      reported_at: isoAgo(BUSINESS_LIVE_CONNECTIVITY_SECONDS + 30),
+    }],
+    runtime: [{ player_id: PLAYER_A, app_version: SHA }],
+  });
+  try {
+    const rows = await loadVenueStatusDots({
+      organizationId: ORG, locationIds: [LOC_A], nowMs, serverBuildId: SHA,
+    });
+    assert.equal(rows[0]?.color, "yellow", "stale playing → yellow unconfirmed");
+    assert.match(rows[0]?.label ?? "", /не подтверждено/);
+    assert.equal(rows[0]?.staleBuild, false);
+  } finally { restore(); }
+}
+
 const slotsSrc = readFileSync(new URL("../src/components/business-app/BusinessPointSlots.tsx", import.meta.url), "utf8");
 const cssSrc = readFileSync(new URL("../src/components/business-app/business-app.css", import.meta.url), "utf8");
 
 assert.match(slotsSrc, /data-testid="biz-venue-status-legend"/, "legend present");
+assert.match(slotsSrc, /HALL_STALE_BUILD_NOTE/);
+assert.match(slotsSrc, /biz-venue-stale-build-notes/);
 assert.match(slotsSrc, /aria-label="Обозначения статуса точек"/);
 assert.match(slotsSrc, /VENUE_STATUS_LEGEND\.map/);
 assert.match(slotsSrc, /aria-label=\{ariaLabel\}/);

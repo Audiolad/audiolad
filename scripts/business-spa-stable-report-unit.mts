@@ -102,26 +102,30 @@ assert.equal(resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/api/business/player
   assert.deepEqual(await fetchSpaTrackUrl(TRACK, (async () => new Response("<html>404", { status: 404 })) as typeof fetch), { ok: false, reason: "network" });
 }
 
-// New build detection: hint once, never reload.
+// New build detection: notify once with the server build id (caller decides when to reload).
 {
   const commits = ["a".repeat(40), "a".repeat(40), "b".repeat(40), "c".repeat(40)];
   let tick: () => void = () => {};
   let hits = 0;
+  let seen = "";
   const f = (async () => new Response(JSON.stringify({ deployCommit: commits.shift() }))) as typeof fetch;
-  const stop = watchSpaBuild(() => hits++, { f, setInterval: (fn) => { tick = fn; return 1; }, clearInterval: () => {} });
+  const stop = watchSpaBuild((id) => { hits++; seen = id; }, { f, setInterval: (fn) => { tick = fn; return 1; }, clearInterval: () => {} });
   const flush = () => new Promise((r) => setTimeout(r, 0));
   await flush(); tick(); await flush(); assert.equal(hits, 0);
   tick(); await flush(); assert.equal(hits, 1);
+  assert.equal(seen, "b".repeat(40));
   tick(); await flush(); assert.equal(hits, 1, "only once");
   stop();
 }
 
-// The /spa player no longer depends on build-specific server actions and never auto-reloads.
+// The /spa player no longer depends on build-specific server actions.
+// Safe reload is gated by shouldReloadForNewBuild (paused / track boundary only).
 const player = readFileSync("src/components/business-app/SpaOnlinePlayer.tsx", "utf8");
 assert.doesNotMatch(player, /spa\/actions/);
-assert.doesNotMatch(player, /location\.reload|router\.refresh|location\.href\s*=/);
+assert.match(player, /shouldReloadForNewBuild/);
+assert.match(player, /location\.reload/);
 const client = readFileSync("src/lib/business-app/spa-player-client.ts", "utf8");
-assert.doesNotMatch(client, /reload\(|location\.href\s*=/);
+assert.doesNotMatch(client, /reload\(|location\.href\s*=/, "watchSpaBuild itself never reloads");
 // Route handlers keep server-side auth (session context + user-session supabase client).
 const reportRoute = readFileSync("src/app/api/business/player/report/route.ts", "utf8");
 assert.match(reportRoute, /loadSpaPilotContext\(\)\)\?\.playerId/);

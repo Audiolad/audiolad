@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
+import {
+  readReloadedBuildId,
+  rememberReloadedBuildId,
+  shouldReloadForNewBuild,
+} from "@/lib/business-app/hall-build-reload";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
@@ -32,9 +37,51 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   const ctlRef = useRef<Controller | null>(null);
   const [view, setView] = useState<View>(() => ({ items: parseItems(initialManifest), status: "idle", current: null, message: null }));
   const [newBuild, setNewBuild] = useState(false);
+  const pendingBuildRef = useRef<string | null>(null);
+  const justChangedTrackRef = useRef(false);
+  const lastTrackRef = useRef<string | null>(null);
 
-  // A newer deploy only shows a gentle hint; never auto-reload (music must not stop).
-  useEffect(() => watchSpaBuild(() => setNewBuild(true)), []);
+  // Newer deploy: reload only when visible and (paused OR right after a track change).
+  useEffect(() => {
+    const tryReload = () => {
+      const pending = pendingBuildRef.current;
+      if (!pending || typeof window === "undefined") return;
+      const audio = audioRef.current;
+      const ctl = ctlRef.current;
+      const musicPaused = !audio || audio.paused || audio.ended
+        || !ctl || ctl.status === "paused" || ctl.status === "idle"
+        || ctl.status === "error" || ctl.status === "no_access";
+      const already = readReloadedBuildId(window.sessionStorage);
+      const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
+      if (!shouldReloadForNewBuild({
+        pageVisible,
+        musicPaused,
+        justChangedTrack: justChangedTrackRef.current,
+        pendingServerBuild: pending,
+        alreadyReloadedFor: already,
+      })) return;
+      rememberReloadedBuildId(window.sessionStorage, pending);
+      pendingBuildRef.current = null;
+      window.location.reload();
+    };
+    const stop = watchSpaBuild((serverBuild) => {
+      setNewBuild(true);
+      pendingBuildRef.current = serverBuild || "new";
+      tryReload();
+    });
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") tryReload();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisible);
+    }
+    return () => {
+      stop();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -82,10 +129,53 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
             });
             const track = c.current?.audioItemId ?? null;
             if (c.status === "loading" || (c.status === "paused" && audio.paused) || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
+            if (track && track !== lastTrackRef.current) {
+              const hadPrevious = lastTrackRef.current != null;
+              lastTrackRef.current = track;
+              if (hadPrevious) {
+                justChangedTrackRef.current = true;
+                if (pendingBuildRef.current && typeof window !== "undefined") {
+                  const already = readReloadedBuildId(window.sessionStorage);
+                  const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
+                  if (shouldReloadForNewBuild({
+                    pageVisible,
+                    musicPaused: false,
+                    justChangedTrack: true,
+                    pendingServerBuild: pendingBuildRef.current,
+                    alreadyReloadedFor: already,
+                  })) {
+                    rememberReloadedBuildId(window.sessionStorage, pendingBuildRef.current);
+                    pendingBuildRef.current = null;
+                    window.location.reload();
+                    return;
+                  }
+                }
+                if (typeof window !== "undefined") {
+                  window.setTimeout(() => { justChangedTrackRef.current = false; }, 2_500);
+                } else {
+                  justChangedTrackRef.current = false;
+                }
+              }
+            }
             if (c.status !== lastState || track !== lastTrack) {
               lastState = c.status;
               lastTrack = track;
               report();
+            }
+            if ((c.status === "paused" || c.status === "idle") && pendingBuildRef.current && typeof window !== "undefined") {
+              const already = readReloadedBuildId(window.sessionStorage);
+              const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
+              if (shouldReloadForNewBuild({
+                pageVisible,
+                musicPaused: true,
+                justChangedTrack: false,
+                pendingServerBuild: pendingBuildRef.current,
+                alreadyReloadedFor: already,
+              })) {
+                rememberReloadedBuildId(window.sessionStorage, pendingBuildRef.current);
+                pendingBuildRef.current = null;
+                window.location.reload();
+              }
             }
           }
         },
@@ -178,7 +268,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       )}
       {newBuild ? (
         <p className="mt-4 text-[0.82rem] business-app-muted" data-testid="spa-new-build">
-          Доступна новая версия страницы. Музыка продолжит играть; обновите страницу, когда будет удобно.
+          Доступна новая версия. Страница обновится сама на паузе или после смены трека.
         </p>
       ) : null}
       <audio ref={audioRef} preload="none" playsInline />

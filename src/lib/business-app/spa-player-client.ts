@@ -36,11 +36,11 @@ export async function fetchSpaManifest(f: Fetch = fetch): Promise<Result<unknown
 }
 
 /**
- * Detects a newer deploy (via /api/health/build) and calls onNewBuild once. Never reloads:
- * the UI only shows a gentle hint so music is not interrupted.
+ * Detects a newer deploy (via /api/health/build) and calls onNewBuild once with the
+ * server build id. The caller decides when it is safe to reload (never mid-track).
  */
 export function watchSpaBuild(
-  onNewBuild: () => void,
+  onNewBuild: (serverBuildId: string) => void,
   opts: { f?: Fetch; setInterval?: (fn: () => void, ms: number) => unknown; clearInterval?: (t: unknown) => void; intervalMs?: number } = {},
 ): () => void {
   const f = opts.f ?? fetch;
@@ -53,10 +53,13 @@ export function watchSpaBuild(
     try {
       const res = await f("/api/health/build", { cache: "no-store" });
       if (!res.ok) return;
-      const commit = ((await res.json()) as { deployCommit?: unknown }).deployCommit;
-      if (typeof commit !== "string" || !commit) return;
+      const json = (await res.json()) as { deployCommit?: unknown; buildId?: unknown };
+      const commit = typeof json.deployCommit === "string" && json.deployCommit
+        ? json.deployCommit
+        : (typeof json.buildId === "string" ? json.buildId : null);
+      if (!commit) return;
       if (initial === undefined) initial = commit;
-      else if (commit !== initial) { done = true; onNewBuild(); }
+      else if (commit !== initial) { done = true; onNewBuild(commit); }
     } catch { /* offline: try later */ }
   };
   void check();

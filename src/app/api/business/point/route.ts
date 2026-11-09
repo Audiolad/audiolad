@@ -23,6 +23,8 @@ import { businessTrialActivityConfig } from "@/lib/business-trial-activity/confi
 import { recordBusinessTrialPointListen } from "@/lib/business-trial-activity/record.server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { normalizeHallAppVersion } from "@/lib/business-app/hall-build-reload";
+import { readServerHallBuildId } from "@/lib/business-app/hall-server-build.server";
 
 /** Log the collapsed client IP once per server process, not on every attempt. */
 let warnedCollapsedIp = false;
@@ -79,6 +81,31 @@ async function writeHallNowPlaying(
       reported_at: new Date().toISOString(),
     }, { onConflict: "player_id" });
   } catch { /* best effort */ }
+}
+
+/**
+ * Persist the hall client's build id into business_player_runtime.app_version.
+ * Column already exists (foundation migration) – no schema change. Best effort.
+ */
+async function writePlayerAppVersion(token: string, appVersion: string): Promise<void> {
+  try {
+    const admin = createServiceRoleClient();
+    const { data: session, error: sessionError } = await admin
+      .from("business_point_sessions")
+      .select("player_id")
+      .eq("token_hash", `\\x${pointTokenHashHex(token)}`)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (sessionError || !session) return;
+    const playerId = (session as { player_id: string }).player_id;
+    if (!playerId) return;
+    await admin
+      .from("business_player_runtime")
+      .update({ app_version: appVersion })
+      .eq("player_id", playerId);
+  } catch {
+    /* best effort */
+  }
 }
 
 function json(body: unknown, status = 200, extra?: { token?: string; secure?: boolean }) {
@@ -419,7 +446,14 @@ export async function POST(request: Request) {
     if (!error && report?.state === "playing" && report.playingConfirmed && businessTrialActivityConfig(process.env).enabled) {
       after(() => recordBusinessTrialPointListen(token));
     }
-    return json(error ? { ok: false, reason: "report_failed" } : { ok: true, data: null });
+    const appVersion = normalizeHallAppVersion(body.appVersion);
+    if (!error && appVersion) {
+      await writePlayerAppVersion(token, appVersion);
+    }
+    const serverBuildId = await readServerHallBuildId();
+    return json(error
+      ? { ok: false, reason: "report_failed" }
+      : { ok: true, data: null, serverBuildId });
   }
 
   return json({ ok: false, reason: "invalid_request" }, 400);

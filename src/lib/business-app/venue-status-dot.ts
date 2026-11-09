@@ -25,6 +25,11 @@ export type VenueStatusDotInput = {
   accessLive: boolean;
   /** Override freshness window (tests); default = hall mirror 75s. */
   freshSeconds?: number;
+  /**
+   * Heartbeat is fresh but a "playing" report is too old (unconfirmed).
+   * Shown yellow – never green – consistent with #1194 stale-playing rule.
+   */
+  unconfirmedPlaying?: boolean;
 };
 
 export const VENUE_STATUS_LEGEND: ReadonlyArray<VenueStatusDot> = [
@@ -61,6 +66,11 @@ export function deriveVenueStatusDot(input: VenueStatusDotInput): VenueStatusDot
     return { color: "green", label: "музыка играет" };
   }
 
+  // Stale "playing" with a live heartbeat: yellow unconfirmed, never green (#1194 / t1325u).
+  if (fresh && input.unconfirmedPlaying) {
+    return { color: "yellow", label: "воспроизведение не подтверждено" };
+  }
+
   if (fresh) {
     if (input.playbackState === "paused") {
       return { color: "yellow", label: "музыка на паузе" };
@@ -75,6 +85,8 @@ export type VenueStatusDotRow = {
   locationId: string;
   color: VenueStatusColor;
   label: string;
+  /** Hall device JS is older than the current server build. */
+  staleBuild?: boolean;
 };
 
 /** Apply account access on top of server rows (client already knows chrome access). */
@@ -85,7 +97,8 @@ export function applyAccessToVenueDots(
   if (accessLive) return rows.map((row) => ({ ...row }));
   return rows.map((row) => ({
     locationId: row.locationId,
-    color: "red",
+    color: "red" as const,
     label: "закончился доступ",
+    staleBuild: row.staleBuild === true,
   }));
 }
