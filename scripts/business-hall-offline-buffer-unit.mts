@@ -452,6 +452,60 @@ function playThrough(w: ReturnType<typeof playerWorld>, from: number, to: number
   w.p.localExpired("t9"); // not the sounding one: nothing happens
 }
 
+// --- 13b. Review #1 F1 – the real buffer wired like the provider: the controller's own "loading"
+//          change rebuilds the plan before it asks for the copy; the selected copy must survive
+//          and the hall must go on offline from the device.
+{
+  const bw = bufferWorld();
+  const tracks = [item(1), item(2), item(3), item(4)];
+  let ctl: SpaOnlinePlayer | null = null;
+  let online = true;
+  const audio = {
+    src: "", currentTime: 0, paused: true, loop: true,
+    async play() { this.paused = false; },
+    async playInstant() { return this.play(); },
+    pause() { this.paused = true; },
+    removeAttribute() { this.src = ""; },
+    load() {},
+  };
+  const seq = (cur: number, len: number) => (cur < 0 || cur >= len - 1 ? 0 : cur + 1);
+  const plan = () => {
+    if (!ctl) return;
+    const index = ctl.index >= 0 ? ctl.index : 0;
+    bw.b.setPlan(hallBufferPlan(tracks, index, seq), tracks[index]?.audioItemId ?? null);
+  };
+  ctl = new SpaOnlinePlayer({
+    audio,
+    now: () => bw.now(),
+    setTimer: () => ({}),
+    clearTimer: () => {},
+    isOnline: () => online,
+    sign: async (id): Promise<OnlineSignResult> => (online ? { ok: true, data: { url: `https://s/${id}` } } : { ok: false, reason: "network" }),
+    backgroundAdvance: () => true,
+    loopAdvance: () => true,
+    nextIndex: seq,
+    localSource: (id, d) => bw.b.localSource(id, d),
+    onSource: (id) => { if (id) bw.b.pin(id); },
+    onChange: () => plan(),
+  }, tracks);
+  await ctl.toggle();
+  await flush();
+  await bw.b.refill(true);
+  await flush();
+  assert.equal(bw.b.readyCount, 3, "next three on the device");
+  online = false;
+  bw.setOnline(false);
+  for (const expected of ["t2", "t3", "t4"]) {
+    for (let t = 0; t <= 198; t += 0.25) { audio.currentTime = t; ctl.onProgress(t, 200); }
+    audio.currentTime = 0.05;
+    ctl.onSeeking(0.05, 200); // loop wrap
+    await flush();
+    assert.equal(ctl.current?.audioItemId, expected);
+    assert.ok(audio.src.startsWith("blob:"), `${expected} played from the device offline (${audio.src})`);
+    assert.equal(ctl.status, "playing");
+  }
+}
+
 // --- 14. Offline report queue: samples kept in order, flushed on reconnect, drops refused ones.
 {
   const mem = new Map<string, string>();
@@ -459,6 +513,12 @@ function playThrough(w: ReturnType<typeof playerWorld>, from: number, to: number
   let now = 1_000_000;
   const q = new HallReportQueue(storage, () => now);
   const s = (n: number): HallUsageSample => ({ eventId: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, sessionId: "00000000-0000-4000-8000-0000000000aa", seq: n, positionMs: n * 15_000, audioItemId: "00000000-0000-4000-8000-0000000000bb", at: now });
+  // Review #1 F2: an empty flush on mount must not block every later flush.
+  assert.equal(await q.flush(async () => "sent"), 0);
+  q.push(s(1));
+  const firstSent: number[] = [];
+  assert.equal(await q.flush(async (x) => { firstSent.push(x.seq); return "sent"; }), 0);
+  assert.deepEqual(firstSent, [1], "sent after an earlier empty flush");
   q.push(s(1)); q.push(s(2)); q.push(s(3));
   q.push(s(2)); // same event id: once
   assert.equal(q.size, 3);
@@ -511,6 +571,8 @@ function playThrough(w: ReturnType<typeof playerWorld>, from: number, to: number
   assert.match(player, /bufferedCount: mirror \? mirror\.bufferedCount : \(pointReports && online \? bufferedCount : null\)/);
   assert.match(player, /if \(current\.status === "no_access"\) \{\n\s+void bufferRef\.current\?\.purge\(\);/);
   assert.ok(!player.includes("SPA_OFFLINE_ENABLED"), "multi-day offline stays off");
+  assert.match(player, /onNoAccess: \(\) => \{\n\s+void ctlRef\.current\?\.applyManifest\(null\);/, "review #1 F3: buffer no_access stops the hall");
+  assert.match(player, /buffer\.setPlan\(\n\s+hallBufferPlan\([^\n]+\),\n\s+current\.tracks\[index\]\?\.audioItemId \?\? null,/, "selected track kept");
   const sw = readFileSync("public/sw.js", "utf8");
   assert.ok(sw.includes('"/storage/v1/"') && sw.includes('request.headers.get("range")'), "service worker still bypasses audio");
   const ws = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");

@@ -533,7 +533,11 @@ export function BusinessCabinetPlayerProvider({
       const current = modelRef.current;
       if (!buffer || !ctl || !current) return;
       const index = ctl.index >= 0 ? ctl.index : playbackRef.current.index;
-      buffer.setPlan(hallBufferPlan(current.tracks, index, (cur, len) => cafeQueueNextIndex(playOrderRef.current, cur, len)));
+      // The selected track (it may still be loading) keeps its copy until it sounds (review #1 F1).
+      buffer.setPlan(
+        hallBufferPlan(current.tracks, index, (cur, len) => cafeQueueNextIndex(playOrderRef.current, cur, len)),
+        current.tracks[index]?.audioItemId ?? null,
+      );
       void buffer.refill(ctl.status === "playing" || ctl.status === "loading");
     };
   });
@@ -592,6 +596,12 @@ export function BusinessCabinetPlayerProvider({
         isOnline: () => navigator.onLine !== false,
         estimate: storage?.estimate ? () => storage.estimate() : undefined,
         onExpired: (audioItemId) => ctlRef.current?.localExpired(audioItemId),
+        // Review #1 F3: the server refused a buffer download – same as a refused track start:
+        // stop the hall now (the buffer has already purged itself).
+        onNoAccess: () => {
+          void ctlRef.current?.applyManifest(null);
+          (fadeRef.current ?? audioRef.current)?.pause();
+        },
         onChange: () => {
           const current = bufferRef.current;
           setBufferedCount(current && current.supported ? current.readyCount : null);

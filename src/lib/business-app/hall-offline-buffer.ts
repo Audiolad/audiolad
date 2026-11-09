@@ -138,6 +138,11 @@ export class HallOfflineBuffer {
   private plan: string[] = [];
   /** Track the element plays now: kept (and its blob: URL alive) until another one sounds. */
   private pinned: string | null = null;
+  /**
+   * Review #1 F1: track the controller has just selected (it is no longer "next" but not sounding
+   * yet). Its copy must survive the plan rebuild that the selection itself triggers.
+   */
+  private selected: string | null = null;
   private downloading = new Map<string, AbortController>();
   private retryAt = 0;
   private sweepTimer: unknown = null;
@@ -226,10 +231,16 @@ export class HallOfflineBuffer {
     return e.url;
   }
 
-  /** Tracks whose copies are kept in memory: the sounding one and the next HALL_BUFFER_WARM. */
+  /** Copies never evicted by a plan change: the sounding track and the selected one. */
+  private kept(id: string): boolean {
+    return id === this.pinned || id === this.selected;
+  }
+
+  /** Tracks whose copies are kept in memory: sounding, selected and the next HALL_BUFFER_WARM. */
   private warmIds(): string[] {
     const ids = this.plan.slice(0, HALL_BUFFER_WARM);
-    return this.pinned ? [this.pinned, ...ids] : ids;
+    for (const id of [this.selected, this.pinned]) if (id && !ids.includes(id)) ids.unshift(id);
+    return ids;
   }
 
   /**
@@ -241,7 +252,7 @@ export class HallOfflineBuffer {
     if (!store || this.disposed) return;
     const want = this.warmIds();
     for (const [id, e] of this.entries) {
-      if (want.includes(id) || id === this.pinned) continue;
+      if (want.includes(id) || this.kept(id)) continue;
       if (e.url) {
         this.d.revokeUrl(e.url);
         e.url = null;
@@ -276,15 +287,19 @@ export class HallOfflineBuffer {
     if (this.pinned === id) return;
     const old = this.pinned;
     this.pinned = id;
-    if (old && !this.plan.includes(old)) this.evict(old);
+    if (old && !this.plan.includes(old) && !this.kept(old)) this.evict(old);
     void this.warm();
   }
 
-  /** The next tracks changed (advance, queue rebuild / top-up, manifest). Evicts the rest. */
-  setPlan(ids: readonly string[]): void {
+  /**
+   * The next tracks changed (advance, queue rebuild / top-up, manifest). Evicts the rest, except
+   * the sounding track and `selectedId` – the one the controller is starting right now.
+   */
+  setPlan(ids: readonly string[], selectedId: string | null = null): void {
     if (this.disposed) return;
     const max = this.maxTracks;
-    const next = [...new Set(ids)].slice(0, max);
+    const next = [...new Set(ids)].filter((id) => id !== selectedId).slice(0, max);
+    this.selected = selectedId;
     this.plan = next;
     for (const [id, ctl] of this.downloading) {
       if (!next.includes(id)) {
@@ -293,7 +308,7 @@ export class HallOfflineBuffer {
       }
     }
     for (const id of [...this.entries.keys()]) {
-      if (id !== this.pinned && !next.includes(id)) this.evict(id);
+      if (!this.kept(id) && !next.includes(id)) this.evict(id);
     }
     void this.warm();
     this.d.onChange?.();
@@ -319,6 +334,9 @@ export class HallOfflineBuffer {
       } catch {
         got = null;
       }
+      // Review #1: purged / disposed while reading – never bring a copy back.
+      if (this.disposed || gen !== this.generation) return;
+      if (this.entries.has(id)) continue;
       if (!got || !(got.downloadedAt > 0) || this.usableUntil(id, got.downloadedAt) <= this.now()) {
         void store.delete(id).catch(() => {});
         continue;
@@ -400,6 +418,7 @@ export class HallOfflineBuffer {
     if (!id) return;
     const budget = await this.budget();
     if (this.disposed || this.downloading.has(id) || this.has(id) || !this.plan.includes(id)) return;
+    if (this.downloading.size >= limit) return; // another refill started meanwhile
     if (this.bytes() + this.avgSize > budget) return; // N shrinks to what the device can hold
     const gen = this.generation;
     const abort = new AbortController();

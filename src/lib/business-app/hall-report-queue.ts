@@ -83,27 +83,29 @@ export class HallReportQueue {
   /** Sends queued samples oldest first; stops at the first network failure. Returns how many left. */
   flush(send: (sample: HallUsageSample) => Promise<HallUsageSendResult>): Promise<number> {
     if (this.flushing) return this.flushing;
-    const run = (async () => {
-      try {
-        for (;;) {
-          const list = this.read();
-          const head = list[0];
-          if (!head) return 0;
-          let result: HallUsageSendResult;
-          try {
-            result = await send(head);
-          } catch {
-            result = "retry";
-          }
-          if (result === "retry") return list.length;
-          // Re-read: samples may have been queued meanwhile.
-          this.write(this.read().filter((s) => s.eventId !== head.eventId));
-        }
-      } finally {
-        this.flushing = null;
-      }
-    })();
+    const run = this.drain(send);
+    // Review #1 F2: cleared only after it is stored (an empty queue finishes synchronously).
     this.flushing = run;
+    void run.then(() => {
+      if (this.flushing === run) this.flushing = null;
+    });
     return run;
+  }
+
+  private async drain(send: (sample: HallUsageSample) => Promise<HallUsageSendResult>): Promise<number> {
+    for (;;) {
+      const list = this.read();
+      const head = list[0];
+      if (!head) return 0;
+      let result: HallUsageSendResult;
+      try {
+        result = await send(head);
+      } catch {
+        result = "retry";
+      }
+      if (result === "retry") return list.length;
+      // Re-read: samples may have been queued meanwhile.
+      this.write(this.read().filter((s) => s.eventId !== head.eventId));
+    }
   }
 }
