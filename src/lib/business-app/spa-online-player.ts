@@ -62,6 +62,13 @@ export type OnlineDeps = {
   random?: () => number;
   /** Browser connectivity hint (tests). Default navigator.onLine, true when unknown. */
   isOnline?: () => boolean;
+  /**
+   * t1303u (Sergey 09.11.2026): true while the page is hidden on a browser that cannot be
+   * trusted to start the next track after the element has ended (iPhone / iPad with the
+   * screen locked). Then the next track is handed over shortly before the end, while the
+   * element still plays, and the boundary never waits for the network. Omitted: false.
+   */
+  backgroundAdvance?: () => boolean;
 };
 
 export const RECOVERY_BASE_MS = 1_000;
@@ -82,6 +89,16 @@ export const PRESIGN_MAX_AGE_MS = 30 * 60_000;
 export const PRESIGN_REFRESH_AGE_MS = 20 * 60_000;
 /** After a failed pre-sign, try again no sooner than this (progress events come ~4/s). */
 export const PRESIGN_RETRY_MS = 10_000;
+/**
+ * Locked iPhone (t1303u): the next track takes over this many seconds before the current one
+ * ends, while the element is still playing (no silent gap after "ended" in which iOS may
+ * refuse to start a new source). Only with `backgroundAdvance()` and a ready pre-sign.
+ */
+export const EARLY_HANDOFF_SEC = 0.75;
+/** No early handoff before this much of a track has played (bogus early durations). */
+export const EARLY_HANDOFF_MIN_PLAYED_SEC = 5;
+/** Element duration further than this from the catalog length: no early handoff ("ended" only). */
+export const EARLY_HANDOFF_DURATION_TOLERANCE_SEC = 2;
 /** Audio errors on one track while the browser is online before the track is skipped. */
 export const RECOVERY_SKIP_AFTER_ERRORS = 4;
 export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
@@ -140,6 +157,8 @@ export class SpaOnlinePlayer {
   private presigning: string | null = null;
   private presignRetryAt = 0;
   private presigned: { audioItemId: string; url: string; at: number } | null = null;
+  /** `op` of the track already handed over early (one handoff per started track). */
+  private handoffOp = -1;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -381,8 +400,67 @@ export class SpaOnlinePlayer {
     if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
     if (this.errorRetries > 0 && positionSec - this.healthyFrom >= RECOVERY_HEALTHY_SEC) this.errorRetries = 0;
     if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
-    void durationSec;
     this.prefetchNext();
+    this.maybeHandoff(positionSec, durationSec);
+  }
+
+  /**
+   * The queue changed (sound / daypart rebuild, staff «Больше / Меньше», owner order): sign
+   * the new next track at once instead of waiting for the next progress event.
+   */
+  queueChanged(): void {
+    // A link signed for the old next track must never stand in for the new one (a track
+    // removed by «Меньше такой музыки» would play, then the kept one would repeat).
+    const p = this.presigned;
+    if (p && p.audioItemId !== this.nextTargetId()) this.presigned = null;
+    this.prefetchNext();
+  }
+
+  /** Track the queue plays after the current one (null: none / same track). */
+  private nextTargetId(): string | null {
+    const target = this.nextTarget();
+    const next = target >= 0 ? this.items[target] : null;
+    if (!next || next.audioItemId === this.current?.audioItemId) return null;
+    return next.audioItemId;
+  }
+
+  private inBackground(): boolean {
+    try {
+      return this.d.backgroundAdvance?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Fresh pre-signed URL for this track, without taking it. */
+  private readyFor(id: string): boolean {
+    const p = this.presigned;
+    return !!p && p.audioItemId === id && this.now() - p.at <= PRESIGN_MAX_AGE_MS;
+  }
+
+  /**
+   * Locked iPhone (t1303u): switch to the pre-signed next track in the last EARLY_HANDOFF_SEC
+   * of the current one, synchronously inside this media event, while the element still plays.
+   * Nothing here waits for a timer or the network; "ended" stays the fallback.
+   */
+  private maybeHandoff(positionSec: number, durationSec: number): void {
+    if (this.switching || this.leaving || this.handoffOp === this.op) return;
+    if (!Number.isFinite(positionSec) || !Number.isFinite(durationSec) || durationSec <= 0) return;
+    if (positionSec < EARLY_HANDOFF_MIN_PLAYED_SEC || durationSec - positionSec > EARLY_HANDOFF_SEC) return;
+    if (!this.inBackground()) return;
+    const cur = this.current;
+    // A misjudged element duration (VBR MP3 without a header) must not cut the track early:
+    // where the catalog knows the length, the element has to agree with it.
+    const known = cur?.durationSeconds;
+    if (typeof known === "number" && Number.isFinite(known) && known > 0 &&
+      Math.abs(known - durationSec) > EARLY_HANDOFF_DURATION_TOLERANCE_SEC) return;
+    const target = this.nextTarget();
+    const next = target >= 0 ? this.items[target] : null;
+    if (!cur || !next || next.audioItemId === cur.audioItemId || !this.readyFor(next.audioItemId)) return;
+    if (this.expired(next)) return;
+    this.handoffOp = this.op;
+    this.retryTrackId = null;
+    void this.playIndex(target, true);
   }
 
   /**
@@ -418,6 +496,8 @@ export class SpaOnlinePlayer {
       if (!r.ok) return failed();
       if (this.presigning === id) this.presigning = null;
       this.presignRetryAt = 0;
+      // The queue moved on while this was signing: keep the link of the current next track.
+      if (id !== this.nextTargetId()) return;
       this.presigned = { audioItemId: id, url: r.data.url, at: this.now() };
     }, failed);
   }
@@ -677,6 +757,8 @@ export class SpaOnlinePlayer {
 
   private advance(instant: boolean): Promise<void> {
     if (this.items.length === 0) return Promise.resolve();
+    // Always the queue's own next track (#1190 «Больше / Меньше» stays in force): a link signed
+    // for another track is never played instead. Without a ready link the boundary signs.
     return this.playIndex(this.nextTarget(), instant);
   }
 
