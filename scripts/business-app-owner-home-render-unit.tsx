@@ -17,7 +17,7 @@ import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-hom
 
 const context: Extract<BusinessOwnerHomeContext, { status: "authenticated" }> = {
   status: "authenticated",
-  owner: { userId: "owner", firstName: "Анна" },
+  owner: { userId: "owner", firstName: "Анна", lastName: "Иванова" },
   organizationId: "org", organizationName: "Организация",
   location: { id: "loc", organizationId: "org", name: "Тестовая точка", addressLine1: null, businessCategory: "spa", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
   canPay: true,

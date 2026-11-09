@@ -80,7 +80,7 @@ const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward()
 const anonymous: Domain = { status: "anonymous" };
 const member: Domain = {
   status: "authenticated",
-  owner: { userId: "u1", firstName: "Анна" },
+  owner: { userId: "u1", firstName: "Анна", lastName: "Иванова" },
   organizationId: "org",
   organizationName: "Кофейня",
   location: { id: "loc", organizationId: "org", name: "Зал", addressLine1: null, businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },

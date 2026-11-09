@@ -39,6 +39,12 @@ export type VenueLicenceView = {
   publicId: string;
   venueName: string;
   address: string | null;
+  /**
+   * Public «Владелец: Имя Фамилия» line for the rights page (Sergey, t1305s9421).
+   * Null when the organization owner has neither name nor surname yet.
+   * Never carries email, phone, user id or hash.
+   */
+  ownerLabel: string | null;
   status: VenueLicenceStatus;
   clock: VenueLicenceClock | null;
   periodStartLabel: string | null;
@@ -51,6 +57,17 @@ function clean(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.replace(/\s+/g, " ").trim();
   return trimmed.length ? trimmed : null;
+}
+
+/** Builds the public «Владелец: …» label. Partial names are fine; empty → null. */
+export function formatVenueOwnerLabel(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string | null {
+  const parts = [clean(input.firstName ?? null), clean(input.lastName ?? null)].filter(
+    (part): part is string => part !== null,
+  );
+  return parts.length ? `Владелец: ${parts.join(" ")}` : null;
 }
 
 export function formatVenueName(place: VenuePlaceFields): string {
@@ -107,6 +124,9 @@ export function presentVenueLicence(input: {
   grant: GrantRow | null;
   paidUntil: string | null;
   paidPeriod: PaidWindow | null;
+  /** Organization owner's first/last name from auth metadata (public-safe). */
+  ownerFirstName?: string | null;
+  ownerLastName?: string | null;
 }): VenueLicenceView {
   const confirmed = Boolean(input.grant || input.paidUntil);
   const access = resolveCustomerAccess({
@@ -129,6 +149,10 @@ export function presentVenueLicence(input: {
     publicId: input.publicId,
     venueName: formatVenueName(input.place),
     address: formatVenueAddress(input.place),
+    ownerLabel: formatVenueOwnerLabel({
+      firstName: input.ownerFirstName,
+      lastName: input.ownerLastName,
+    }),
     status,
     clock,
     periodStartLabel: dayLabel(period.start),

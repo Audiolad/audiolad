@@ -52,11 +52,11 @@ const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward()
 
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const signedInNoOrg: BusinessOwnerHomeContext = {
-  status: "authenticated", owner: { userId: "u0", firstName: "Ира" }, location: null, organizationName: null, organizationId: null, canPay: false, offerAccepted: false, signals: null,
+  status: "authenticated", owner: { userId: "u0", firstName: "Ира", lastName: "Иванова" }, location: null, organizationName: null, organizationId: null, canPay: false, offerAccepted: false, signals: null,
 };
 const member: BusinessOwnerHomeContext = {
   status: "authenticated",
-  owner: { userId: "u1", firstName: "Анна" },
+  owner: { userId: "u1", firstName: "Анна", lastName: "Иванова" },
   organizationId: "org", organizationName: "Кофейня",
   location: { id: "loc", organizationId: "org", name: "Зал", addressLine1: null, businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
   canPay: true,

@@ -35,12 +35,16 @@ async function syncSingleVenueOrganizationName(supabase: ServerSupabase, input: 
 }
 
 /**
- * Saves the owner name (auth user_metadata.first_name) and the name of the venue the cabinet
- * shows right now (business_locations.name – the header switcher, «Главная», the hall player).
- * The venue is resolved on the server; ids and roles from the form are never trusted.
- * The rename goes through the existing owner-only `rename_business_location` RPC.
+ * Saves the owner name and required surname (auth user_metadata.first_name / last_name) and the
+ * name of the venue the cabinet shows right now (business_locations.name – the header switcher,
+ * «Главная», the hall player). The venue is resolved on the server; ids and roles from the form
+ * are never trusted. The rename goes through the existing owner-only `rename_business_location` RPC.
+ * Surname is required on save (Sergey, t1305s9421). Existing empty surnames keep music;
+ * the home/profile prompt asks the owner to fill it without blocking playback.
  */
-export async function saveBusinessProfile(input: { ownerName: string; venueName: string | null }) {
+export async function saveBusinessProfile(input: {
+  ownerName: string; ownerSurname: string; venueName: string | null;
+}) {
   const parsed = validateBusinessProfile(input);
   if (!parsed.ok) return parsed;
   if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
@@ -70,14 +74,21 @@ export async function saveBusinessProfile(input: { ownerName: string; venueName:
       venueName,
     });
   }
-  const { error } = await supabase.auth.updateUser({ data: { first_name: parsed.ownerName } });
+  const { error } = await supabase.auth.updateUser({
+    data: { first_name: parsed.ownerName, last_name: parsed.ownerSurname },
+  });
   if (error) {
     // Auth and public data cannot share a transaction. Be explicit about a partial save.
-    return { ok: false, error: "Имя не сохранено. Название кофейни могло сохраниться. Повторите попытку." } as const;
+    return { ok: false, error: "Имя и фамилия не сохранены. Название кофейни могло сохраниться. Повторите попытку." } as const;
   }
   // The client refreshes the RSC payload, including the layout domain provider, without
   // invalidating/remounting the persistent cabinet player.
-  return { ok: true, ownerName: parsed.ownerName, venueName } as const;
+  return {
+    ok: true,
+    ownerName: parsed.ownerName,
+    ownerSurname: parsed.ownerSurname,
+    venueName,
+  } as const;
 }
 
 /**

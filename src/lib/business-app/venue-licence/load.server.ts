@@ -16,6 +16,8 @@ import { presentVenueLicence, type PaidWindow, type VenueLicenceView, type Venue
  * Name and address come from business_locations (name, address_line1/2, city,
  * region, postal_code). address_line1 is the owner-edited street address (P1-12).
  * The clock is the organization owner's gift / payment. The view drops the user id.
+ * The owner's first and last name from auth metadata become the public «Владелец» line
+ * (Sergey, t1305s9421); email, phone and ids never reach the view.
  */
 
 type Db = ReturnType<typeof createServiceRoleClient>;
@@ -58,9 +60,14 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
   let grant: GrantRow | null = null;
   let paidUntil: string | null = null;
   let paidPeriod: PaidWindow | null = null;
+  let ownerFirstName: string | null = null;
+  let ownerLastName: string | null = null;
   if (ownerId) {
     const { data: owner, error: authError } = await db.auth.admin.getUserById(ownerId);
     if (authError || !owner.user) throw new Error("venue_licence_unavailable");
+    const meta = (owner.user.user_metadata ?? {}) as Record<string, unknown>;
+    ownerFirstName = asString(meta.first_name);
+    ownerLastName = asString(meta.last_name);
     ({ grant, paidUntil } = await peekAccessPeriodsWith(createPeekReader(db), {
       userId: ownerId,
       emailHash: hashAccessEmail(owner.user.email),
@@ -94,5 +101,7 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
     grant,
     paidUntil,
     paidPeriod,
+    ownerFirstName,
+    ownerLastName,
   });
 }

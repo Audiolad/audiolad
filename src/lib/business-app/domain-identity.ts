@@ -25,3 +25,21 @@ export function extractBusinessFirstName(input: {
 
   return "";
 }
+
+/** Surname from auth user_metadata.last_name. No full_name / email fallback. */
+export function extractBusinessLastName(input: {
+  metadataLastName?: string | null;
+}): string {
+  return typeof input.metadataLastName === "string" ? input.metadataLastName.trim() : "";
+}
+
+/** «Имя Фамилия» for the public rights page. Skips empty parts; null when both empty. */
+export function formatBusinessOwnerDisplayName(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string | null {
+  const parts = [input.firstName, input.lastName]
+    .map((part) => (typeof part === "string" ? part.replace(/\s+/g, " ").trim() : ""))
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
+}
