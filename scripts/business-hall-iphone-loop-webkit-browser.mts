@@ -45,7 +45,7 @@ const bundle = await build({
       import { lockedAppleScreen } from "./src/lib/business-app/hall-media-session";
       export function start(catalogSeconds) {
         const el = document.querySelector("audio");
-        const loopMode = prepareLoopAudio(el, navigator);
+        const loopMode = prepareLoopAudio(el, navigator, true);
         const fader = new FadingAudio(el);
         const events = [];
         const ctl = new SpaOnlinePlayer({
