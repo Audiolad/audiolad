@@ -1,4 +1,5 @@
--- Disposable smoke for 20270218120000_business_offer_editions.sql. Rolls back.
+-- Disposable smoke for 20270218120000_business_offer_editions.sql and the edition 2 seed
+-- (20270303120000_business_offer_edition_2.sql). Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;
 -- Minimal Auth fixture in CI compile lacks these GoTrue columns (rolled back with the smoke).
@@ -16,6 +17,8 @@ DECLARE
   v_org_guest uuid := gen_random_uuid();
   v_offer_version constant text := 'offer-v1-2026-11-04';
   v_offer_hash constant text := '9d4046f36c20f5702697eac0af26de1c3579c6929c61d8ac4441c0b39617c7dc';
+  v_offer2_version constant text := 'offer-v2-2026-11-09';
+  v_offer2_hash constant text := 'fb57866ccb90a333fd240bfcb2b3c85bacf12e8751bac1bbfab8946c6930105b';
   v_annex_version constant text := 'r8-2026-10-18';
   v_annex_hash constant text := '0fbbfe610f344920a084e58b5987cce5f4d7033528abc8760aac07b89de7078a';
   v_accepted boolean;
@@ -183,6 +186,42 @@ BEGIN
   WHERE a.document_version = v_offer_version AND a.content_hash = v_offer_hash;
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'owner acceptance not visible to the owner';
+  END IF;
+  -- Edition 2: the owner of edition 1 accepts the new edition once more, for the same account.
+  BEGIN
+    PERFORM * FROM public.accept_business_offer_edition(
+      'business-offer', v_offer2_version, v_offer_hash, v_annex_version, v_annex_hash
+    );
+    RAISE EXCEPTION 'edition 2 accepted with the edition 1 hash';
+  EXCEPTION
+    WHEN invalid_parameter_value THEN
+      IF SQLERRM NOT LIKE '%offer_document_unknown%' THEN
+        RAISE;
+      END IF;
+  END;
+  SELECT r.already_accepted INTO v_accepted
+  FROM public.accept_business_offer_edition(
+    'business-offer', v_offer2_version, v_offer2_hash, v_annex_version, v_annex_hash
+  ) AS r;
+  IF v_accepted THEN
+    RAISE EXCEPTION 'edition 2 looked accepted before the owner accepted it';
+  END IF;
+  SELECT r.already_accepted INTO v_accepted
+  FROM public.accept_business_offer_edition(
+    'business-offer', v_offer2_version, v_offer2_hash, v_annex_version, v_annex_hash
+  ) AS r;
+  IF NOT v_accepted THEN
+    RAISE EXCEPTION 'edition 2 was accepted twice';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.business_offer_edition_acceptances_for_caller();
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'owner should keep edition 1 and add edition 2, rows: %', v_count;
+  END IF;
+  SELECT count(*) INTO v_count
+  FROM public.business_offer_edition_acceptances_for_caller() AS a
+  WHERE a.document_version = v_offer_version AND a.content_hash = v_offer_hash;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'edition 1 acceptance changed after edition 2';
   END IF;
   RESET ROLE;
 

@@ -24,7 +24,7 @@ export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_
 export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Бизнес»";
 
 export const BUSINESS_OFFER_SUMMARY =
-  "Основной договор: 7 дней в подарок, 799 ₽ за точку на 30 дней, разовые оплаты, продление и возврат. Остальные документы – его приложения.";
+  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Остальные документы – его приложения.";
 
 export const BUSINESS_ONBOARDING_HREF = "/onboarding";
 

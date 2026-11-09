@@ -12,7 +12,7 @@ import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } fro
 
 export const dynamic = "force-dynamic";
 
-const DESCRIPTION = "Договор-оферта сервиса «АудиоЛад Бизнес»: 7 дней в подарок, 799 ₽ за точку на 30 дней, разовые оплаты, продление и возврат.";
+const DESCRIPTION = "Договор-оферта сервиса «АудиоЛад Бизнес»: 7 дней в подарок, разовые оплаты, продление и возврат. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${BUSINESS_OFFER_TITLE} – ${BUSINESS_OFFER_EDITION.label}`;

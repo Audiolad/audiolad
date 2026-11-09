@@ -68,6 +68,17 @@ assert.equal(BUSINESS_OFFER_HREF, "/documents/business-offer");
 const text = file;
 // Edition 2 (Sergey 09.11.2026): no fixed price in the offer; the current tariff is shown in the cabinet.
 assert.doesNotMatch(text, /\d+\s*₽/, "no fixed price in the offer text");
+{
+  // Delta review note 1: no fixed price next to the offer either (documents list, page description).
+  const { BUSINESS_OFFER_SUMMARY } = await import("../src/lib/business/offer");
+  const pageSrc = readFileSync("src/app/business-app/documents/business-offer/page.tsx", "utf8");
+  const description = pageSrc.match(/const DESCRIPTION = "([^"]+)"/)?.[1] ?? "";
+  for (const [label, t] of [["summary", BUSINESS_OFFER_SUMMARY], ["description", description]] as const) {
+    assert.doesNotMatch(t, /₽|\d{3,}/, `${label}: no fixed price`);
+    assert.match(t, /Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты\./, label);
+    assert.doesNotMatch(t, /—/, label);
+  }
+}
 assert.match(text, new RegExp(`Стоимость доступа к одной точке на ${BUSINESS_PAID_PERIOD_DAYS} дней устанавливается действующими тарифами Сервиса`));
 assert.match(text, /Действующий тариф указывается в личном кабинете до оплаты/);
 assert.match(text, /Изменённая стоимость применяется со следующей оплаты, уже оплаченные периоды не пересчитываются/);
