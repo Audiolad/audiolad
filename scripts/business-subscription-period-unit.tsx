@@ -129,7 +129,7 @@ const paidAt = new Date("2026-11-09T10:00:00.000Z");
 {
   const ownerDomain: BusinessOwnerHomeContext = {
     status: "authenticated",
-    owner: { userId: "owner", firstName: "Анна" },
+    owner: { userId: "owner", firstName: "Анна", lastName: "Иванова" },
     organizationId: "org",
     organizationName: "Кафе",
     location: null,
