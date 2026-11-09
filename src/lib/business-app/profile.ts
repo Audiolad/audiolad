@@ -1,13 +1,21 @@
 /** Shared browser/server validation. Limits are Unicode code points after trimming. */
 export const BUSINESS_OWNER_NAME_MAX = 80;
 /** Same limit as `rename_business_location` (business_locations.name). */
-export const BUSINESS_VENUE_NAME_MAX = 120;
+/** Same limit as `rename_business_organization` (business_organizations.name). */
+export const BUSINESS_ORGANIZATION_NAME_MAX = 120;
+/** @deprecated Use BUSINESS_ORGANIZATION_NAME_MAX – kept for older imports. */
+export const BUSINESS_VENUE_NAME_MAX = BUSINESS_ORGANIZATION_NAME_MAX;
 /** Hint in the empty owner name field and in the header switcher. */
 export const BUSINESS_OWNER_NAME_PLACEHOLDER = "Ваше имя";
 /** Profile link that opens the form with the owner name field focused. */
 export const BUSINESS_PROFILE_NAME_HREF = "/profile?edit=name";
 /** Auto name of a new organization and its first venue (guest start, first signup). */
 export const DEFAULT_BUSINESS_ORGANIZATION = "Моя кофейня";
+/** Empty-field placeholder for the account-level cafe / organization name. */
+export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моя кофейня";
+/** Under the organization name field: not a hall name (Sergey, t1316u). */
+export const BUSINESS_ORGANIZATION_NAME_HINT =
+  "Это название кофейни или организации. Названия залов задаются отдельно.";
 export const BUSINESS_OWNER_NAME_FIELD_ID = "business-owner-name";
 
 /** Browser only: scroll the profile owner name field into view and put the cursor there. */
@@ -34,7 +42,7 @@ export const BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT =
 export const BUSINESS_OWNER_SURNAME_REQUIRED_CTA = "Указать фамилию";
 export const BUSINESS_OWNER_SURNAME_REQUIRED_ERROR = "Введите фамилию.";
 export const BUSINESS_PROFILE_LIMITS_TEXT =
-  "Имя и фамилия – до 80 символов, название кофейни – до 120 символов.";
+  "Имя и фамилия – до 80 символов, название – до 120 символов.";
 
 /** Browser only: scroll the surname field into view and put the cursor there. */
 export function focusBusinessOwnerSurnameField() {
@@ -47,13 +55,15 @@ export function focusBusinessOwnerSurnameField() {
 }
 
 /**
- * `venueName: null` means the account has no venue yet (only the name is saved).
- * A venue name is required: the header, the hall player and documents show it.
+ * `organizationName: null` – the account has no organization yet (only the person is saved).
+ * When the organization exists, its account-level name is required and never taken from a hall.
+ * Hall names are edited elsewhere (venue place form); the profile never renames a hall.
  */
 export function validateBusinessProfile(input: unknown) {
-  if (!input || typeof input !== "object" || !("ownerName" in input) || !("venueName" in input) ||
-      typeof input.ownerName !== "string" || (input.venueName !== null && typeof input.venueName !== "string")) {
-    return { ok: false, error: "Проверьте имя, фамилию и название кофейни." } as const;
+  if (!input || typeof input !== "object" || !("ownerName" in input) || !("organizationName" in input) ||
+      typeof input.ownerName !== "string" ||
+      (input.organizationName !== null && typeof input.organizationName !== "string")) {
+    return { ok: false, error: "Проверьте имя, фамилию и название кофейни / организации." } as const;
   }
   // Surname is required (Sergey, t1305s9421). Missing key → empty so the required check fires.
   const rawSurname = "ownerSurname" in input && typeof (input as { ownerSurname?: unknown }).ownerSurname === "string"
@@ -62,26 +72,37 @@ export function validateBusinessProfile(input: unknown) {
       ? null
       : "";
   if (rawSurname === null) {
-    return { ok: false, error: "Проверьте имя, фамилию и название кофейни." } as const;
+    return { ok: false, error: "Проверьте имя, фамилию и название кофейни / организации." } as const;
   }
-  const rawVenue = input.venueName as string | null;
+  const rawOrganization = input.organizationName as string | null;
   // Validate before trim so leading/trailing control characters are rejected too.
-  if (/[<>\p{Cc}\p{Cf}]/u.test(input.ownerName + rawSurname + (rawVenue ?? ""))) {
+  if (/[<>\p{Cc}\p{Cf}]/u.test(input.ownerName + rawSurname + (rawOrganization ?? ""))) {
     return { ok: false, error: "Уберите угловые скобки и управляющие символы." } as const;
   }
   const ownerName = input.ownerName.trim();
   const ownerSurname = rawSurname.trim();
-  const venueName = rawVenue === null ? null : rawVenue.trim();
+  const organizationName = rawOrganization === null ? null : rawOrganization.trim();
   if (
     [...ownerName].length > BUSINESS_OWNER_NAME_MAX ||
     [...ownerSurname].length > BUSINESS_OWNER_SURNAME_MAX ||
-    (venueName !== null && [...venueName].length > BUSINESS_VENUE_NAME_MAX)
+    (organizationName !== null && [...organizationName].length > BUSINESS_ORGANIZATION_NAME_MAX)
   ) {
     return { ok: false, error: BUSINESS_PROFILE_LIMITS_TEXT } as const;
   }
   if (!ownerSurname) return { ok: false, error: BUSINESS_OWNER_SURNAME_REQUIRED_ERROR } as const;
-  if (venueName === "") return { ok: false, error: "Введите название кофейни." } as const;
-  return { ok: true, ownerName, ownerSurname, venueName } as const;
+  if (organizationName === "") {
+    return { ok: false, error: "Введите название кофейни / организации." } as const;
+  }
+  return { ok: true, ownerName, ownerSurname, organizationName } as const;
+}
+
+/**
+ * Value shown in the profile organization field.
+ * Uses only the organization (account) name – never a hall / venue name (Sergey, t1316u).
+ * Missing / blank → empty input with placeholder; do not substitute a venue name.
+ */
+export function businessProfileOrganizationFieldValue(organizationName: string | null | undefined) {
+  return typeof organizationName === "string" ? organizationName.trim() : "";
 }
 
 const KINDS: Record<string, string> = {
