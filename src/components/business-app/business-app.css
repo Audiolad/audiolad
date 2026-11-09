@@ -2238,3 +2238,59 @@
 .business-point-switch > .business-app-btn {
   justify-self: start;
 }
+
+
+/* t1309u – status circles on «Мои точки» (left of venue name so buttons stay aligned). */
+.business-venue-status-btn {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.business-venue-status-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--biz-neutral);
+  box-shadow: 0 0 0 1px var(--biz-neutral-border);
+}
+
+.business-venue-status-dot--green {
+  background: var(--biz-green);
+}
+
+.business-venue-status-dot--yellow {
+  background: var(--biz-yellow);
+}
+
+.business-venue-status-dot--red {
+  background: var(--biz-red);
+}
+
+.business-venue-status-dot--grey {
+  background: var(--biz-neutral);
+}
+
+/* Before first poll: outline only – not the grey «not paired» fill. */
+.business-venue-status-dot--pending {
+  background: transparent;
+  box-shadow: 0 0 0 1.5px var(--biz-neutral-border);
+}
+
+.business-venue-status-legend {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--biz-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.business-venue-status-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
