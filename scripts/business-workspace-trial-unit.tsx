@@ -21,7 +21,7 @@ import BusinessAtmosphereTrackButton from "../src/components/business-app/Busine
 import BusinessPlayerSettings from "../src/components/business-app/BusinessPlayerSettings";
 import { BusinessCabinetModeProvider, BusinessEntryProvider } from "../src/components/business-app/BusinessPointMode";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
-import { musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
+import { BusinessCabinetPlayerProvider, musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
@@ -739,6 +739,36 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(moreBtn, /Больше такой музыки[\s\S]*cafe-queue__glyph/, "the more label sits left of the plus");
   assert.match(moreBtn, /M12 8v8M8 12h8/, "the right button is the plus icon");
   assert.doesNotMatch(moreBtn, /Меньше такой музыки/);
+  // Hall side (Sergey 09.11.2026): more/less follow the owner's switch «Разрешить менять музыку с
+  // устройства в заведении»; preview «как видит точка» shows exactly that.
+  const hallSide = (mode: "point" | "preview", pointCanEdit: boolean) => renderToStaticMarkup(
+    <BusinessCabinetModeProvider value={{
+      mode, pointReports: mode === "point", pointCanEdit,
+      pointVenueName: "Кафе", ownerUnlockUntil: null, canPreview: mode === "preview",
+    }}>
+      <BusinessEntryProvider initialEntry="venue">
+        <BusinessWorkspace model={model({})} />
+      </BusinessEntryProvider>
+    </BusinessCabinetModeProvider>,
+  );
+  assert.match(hallSide("preview", true), /data-testid="biz-cafe-more"/, "switch on: the hall view has more/less");
+  assert.doesNotMatch(hallSide("preview", false), /biz-cafe-feedback|Больше такой музыки/, "switch off: no more/less in the hall");
+  assert.doesNotMatch(hallSide("preview", true), /data-testid="biz-cafe-queue"/, "day-time stays with the owner");
+  assert.match(hallSide("point", true), /data-testid="biz-cafe-more"/, "hall device, switch on");
+  assert.doesNotMatch(hallSide("point", false), /biz-cafe-feedback/, "hall device, switch off");
+  // The reporting hall player waits for its live switch (venue sound poll) before showing them.
+  const reportingHall = renderToStaticMarkup(
+    <BusinessCabinetModeProvider value={{
+      mode: "point", pointReports: true, pointCanEdit: true,
+      pointVenueName: "Кафе", ownerUnlockUntil: null, canPreview: false,
+    }}>
+      <BusinessCabinetPlayerProvider initialModel={model({})} pointReports>
+        <BusinessWorkspace model={model({})} />
+      </BusinessCabinetPlayerProvider>
+    </BusinessCabinetModeProvider>,
+  );
+  assert.match(reportingHall, /data-testid="biz-now-playing"/);
+  assert.doesNotMatch(reportingHall, /biz-cafe-feedback/, "no buttons before the server confirms the switch");
   const feedbackSource = read("src/components/business-app/workspace/CafeQueueControls.tsx");
   assert.match(feedbackSource, /\(\["less", "more"\] as const\)\.map/);
   assert.match(feedbackSource, /onClick=\{\(\) => onFeedback\(kind\)\}/);

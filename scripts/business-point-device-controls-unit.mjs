@@ -49,5 +49,8 @@ assert.match(player, /window.clearInterval\(clockTimer\)/);
 assert.doesNotMatch(player, /seenVersion/);
 // The default parsed profile follows the very same live queue path as saved sound.
 assert.match(player, /latest = pointSoundUpdate\(json\)/);
-assert.match(player, /applySound\(sound, \(daypart\) => rebuildFromProfile\({[\s\S]*?keepCurrent: true/);
+assert.match(player, /applySound\(sound, \(daypart\) => \{[\s\S]*?return rebuildFromProfile\(\{[\s\S]*?feedback: hallFeedbackRef\.current,[\s\S]*?keepCurrent: true/);
+// Staff «Больше / Меньше такой музыки» (09.11.2026): server check first, then the hall's own queue.
+assert.match(player, /if \(!pointReports \|\| !pointCanEdit\) return "failed";/);
+assert.match(player, /steerHall,\n  \};/);
 console.log("business-point-device-controls-unit: ok");

@@ -17,6 +17,10 @@ const QUESTIONS: Record<PointCommandType, string> = {
   next_track: "Включить следующий трек в зале?",
 };
 
+export const POINT_SWITCH_LABEL = "Разрешить менять музыку с устройства в заведении";
+export const POINT_SWITCH_ON_HINT = "Сотрудники в зале могут переключать треки и нажимать «Больше такой музыки» и «Меньше такой музыки».";
+export const POINT_SWITCH_OFF_HINT = "Музыку в зале меняете только вы из кабинета. Чтобы сотрудники снова могли ей управлять, нажмите «Включить изменения».";
+
 export default function VenueControlPanel({
   locationId,
   pointCanEdit,
@@ -163,17 +167,42 @@ export default function VenueControlPanel({
           Следующий трек в зале
         </button>
       </div>
-      <label className="flex items-start gap-3 text-sm leading-6 text-[var(--biz-text)]">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={allowed}
-          disabled={pending || confirm !== null}
-          data-testid="biz-point-can-edit"
-          onChange={(event) => saveFlag(event.target.checked)}
-        />
-        <span>Разрешить менять музыку с устройства в заведении</span>
-      </label>
+      {/* MAX Potok-style switch (Sergey 09.11.2026): both states stay visible; a tap only asks. */}
+      <div className="business-point-switch" data-testid="biz-point-switch" data-allowed={allowed ? "true" : "false"}>
+        <div className="business-point-switch__row">
+          <span id="biz-point-can-edit-label" className="business-point-switch__label">
+            {POINT_SWITCH_LABEL}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowed}
+            aria-labelledby="biz-point-can-edit-label"
+            className="business-point-switch__toggle business-app-focus-ring"
+            data-on={allowed ? "true" : "false"}
+            disabled={pending || confirm !== null}
+            data-testid="biz-point-can-edit"
+            onClick={() => saveFlag(!allowed)}
+          >
+            <span className="business-point-switch__knob" aria-hidden="true" />
+            <span className="business-point-switch__state">{allowed ? "Включено" : "Выключено"}</span>
+          </button>
+        </div>
+        <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-point-switch-hint">
+          {allowed ? POINT_SWITCH_ON_HINT : POINT_SWITCH_OFF_HINT}
+        </p>
+        {allowed ? null : (
+          <button
+            type="button"
+            className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            disabled={pending || confirm !== null}
+            data-testid="biz-point-enable"
+            onClick={() => saveFlag(true)}
+          >
+            Включить изменения
+          </button>
+        )}
+      </div>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         В зале новое звучание начнётся со следующего трека.
       </p>

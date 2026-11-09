@@ -25,7 +25,7 @@ import {
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
-import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
+import { voteCafeFeedback, type CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
 import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
@@ -59,7 +59,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const hostname = useBusinessHostname();
   const guestStartEnabled = useGuestStartEnabled();
   const player = useCabinetPlayer();
-  // Ratings and day-time choices stay with the owner (cabinet-mode.ts), also in the preview.
+  // Day-time choices stay with the owner (cabinet-mode.ts), also in the preview. Ratings are the
+  // owner's and, while the owner's switch is on, the hall's (trackRatings: if_allowed).
   const cabinet = useBusinessCabinetMode();
   const adopt = player.adopt;
   const playIndex = player.playIndex;
@@ -394,7 +395,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               appearance="round"
               size="large"
             />
-            {cabinet.can("trackRatings") ? <CafeTrackFeedback
+            {/* Hall device: the live switch from the venue sound poll, not only the page load. */}
+            {cabinet.can("trackRatings") && (!player.pointDevice || player.canChangeMusic) ? <CafeTrackFeedback
               phase={feedbackPhase}
               busyKind={feedbackBusyKind}
               onFeedback={(kind) => {
@@ -404,6 +406,22 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 feedbackStarted.current = Date.now();
                 setFeedbackPhase("working");
                 setFeedbackBusyKind(kind);
+                if (player.pointDevice) {
+                  // The hall plays its own queue (the queue effect above is the owner's): the vote
+                  // rebuilds the hall queue here, after the server checks the owner's switch.
+                  const ticket = feedbackTicket.current;
+                  const started = feedbackStarted.current;
+                  const votes = voteCafeFeedback(queue.feedback, current.audioItemId, kind);
+                  queue.vote(current.audioItemId, kind);
+                  const daypart = queue.effectiveDaypart;
+                  void player.steerHall(votes, daypart ? { character: queue.profile.character, direction: queue.profile.direction, daypart } : null)
+                    .then((result) => {
+                      if (ticket !== feedbackTicket.current) return;
+                      feedbackPending.current = false;
+                      settleFeedback(ticket, started, result === "applied");
+                    });
+                  return;
+                }
                 queue.vote(current.audioItemId, kind);
               }}
             /> : null}
