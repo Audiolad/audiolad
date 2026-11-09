@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Pay button white price + live countdown</title>
+<style>
+:root{
+  --biz-espresso:#2b1d14;--biz-coffee:#6f4326;--biz-coffee-deep:#573219;
+  --biz-text:#2b1d14;--biz-text-muted:#6b5848;--biz-border:#e4d5c3;
+  --biz-on-accent:#fff8ef;--biz-cream:#f7f1e8;--biz-milk:#fffaf3;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--biz-cream);color:var(--biz-text)}
+.wrap{max-width:720px;margin:0 auto;padding:20px}
+.card{background:var(--biz-milk);border:1px solid var(--biz-border);border-radius:16px;padding:16px}
+h2{margin:0 0 8px;font-size:1.25rem}
+.muted{color:var(--biz-text-muted);font-size:.9rem;margin:0 0 12px}
+.terms{space-y:4px;border:1px solid var(--biz-border);border-radius:12px;padding:12px;font-size:.95rem;line-height:1.5;margin:0 0 12px}
+.terms p{margin:0 0 6px}
+.font-semibold{font-weight:600}
+.business-app-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  min-height:44px;padding:0 1.1rem;border-radius:12px;border:1px solid transparent;
+  font-weight:600;font-size:.95rem;width:100%;cursor:default;
+  background:var(--biz-coffee);color:var(--biz-on-accent);
+}
+.inline{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 8px}
+.nowrap{white-space:nowrap}
+.label{font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--biz-text-muted);margin:0 0 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="label">Подписка – кнопка оплаты со скидкой (t1336u) + живой отсчёт (t1337u)</p>
+  <section class="card" id="podpiska">
+    <h2>Подписка</h2>
+    <p style="font-weight:700;font-size:1.25rem;margin:0">Бесплатный доступ ещё 5 дней</p>
+    <p class="muted">до 14 ноября</p>
+    <div class="terms" data-testid="biz-partner-terms">
+      <p class="font-semibold">Персональное предложение – скидка 50% на первые 3 оплаченных месяца</p>
+      <p><span class="nowrap" data-testid="biz-partner-price"><s style="color:var(--biz-text-muted)">799&nbsp;₽</s> <strong>399&nbsp;₽</strong></span> за точку за 30 дней.</p>
+      <p>Точек: 2. Итого: <span class="nowrap"><s style="color:var(--biz-text-muted)">1598&nbsp;₽</s> <strong>798&nbsp;₽</strong></span> за 30 дней. Одна оплата за все активные точки.</p>
+      <p style="color:var(--biz-text-muted)">Цена действует 3 оплаченных периода по 30 дней с первой оплаты, для всех точек аккаунта.</p>
+      <div data-testid="biz-partner-reservation-block">
+        <p class="font-semibold" role="status" data-testid="biz-partner-countdown" id="countdown">Код действует ещё 71:59:42</p>
+        <p class="font-semibold" role="status" data-testid="biz-partner-reservation">Код закреплён за вами на 72 часа, до 12 ноября, 18:31 по московскому времени – цена <span class="nowrap"><s style="color:var(--biz-text-muted)">799&nbsp;₽</s> <strong>399&nbsp;₽</strong></span> сохранится при оплате. Оставшиеся бесплатные дни не сгорают.</p>
+      </div>
+    </div>
+    <p class="muted" data-testid="biz-home-terms-accepted">Оплата по договору: Договор-оферта «АудиоЛад Бизнес», редакция 2 от 09.11.2026.</p>
+    <button type="button" class="business-app-btn" data-testid="biz-home-pay-button">
+      <span class="inline">
+        <span>Оплатить</span>
+        <span class="nowrap" data-testid="biz-home-pay-button-price">
+          <s class="text-white/75" style="color:rgba(255,255,255,.75)" data-testid="biz-home-pay-button-price-standard">1598&nbsp;₽</s>
+          <strong class="font-bold text-white" style="color:#fff;font-weight:700" data-testid="biz-home-pay-button-price-current">798&nbsp;₽</strong>
+        </span>
+      </span>
+    </button>
+  </section>
+</div>
+<script>
+(function(){
+  // Demo live tick from a fixed reservedUntil so the shot shows HH:MM:SS moving.
+  const until = Date.now() + (71*3600 + 59*60 + 42)*1000;
+  const el = document.getElementById('countdown');
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function tick(){
+    const ms = until - Date.now();
+    if (ms <= 0) { el.textContent = 'Код действует ещё 00:00:00'; return; }
+    const total = Math.floor(ms/1000);
+    const hh = Math.floor(total/3600);
+    const mm = Math.floor((total%3600)/60);
+    const ss = total%60;
+    el.textContent = 'Код действует ещё ' + pad(hh) + ':' + pad(mm) + ':' + pad(ss);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

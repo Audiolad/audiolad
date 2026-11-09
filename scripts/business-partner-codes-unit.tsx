@@ -158,7 +158,9 @@ assert.equal(held?.reservedUntil, "2026-11-12T07:05:00Z");
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")),
   "Код закреплён за вами на 72 часа, до 12 ноября, 10:05 по московскому времени – цена");
 assert.doesNotMatch(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")) ?? "", /оплатите сейчас|оплатите сразу/);
-assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-09T08:00:00Z")), "Код действует ещё 71:05");
+assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-09T08:00:00Z")), "Код действует ещё 71:05:00");
+assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-09T08:00:42Z")), "Код действует ещё 71:04:18", "ticks include seconds from reservedUntil");
+assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-12T07:05:00Z")), null, "exactly at expiry – no countdown");
 assert.equal(partnerReservationCountdownLabel(held, new Date("2026-11-12T08:00:00Z")), null, "no countdown after the hold");
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-12T08:00:00Z")), null, "no note after the hold");
 assert.equal(partnerReservationNoteLead(last), null, "no hold note once the code is bound");
@@ -228,9 +230,16 @@ assert.equal(rows[0].codeDisplay, "ABCD-EFGH-JKMN");
 // t1300u: the personal price is always rendered with the usual price struck through.
 const struck = renderToStaticMarkup(<BusinessStruckPrice standardRub={799} priceRub={399} />);
 assert.match(struck, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>/);
+assert.match(struck, /text-\[var\(--biz-text-muted\)\]/, "default tone keeps muted ink off the button");
+const struckOnButton = renderToStaticMarkup(<BusinessStruckPrice standardRub={1598} priceRub={798} tone="onButton" testId="biz-home-pay-button-price" />);
+assert.match(struckOnButton, /text-white\/75/, "onButton struck is translucent white");
+assert.match(struckOnButton, /font-bold text-white/, "onButton current is white bold");
+assert.doesNotMatch(struckOnButton, /--biz-text/, "onButton does not pull dark card ink");
 const terms = renderToStaticMarkup(<BusinessPartnerTerms quote={reserved} />);
-const heldTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={{ ...held!, reservedUntil: "2099-01-01T09:00:00Z" }} />);
-assert.match(heldTerms, /data-testid="biz-partner-countdown"[^>]*>Код действует ещё/, "live countdown while reserved");
+const heldTerms = renderToStaticMarkup(
+  <BusinessPartnerTerms quote={{ ...held!, reservedUntil: "2099-01-01T09:00:17Z" }} now={new Date("2099-01-01T08:00:00Z")} />,
+);
+assert.match(heldTerms, /data-testid="biz-partner-countdown"[^>]*>Код действует ещё 01:00:17</, "live countdown while reserved includes seconds");
 assert.match(heldTerms, /data-testid="biz-partner-reservation"[^>]*>Код закреплён за вами на 72 часа, до 1 января, 12:00 по московскому времени – цена <span[^>]*><s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong><\/span> сохранится при оплате/, "soft hold note keeps 799 struck through next to 399");
 assert.doesNotMatch(heldTerms, /оплатите сейчас|оплатите сразу/);
 const midTerms = renderToStaticMarkup(<BusinessPartnerTerms quote={mid!} />);
@@ -267,6 +276,8 @@ assert.match(discountedControls, /data-testid="biz-partner-terms"/);
 assert.match(discountedControls, /<s[^>]*>799\u00a0₽<\/s>/, "799 struck through before payment");
 assert.match(discountedControls, /data-testid="biz-home-pay-button-price"/, "pay button shows struck total");
 assert.match(discountedControls, /<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/, "two venues: ~~1598~~ 798 on the button");
+assert.match(discountedControls, /data-testid="biz-home-pay-button-price-standard"[^>]*class="text-white\/75"|class="text-white\/75"[^>]*data-testid="biz-home-pay-button-price-standard"/, "struck total on pay button is translucent white");
+assert.match(discountedControls, /data-testid="biz-home-pay-button-price-current"[^>]*class="font-bold text-white"|class="font-bold text-white"[^>]*data-testid="biz-home-pay-button-price-current"/, "current total on pay button is white bold");
 assert.doesNotMatch(discountedControls, /Автосписания нет[\s\S]*799 ₽ за 30 дней, картой/, "no plain 799 line next to the offer");
 resetPartnerQuoteStore({ status: "ready", quote: mid });
 const midControls = renderToStaticMarkup(<BusinessPayControls {...controls} />);

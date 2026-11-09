@@ -256,19 +256,21 @@ export function partnerReservationNoteLead(quote: PartnerQuote | null, now: Date
   return `Код закреплён за вами на ${PARTNER_CODE_RESERVATION_HOURS} часа, до ${ruMoscowDateTime(quote.reservedUntil)} по московскому времени – цена`;
 }
 
-/** Live «Код действует ещё ЧЧ:ММ» while the 72h reservation is open (t1328u). */
+/** Live «Код действует ещё ЧЧ:ММ:СС» while the 72h reservation is open (t1328u / t1337u). */
 export function partnerReservationCountdownLabel(quote: PartnerQuote | null, now: Date = new Date()): string | null {
   if (!quote || quote.source !== "reserved" || !quote.reservedUntil) return null;
   const until = new Date(quote.reservedUntil).getTime();
   if (!Number.isFinite(until)) return null;
   const ms = until - now.getTime();
   if (ms <= 0) return null;
-  const totalMinutes = Math.floor(ms / 60_000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
   const hh = String(hours).padStart(2, "0");
   const mm = String(minutes).padStart(2, "0");
-  return `Код действует ещё ${hh}:${mm}`;
+  const ss = String(seconds).padStart(2, "0");
+  return `Код действует ещё ${hh}:${mm}:${ss}`;
 }
 
 /**

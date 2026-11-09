@@ -429,6 +429,7 @@ export function BusinessPayControls({
                   standardRub={quote.standardTotalRub}
                   priceRub={quote.totalRub}
                   testId="biz-home-pay-button-price"
+                  tone="onButton"
                 />
               </span>
             ) : (
