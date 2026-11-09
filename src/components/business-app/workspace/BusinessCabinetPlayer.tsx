@@ -626,9 +626,8 @@ export function BusinessCabinetPlayerProvider({
     const fader = new FadingAudio(audio);
     fader.setVolume(playbackRef.current.volume);
     fadeRef.current = fader;
-    // t1314u: iPhone / iPad (home-screen app above all): the element never reaches a natural end,
-    // which would close the iOS audio session for good while the screen is locked (WebKit bug
-    // 261858). The controller switches tracks while the element still plays (hall-loop-audio.ts).
+    // t1314u loop mode (hall-loop-audio.ts) is rolled back (t1335u): prepareLoopAudio returns false
+    // while HALL_LOOP_MODE_ENABLED is off, so iPhone uses the #1192 early handoff + "ended" again.
     const loopMode = prepareLoopAudio(audio, navigator);
     const ctl = new Controller(
       {
