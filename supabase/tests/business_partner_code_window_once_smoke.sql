@@ -46,6 +46,10 @@ UPDATE orders SET status='cancelled' WHERE id=(SELECT v FROM wo WHERE k='o1');
 -- Another code and back: the first code keeps its first end.
 SELECT public.reserve_business_partner_code('JJJJJJJJJJJ2');
 SELECT public.check_test((SELECT reserved_by_user_id IS NULL FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'one code held at a time');
+-- Scope (t1338u «from the first time the account enters the code»): the window is per code and account.
+-- A different personal code has its own 72 hours from its own first entry; it never changes the first code's end.
+SELECT public.check_test((SELECT reserved_until > clock_timestamp()+interval '71 hours' FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'another code: its own 72 hours from its first entry');
+SELECT public.check_test((SELECT expires_at=(SELECT t FROM wo WHERE k='end') FROM business_partner_code_windows WHERE code_id=(SELECT v FROM wo WHERE k='code')), 'another code does not touch the first window');
 SELECT public.reserve_business_partner_code('JJJJJJJJJJJJ');
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'coming back keeps the first end');
 
@@ -66,6 +70,11 @@ DO $$ BEGIN
 END; $$;
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'refused entry changes nothing');
 SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='standard', 'after the end: standard price');
+-- Coming back to the other code keeps its own first end too.
+INSERT INTO wo(k, t) SELECT 'end2', w.expires_at FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='JJJJJJJJJJJ2';
+SELECT public.reserve_business_partner_code('JJJJJJJJJJJ2');
+SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end2') FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'other code: repeat entry keeps its first end');
+UPDATE business_partner_codes SET reserved_by_user_id=NULL, reserved_until=NULL WHERE code='JJJJJJJJJJJ2';
 -- The second owner of the same account: the same 72 hours, no restart.
 SET test.uid='00000000-0000-4000-8000-0000000001a2';
 DO $$ BEGIN

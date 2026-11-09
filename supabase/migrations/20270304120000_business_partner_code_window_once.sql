@@ -17,6 +17,10 @@
 --   3. A trigger on business_partner_codes never lets reserved_until move past the window end
 --      of the holding account. This covers create_business_subscription_order, which used to
 --      push the hold to now + 72 hours when a payment link was opened.
+-- Scope of «once»: per (code, business account), as asked («from the first time the account enters
+-- the code»). A different personal code issued to the same account has its own 72 hours from its own
+-- first entry and never moves the first code's end; the existing rule «one personal price per account»
+-- (entitlement on the first payment) is unchanged.
 -- What does not change: prices, the quote, binding on the first real payment, revoke, another
 -- account taking a code whose hold ran out (existing behaviour), every order and payment.
 --
