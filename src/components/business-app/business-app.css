@@ -2241,8 +2241,7 @@
 
 
 /* t1309u / t1323u – status circles on «Мои точки» (left of venue name).
-   Size 2× and saturated fills: theme --biz-yellow/--biz-green are ink tones and
-   looked brown/muddy on the cream background at 390px. */
+   Size 2×; colours via --biz-status-dot-* (ink --biz-yellow looked brown on cream). */
 .business-venue-status-btn {
   justify-content: flex-start;
   text-align: left;
@@ -2255,29 +2254,29 @@
   width: 1.3rem;
   height: 1.3rem;
   border-radius: 999px;
-  background: #9ca3af;
-  box-shadow: 0 0 0 1px rgba(42, 36, 28, 0.18);
+  background: var(--biz-status-dot-grey);
+  box-shadow: 0 0 0 1px var(--biz-status-dot-grey-ring);
 }
 
 .business-venue-status-dot--green {
-  background: #22c55e;
-  box-shadow: 0 0 0 1px #15803d;
+  background: var(--biz-status-dot-green);
+  box-shadow: 0 0 0 1px var(--biz-status-dot-green-ring);
 }
 
 .business-venue-status-dot--yellow {
   /* Bright yellow + darker ring so it stays yellow (not brown) on beige. */
-  background: #FACC15;
-  box-shadow: 0 0 0 1.5px #A16207;
+  background: var(--biz-status-dot-yellow);
+  box-shadow: 0 0 0 1.5px var(--biz-status-dot-yellow-ring);
 }
 
 .business-venue-status-dot--red {
-  background: #ef4444;
-  box-shadow: 0 0 0 1px #b91c1c;
+  background: var(--biz-status-dot-red);
+  box-shadow: 0 0 0 1px var(--biz-status-dot-red-ring);
 }
 
 .business-venue-status-dot--grey {
-  background: #9ca3af;
-  box-shadow: 0 0 0 1px rgba(42, 36, 28, 0.22);
+  background: var(--biz-status-dot-grey);
+  box-shadow: 0 0 0 1px var(--biz-status-dot-grey-ring);
 }
 
 /* Before first poll: outline only – not the grey «not paired» fill. */

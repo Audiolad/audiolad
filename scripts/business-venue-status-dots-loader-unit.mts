@@ -243,15 +243,21 @@ assert.match(cssSrc, /\.business-venue-status-dot--pending/, "pending outline st
 assert.match(cssSrc, /\.business-venue-status-btn\s*\{[\s\S]*?justify-content:\s*flex-start/);
 assert.match(cssSrc, /\.business-venue-status-legend/);
 
-/* t1323u – dots 2× and clear yellow (not theme ink brown). */
+/* t1323u – dots 2× and clear yellow via status-dot tokens (not theme ink). */
+const themeSrc = readFileSync(new URL("../src/components/business-app/theme/business-theme.css", import.meta.url), "utf8");
 assert.match(cssSrc, /\.business-venue-status-dot\s*\{[\s\S]*?width:\s*1\.3rem/, "dot width 2×");
 assert.match(cssSrc, /\.business-venue-status-dot\s*\{[\s\S]*?height:\s*1\.3rem/, "dot height 2×");
 assert.doesNotMatch(cssSrc, /\.business-venue-status-dot--yellow\s*\{[\s\S]*?var\(--biz-yellow\)/, "yellow must not use theme ink");
-assert.match(cssSrc, /\.business-venue-status-dot--yellow\s*\{[\s\S]*?#FACC15/i, "bright yellow fill");
-assert.match(cssSrc, /\.business-venue-status-dot--yellow\s*\{[\s\S]*?#A16207/i, "yellow darker ring");
-assert.match(cssSrc, /\.business-venue-status-dot--green\s*\{[\s\S]*?#22c55e/i, "saturated green");
-assert.match(cssSrc, /\.business-venue-status-dot--red\s*\{[\s\S]*?#ef4444/i, "saturated red");
-assert.match(cssSrc, /\.business-venue-status-dot--grey\s*\{[\s\S]*?#9ca3af/i, "clear grey");
+assert.match(cssSrc, /\.business-venue-status-dot--yellow\s*\{[\s\S]*?var\(--biz-status-dot-yellow\)/, "yellow uses status-dot token");
+assert.match(cssSrc, /\.business-venue-status-dot--yellow\s*\{[\s\S]*?var\(--biz-status-dot-yellow-ring\)/, "yellow ring token");
+assert.match(cssSrc, /\.business-venue-status-dot--green\s*\{[\s\S]*?var\(--biz-status-dot-green\)/, "green token");
+assert.match(cssSrc, /\.business-venue-status-dot--red\s*\{[\s\S]*?var\(--biz-status-dot-red\)/, "red token");
+assert.match(cssSrc, /\.business-venue-status-dot--grey\s*\{[\s\S]*?var\(--biz-status-dot-grey\)/, "grey token");
 assert.match(cssSrc, /\.business-venue-status-dot--pending\s*\{[\s\S]*?background:\s*transparent/, "pending stays outline");
+assert.match(themeSrc, /--biz-status-dot-yellow:\s*#FACC15/i, "theme bright yellow");
+assert.match(themeSrc, /--biz-status-dot-yellow-ring:\s*#A16207/i, "theme yellow ring");
+assert.match(themeSrc, /--biz-status-dot-green:\s*#22c55e/i, "theme saturated green");
+assert.match(themeSrc, /--biz-status-dot-red:\s*#ef4444/i, "theme saturated red");
+assert.match(themeSrc, /--biz-status-dot-grey:\s*#9ca3af/i, "theme clear grey");
 
 console.log("business-venue-status-dots-loader-unit: ok");
