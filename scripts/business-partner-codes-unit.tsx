@@ -309,6 +309,7 @@ assert.match(landing, /\/profile#podpiska/, "lands on subscription after activat
 assert.match(landing, /Закрепляем скидку/, "waits for reserve before navigate");
 const profileSub = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.match(profileSub, /id="podpiska"/);
+assert.doesNotMatch(profileSub, /window\.location/);
 assert.match(profileSub, /BusinessPartnerHomeBanner/);
 assert.match(card, /BusinessPartnerHomeBanner/, "home shows discount banner");
 assert.match(quoteStore, /refreshPartnerQuoteFromCookie/, "pay UI refreshes quote on mount (t1328u race)");
