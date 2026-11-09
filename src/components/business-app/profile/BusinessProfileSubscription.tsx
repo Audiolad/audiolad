@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BusinessPayControls, useBusinessHomePay } from "@/components/business-app/BusinessHomeAccessCard";
+import BusinessPartnerCodePanel from "@/components/business-app/BusinessPartnerCodePanel";
 import { businessProfileSubscription } from "@/lib/business-app/profile-subscription";
 
 export default function BusinessProfileSubscription({ timezone, nowIso, offerAccepted }: { timezone: string; nowIso: string; offerAccepted: boolean }) {
@@ -22,6 +23,7 @@ export default function BusinessProfileSubscription({ timezone, nowIso, offerAcc
       <BusinessPayControls canPay={canPay} accepted={offerAccepted || accepted} busy={busy} error={error}
         onAccept={accept} onPay={pay} payLabel={summary.button} buttonVariant="cta" showAcceptedNote
         receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null} />
+      <BusinessPartnerCodePanel canPay={canPay} />
     </section>
   );
 }

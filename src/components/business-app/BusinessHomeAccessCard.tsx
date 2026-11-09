@@ -17,6 +17,17 @@ import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-gr
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+import {
+  partnerConfirmedUnitPriceMinor,
+  parsePartnerQuote,
+  partnerQuoteIsDiscounted,
+} from "@/lib/business/partner-codes";
+import {
+  BusinessPartnerFinishedNotice,
+  BusinessPartnerTerms,
+  BusinessStruckPrice,
+} from "@/components/business-app/BusinessPartnerPrice";
+import { getPartnerQuote, setPartnerQuote, usePartnerQuote } from "@/components/business-app/partner-quote-store";
 
 function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): string {
   if (domain.status !== "authenticated" || !domain.pilotSlots) return formatBusinessMonthlyPrice();
@@ -114,15 +125,21 @@ export function useBusinessHomePay() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { "Idempotency-Key": crypto.randomUUID(), "Content-Type": "application/json" },
-        body: JSON.stringify(typedEmail ? { receipt_email: typedEmail } : {}),
+        // The per-venue price shown next to the button; the server refuses any other one.
+        body: JSON.stringify({
+          ...(typedEmail ? { receipt_email: typedEmail } : {}),
+          confirmed_unit_price_minor: partnerConfirmedUnitPriceMinor(getPartnerQuote()),
+        }),
       });
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
         href?: string;
         payment_url?: string;
+        quote?: unknown;
       } | null;
       if (!response.ok || typeof payload?.payment_url !== "string") {
         const next = payErrorFromPayload(payload);
+        if (next.code === "partner_terms_changed") setPartnerQuote(parsePartnerQuote(payload?.quote));
         if (next.code === "receipt_email_required") setAskReceiptEmail(true);
         setError(next);
         setBusy(false);
@@ -157,9 +174,12 @@ export function useBusinessHomePay() {
 /** Owner payment before the first venue. A manager and a venue device do not see the button. */
 export default function BusinessHomeAccessCard() {
   const domain = useBusinessDomain();
-  const totalLabel = businessPaymentLabel(domain);
   const { access, hasTerm, canPay, accepted, busy, error, accept, pay: startPay, askReceiptEmail, receiptEmail, setReceiptEmail } =
     useBusinessHomePay();
+  const quote = usePartnerQuote(canPay);
+  const totalLabel = partnerQuoteIsDiscounted(quote)
+    ? <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-home-offer-price" />
+    : businessPaymentLabel(domain);
 
   if (!hasTerm || !access.endsAt) {
     return null;
@@ -321,12 +341,20 @@ export function BusinessPayControls({
   showAcceptedNote?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const quote = usePartnerQuote(canPay);
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        {businessPaymentNote(domain)}
-      </p>
+      {partnerQuoteIsDiscounted(quote) ? (
+        <BusinessPartnerTerms quote={quote} />
+      ) : (
+        <>
+          <BusinessPartnerFinishedNotice quote={quote} />
+          <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+            {businessPaymentNote(domain)}
+          </p>
+        </>
+      )}
       {accepted ? (
         <>
           <BusinessOfferAcceptedNote />
@@ -393,6 +421,13 @@ export function BusinessPayError({ error }: { error: PayError }) {
     return <p role="alert" data-testid="biz-home-pay-error">Оплата временно недоступна. Попробуйте ещё раз позже.</p>;
   }
   if (error.code === "venue_topup_not_available") return <p role="alert">Новая точка будет включена при следующем продлении. Доплата в текущем периоде пока недоступна.</p>;
+  if (error.code === "partner_terms_changed") {
+    return (
+      <p role="alert" data-testid="biz-home-pay-error">
+        Цена оплаты изменилась. Проверьте условия выше и нажмите кнопку оплаты ещё раз.
+      </p>
+    );
+  }
   if (error.code === "pending_order_mismatch") return <p role="alert">Состав точек изменился. Не оплачивайте прежнюю ссылку; обратитесь в поддержку.</p>;
   return <p role="alert" data-testid="biz-home-pay-error">Не удалось перейти к оплате. Попробуйте ещё раз.</p>;
 }

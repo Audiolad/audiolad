@@ -1,4 +1,5 @@
 import { BUSINESS_OFFER_HREF, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
+import { BUSINESS_PLAN_MONTHLY_PRICE_RUB } from "@/lib/business/plan";
 
 export const BUSINESS_SUBSCRIPTION_ORDER_KIND = "business_subscription";
 
@@ -13,7 +14,22 @@ export type BusinessPayErrorCode =
   | "receipt_email_required"
   | "venue_topup_not_available"
   | "pending_order_mismatch"
+  | "partner_terms_changed"
   | "internal_error";
+
+export const BUSINESS_STANDARD_UNIT_PRICE_MINOR = BUSINESS_PLAN_MONTHLY_PRICE_RUB * 100;
+
+/**
+ * Per-venue price the owner saw next to «Оплатить» (8142d69a). Absent = the standard price
+ * (older clients). Whole rubles in kopecks, never fractions; null = malformed request.
+ */
+export function parseConfirmedUnitPriceMinor(raw: unknown): number | null {
+  if (raw === undefined || raw === null) return BUSINESS_STANDARD_UNIT_PRICE_MINOR;
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 100 || raw > BUSINESS_STANDARD_UNIT_PRICE_MINOR || raw % 100 !== 0) {
+    return null;
+  }
+  return raw;
+}
 
 const RECEIPT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -48,6 +64,8 @@ export function mapBusinessSubscriptionRpcError(message: string): {
   const normalized = message.toLowerCase();
   if (normalized.includes("venue_topup_not_available")) return { status: 409, error: "venue_topup_not_available", href: null };
   if (normalized.includes("pending_order_mismatch")) return { status: 409, error: "pending_order_mismatch", href: null };
+  // 8142d69a: the per-venue price changed since the owner saw it (code applied or used up).
+  if (normalized.includes("partner_terms_changed")) return { status: 409, error: "partner_terms_changed", href: null };
   if (normalized.includes("not_authenticated")) {
     return { status: 401, error: "unauthorized", href: null };
   }
