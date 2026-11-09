@@ -10,7 +10,7 @@ import {
   SpaOnlinePlayer,
   type OnlineSignResult,
 } from "../src/lib/business-app/spa-online-player";
-import { prepareLoopAudio } from "../src/lib/business-app/hall-loop-audio";
+import { HALL_LOOP_MODE_ENABLED, prepareLoopAudio } from "../src/lib/business-app/hall-loop-audio";
 import { syncPlayerMediaSession } from "../src/lib/business-app/hall-media-session";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
 
@@ -398,19 +398,28 @@ function playThrough(w: ReturnType<typeof world>, from: number, to: number, dura
   assert.equal(v.p.status, "paused");
 }
 
-// 10. prepareLoopAudio: loop + audio session "playback" only on Apple touch devices.
+// 10. prepareLoopAudio: loop + audio session "playback" only on Apple touch devices, and only when
+// enabled. t1335u rollback: production default is OFF – nothing is touched on any device.
 {
   const iphone = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X)", platform: "iPhone", maxTouchPoints: 5, audioSession: { type: "auto" } };
   const ipad = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", platform: "MacIntel", maxTouchPoints: 5 };
   const samsung = { userAgent: "Mozilla/5.0 (Linux; Android 14; SM-S918B)", platform: "Linux armv8l", maxTouchPoints: 5 };
+  assert.equal(HALL_LOOP_MODE_ENABLED, false, "t1335u: loop mode rolled back in production");
+  const off = { loop: false };
+  assert.equal(prepareLoopAudio(off, iphone), false, "default: iPhone gets no loop");
+  assert.equal(off.loop, false);
+  assert.equal(iphone.audioSession.type, "auto", "default: audio session untouched");
+  const offPad = { loop: false };
+  assert.equal(prepareLoopAudio(offPad, ipad), false);
+  assert.equal(offPad.loop, false);
   const a = { loop: false };
-  assert.equal(prepareLoopAudio(a, iphone), true);
+  assert.equal(prepareLoopAudio(a, iphone, true), true);
   assert.equal(a.loop, true);
   assert.equal(iphone.audioSession.type, "playback");
   const b = { loop: false };
-  assert.equal(prepareLoopAudio(b, ipad), true, "iPadOS reporting a Mac");
+  assert.equal(prepareLoopAudio(b, ipad, true), true, "iPadOS reporting a Mac");
   const c = { loop: false };
-  assert.equal(prepareLoopAudio(c, samsung), false);
+  assert.equal(prepareLoopAudio(c, samsung, true), false);
   assert.equal(c.loop, false, "Android unchanged");
 }
 
