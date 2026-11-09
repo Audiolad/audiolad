@@ -88,7 +88,7 @@ export default function BusinessPointSlots() {
   }, [enabled, locationId]);
   const signals = live?.locationId === locationId ? live?.signals : domain.status === "authenticated" ? domain.signals : null;
   const venueDots = useMemo(() => {
-    const rows = live?.locationId === locationId ? live.venues : [];
+    const rows = live && live.locationId === locationId ? live.venues : [];
     return applyAccessToVenueDots(rows, accessLive);
   }, [live, locationId, accessLive]);
   const statusById = useMemo(() => new Map(venueDots.map((row) => [row.locationId, row])), [venueDots]);

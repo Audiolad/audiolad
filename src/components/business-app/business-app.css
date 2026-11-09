@@ -2252,24 +2252,24 @@
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 999px;
-  background: #9ca3af;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  background: var(--biz-neutral);
+  box-shadow: 0 0 0 1px var(--biz-neutral-border);
 }
 
 .business-venue-status-dot--green {
-  background: #22c55e;
+  background: var(--biz-green);
 }
 
 .business-venue-status-dot--yellow {
-  background: #eab308;
+  background: var(--biz-yellow);
 }
 
 .business-venue-status-dot--red {
-  background: #ef4444;
+  background: var(--biz-red);
 }
 
 .business-venue-status-dot--grey {
-  background: #9ca3af;
+  background: var(--biz-neutral);
 }
 
 .business-venue-status-legend {

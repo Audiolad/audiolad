@@ -5,7 +5,7 @@ import {
   applyAccessToVenueDots,
   deriveVenueStatusDot,
   VENUE_STATUS_LEGEND,
-} from "../src/lib/business-app/venue-status-dot.ts";
+} from "../src/lib/business-app/venue-status-dot";
 
 const FRESH = 75;
 
