@@ -35,8 +35,27 @@ import type { PointCommandType } from "@/lib/business-app/point-commands";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { atmosphereQueuePlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
+import {
+  CAFE_QUEUE_RECENT_RING,
+  createQueueTopUpGuard,
+  rememberPlayedId,
+  shouldTopUpQueue,
+  spliceTopUpOrder,
+  uniqueAheadCount,
+  queueTopUpOwnsPlayback,
+} from "@/lib/business-app/cafe-queue/auto-topup";
 import { cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex } from "@/lib/business-app/cafe-queue/order";
-import type { CafeDaypart, CafeQueueFeedback } from "@/lib/business-app/cafe-queue/prefs";
+import {
+  CAFE_QUEUE_FEEDBACK_KEY,
+  CAFE_QUEUE_PREFS_KEY,
+  cafeDaypartHoursKey,
+  effectiveCafeDaypartAt,
+  parseCafeDaypartHours,
+  parseCafeQueueFeedback,
+  parseCafeQueuePrefs,
+  type CafeDaypart,
+  type CafeQueueFeedback,
+} from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
 import {
@@ -206,6 +225,10 @@ export function BusinessCabinetPlayerProvider({
   const hallFeedbackRef = useRef<readonly CafeQueueFeedback[]>([]);
   /** Hall device: the venue sound of the last rebuild (what a staff vote rebuilds from). */
   const hallSoundRef = useRef<{ character: GuestCoffeeCharacter; direction: GuestCoffeeDirection; daypart: CafeDaypart; energyOffset: number } | null>(null);
+  /** Recently played audio ids (device ring) – pushed to the back on auto top-up. */
+  const recentPlayedRef = useRef<string[]>([]);
+  const topUpGuardRef = useRef(createQueueTopUpGuard());
+  const tryQueueTopUpRef = useRef<() => void>(() => {});
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -483,12 +506,15 @@ export function BusinessCabinetPlayerProvider({
           if (trackId && trackId !== lastTrackForReloadRef.current) {
             const hadPrevious = lastTrackForReloadRef.current != null;
             lastTrackForReloadRef.current = trackId;
+            recentPlayedRef.current = rememberPlayedId(recentPlayedRef.current, trackId);
             // Boundary only: first start is not a "track change" for reload purposes.
             if (hadPrevious) {
               justChangedTrackRef.current = true;
               trySafeBuildReload();
               // Clear the boundary flag shortly so mid-track never reloads.
               window.setTimeout(() => { justChangedTrackRef.current = false; }, 2_500);
+              // Near the end of the unique queue: rebuild between tracks (locked iPhone safe).
+              tryQueueTopUpRef.current();
             }
           }
           setView((prev) => ({
@@ -988,6 +1014,117 @@ export function BusinessCabinetPlayerProvider({
     }));
     remember({ index: start, positionSec: 0 }, false);
   }, [remember]);
+
+  const resolveTopUpSound = useCallback((): {
+    character: GuestCoffeeCharacter;
+    direction: GuestCoffeeDirection;
+    daypart: CafeDaypart;
+    energyOffset: number;
+    feedback: readonly CafeQueueFeedback[];
+  } | null => {
+    const hall = hallSoundRef.current;
+    const feedback = hallFeedbackRef.current.length > 0
+      ? hallFeedbackRef.current
+      : (() => {
+          try {
+            return parseCafeQueueFeedback(window.sessionStorage.getItem(CAFE_QUEUE_FEEDBACK_KEY));
+          } catch {
+            return [] as CafeQueueFeedback[];
+          }
+        })();
+    if (hall) return { ...hall, feedback };
+    try {
+      const stored = coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
+      const profile = parseBusinessSoundProfile(stored);
+      const prefs = parseCafeQueuePrefs(coffeeStorage.getItem(CAFE_QUEUE_PREFS_KEY));
+      const locationId = modelRef.current?.locationId ?? null;
+      const hours = parseCafeDaypartHours(coffeeStorage.getItem(cafeDaypartHoursKey(locationId)));
+      const now = new Date();
+      const minute = now.getHours() * 60 + now.getMinutes();
+      const daypart = effectiveCafeDaypartAt(prefs.daypartMode, minute, hours)
+        ?? (profile.daypart === "morning" || profile.daypart === "day" || profile.daypart === "evening"
+          ? profile.daypart
+          : null);
+      if (!daypart) return null;
+      return {
+        character: profile.character,
+        direction: profile.direction,
+        daypart,
+        energyOffset: prefs.energyOffset,
+        feedback,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const tryQueueTopUp = useCallback(async () => {
+    if (!queueTopUpOwnsPlayback({ pointDevice: pointReports, hallMirror: hallMirrorRef.current })) return;
+    const current = modelRef.current;
+    if (!current || current.tracks.length === 0) return;
+    const ctl = ctlRef.current;
+    const index = ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index;
+    if (index < 0) return;
+    const order = playOrderRef.current ?? current.tracks.map((_, i) => i);
+    const ahead = uniqueAheadCount(current.tracks, order, index);
+    if (!shouldTopUpQueue(ahead)) return;
+    const guard = topUpGuardRef.current;
+    if (!guard.canStart() || !guard.begin()) return;
+    const sound = resolveTopUpSound();
+    if (!sound) {
+      guard.fail();
+      return;
+    }
+    const playingId = current.tracks[index]?.audioItemId;
+    const exclude = recentPlayedRef.current.slice(0, CAFE_QUEUE_RECENT_RING);
+    const gen = ++rebuildGen.current;
+    try {
+      const params = new URLSearchParams({ space: current.spaceId });
+      const res = await fetch(`/api/business/workspace/queue?${params.toString()}`, {
+        ...JSON_POST,
+        body: JSON.stringify({
+          character: sound.character,
+          direction: sound.direction,
+          daypart: sound.daypart,
+          energyOffset: sound.energyOffset,
+          feedback: sound.feedback,
+          boundaryAudioItemId: playingId,
+          seed: Math.floor(Math.random() * 0x7fffffff),
+          excludeAudioItemIds: exclude,
+        }),
+      });
+      if (rebuildGen.current !== gen) {
+        guard.fail();
+        return;
+      }
+      if (!res.ok) {
+        guard.fail();
+        return;
+      }
+      const json = await res.json() as { ok?: boolean; order?: unknown };
+      if (rebuildGen.current !== gen || json.ok !== true || !Array.isArray(json.order)) {
+        guard.fail();
+        return;
+      }
+      const indices = cafeQueueIndices(current.tracks, json.order);
+      if (indices.length === 0) {
+        guard.fail();
+        return;
+      }
+      const nextOrder = spliceTopUpOrder(indices, index, current.tracks, exclude);
+      playOrderRef.current = nextOrder;
+      setQueueOrderState(nextOrder);
+      // Pre-sign the new next URL so a locked iPhone never waits at the boundary.
+      ctlRef.current?.queueChanged();
+      guard.succeed();
+    } catch {
+      guard.fail();
+    }
+  }, [pointReports, resolveTopUpSound]);
+
+  useEffect(() => {
+    tryQueueTopUpRef.current = () => { void tryQueueTopUp(); };
+  }, [tryQueueTopUp]);
 
   const cancelAtmosphereRebuild = useCallback(() => {
     rebuildGen.current += 1;
