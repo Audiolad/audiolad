@@ -13,6 +13,7 @@ import {
   formatPartnerCode,
   generatePartnerCode,
   mapPartnerCodeRpcError,
+  partnerCodeErrorText,
   normalizePartnerCode,
   parsePartnerPeriods,
   parsePartnerQuote,
@@ -88,6 +89,10 @@ assert.equal(mapBusinessSubscriptionRpcError("partner_terms_changed").status, 40
 assert.equal(mapPartnerCodeRpcError("ERROR: partner_code_unavailable").error, "partner_code_unavailable");
 assert.equal(mapPartnerCodeRpcError("partner_code_already_applied").status, 409);
 assert.equal(mapPartnerCodeRpcError("boom").error, "internal_error");
+// t1338u: after the account's first 72 hours the same account gets a final «expired» answer.
+assert.deepEqual(mapPartnerCodeRpcError("ERROR: partner_code_expired"), { status: 410, error: "partner_code_expired" });
+assert.ok(partnerCodeErrorIsFinal("partner_code_expired"), "an expired code drops the link cookie");
+assert.equal(partnerCodeErrorText("partner_code_expired"), "Срок действия этого кода закончился.");
 
 // Server quote parsing.
 const reserved = parsePartnerQuote({ source: "reserved", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 2,

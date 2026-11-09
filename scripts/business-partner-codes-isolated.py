@@ -75,14 +75,30 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
           'ALTER TABLE orders ADD COLUMN updated_at timestamptz, ADD COLUMN cancelled_at timestamptz;',
           partner_migration_without_fulfill(),
           (root/'supabase/tests/business_partner_codes_smoke.sql').read_text()]
+# t1338u: the 72-hour hold counted once per account (20270304120000).
+window_once = migration('20270304120000_business_partner_code_window_once.sql')
+window_smoke = (root/'supabase/tests/business_partner_code_window_once_smoke.sql').read_text()
+
+def single_user(data, run_blocks, markers):
+    sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
+    result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
+    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or any(m not in result.stdout for m in markers):
+        print(result.stdout, result.stderr)
+        raise SystemExit(1)
+
+markers = ['three-point pilot: PASS', 'shared-venue billing: PASS', 'venue slots systemic: PASS', 'partner codes: PASS']
+# Regression: the whole partner-code smoke also passes with the once-only window applied first.
+with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-window-') as tmp:
+    data = Path(tmp)/'data'
+    subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
+    single_user(data, blocks[:-1] + [window_once, blocks[-1], window_smoke], markers + ['partner code window once: PASS'])
+print('partner codes: full smoke with the once-only 72-hour window applied first: PASS')
+
 with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     data = Path(tmp)/'data'
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
-    sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in blocks)+'\n'
-    result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
-    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'three-point pilot: PASS' not in result.stdout or 'shared-venue billing: PASS' not in result.stdout or 'venue slots systemic: PASS' not in result.stdout or 'partner codes: PASS' not in result.stdout:
-        print(result.stdout, result.stderr)
-        raise SystemExit(1)
+    # Production order: rows created under 20270302120000, then the window migration backfills them.
+    single_user(data, blocks + [window_once, window_smoke], markers + ['partner code window once: PASS'])
     # Parallel redemption with two real sessions: exactly one owner gets the code.
     sock = Path(tmp)/'sock'; sock.mkdir()
     server = subprocess.Popen([str(pg/'postgres'), '-D', str(data), '-k', str(sock), '-c', 'listen_addresses=', '-p', '55433'],
@@ -101,11 +117,13 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
         wins = sum(1 for proc in procs if proc.returncode == 0)
         losers = [err for proc, (_, err) in zip(procs, outcomes) if proc.returncode != 0]
         held = subprocess.run(psql + ['-c', "SELECT count(*) FROM business_partner_codes WHERE code='KKKKMMMMNNNN' AND reserved_by_user_id IS NOT NULL"], check=True, capture_output=True, text=True).stdout.strip()
-        if wins != 1 or len(losers) != 1 or 'partner_code_unavailable' not in losers[0] or held != '1':
+        windows = subprocess.run(psql + ['-c', "SELECT count(*) FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='KKKKMMMMNNNN'"], check=True, capture_output=True, text=True).stdout.strip()
+        if wins != 1 or len(losers) != 1 or 'partner_code_unavailable' not in losers[0] or held != '1' or windows != '1':
             print(outcomes)
             raise SystemExit('parallel redemption: FAIL')
     finally:
         server.terminate(); server.wait(timeout=30)
-    print('partner codes: two parallel sessions, exactly one reservation: PASS')
+    print('partner codes: two parallel sessions, exactly one reservation and one 72-hour window: PASS')
+    print('partner codes: 72 hours counted once per account from the first entry (repeat visits, payment link, re-reserve, another code and back, second owner, end with and without an open link, existing holds kept): PASS')
     print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote, an earlier 79900 payment then the code (window from the first code payment), 72-hour hold end in the quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')
