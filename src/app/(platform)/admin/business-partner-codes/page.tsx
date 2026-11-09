@@ -8,7 +8,6 @@ import {
   type PartnerPeriodDbRow,
 } from "@/lib/admin/business-partner-codes";
 import { requirePlatformOwnerAccess } from "@/lib/admin/require-platform-owner";
-import { BUSINESS_ORIGIN } from "@/lib/business-app/host";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +65,7 @@ export default async function AdminBusinessPartnerCodesPage() {
             Список кодов недоступен – возможно, миграция ещё не применена.
           </div>
         ) : (
-          <BusinessPartnerCodesPanel rows={rows} origin={BUSINESS_ORIGIN} />
+          <BusinessPartnerCodesPanel rows={rows} />
         )}
       </div>
     </section>
