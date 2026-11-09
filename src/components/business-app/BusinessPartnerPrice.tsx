@@ -22,10 +22,10 @@ export function BusinessStruckPrice({
   return (
     <span className="whitespace-nowrap" data-testid={testId}>
       <s className="text-[var(--biz-text-muted)]" data-testid={`${testId}-standard`} aria-label={`Обычная цена ${standardRub} ₽`}>
-        {standardRub}&nbsp;₽
+        {`${standardRub}\u00a0₽`}
       </s>{" "}
       <strong className="text-[var(--biz-text)]" data-testid={`${testId}-current`}>
-        {priceRub}&nbsp;₽
+        {`${priceRub}\u00a0₽`}
       </strong>
     </span>
   );

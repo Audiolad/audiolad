@@ -101,7 +101,7 @@ export default function BusinessPartnerCodePanel({ canPay }: { canPay: boolean }
         autoComplete="off"
         autoCapitalize="characters"
         spellCheck={false}
-        placeholder="XXXX-XXXX-XXXX"
+        placeholder="Код из приглашения"
         value={value}
         disabled={busy}
         onChange={(event) => {
