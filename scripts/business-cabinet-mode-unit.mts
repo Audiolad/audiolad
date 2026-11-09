@@ -50,7 +50,7 @@ assert.deepEqual(
 
 // Hidden on the venue side.
 for (const permission of [
-  "accessCard", "accessLine", "payLink", "offerAccept", "sectionProfile", "sectionOnboarding", "trackRatings",
+  "accessCard", "accessLine", "payLink", "offerAccept", "sectionProfile", "sectionOnboarding",
   "daypartSettings", "atmosphereRebuild", "venueRemote", "deviceManagement", "stickerDownload", "ownerChecklist", "profileEdit", "signOut",
 ] as const) {
   assert.equal(businessCabinetCan({ mode: "point" }, permission), false, `point: no ${permission}`);
@@ -63,6 +63,14 @@ for (const permission of ["inspectorCard", "inspectorQr", "playbackReport", "pla
 assert.equal(businessCabinetCan({ mode: "owner" }, "disconnectThisDevice"), false);
 assert.equal(businessCabinetCan({ mode: "point", pointCanEdit: false }, "atmosphereSettings"), false);
 assert.equal(businessCabinetCan({ mode: "point" }, "atmosphereSettings"), true, "missing switch stays allowed");
+// «Больше / Меньше такой музыки» on the hall (Sergey 09.11.2026): the owner's switch decides, on by default.
+assert.equal(BUSINESS_CABINET_PERMISSIONS.trackRatings.venue, "if_allowed");
+assert.equal(businessCabinetCan({ mode: "point" }, "trackRatings"), true, "missing switch: staff steer the stream");
+assert.equal(businessCabinetCan({ mode: "point", pointCanEdit: true }, "trackRatings"), true, "switch on: hall shows more/less");
+assert.equal(businessCabinetCan({ mode: "point", pointCanEdit: false }, "trackRatings"), false, "switch off: owner only");
+assert.equal(businessCabinetCan({ mode: "preview", pointCanEdit: false }, "trackRatings"), false, "preview shows what the hall sees");
+assert.equal(businessCabinetCan({ mode: "owner", pointCanEdit: false }, "trackRatings"), true, "the owner always rates");
+assert.equal(businessCabinetCan({ mode: "point", pointCanEdit: true }, "daypartSettings"), false, "day-time stays with the owner");
 
 assert.ok(isBusinessOwnerOnlyPath("/profile"));
 assert.ok(isBusinessOwnerOnlyPath("/onboarding/x"));
@@ -185,7 +193,15 @@ const help = read("src/components/business-app/BusinessHallHelp.tsx");
 assert.match(help, /Отключить это устройство/);
 assert.match(help, /action: "disconnect-self"/);
 const workspace = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
-assert.match(workspace, /cabinet\.can\("trackRatings"\) \? <CafeTrackFeedback/);
+assert.match(workspace, /cabinet\.can\("trackRatings"\) && \(!player\.pointDevice \|\| player\.canChangeMusic\) \? <CafeTrackFeedback/);
+// A hall vote really steers the hall queue (the owner queue effect skips the hall device).
+assert.match(workspace, /if \(player\.pointDevice\) return;/);
+assert.match(workspace, /void player\.steerHall\(votes,/);
+const cabinetPlayer = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
+assert.match(cabinetPlayer, /const steerHall: CabinetPlayerApi\["steerHall"\] = async/);
+assert.match(cabinetPlayer, /if \(!\(await authorizeMusicChange\(\)\)\) return "failed";\n    hallFeedbackRef\.current = feedback;/, "server checks the switch first");
+assert.match(cabinetPlayer, /feedback: hallFeedbackRef\.current,/, "sound and daypart rebuilds keep staff votes");
+assert.match(cabinetPlayer, /rebuildFromProfile\(\{ \.\.\.sound, feedback, keepCurrent: true \}\)/, "the playing track stays");
 assert.match(workspace, /cabinet\.can\("payLink"\)/);
 
 for (const path of [

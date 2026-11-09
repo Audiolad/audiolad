@@ -98,6 +98,16 @@ type CabinetPlayerApi = {
     feedback: readonly CafeQueueFeedback[];
   }) => Promise<"applied" | "deferred" | "failed">;
   cancelAtmosphereRebuild: () => void;
+  /**
+   * Hall device only (Sergey 09.11.2026): «Больше / Меньше такой музыки» from staff. Checks the
+   * owner's switch on the server (music-change), then rebuilds the hall's own queue from the
+   * venue sound with these votes; the playing track stays. Later sound and daypart rebuilds on
+   * the hall keep the votes. `fallback` is used before the first venue sound answer.
+   */
+  steerHall: (
+    feedback: readonly CafeQueueFeedback[],
+    fallback: { character: GuestCoffeeCharacter; direction: GuestCoffeeDirection; daypart: CafeDaypart } | null,
+  ) => Promise<"applied" | "failed">;
 };
 
 const CabinetContext = createContext<CabinetPlayerApi | null>(null);
@@ -183,6 +193,10 @@ export function BusinessCabinetPlayerProvider({
   const refreshPointSoundRef = useRef<() => void>(() => {});
   const [pointCanEdit, setPointCanEdit] = useState(false);
   const soundInstallRef = useRef<Promise<unknown> | null>(null);
+  /** Hall device: staff votes, kept for every later rebuild of the hall queue. */
+  const hallFeedbackRef = useRef<readonly CafeQueueFeedback[]>([]);
+  /** Hall device: the venue sound of the last rebuild (what a staff vote rebuilds from). */
+  const hallSoundRef = useRef<{ character: GuestCoffeeCharacter; direction: GuestCoffeeDirection; daypart: CafeDaypart; energyOffset: number } | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -937,14 +951,17 @@ export function BusinessCabinetPlayerProvider({
     let refreshPending = false;
     const take = (sound: PointSoundUpdate) => {
       if (soundInstallRef.current) return;
-      const run = applySound(sound, (daypart) => rebuildFromProfile({
-        character: sound.character,
-        direction: sound.direction,
-        daypart,
-        feedback: [],
-        energyOffset: sound.energyOffset,
-        keepCurrent: true,
-      })).finally(() => {
+      const run = applySound(sound, (daypart) => {
+        hallSoundRef.current = { character: sound.character, direction: sound.direction, daypart, energyOffset: sound.energyOffset };
+        return rebuildFromProfile({
+          character: sound.character,
+          direction: sound.direction,
+          daypart,
+          feedback: hallFeedbackRef.current,
+          energyOffset: sound.energyOffset,
+          keepCurrent: true,
+        });
+      }).finally(() => {
         if (soundInstallRef.current === run) soundInstallRef.current = null;
       });
       soundInstallRef.current = run;
@@ -1069,6 +1086,16 @@ export function BusinessCabinetPlayerProvider({
   // Mirror: the hall has no «previous» / «play this one» command; the queue is the hall's.
   const devicePrevious = async () => { if (!mirror && await authorizeMusicChange()) await previous(); };
   const devicePlayIndex = async (index: number) => { if (!mirror && await authorizeMusicChange()) await playIndex(index); };
+  const steerHall: CabinetPlayerApi["steerHall"] = async (feedback, fallback) => {
+    if (!pointReports || !pointCanEdit) return "failed";
+    if (!(await authorizeMusicChange())) return "failed";
+    hallFeedbackRef.current = feedback;
+    if (soundInstallRef.current) await soundInstallRef.current;
+    const sound = hallSoundRef.current ?? (fallback ? { ...fallback, energyOffset: 0 } : null);
+    if (!sound) return "failed";
+    const result = await rebuildFromProfile({ ...sound, feedback, keepCurrent: true });
+    return result === "applied" ? "applied" : "failed";
+  };
 
   const api: CabinetPlayerApi = {
     accessModel: model,
@@ -1094,6 +1121,7 @@ export function BusinessCabinetPlayerProvider({
     applyAtmosphereQueue: pointReports ? () => {} : applyAtmosphereQueue,
     rebuildFromProfile: pointReports ? async () => "deferred" : rebuildFromProfile,
     cancelAtmosphereRebuild,
+    steerHall,
   };
 
   const coverSrc = track ? cabinetAlbumCoverUrl({ coverUrl: track.coverUrl }) : null;
