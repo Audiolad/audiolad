@@ -84,15 +84,17 @@ export default function BusinessAppShell({
 
 /** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
 function BusinessShellFrame({ children, pointReports, initialGuestLimit }: { children: ReactNode; pointReports: boolean; initialGuestLimit: GuestCoffeeLimitState | null }) {
-  const access = resolveBusinessAccess(useBusinessDomain(), pointReports);
+  // The period line and the guest offer are the owner's (cabinet-mode.ts «accessLine»), not the hall's.
+  const cabinet = useBusinessCabinetMode();
+  // t1299u: the hall side is a point device for the chrome even when its cookie is revoked or
+  // unchecked (no reports then), so it never gets guest links or the guest strip.
+  const access = resolveBusinessAccess(useBusinessDomain(), pointReports || cabinet.side === "venue");
   const signedIn = useBusinessDomain().status === "authenticated";
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  // The period line and the guest offer are the owner's (cabinet-mode.ts «accessLine»), not the hall's.
-  const cabinet = useBusinessCabinetMode();
   const showGuestBar = access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
   const showAccessLine = liveAccess && !cabinetMusic && cabinet.can("accessLine");
 
