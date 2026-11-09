@@ -66,7 +66,6 @@ function SignUpForm() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const nextParam = searchParams.get("next");
-  const businessTrial = isBusinessTrialNext(nextParam);
 
   function trackSignupStartedOnce() {
     if (signupStartedRef.current) {
@@ -92,7 +91,8 @@ function SignUpForm() {
     { firstName, lastName, email, password, legalConsent },
     fieldErrors,
     { firstNameTouched, lastNameTouched, submitAttempted },
-    { lastNameOptional: businessTrial },
+    // Business owners: surname is required (Sergey, t1305s9421) – same as the main site.
+    {},
   );
 
   function clearFieldError(field: SignUpClientField) {
@@ -327,7 +327,7 @@ function SignUpForm() {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium">{businessTrial ? "Фамилия – необязательно" : "Фамилия"}</span>
+            <span className="text-sm font-medium">Фамилия</span>
 
             <input
               type="text"
@@ -341,7 +341,7 @@ function SignUpForm() {
                 setLastName(event.currentTarget.value);
                 clearFieldError("lastName");
               }}
-              required={!businessTrial}
+              required
               autoComplete="family-name"
               placeholder="Ваша фамилия"
               aria-invalid={formState.lastNameFieldInvalid}

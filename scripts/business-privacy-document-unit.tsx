@@ -15,14 +15,17 @@ import { CoffeeAuthProvider } from "../src/components/auth/AuthHostNavigation";
 (globalThis as { React?: typeof React }).React = React;
 const read = (path: string) => readFileSync(path, "utf8");
 const html = renderToStaticMarkup(<PrivacyDocument />);
-// Baseline: the 03.11.2026 platform document at f41f6955, without shell or class attributes.
+// Baseline: the 09.11.2026 platform document (surname for Business owners), without shell or class attributes.
 assert.equal(createHash("sha256").update(html.replace(/ class="[^"]*"/g, "")).digest("hex"),
-  "010ac3f329d0fb8cc2e01ec709225c6d95978e5d8482246513872d96773ee761");
+  "41b71e42f860fc82de7bb23a0e63dc01689c4a6aedd1139927793c8a3f08dccf");
 assert.equal((html.match(/<section /g) ?? []).length, 16);
 assert.match(html, /id="section-8"/);
-assert.match(html, /Последнее обновление: 3 ноября 2026 года/);
-assert.equal(findClientDocument("privacy")?.versionDate, "2026-11-03");
-assert.match(findClientDocument("privacy")?.editionLabel ?? "", /3 ноября 2026/);
+assert.match(html, /Последнее обновление: 9 ноября 2026 года/);
+assert.match(html, /указанном заведении/);
+assert.match(html, /странице подтверждения прав заведения/);
+assert.doesNotMatch(html, /имя или отображаемое имя/);
+assert.equal(findClientDocument("privacy")?.versionDate, "2026-11-09");
+assert.match(findClientDocument("privacy")?.editionLabel ?? "", /9 ноября 2026/);
 const businessHtml = renderToStaticMarkup(<BusinessPrivacyPage />);
 assert.match(businessHtml, /class="business-app-card"/);
 assert.match(businessHtml, /href="\/documents"/);

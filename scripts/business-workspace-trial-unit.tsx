@@ -1282,7 +1282,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
 
   const withPoint: BusinessOwnerHomeContext = {
     status: "authenticated",
-    owner: { userId: USER_A, firstName: "Анна" },
+    owner: { userId: USER_A, firstName: "Анна", lastName: "Иванова" },
     location: {
       id: "11111111-1111-4111-8111-111111111111",
       organizationId: "22222222-2222-4222-8222-222222222222",
