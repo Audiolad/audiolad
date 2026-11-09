@@ -78,17 +78,19 @@ const paidAt = new Date("2026-11-09T10:00:00.000Z");
     { mode: "trial", endsAt: "2026-11-14T15:00:00.000Z" },
     now,
   );
+  // endsAt 14 Nov 15:00Z + 30d = 14 Dec 15:00Z → Moscow day 14 декабря 2026
   assert.equal(
     trialNote,
-    "Бесплатные дни сохранятся: оплаченные 30 дней начнутся после 14 ноября 2026",
+    "Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 14 декабря 2026.",
   );
   const paidNote = businessEarlyPayCarryoverNote(
     { mode: "paid", endsAt: "2026-12-05T15:00:00.000Z" },
     now,
   );
+  // 5 Dec 15:00Z + 30d = 4 Jan 15:00Z → Moscow 4 января 2027
   assert.equal(
     paidNote,
-    "Уже оплаченные дни сохранятся: новые 30 дней начнутся после 5 декабря 2026",
+    "Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 4 января 2027.",
   );
   assert.equal(businessEarlyPayCarryoverNote({ mode: "grace", endsAt: "2026-11-14T15:00:00.000Z" }, now), null);
   assert.equal(businessEarlyPayCarryoverNote({ mode: "offer", endsAt: null }, now), null);
@@ -153,7 +155,26 @@ const paidAt = new Date("2026-11-09T10:00:00.000Z");
     </BusinessDomainProvider>,
   );
   assert.match(html, /data-testid="biz-home-carryover-note"/);
-  assert.match(html, /Бесплатные дни сохранятся: оплаченные 30 дней начнутся после 14 ноября 2026/);
+  assert.match(html, /Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 14 декабря 2026\./);
+}
+
+
+// t1313u: every early-pay surface either uses BusinessPayControls or BusinessEarlyPayCarryoverNote.
+{
+  const checklist = readFileSync("src/components/business-app/BusinessHomeChecklist.tsx", "utf8");
+  assert.match(checklist, /BusinessEarlyPayCarryoverNote/);
+  const profile = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
+  assert.match(profile, /BusinessPayControls/);
+  assert.match(profile, /payLabel=\{summary\.button\}/);
+  const slots = readFileSync("src/components/business-app/BusinessPointSlots.tsx", "utf8");
+  assert.match(slots, /BusinessPayControls/);
+  const home = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
+  assert.match(home, /businessEarlyPayCarryoverNote\(access\)/);
+  assert.match(home, /BusinessEarlyPayCarryoverNote/);
+  // Hall «Продлить доступ» is only after access ended – not an early-pay stack surface.
+  const hall = readFileSync("src/components/business-app/BusinessHallHome.tsx", "utf8");
+  assert.match(hall, /Продлить доступ/);
+  assert.doesNotMatch(hall, /carryover|BusinessPayControls/);
 }
 
 console.log("business-subscription-period-unit: ok");

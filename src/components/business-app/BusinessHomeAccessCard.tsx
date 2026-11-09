@@ -372,15 +372,15 @@ export function BusinessPayControls({
           </p>
         </>
       )}
-      {carryoverNote ? (
-        <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
-          {carryoverNote}
-        </p>
-      ) : null}
       {accepted ? (
         <>
           <BusinessOfferAcceptedNote />
           {receiptEmail ? <BusinessReceiptEmailField control={receiptEmail} busy={busy} /> : null}
+          {carryoverNote ? (
+            <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
+              {carryoverNote}
+            </p>
+          ) : null}
           <button
             type="button"
             className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
@@ -408,6 +408,22 @@ export function BusinessPayControls({
       )}
       {error ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
     </div>
+  );
+}
+
+export function BusinessEarlyPayCarryoverNote({
+  access,
+  now,
+}: {
+  access: Parameters<typeof businessEarlyPayCarryoverNote>[0];
+  now?: Date;
+}) {
+  const note = businessEarlyPayCarryoverNote(access, now);
+  if (!note) return null;
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
+      {note}
+    </p>
   );
 }
 

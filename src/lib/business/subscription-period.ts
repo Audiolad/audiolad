@@ -25,21 +25,29 @@ export function businessPaidPeriodBounds(input: {
   return { periodStart, periodEnd };
 }
 
-/**
- * Shown next to «Оплатить» / «Оплатить заранее» / «Продлить» while a gift or paid period is live.
- * Never mentions the hidden grace window.
- */
-export function businessEarlyPayCarryoverNote(
+/** New access-until after an early payment that stacks +30 days on the live period end. */
+export function businessEarlyPayAccessUntilIso(
   access: Pick<BusinessChromeAccess, "mode" | "endsAt">,
   now: Date = new Date(),
 ): string | null {
   if ((access.mode !== "trial" && access.mode !== "paid") || !access.endsAt) return null;
   const endMs = Date.parse(access.endsAt);
   if (!Number.isFinite(endMs) || endMs <= now.getTime()) return null;
-  const day = formatMoscowDay(access.endsAt);
+  return new Date(endMs + BUSINESS_PAID_PERIOD_DAYS * 86_400_000).toISOString();
+}
+
+/**
+ * Shown next to early-pay buttons («Оплатить заранее», «Продлить», trial «Оплатить»)
+ * while a gift or paid period is still live. Never mentions the hidden grace window.
+ * t1313u: remaining days kept + 30 on top, with the computed new access date.
+ */
+export function businessEarlyPayCarryoverNote(
+  access: Pick<BusinessChromeAccess, "mode" | "endsAt">,
+  now: Date = new Date(),
+): string | null {
+  const untilIso = businessEarlyPayAccessUntilIso(access, now);
+  if (!untilIso) return null;
+  const day = formatMoscowDay(untilIso);
   if (!day) return null;
-  if (access.mode === "trial") {
-    return `Бесплатные дни сохранятся: оплаченные ${BUSINESS_PAID_PERIOD_DAYS} дней начнутся после ${day}`;
-  }
-  return `Уже оплаченные дни сохранятся: новые ${BUSINESS_PAID_PERIOD_DAYS} дней начнутся после ${day}`;
+  return `Оставшиеся дни сохранятся, и к ним добавится ещё ${BUSINESS_PAID_PERIOD_DAYS} дней – доступ будет до ${day}.`;
 }
