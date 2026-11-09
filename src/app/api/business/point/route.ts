@@ -409,6 +409,24 @@ export async function POST(request: Request) {
     const jar = request.headers.get("cookie") ?? "";
     const token = readCookie(jar, BUSINESS_POINT_COOKIE);
     if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
+    // t1331u: a listening sample the hall recorded while offline (played from its buffer). Only
+    // the usage RPC runs (session, assignment and eligibility re-checked there); live state and
+    // heartbeat are never written late, so the owner dot stays «нет связи» for the outage.
+    if (body.kind === "usage") {
+      const usage = body.usage && typeof body.usage === "object" && !Array.isArray(body.usage)
+        ? body.usage as Record<string, unknown> : null;
+      if (!usage || !isPointCommandId(usage.eventId) || !isPointCommandId(usage.sessionId)
+        || !isPointCommandId(usage.audioItemId)
+        || !Number.isSafeInteger(usage.seq) || Number(usage.seq) < 1
+        || !Number.isSafeInteger(usage.positionMs) || Number(usage.positionMs) < 0) {
+        return json({ ok: false, reason: "invalid_sample" }, 400);
+      }
+      const { error: usageError } = await supabase.rpc("apply_business_point_usage_sample", {
+        p_token: token, p_client_event_id: usage.eventId, p_playback_session_id: usage.sessionId,
+        p_sample_seq: usage.seq, p_audio_item_id: usage.audioItemId, p_position_ms: usage.positionMs,
+      });
+      return json(usageError ? { ok: false, reason: "usage_report_failed" } : { ok: true, data: null });
+    }
     const kind = body.kind === "playback" ? "playback" : body.kind === "heartbeat" ? "heartbeat" : null;
     if (!kind) return json({ ok: false, reason: "invalid_request" }, 400);
     const report = kind === "playback" && isSpaLiveReport(body.report) ? body.report : null;

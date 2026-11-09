@@ -15,7 +15,10 @@ import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
-import { postPointReport } from "@/lib/business-app/cabinet-player-client";
+import { postPointReport, postPointUsage } from "@/lib/business-app/cabinet-player-client";
+import { HallOfflineBuffer, hallBufferPlan } from "@/lib/business-app/hall-offline-buffer";
+import { createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, writeHallBufferOwner } from "@/lib/business-app/hall-offline-buffer-store";
+import { HallReportQueue } from "@/lib/business-app/hall-report-queue";
 import {
   hallBuildMismatch,
   readReloadedBuildId,
@@ -32,7 +35,7 @@ import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMedi
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
-import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
+import { SpaOnlinePlayer as Controller, type OnlineSignResult, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { atmosphereQueuePlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import {
@@ -167,6 +170,51 @@ const JSON_POST = {
   cache: "no-store" as const,
 };
 
+/** Short-lived signed URL of one track (server re-checks access). Shared by the player and the hall buffer. */
+async function signWorkspaceTrack(spaceId: string, audioItemId: string): Promise<OnlineSignResult> {
+  // A hung request on a flaky network must not freeze recovery: give up after 15 s
+  // and let the controller retry with backoff.
+  const abort = new AbortController();
+  const timeout = window.setTimeout(() => abort.abort(), SIGN_TIMEOUT_MS);
+  try {
+    const params = new URLSearchParams({ space: spaceId });
+    const res = await fetch(`/api/business/workspace/track-url?${params.toString()}`, {
+      ...JSON_POST,
+      body: JSON.stringify({ audioItemId }),
+      signal: abort.signal,
+    });
+    const json = (await res.json()) as { ok?: boolean; data?: { url?: string }; reason?: string };
+    if (json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
+    return { ok: false, reason: json.reason || "network" };
+  } catch {
+    return { ok: false, reason: "network" };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+/** One buffer download may take this long before it is abandoned (slow line: retried later). */
+const BUFFER_FETCH_TIMEOUT_MS = 180_000;
+
+async function fetchTrackBlob(url: string, signal: AbortSignal): Promise<Blob> {
+  const timeout = new AbortController();
+  const timer = window.setTimeout(() => timeout.abort(), BUFFER_FETCH_TIMEOUT_MS);
+  const stop = () => timeout.abort();
+  signal.addEventListener("abort", stop, { once: true });
+  try {
+    // Straight to the storage URL: the service worker never handles audio (public/sw.js).
+    const res = await fetch(url, { signal: timeout.signal, credentials: "omit", cache: "no-store" });
+    if (!res.ok) throw new Error(`buffer_fetch_${res.status}`);
+    return await res.blob();
+  } finally {
+    window.clearTimeout(timer);
+    signal.removeEventListener("abort", stop);
+  }
+}
+
+
+/** The hall reports its buffered count when it changes, else at most this often. */
+
 function readLocal(spaceId: string, trackCount: number, locationId?: string): WorkspacePlayback | null {
   try {
     const raw = window.localStorage.getItem(playbackStorageKey(spaceId, locationId));
@@ -249,7 +297,9 @@ export function BusinessCabinetPlayerProvider({
   const savedPlaceRef = useRef(false);
   const rebuildGen = useRef(0);
   const hallMirrorRef = useRef(false);
-
+  /** t1331u: hall device only – copies of the next tracks for a short outage. */
+  const bufferRef = useRef<HallOfflineBuffer | null>(null);
+  const reportQueueRef = useRef<HallReportQueue | null>(null);
   const adopt = useCallback((next: WorkspacePageModel) => {
     const current = modelRef.current;
     // Navigation may arrive after a newer status response. Reject conflicting
@@ -366,6 +416,7 @@ export function BusinessCabinetPlayerProvider({
     const time = fading ? 0 : audio.currentTime;
     const index = fading ? tracks.findIndex((t) => t.audioItemId === audible) : ctl.index;
     const upcoming = index >= 0 ? hallUpcomingSnapshot(tracks, playOrderRef.current, index) : { ids: [], aheadCount: 0 };
+    // t1333u: buffer stays on the device only – never reported to the owner / DB.
     const nowPlaying = {
       positionMs: Number.isFinite(time) && time > 0 ? Math.min(86_400_000, Math.floor(time * 1000)) : 0,
       durationMs: !fading && Number.isFinite(audio.duration) && audio.duration > 0
@@ -377,10 +428,24 @@ export function BusinessCabinetPlayerProvider({
     sendSpaLiveReport(
       (live) => {
         if (!usageSession.current) usageSession.current = crypto.randomUUID();
-        return postPointReport({ kind: "playback", report: live, sample: live.playingConfirmed && audioRef.current ? {
+        const sample = live.playingConfirmed && audioRef.current ? {
           eventId: crypto.randomUUID(), sessionId: usageSession.current, seq: ++usageSeq.current,
           positionMs: Math.floor(audioRef.current.currentTime * 1000),
-        } : null, nowPlaying });
+        } : null;
+        // t1331u: samples recorded offline go first, in order; a new one queues behind them.
+        const queue = reportQueueRef.current;
+        const backlog = !!queue && queue.size > 0;
+        if (sample && backlog && live.audioItemId) {
+          queue.push({ ...sample, audioItemId: live.audioItemId, at: Date.now() });
+        }
+        return postPointReport({ kind: "playback", report: live, sample: backlog ? null : sample, nowPlaying }).then((result) => {
+          if (result.ok) {
+            if (queue && queue.size > 0) void queue.flush((s) => postPointUsage(s));
+          } else if (result.reason === "network" && sample && !backlog && queue && live.audioItemId) {
+            queue.push({ ...sample, audioItemId: live.audioItemId, at: Date.now() });
+          }
+          return result;
+        });
       },
       report,
     );
@@ -456,6 +521,104 @@ export function BusinessCabinetPlayerProvider({
 
   const catalogKey = model && open ? workspaceControllerKey(model) : "";
 
+  /** t1331u: the next HALL_BUFFER_TRACKS of the live queue, downloaded while the hall plays. */
+  const bufferPlanRef = useRef<() => void>(() => {});
+  useLayoutEffect(() => {
+    bufferPlanRef.current = () => {
+      const buffer = bufferRef.current;
+      const ctl = ctlRef.current;
+      const current = modelRef.current;
+      if (!buffer || !ctl || !current) return;
+      const index = ctl.index >= 0 ? ctl.index : playbackRef.current.index;
+      // The selected track (it may still be loading) keeps its copy until it sounds (review #1 F1).
+      buffer.setPlan(
+        hallBufferPlan(current.tracks, index, (cur, len) => cafeQueueNextIndex(playOrderRef.current, cur, len)),
+        current.tracks[index]?.audioItemId ?? null,
+      );
+      void buffer.refill(ctl.status === "playing" || ctl.status === "loading");
+    };
+  });
+  useEffect(() => {
+    bufferPlanRef.current();
+  }, [queueOrder]);
+
+  useEffect(() => {
+    if (!canBeat) {
+      // Not a hall device (any more): copies left from an earlier pairing go.
+      if (readHallBufferOwner()) void purgeHallBufferStorage();
+      return;
+    }
+    const queue = new HallReportQueue((() => {
+      try { return window.localStorage; } catch { return null; }
+    })());
+    reportQueueRef.current = queue;
+    const flush = () => { if (navigator.onLine !== false) void queue.flush((s) => postPointUsage(s)); };
+    const sync = () => {
+      flush();
+      bufferPlanRef.current();
+    };
+    flush();
+    window.addEventListener("online", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      if (reportQueueRef.current === queue) reportQueueRef.current = null;
+    };
+  }, [canBeat]);
+
+  const bufferOwner = canBeat && open && model ? `${model.spaceId}:${model.locationId ?? ""}` : null;
+  useEffect(() => {
+    if (!bufferOwner) return;
+    let cancelled = false;
+    let buffer: HallOfflineBuffer | null = null;
+    void (async () => {
+      const store = await createHallBufferStore();
+      if (cancelled) return;
+      // Another hall used this browser before: its copies never play here.
+      if (store && readHallBufferOwner() !== bufferOwner) {
+        try { await store.clear(); } catch { /* best effort */ }
+        if (cancelled) return;
+      }
+      if (store) writeHallBufferOwner(bufferOwner);
+      const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
+      buffer = new HallOfflineBuffer({
+        store,
+        sign: (audioItemId) => signWorkspaceTrack(modelRef.current?.spaceId ?? "cafe", audioItemId),
+        fetchBlob: fetchTrackBlob,
+        createUrl: (blob) => URL.createObjectURL(blob),
+        revokeUrl: (url) => URL.revokeObjectURL(url),
+        window: (audioItemId) => {
+          const item = ctlRef.current?.items.find((i) => i.audioItemId === audioItemId);
+          return item ? { until: item.playableUntil ? item.playableUntil.getTime() : null } : null;
+        },
+        isOnline: () => navigator.onLine !== false,
+        estimate: storage?.estimate ? () => storage.estimate() : undefined,
+        onExpired: (audioItemId) => ctlRef.current?.localExpired(audioItemId),
+        // Review #1 F3: the server refused a buffer download – same as a refused track start:
+        // stop the hall now (the buffer has already purged itself).
+        onNoAccess: () => {
+          void ctlRef.current?.applyManifest(null);
+          (fadeRef.current ?? audioRef.current)?.pause();
+        },
+        onChange: () => {
+          /* t1333u: count stays local; owner UI no longer shows a buffer line. */
+        },
+      });
+      bufferRef.current = buffer;
+      if (store && storage?.persist) void storage.persist().catch(() => {});
+      await buffer.rehydrate();
+      if (cancelled) return;
+      bufferPlanRef.current();
+      buffer.sweep();
+    })();
+    return () => {
+      cancelled = true;
+      if (buffer) {
+        buffer.dispose();
+        if (bufferRef.current === buffer) bufferRef.current = null;
+      }
+    };
+  }, [bufferOwner]);
+
   useEffect(() => {
     const audio = audioRef.current;
     const current = modelRef.current;
@@ -470,26 +633,11 @@ export function BusinessCabinetPlayerProvider({
     const ctl = new Controller(
       {
         audio: fader,
-        sign: async (audioItemId) => {
-          // A hung request on a flaky network must not freeze recovery: give up after 15 s
-          // and let the controller retry with backoff.
-          const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), SIGN_TIMEOUT_MS);
-          try {
-            const params = new URLSearchParams({ space: modelRef.current?.spaceId ?? "cafe" });
-            const res = await fetch(`/api/business/workspace/track-url?${params.toString()}`, {
-              ...JSON_POST,
-              body: JSON.stringify({ audioItemId }),
-              signal: abort.signal,
-            });
-            const json = (await res.json()) as { ok?: boolean; data?: { url?: string }; reason?: string };
-            if (json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
-            return { ok: false, reason: json.reason || "network" };
-          } catch {
-            return { ok: false, reason: "network" };
-          } finally {
-            window.clearTimeout(timeout);
-          }
+        sign: (audioItemId) => signWorkspaceTrack(modelRef.current?.spaceId ?? "cafe", audioItemId),
+        // t1331u: hall device copy of the track (offline buffer), preferred over the network.
+        localSource: (audioItemId, durationSec) => bufferRef.current?.localSource(audioItemId, durationSec) ?? null,
+        onSource: (audioItemId) => {
+          if (audioItemId) bufferRef.current?.pin(audioItemId);
         },
         // Locked iPhone (t1303u): hand the next track over before the end, never wait for the
         // network at the boundary.
@@ -524,6 +672,11 @@ export function BusinessCabinetPlayerProvider({
             needsGesture: current.needsGesture,
             index: current.index < 0 ? prev.index : current.index,
           }));
+          // t1331u: access gone – every copy on the device goes too; otherwise follow the queue.
+          if (current.status === "no_access") {
+            void bufferRef.current?.purge();
+            reportQueueRef.current?.clear();
+          } else bufferPlanRef.current();
           if (current.status === "paused" || current.status === "idle") {
             trySafeBuildReload();
           }
@@ -641,6 +794,7 @@ export function BusinessCabinetPlayerProvider({
       },
       onExpired: () => {
         void ctlRef.current?.applyManifest(null);
+        void bufferRef.current?.purge();
         (fadeRef.current ?? audioRef.current)?.pause();
         const prev = modelRef.current;
         if (!prev || prev.spaceId !== accessSpace) return;

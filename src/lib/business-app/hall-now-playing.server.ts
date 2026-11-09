@@ -40,8 +40,8 @@ export async function loadHallNowPlaying(input: { organizationId: string; locati
       .eq("player_id", session.player_id)
       .eq("location_id", input.locationId)
       .maybeSingle();
+    // queue_ahead_count is optional on older schemas; fall back to the preview ids alone.
     let snapshot = await readSnapshot(`${columns}, queue_ahead_count`);
-    // An application rollback / pending migration still reads the existing preview.
     if (snapshot.error?.code === "42703" || snapshot.error?.code === "PGRST204") {
       snapshot = await readSnapshot(columns);
     }
