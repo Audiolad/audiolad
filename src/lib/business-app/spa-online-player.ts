@@ -520,9 +520,32 @@ export class SpaOnlinePlayer {
   private settleWrapPending(): void {
     if (this.wrapPendingOp !== this.op || this.disposed || this.status !== "playing") return;
     this.wrapPendingOp = -1;
-    const target = this.nextTarget();
-    if (target < 0) return;
-    void this.playIndex(target, true);
+    if (!this.nextTargetId()) {
+      // No distinct next track any more (queue shrank): the current one keeps looping and the
+      // next wrap / handoff of this same track must be able to fire again.
+      this.handoffOp = -1;
+      return;
+    }
+    void this.playIndex(this.nextTarget(), true);
+  }
+
+  /**
+   * Review F6: the queue or the manifest changed while a loop wrap waits for the next link.
+   * No distinct next track: clear the wait (and the one-handoff mark) so the track is not stuck
+   * looping once the queue grows again. A ready link: switch now. Otherwise sign the new next
+   * track; its answer (or failure) settles the wait.
+   */
+  private recheckWrapPending(): void {
+    if (this.wrapPendingOp !== this.op || this.disposed || this.status !== "playing") return;
+    const id = this.nextTargetId();
+    if (!id) {
+      this.wrapPendingOp = -1;
+      this.handoffOp = -1;
+      return;
+    }
+    if (this.readyFor(id)) return this.settleWrapPending();
+    this.presignRetryAt = 0;
+    this.prefetchNext();
   }
 
   /**
@@ -535,6 +558,7 @@ export class SpaOnlinePlayer {
     const p = this.presigned;
     if (p && p.audioItemId !== this.nextTargetId()) this.presigned = null;
     this.prefetchNext();
+    this.recheckWrapPending();
   }
 
   /** Track the queue plays after the current one (null: none / same track). */
@@ -619,7 +643,7 @@ export class SpaOnlinePlayer {
       if (this.presigning === id) this.presigning = null;
       this.presignRetryAt = 0;
       // The queue moved on while this was signing: keep the link of the current next track.
-      if (id !== this.nextTargetId()) return;
+      if (id !== this.nextTargetId()) return this.recheckWrapPending();
       this.presigned = { audioItemId: id, url: r.data.url, at: this.now() };
       this.settleWrapPending();
     }, failed);
@@ -956,6 +980,7 @@ export class SpaOnlinePlayer {
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
       if (this.expired(items[idx])) return this.onDeadline(wasActive);
       if (this.status === "playing") this.armDeadline(currentId as string, this.op);
+      this.recheckWrapPending();
       this.d.onChange();
       return;
     }

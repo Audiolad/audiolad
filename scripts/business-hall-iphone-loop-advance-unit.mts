@@ -29,6 +29,8 @@ function world(opts: { hidden?: boolean; loop?: boolean; items?: SpaManifestItem
   const log: string[] = [];
   const held: ((r: OnlineSignResult) => void)[] = [];
   let hold = false;
+  /** Queue override: index to play after `cur` (null: the next row). */
+  let nextOverride: ((cur: number, len: number) => number) | null = null;
   const audio = {
     src: "",
     currentTime: 0,
@@ -56,6 +58,7 @@ function world(opts: { hidden?: boolean; loop?: boolean; items?: SpaManifestItem
     },
     backgroundAdvance: () => hidden,
     loopAdvance: () => audio.loop,
+    nextIndex: (cur, len) => (nextOverride ? nextOverride(cur, len) : (cur < 0 || cur >= len - 1 ? 0 : cur + 1)),
     onChange() {},
   }, opts.items ?? [item(1), item(2), item(3)]);
   return {
@@ -65,6 +68,7 @@ function world(opts: { hidden?: boolean; loop?: boolean; items?: SpaManifestItem
     setHang(v: boolean) { hang = v; },
     setHold(v: boolean) { hold = v; },
     setRefuse(v: boolean) { refuse = v; },
+    setNext(fn: ((cur: number, len: number) => number) | null) { nextOverride = fn; },
   };
 }
 
@@ -210,6 +214,93 @@ function playThrough(w: ReturnType<typeof world>, from: number, to: number, dura
   w.log.length = 0;
   w.p.onProgress(1.8, 200);
   assert.deepEqual(w.log, ["pause", "play:https://s/track-2"]);
+}
+
+// 4f. Review F6: a wrap waits for the next link, then the manifest shrinks to the current track
+//     only (no distinct next): the wait is cleared, the track keeps looping. When the manifest
+//     grows again, the next wrap moves on (never stuck on one track).
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  w.setHold(true);
+  w.tick(31 * 60_000);
+  playThrough(w, 100, 198, 200);
+  w.p.onSeeking(0.1, 200); // wrap → waits for the track-2 link
+  const late = w.held.at(-1);
+  await w.p.applyManifest([item(1)]);
+  assert.equal(w.p.current?.audioItemId, "track-1");
+  assert.equal(w.p.status, "playing");
+  late?.({ ok: true, data: { url: "https://s/track-2" } }); // the old answer arrives late
+  await flush();
+  w.log.length = 0;
+  playThrough(w, 0.25, 198, 200);
+  w.p.onSeeking(0.1, 200); // one-track program: the loop itself
+  assert.deepEqual(w.log, [], "no switch, no teardown while there is no next track");
+  w.setHold(false);
+  await w.p.applyManifest([item(1), item(2), item(3)]);
+  playThrough(w, 0.25, 198, 200); // pre-signs track-2 again
+  await flush();
+  w.log.length = 0;
+  w.p.onSeeking(0.1, 200);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"], "after the queue grew the next wrap moves on");
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-2");
+}
+
+// 4g. Review F6, queue order: while a wrap waits, «Меньше такой музыки» leaves no distinct next
+//     track (queueChanged). The wait clears; once a next track is back, the queue moves on –
+//     including by the early handoff, which must not stay blocked either.
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  w.setHold(true);
+  w.tick(31 * 60_000);
+  playThrough(w, 100, 198, 200);
+  w.p.onSeeking(0.1, 200);
+  w.setNext((cur) => cur); // no distinct next
+  w.p.queueChanged();
+  for (const r of w.held.splice(0)) r({ ok: true, data: { url: "https://s/track-2" } });
+  await flush();
+  w.log.length = 0;
+  playThrough(w, 0.25, 198, 200);
+  w.p.onSeeking(0.1, 200);
+  assert.deepEqual(w.log, [], "no next track: keeps looping");
+  assert.equal(w.p.current?.audioItemId, "track-1");
+  w.setHold(false);
+  w.setNext(null);
+  w.p.queueChanged(); // signs track-2 now
+  await flush();
+  playThrough(w, 0.25, 199, 200);
+  w.log.length = 0;
+  w.p.onProgress(200 - EARLY_HANDOFF_SEC + 0.1, 200);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"], "early handoff works again");
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-2");
+}
+
+// 4h. Review F6: the queue changes while a wrap waits and the NEW next track's link arrives:
+//     the switch goes to the new next track, not the old one.
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  w.setHold(true);
+  w.tick(31 * 60_000);
+  playThrough(w, 100, 198, 200);
+  w.p.onSeeking(0.1, 200); // waits for track-2
+  w.setNext(() => 2); // track-3 is next now
+  w.p.queueChanged();
+  const pending = w.held.splice(0);
+  pending[0]?.({ ok: true, data: { url: "https://s/track-2" } }); // stale answer: ignored
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-1", "stale link never plays");
+  w.log.length = 0;
+  pending[1]?.({ ok: true, data: { url: "https://s/track-3" } });
+  await flush();
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-3"]);
+  assert.equal(w.p.current?.audioItemId, "track-3");
 }
 
 // 5. Seeks made by the user (progress bar back to the start) or by the player are not a wrap.
