@@ -20,6 +20,7 @@ import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/li
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
+import { lockedAppleScreen, syncPlayerMediaSession, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
@@ -400,6 +401,9 @@ export function BusinessCabinetPlayerProvider({
             window.clearTimeout(timeout);
           }
         },
+        // Locked iPhone (t1303u): hand the next track over before the end, never wait for the
+        // network at the boundary.
+        backgroundAdvance: () => lockedAppleScreen(document, navigator),
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
         previousIndex: (currentIndex, length) => cafeQueuePreviousIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
@@ -828,6 +832,7 @@ export function BusinessCabinetPlayerProvider({
     if (prev && prev.length === order.length && prev.every((value, index) => value === order[index])) return;
     playOrderRef.current = order;
     setQueueOrderState(order);
+    ctl?.queueChanged();
     const idle = !ctl || ctl.status === "idle";
     if (savedPlaceRef.current || !idle) return;
     const start = unique[0] ?? 0;
@@ -861,6 +866,7 @@ export function BusinessCabinetPlayerProvider({
     });
     playOrderRef.current = plan.order;
     setQueueOrderState(plan.order);
+    ctl?.queueChanged();
     takeAtmosphereRestart();
     if (plan.keepCurrent) return;
     const start = plan.index;
@@ -933,6 +939,8 @@ export function BusinessCabinetPlayerProvider({
         const order = pointKeepCurrentOrder(indices, ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index);
         playOrderRef.current = order;
         setQueueOrderState(order);
+        // The next track changed: pre-sign it now (a locked iPhone cannot wait at the boundary).
+        ctl?.queueChanged();
         return "applied";
       }
       applyAtmosphereQueue(indices);
@@ -1125,6 +1133,38 @@ export function BusinessCabinetPlayerProvider({
   };
 
   const coverSrc = track ? cabinetAlbumCoverUrl({ coverUrl: track.coverUrl }) : null;
+
+  // Lock screen «Now Playing» (t1303u): the page that really plays keeps title, cover and
+  // play / pause / next there. Owner mirror: nothing plays on this phone, the session is cleared.
+  const sessionRunRef = useRef<(action: SessionAction) => void>(() => {});
+  useLayoutEffect(() => {
+    sessionRunRef.current = (action) => {
+      const status = ctlRef.current?.status;
+      const active = status === "playing" || status === "loading";
+      if (action === "nexttrack") return void deviceNext();
+      if ((action === "play") !== active) void toggleRef.current();
+    };
+  });
+  const localSessionCanNext = !pointReports || pointCanEdit;
+  const sessionTrack = open && !mirror && track ? track : null;
+  const sessionTitle = sessionTrack?.title ?? "";
+  const sessionArtist = sessionTrack?.authorName?.trim() || "";
+  const sessionArtwork = sessionTrack && coverSrc && failedCover !== coverSrc ? coverSrc : null;
+  const sessionPlaying = view.status === "playing" || view.status === "loading";
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    syncPlayerMediaSession(
+      navigator.mediaSession,
+      sessionTrack ? { title: sessionTitle, artist: sessionArtist, artwork: sessionArtwork, playing: sessionPlaying, canNext: localSessionCanNext } : null,
+      (action) => sessionRunRef.current(action),
+      (init) => (typeof MediaMetadata === "undefined" ? null : new MediaMetadata(init)),
+    );
+  }, [sessionTrack, sessionTitle, sessionArtist, sessionArtwork, sessionPlaying, localSessionCanNext]);
+  useEffect(() => () => {
+    if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+      syncPlayerMediaSession(navigator.mediaSession, null, () => {}, () => null);
+    }
+  }, []);
 
   return (
     <CabinetContext.Provider value={api}>
