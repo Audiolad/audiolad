@@ -1,6 +1,7 @@
 import {
   partnerDiscountPercent,
   partnerFinishedNotice,
+  partnerLatePaymentNotice,
   partnerQuoteTermsLines,
   type PartnerQuote,
 } from "@/lib/business/partner-codes";
@@ -60,6 +61,16 @@ export function BusinessPartnerFinishedNotice({ quote }: { quote: PartnerQuote |
   if (!notice) return null;
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" role="status" data-testid="biz-partner-finished">
+      {notice}
+    </p>
+  );
+}
+
+export function BusinessPartnerLatePaymentNotice({ quote }: { quote: PartnerQuote | null }) {
+  const notice = partnerLatePaymentNotice(quote);
+  if (!notice) return null;
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text-muted)]" role="status" data-testid="biz-partner-late-payment">
       {notice}
     </p>
   );

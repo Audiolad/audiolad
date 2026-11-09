@@ -15,6 +15,7 @@ export type BusinessPayErrorCode =
   | "venue_topup_not_available"
   | "pending_order_mismatch"
   | "partner_terms_changed"
+  | "partner_period_in_payment"
   | "internal_error";
 
 export const BUSINESS_STANDARD_UNIT_PRICE_MINOR = BUSINESS_PLAN_MONTHLY_PRICE_RUB * 100;
@@ -65,6 +66,7 @@ export function mapBusinessSubscriptionRpcError(message: string): {
   if (normalized.includes("venue_topup_not_available")) return { status: 409, error: "venue_topup_not_available", href: null };
   if (normalized.includes("pending_order_mismatch")) return { status: 409, error: "pending_order_mismatch", href: null };
   // 8142d69a: the per-venue price changed since the owner saw it (code applied or used up).
+  if (normalized.includes("partner_period_in_payment")) return { status: 409, error: "partner_period_in_payment", href: null };
   if (normalized.includes("partner_terms_changed")) return { status: 409, error: "partner_terms_changed", href: null };
   if (normalized.includes("not_authenticated")) {
     return { status: 401, error: "unauthorized", href: null };

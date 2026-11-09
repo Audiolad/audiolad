@@ -24,6 +24,16 @@ def function(sql, name):
     start = sql.index('CREATE OR REPLACE FUNCTION public.' + name + '(')
     return sql[start:sql.index('\n$$;', start)+4]
 
+def partner_migration_without_fulfill():
+    # The payment webhook schema is not in these small fixtures: the late-confirmation branch of
+    # fulfill_tochka_payment_transactional is covered by the post-apply real-compile smoke
+    # (supabase/tests/business_partner_codes_fulfill_smoke.sql). Everything else runs here.
+    sql = migration('20270302120000_business_partner_codes.sql')
+    start = sql.index('-- 11. Bank confirmation of a replaced business link')
+    marker = 'COMMENT ON FUNCTION public.fulfill_tochka_payment_transactional IS'
+    end = sql.index("';\n", sql.index(marker)) + 2
+    return sql[:start] + sql[end:]
+
 stubs = """
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
@@ -62,7 +72,8 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
           (root/'supabase/tests/business_shared_venue_renewal_smoke.sql').read_text(),
           migration('20270227120000_business_venue_slots_systemic.sql'),
           (root/'supabase/tests/business_venue_slots_systemic_smoke.sql').read_text(),
-          migration('20270302120000_business_partner_codes.sql'),
+          'ALTER TABLE orders ADD COLUMN updated_at timestamptz, ADD COLUMN cancelled_at timestamptz;',
+          partner_migration_without_fulfill(),
           (root/'supabase/tests/business_partner_codes_smoke.sql').read_text()]
 with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     data = Path(tmp)/'data'
@@ -96,5 +107,5 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     finally:
         server.terminate(); server.wait(timeout=30)
     print('partner codes: two parallel sessions, exactly one reservation: PASS')
-    print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one: PASS')
+    print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')

@@ -190,4 +190,86 @@ DO $$ BEGIN
     RAISE EXCEPTION 'direct 39900 order without a code accepted';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END; $$;
+
+-- Shared helper: a real succeeded payment for an existing order.
+CREATE FUNCTION pg_temp.pay(p_order uuid) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN
+  INSERT INTO payments(order_id,status,amount_minor,confirmed_at) SELECT p_order,'succeeded',o.amount_minor,clock_timestamp() FROM orders o WHERE o.id=p_order;
+  UPDATE orders SET status='paid', paid_at=clock_timestamp() WHERE id=p_order;
+  RETURN public.apply_business_subscription_for_order(p_order);
+END; $f$;
+INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000000e1'), ('00000000-0000-4000-8000-0000000000e2'),
+  ('00000000-0000-4000-8000-0000000000f1'), ('00000000-0000-4000-8000-0000000000f2'), ('00000000-0000-4000-8000-0000000000a9');
+INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000000e1'), ('00000000-0000-4000-8000-0000000000e2'),
+  ('00000000-0000-4000-8000-0000000000f1'), ('00000000-0000-4000-8000-0000000000f2'), ('00000000-0000-4000-8000-0000000000a9');
+INSERT INTO business_partner_codes(code, purpose) VALUES ('EEEEEEEEEEEE','other'), ('EEEEEEEEEEE2','other'), ('FFFFFFFFFFFF','other'), ('GGGGGGGGGGGG','other');
+
+-- Revoke: reserve, open a 39900 link, revoke, then the bank still confirms the old link.
+SET test.uid='00000000-0000-4000-8000-0000000000e1';
+INSERT INTO pc SELECT 'orgE', (public.create_business_organization_with_location('E','Зал 1','cafe','RU','Europe/Moscow')->>'organization_id')::uuid;
+SELECT public.reserve_business_partner_code('EEEEEEEEEEEE');
+INSERT INTO pc SELECT 'e399', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SELECT public.check_test((public.revoke_business_partner_code((SELECT id FROM business_partner_codes WHERE code='EEEEEEEEEEEE'))->>'invalidated_orders')::int=1, 'revoke: the open personal-price link is no longer offered');
+SELECT public.check_test(((public.revoke_business_partner_code((SELECT id FROM business_partner_codes WHERE code='EEEEEEEEEEEE'))->>'already')::boolean), 'revoke is idempotent');
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='standard', 'revoke: quote back to the standard price');
+INSERT INTO pc SELECT 'e799', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 79900);
+SELECT public.check_test((SELECT v FROM pc WHERE k='e799')<>(SELECT v FROM pc WHERE k='e399') AND (SELECT amount_minor=79900 FROM orders WHERE id=(SELECT v FROM pc WHERE k='e799')), 'revoke: the owner gets a fresh 79900 link, the revoked link is not reused');
+SELECT public.check_test(((pg_temp.pay((SELECT v FROM pc WHERE k='e399'))->'partner'->>'reason')='code_revoked'), 'revoke then late payment: the code is refused');
+SELECT public.check_test((SELECT bound_organization_id IS NULL FROM business_partner_codes WHERE code='EEEEEEEEEEEE')
+  AND NOT EXISTS (SELECT 1 FROM business_partner_entitlements WHERE organization_id=(SELECT v FROM pc WHERE k='orgE')), 'revoked code never binds, no personal price');
+SELECT public.check_test((SELECT opens_access AND amount_minor=39900 FROM business_subscription_periods WHERE order_id=(SELECT v FROM pc WHERE k='e399')), 'the money paid buys exactly its 30 days');
+SELECT public.check_test((SELECT late_paid_at IS NOT NULL AND reason='partner_code_revoked' FROM business_subscription_superseded_orders WHERE order_id=(SELECT v FROM pc WHERE k='e399')), 'late payment on a revoked code is recorded');
+SELECT public.check_test((public.business_partner_quote_for_caller()->'late_payment'->>'reason')='partner_code_revoked' AND (public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=79900, 'owner sees the revoked-code payment, next price 79900');
+-- A code revoked by a direct row update (no admin function) is refused the same way.
+SET test.uid='00000000-0000-4000-8000-0000000000e2';
+INSERT INTO pc SELECT 'orgE2', (public.create_business_organization_with_location('E2','Зал 1','cafe','RU','Europe/Moscow')->>'organization_id')::uuid;
+SELECT public.reserve_business_partner_code('EEEEEEEEEEE2');
+INSERT INTO pc SELECT 'e2', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+UPDATE business_partner_codes SET revoked_at=clock_timestamp(), reserved_by_user_id=NULL, reserved_until=NULL WHERE code='EEEEEEEEEEE2';
+SELECT public.check_test(((pg_temp.pay((SELECT v FROM pc WHERE k='e2'))->'partner'->>'reason')='code_revoked'), 'revoked without the admin function: refused');
+SELECT public.check_test((SELECT bound_organization_id IS NULL FROM business_partner_codes WHERE code='EEEEEEEEEEE2'), 'revoked without the admin function: never binds');
+DO $$ BEGIN
+  BEGIN PERFORM public.revoke_business_partner_code((SELECT id FROM business_partner_codes WHERE code='ABCDEFGHJKMN')); RAISE EXCEPTION 'bound code revoked';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_code_bound' THEN RAISE; END IF; END;
+END; $$;
+SELECT public.check_test(NOT has_function_privilege('authenticated','public.revoke_business_partner_code(uuid)','EXECUTE'), 'revoke is service-only');
+
+-- An open unpaid 79900 link, then a code: the owner proceeds alone.
+SET test.uid='00000000-0000-4000-8000-0000000000a9';
+INSERT INTO pc SELECT 'orgG', (public.create_business_organization_with_location('G','Зал 1','cafe','RU','Europe/Moscow')->>'organization_id')::uuid;
+INSERT INTO pc SELECT 'g799', order_id FROM public.create_business_subscription_order(gen_random_uuid());
+SELECT public.reserve_business_partner_code('GGGGGGGGGGGG');
+INSERT INTO pc SELECT 'g399', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SELECT public.check_test((SELECT amount_minor=39900 FROM orders WHERE id=(SELECT v FROM pc WHERE k='g399')), 'open 79900 link: the code still gives a 39900 link');
+SELECT public.check_test((SELECT reason='partner_code_applied' FROM business_subscription_superseded_orders WHERE order_id=(SELECT v FROM pc WHERE k='g799')), 'the old ordinary link is replaced, not reused');
+SELECT public.check_test((SELECT order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900))=(SELECT v FROM pc WHERE k='g399'), 'repeat: the same 39900 link (idempotent)');
+SELECT public.check_test((SELECT count(*)=1 FROM business_subscription_superseded_orders WHERE organization_id=(SELECT v FROM pc WHERE k='orgG')), 'replacement recorded once');
+-- The bank still confirms the replaced 79900 link: 30 days at 79900, no binding, nothing lost.
+SELECT public.check_test((pg_temp.pay((SELECT v FROM pc WHERE k='g799'))->>'partner') IS NULL, 'late ordinary payment: no partner record');
+SELECT public.check_test((SELECT opens_access AND amount_minor=79900 FROM business_subscription_periods WHERE order_id=(SELECT v FROM pc WHERE k='g799')), 'late ordinary payment buys its 30 days');
+SELECT public.check_test((SELECT bound_organization_id IS NULL AND reserved_by_user_id IS NOT NULL FROM business_partner_codes WHERE code='GGGGGGGGGGGG'), 'the code stays reserved, not burned');
+SELECT public.check_test((public.business_partner_quote_for_caller()->'late_payment'->>'reason')='partner_code_applied' AND (public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=39900, 'owner sees the late payment, the code price stays');
+SELECT public.check_test(((pg_temp.pay((SELECT v FROM pc WHERE k='g399'))->'partner'->>'period_index')::int=1), 'then the 39900 link is period 1');
+SELECT public.check_test((SELECT bound_organization_id=(SELECT v FROM pc WHERE k='orgG') FROM business_partner_codes WHERE code='GGGGGGGGGGGG'), 'and binds the code');
+SELECT public.check_test((SELECT p.period_start=(SELECT period_end FROM business_subscription_periods WHERE order_id=(SELECT v FROM pc WHERE k='g799')) FROM business_subscription_periods p WHERE p.order_id=(SELECT v FROM pc WHERE k='g399')), 'no overlap: the code period follows the late ordinary one');
+
+-- Two owners of one account: only one open link for the same personal-price period.
+SET test.uid='00000000-0000-4000-8000-0000000000f1';
+INSERT INTO pc SELECT 'orgF', (public.create_business_organization_with_location('F','Зал 1','cafe','RU','Europe/Moscow')->>'organization_id')::uuid;
+INSERT INTO business_organization_members(organization_id,user_id,role,created_at) SELECT v,'00000000-0000-4000-8000-0000000000f2','owner',now()+interval '1 second' FROM pc WHERE k='orgF';
+SELECT public.reserve_business_partner_code('FFFFFFFFFFFF');
+INSERT INTO pc SELECT 'f1', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SELECT pg_temp.pay(v) FROM pc WHERE k='f1';
+UPDATE business_subscription_periods SET period_start=period_start-interval '400 days', period_end=period_end-interval '400 days'
+WHERE order_id=(SELECT v FROM pc WHERE k='f1');
+UPDATE access_paid_periods SET paid_until=clock_timestamp()-interval '1 day' WHERE user_id='00000000-0000-4000-8000-0000000000f1';
+INSERT INTO pc SELECT 'f1b', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SET test.uid='00000000-0000-4000-8000-0000000000f2';
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=39900, 'second owner sees the account price');
+DO $$ BEGIN
+  BEGIN PERFORM * FROM public.create_business_subscription_order(gen_random_uuid(), 39900); RAISE EXCEPTION 'two open links for one personal period';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_period_in_payment' THEN RAISE; END IF; END;
+END; $$;
+-- Venue-less account with an active discount: quote and checkout agree on the standard single payment.
+UPDATE business_locations SET status='closed' WHERE organization_id=(SELECT v FROM pc WHERE k='orgF');
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='entitlement' AND (public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=79900, 'no active venue: quote shows the standard single payment');
 SELECT 'partner codes: PASS';

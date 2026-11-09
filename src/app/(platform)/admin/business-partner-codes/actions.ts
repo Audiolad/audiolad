@@ -62,22 +62,20 @@ export async function createPartnerCodeAction(input: {
   return { ok: false, error: "unavailable" };
 }
 
-/** Only a code that is not bound to an account yet. A bound code keeps its account forever. */
+/**
+ * Only a code that is not bound to an account yet. A bound code keeps its account forever.
+ * One transaction: the code is revoked and its open personal-price payment links stop being
+ * offered; a payment that still arrives on such a link buys only the 30 days it paid for.
+ */
 export async function revokePartnerCodeAction(input: { id: string }): Promise<{ ok: boolean }> {
   await requirePlatformOwnerAccess(BUSINESS_PARTNER_CODES_HREF);
   const id = typeof input?.id === "string" ? input.id : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false };
   try {
-    const { data, error } = await createServiceRoleClient()
-      .from("business_partner_codes")
-      .update({ revoked_at: new Date().toISOString(), reserved_by_user_id: null, reserved_until: null })
-      .eq("id", id)
-      .is("bound_organization_id", null)
-      .is("revoked_at", null)
-      .select("id");
+    const { data, error } = await createServiceRoleClient().rpc("revoke_business_partner_code", { p_code_id: id });
     if (error) return { ok: false };
     revalidatePath(BUSINESS_PARTNER_CODES_HREF);
-    return { ok: Array.isArray(data) && data.length === 1 };
+    return { ok: (data as { ok?: unknown } | null)?.ok === true };
   } catch {
     return { ok: false };
   }

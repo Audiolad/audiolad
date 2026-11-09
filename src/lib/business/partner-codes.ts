@@ -94,7 +94,23 @@ export type PartnerQuote = {
   periodsUsed: number;
   codeHint: string | null;
   discountPaidUntil: string | null;
+  /** A payment that still arrived on a link the cabinet no longer offered (replaced or revoked code). */
+  latePayment: PartnerLatePayment | null;
 };
+
+export type PartnerLatePayment = {
+  reason: "partner_code_applied" | "partner_code_revoked";
+  paidAt: string;
+  periodEnd: string;
+};
+
+function parseLatePayment(raw: unknown): PartnerLatePayment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  if (row.reason !== "partner_code_applied" && row.reason !== "partner_code_revoked") return null;
+  if (typeof row.paid_at !== "string" || typeof row.period_end !== "string") return null;
+  return { reason: row.reason, paidAt: row.paid_at, periodEnd: row.period_end };
+}
 
 function minorToRub(value: unknown): number | null {
   const n = typeof value === "string" ? Number(value) : value;
@@ -129,6 +145,7 @@ export function parsePartnerQuote(raw: unknown): PartnerQuote | null {
     periodsUsed: intOrNull(row.periods_used) ?? 0,
     codeHint: typeof row.code_hint === "string" ? row.code_hint : null,
     discountPaidUntil: typeof row.discount_paid_until === "string" ? row.discount_paid_until : null,
+    latePayment: parseLatePayment(row.late_payment),
   };
 }
 
@@ -178,6 +195,28 @@ export function partnerFinishedNotice(quote: PartnerQuote | null): string | null
   return `Персональная цена закончилась: оплачено ${quote.periodsUsed} ${ruPeriodsWord(quote.periodsUsed)}. Сейчас действует обычная цена – ${quote.standardUnitPriceRub} ₽ за точку за ${BUSINESS_PAID_PERIOD_DAYS} дней.`;
 }
 
+function ruMoscowDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: "Europe/Moscow" });
+}
+
+/**
+ * The bank still confirmed a link the cabinet had replaced: the money is never lost, it buys
+ * exactly the 30 days that were paid. For a revoked code no personal price follows.
+ */
+export function partnerLatePaymentNotice(quote: PartnerQuote | null): string | null {
+  const late = quote?.latePayment;
+  if (!late) return null;
+  const paid = ruMoscowDate(late.paidAt);
+  const until = ruMoscowDate(late.periodEnd);
+  if (!paid || !until) return null;
+  if (late.reason === "partner_code_revoked") {
+    return `Персональный код отозван до первой оплаты. Оплата от ${paid} засчитана полностью: доступ продлён до ${until}. Скидка по коду больше не действует, следующая оплата – по обычной цене ${quote.standardUnitPriceRub} ₽ за точку.`;
+  }
+  return `Прежняя ссылка на оплату всё же была оплачена ${paid}. Оплата засчитана полностью: доступ продлён до ${until}.`;
+}
+
 export type PartnerCodeApiError =
   | "partner_code_invalid"
   | "partner_code_unavailable"
@@ -185,8 +224,14 @@ export type PartnerCodeApiError =
   | "not_organization_owner"
   | "support_mode_consent_forbidden"
   | "venue_device"
+  | "rate_limited"
   | "unauthorized"
   | "internal_error";
+
+/** Only these mean the code itself can never work for this account: the link cookie is dropped. */
+export function partnerCodeErrorIsFinal(code: PartnerCodeApiError | string): boolean {
+  return code === "partner_code_invalid" || code === "partner_code_unavailable" || code === "partner_code_already_applied";
+}
 
 export function mapPartnerCodeRpcError(message: string): { status: number; error: PartnerCodeApiError } {
   const m = message.toLowerCase();
@@ -213,6 +258,8 @@ export function partnerCodeErrorText(code: PartnerCodeApiError | string): string
       return "На устройстве в зале код не применяется.";
     case "support_mode_consent_forbidden":
       return "В режиме сопровождения код не применяется.";
+    case "rate_limited":
+      return "Слишком много попыток. Подождите минуту и попробуйте снова.";
     default:
       return "Не удалось применить код. Попробуйте ещё раз.";
   }

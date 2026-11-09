@@ -1,10 +1,14 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+
+import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import {
   PARTNER_CODE_COOKIE,
   PARTNER_CODE_COOKIE_MAX_AGE_SECONDS,
   mapPartnerCodeRpcError,
+  partnerCodeErrorIsFinal,
   normalizePartnerCode,
   parsePartnerQuote,
   type PartnerQuote,
@@ -46,6 +50,17 @@ function withPendingCookie(response: NextResponse, request: Request, code: strin
   return response;
 }
 
+// Simple per-address limit (same in-memory limiter as other public routes): enough for a
+// person typing a code, useless for guessing 32^12 codes.
+const PARTNER_CODE_RATE_LIMIT = 30;
+const PARTNER_CODE_RATE_WINDOW_MS = 60_000;
+
+function partnerCodeRateLimited(request: Request): boolean {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+  const key = `biz-partner-code:${createHash("sha256").update(ip).digest("hex").slice(0, 16)}`;
+  return !checkAnalyticsRateLimit(key, PARTNER_CODE_RATE_LIMIT, PARTNER_CODE_RATE_WINDOW_MS);
+}
+
 /** Only for a personal link opened before any account exists. Says whether the offer is open. */
 async function previewCode(code: string) {
   try {
@@ -74,6 +89,9 @@ async function previewCode(code: string) {
  * A hall device never applies a code.
  */
 export async function POST(request: Request) {
+  if (partnerCodeRateLimited(request)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
   const body = (await request.json().catch(() => null)) as { code?: unknown } | null;
   const typed = body && "code" in body ? normalizePartnerCode(body.code) : undefined;
   if (typed === null) {
@@ -103,18 +121,19 @@ export async function POST(request: Request) {
     const { data, error } = await supabase.rpc("reserve_business_partner_code", { p_code: code });
     if (error) {
       const mapped = mapPartnerCodeRpcError(error.message);
-      if (mapped.error === "internal_error" && typed === undefined) {
-        // Old schema or a transient error: keep the link code for the next visit.
-      } else if (typed !== undefined) {
+      // Only a final answer about the code itself drops the link code. «Not an owner yet»,
+      // support mode or a transient error keep it for the next visit.
+      const final = partnerCodeErrorIsFinal(mapped.error);
+      if (typed !== undefined) {
         return withPendingCookie(
           NextResponse.json({ error: mapped.error }, { status: mapped.status }),
           request,
-          mapped.error === "internal_error" ? readPendingCode(request) : null,
+          // A wrong typed code never drops a different code kept from the personal link.
+          final && readPendingCode(request) === typed ? null : readPendingCode(request),
         );
-      } else {
-        keepCookie = null;
-        reserveError = mapped.error;
       }
+      if (final) keepCookie = null;
+      reserveError = mapped.error === "internal_error" ? null : mapped.error;
     } else {
       quote = parsePartnerQuote((data as { quote?: unknown } | null)?.quote);
     }

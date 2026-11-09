@@ -24,6 +24,7 @@ import {
 } from "@/lib/business/partner-codes";
 import {
   BusinessPartnerFinishedNotice,
+  BusinessPartnerLatePaymentNotice,
   BusinessPartnerTerms,
   BusinessStruckPrice,
 } from "@/components/business-app/BusinessPartnerPrice";
@@ -345,6 +346,7 @@ export function BusinessPayControls({
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
+      <BusinessPartnerLatePaymentNotice quote={quote} />
       {partnerQuoteIsDiscounted(quote) ? (
         <BusinessPartnerTerms quote={quote} />
       ) : (
@@ -425,6 +427,13 @@ export function BusinessPayError({ error }: { error: PayError }) {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
         Цена оплаты изменилась. Проверьте условия выше и нажмите кнопку оплаты ещё раз.
+      </p>
+    );
+  }
+  if (error.code === "partner_period_in_payment") {
+    return (
+      <p role="alert" data-testid="biz-home-pay-error">
+        Другой владелец аккаунта уже открыл оплату этого периода по персональной цене. Проверьте статус оплаты чуть позже.
       </p>
     );
   }

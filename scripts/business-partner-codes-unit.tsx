@@ -21,7 +21,9 @@ import {
   partnerCodeStatus,
   partnerConfirmedUnitPriceMinor,
   partnerDiscountPercent,
+  partnerCodeErrorIsFinal,
   partnerFinishedNotice,
+  partnerLatePaymentNotice,
   partnerPeriodsLeft,
   partnerQuoteIsDiscounted,
   partnerQuoteTermsLines,
@@ -98,6 +100,24 @@ assert.ok(finished);
 assert.equal(partnerQuoteIsDiscounted(finished), false, "after the window no discount is shown");
 assert.match(partnerFinishedNotice(finished) ?? "", /Персональная цена закончилась: оплачено 3 оплаченных периода\. Сейчас действует обычная цена – 799 ₽ за точку за 30 дней\./);
 assert.equal(ruPeriodsWord(1), "оплаченный период");
+
+// A late bank confirmation of a replaced link: shown plainly, never a bare personal price.
+const revokedLate = parsePartnerQuote({ source: "standard", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 1,
+  total_minor: 79900, late_payment: { reason: "partner_code_revoked", paid_at: "2026-11-09T07:00:00Z", period_end: "2026-12-09T07:00:00Z" } });
+assert.ok(revokedLate?.latePayment);
+assert.equal(partnerLatePaymentNotice(revokedLate),
+  "Персональный код отозван до первой оплаты. Оплата от 9 ноября засчитана полностью: доступ продлён до 9 декабря. Скидка по коду больше не действует, следующая оплата – по обычной цене 799 ₽ за точку.");
+assert.doesNotMatch(partnerLatePaymentNotice(revokedLate) ?? "", /399/, "no bare personal price");
+const replacedLate = parsePartnerQuote({ source: "reserved", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1,
+  total_minor: 39900, discount_periods: 3, period_index: 1, periods_used: 0,
+  late_payment: { reason: "partner_code_applied", paid_at: "2026-11-09T07:00:00Z", period_end: "2026-12-09T07:00:00Z" } });
+assert.equal(partnerLatePaymentNotice(replacedLate), "Прежняя ссылка на оплату всё же была оплачена 9 ноября. Оплата засчитана полностью: доступ продлён до 9 декабря.");
+assert.equal(partnerLatePaymentNotice(reserved), null);
+assert.equal(parsePartnerQuote({ source: "standard", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 79900, late_payment: { reason: "x" } })?.latePayment, null);
+// Only a final answer about the code drops the link cookie.
+assert.ok(partnerCodeErrorIsFinal("partner_code_invalid") && partnerCodeErrorIsFinal("partner_code_unavailable") && partnerCodeErrorIsFinal("partner_code_already_applied"));
+assert.ok(!partnerCodeErrorIsFinal("not_organization_owner") && !partnerCodeErrorIsFinal("support_mode_consent_forbidden") && !partnerCodeErrorIsFinal("internal_error"));
+assert.equal(mapBusinessSubscriptionRpcError("partner_period_in_payment").error, "partner_period_in_payment");
 assert.equal(ruPeriodsWord(3), "оплаченных периода");
 assert.equal(ruPeriodsWord(5), "оплаченных периодов");
 
@@ -198,10 +218,20 @@ assert.match(route, /p_expected_unit_price_minor: confirmedUnitPriceMinor/);
 const landing = readFileSync("src/components/business-app/BusinessPartnerLanding.tsx", "utf8");
 assert.match(landing, /BusinessStruckPrice/, "the link landing shows the struck price");
 assert.match(landing, /BusinessGuestStartCta/, "the free start stays the same");
+const partnerRoute = readFileSync("src/app/api/business/partner-code/route.ts", "utf8");
+assert.match(partnerRoute, /checkAnalyticsRateLimit/, "the code endpoint is rate limited");
+assert.match(partnerRoute, /partnerCodeErrorIsFinal/, "the link cookie survives non-final errors");
+const revoke = readFileSync("src/app/(platform)/admin/business-partner-codes/actions.ts", "utf8");
+assert.match(revoke, /rpc\("revoke_business_partner_code"/, "revoke goes through the one transactional function");
+assert.match(card, /partner_period_in_payment/);
 const migration = readFileSync("supabase/migrations/20270302120000_business_partner_codes.sql", "utf8");
 assert.match(migration, /^-- PREPARE ONLY/);
 assert.doesNotMatch(migration, /GRACE|льготн/i);
 const executable = migration.split("COMMIT;")[0].replace(/--[^\n]*/g, "");
 assert.doesNotMatch(executable, /DROP TABLE|DROP COLUMN|TRUNCATE/i, "additive only");
 assert.deepEqual(executable.match(/DELETE FROM [a-z_.]+/g), ["DELETE FROM public.access_paid_periods"], "only the existing guest-summary fold, unchanged");
+// The replaced-link path never ends in the dead-end mismatch for a code, and fulfilment changes only that branch.
+assert.match(executable, /v_replace_reason := 'partner_code_applied'/);
+assert.match(executable, /IF v_order.status IN \('cancelled', 'failed'\) AND NOT v_superseded THEN/);
+assert.equal((executable.match(/v_superseded/g) ?? []).length, 5, "fulfilment: one flag, three guarded branches");
 console.log("business-partner-codes-unit: PASS");

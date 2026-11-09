@@ -85,6 +85,23 @@ ALTER TABLE public.business_subscription_periods DROP CONSTRAINT business_subscr
 ALTER TABLE public.business_subscription_periods ADD CONSTRAINT business_subscription_periods_amount_check
   CHECK (amount_minor BETWEEN 100 AND 79900 * 10 AND amount_minor % 100 = 0);
 
+-- Open payment links that the cabinet no longer offers: an ordinary link replaced when the
+-- owner applied a code, or a personal-price link of a code revoked before payment. The bank
+-- link itself may still be paid: such a late payment buys exactly the 30 days that were paid
+-- (never a personal-price entitlement for a revoked code) and is recorded here for the owner.
+CREATE TABLE public.business_subscription_superseded_orders (
+  order_id uuid PRIMARY KEY REFERENCES public.orders(id) ON DELETE RESTRICT,
+  organization_id uuid NOT NULL REFERENCES public.business_organizations(id) ON DELETE RESTRICT,
+  reason text NOT NULL CHECK (reason IN ('partner_code_applied', 'partner_code_revoked')),
+  superseded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  late_paid_at timestamptz NULL
+);
+CREATE INDEX business_subscription_superseded_orders_org
+  ON public.business_subscription_superseded_orders(organization_id, late_paid_at);
+ALTER TABLE public.business_subscription_superseded_orders ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.business_subscription_superseded_orders FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.business_subscription_superseded_orders TO service_role;
+
 -- 5. The single price source per business account.
 -- source: 'entitlement' (bound, personal price left), 'finished' (all personal periods used),
 -- 'reserved' (code held by this owner, first payment not made yet) or 'standard'.
@@ -111,7 +128,8 @@ BEGIN
     WHERE c.reserved_by_user_id = p_user_id AND c.bound_organization_id IS NULL AND c.revoked_at IS NULL
       AND (c.reserved_until > clock_timestamp() OR EXISTS (
         SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
-        WHERE s.partner_code_id = c.id AND o.user_id = p_user_id AND o.status = 'pending'))
+        WHERE s.partner_code_id = c.id AND o.user_id = p_user_id AND o.status = 'pending'
+          AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)))
     ORDER BY c.reserved_until DESC LIMIT 1;
     IF FOUND THEN
       RETURN QUERY SELECT 'reserved'::text, v_c.unit_price_minor, v_c.id, 1, v_c.discount_periods::integer, 0;
@@ -135,7 +153,7 @@ GRANT EXECUTE ON FUNCTION public.business_partner_owner_organization(uuid) TO se
 
 CREATE FUNCTION public.business_partner_quote_json(p_user_id uuid) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_org uuid; v_q record; v_count integer := 0; v_hint text; v_until timestamptz;
+DECLARE v_org uuid; v_q record; v_count integer := 0; v_hint text; v_until timestamptz; v_late jsonb;
 BEGIN
   v_org := public.business_partner_owner_organization(p_user_id);
   IF v_org IS NOT NULL THEN
@@ -148,9 +166,20 @@ BEGIN
   IF v_org IS NOT NULL THEN
     SELECT max(p.period_end) INTO v_until FROM public.business_partner_entitlement_periods p WHERE p.organization_id = v_org;
   END IF;
-  -- Without an active venue the old single-payment path stays at the standard price.
-  IF v_count = 0 AND v_q.source = 'reserved' THEN
+  -- Without an active venue the old single-payment path stays at the standard price,
+  -- exactly as create_business_subscription_order charges it.
+  IF v_count = 0 AND v_q.source IN ('reserved', 'entitlement') THEN
     v_q.unit_price_minor := 79900;
+  END IF;
+  -- A payment that still arrived on a link the cabinet no longer offers: shown to the owner
+  -- while the 30 days it bought last.
+  IF v_org IS NOT NULL THEN
+    SELECT jsonb_build_object('reason', x.reason, 'paid_at', x.late_paid_at, 'period_end', p.period_end)
+    INTO v_late
+    FROM public.business_subscription_superseded_orders x
+    JOIN public.business_subscription_periods p ON p.order_id = x.order_id
+    WHERE x.organization_id = v_org AND x.late_paid_at IS NOT NULL AND p.period_end > clock_timestamp()
+    ORDER BY x.late_paid_at DESC LIMIT 1;
   END IF;
   RETURN jsonb_build_object(
     'source', v_q.source,
@@ -162,7 +191,8 @@ BEGIN
     'period_index', v_q.period_index,
     'periods_used', v_q.periods_used,
     'code_hint', v_hint,
-    'discount_paid_until', v_until);
+    'discount_paid_until', v_until,
+    'late_payment', v_late);
 END; $$;
 REVOKE ALL ON FUNCTION public.business_partner_quote_json(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.business_partner_quote_json(uuid) TO service_role;
@@ -215,13 +245,15 @@ BEGIN
   IF v_c.reserved_by_user_id IS NOT NULL AND v_c.reserved_by_user_id <> v_user AND (
     v_c.reserved_until > clock_timestamp() OR EXISTS (
       SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
-      WHERE s.partner_code_id = v_c.id AND o.status = 'pending')) THEN
+      WHERE s.partner_code_id = v_c.id AND o.status = 'pending'
+        AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id))) THEN
     RAISE EXCEPTION 'partner_code_unavailable' USING ERRCODE = 'P0001';
   END IF;
 
   -- An open payment link of this owner under another code keeps that code.
   IF EXISTS (SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
-    WHERE o.user_id = v_user AND o.status = 'pending' AND s.partner_code_id IS NOT NULL AND s.partner_code_id <> v_c.id) THEN
+    WHERE o.user_id = v_user AND o.status = 'pending' AND s.partner_code_id IS NOT NULL AND s.partner_code_id <> v_c.id
+      AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)) THEN
     RAISE EXCEPTION 'partner_code_already_applied' USING ERRCODE = 'P0001';
   END IF;
 
@@ -265,6 +297,15 @@ BEGIN
   IF NOT FOUND THEN RETURN jsonb_build_object('recorded', false, 'reason', 'code_missing'); END IF;
   SELECT * INTO v_e FROM public.business_partner_entitlements WHERE organization_id = p_organization_id FOR UPDATE;
   IF NOT FOUND THEN
+    IF v_c.revoked_at IS NOT NULL THEN
+      -- Revoked before its first payment: the money was charged at the shown price and buys
+      -- this one paid period; the code never binds and no personal price follows.
+      INSERT INTO public.business_subscription_superseded_orders(order_id, organization_id, reason, late_paid_at)
+      VALUES (p_order_id, p_organization_id, 'partner_code_revoked', p_paid_at)
+      ON CONFLICT (order_id) DO UPDATE SET late_paid_at = coalesce(
+        public.business_subscription_superseded_orders.late_paid_at, EXCLUDED.late_paid_at);
+      RETURN jsonb_build_object('recorded', false, 'reason', 'code_revoked');
+    END IF;
     IF v_c.bound_organization_id IS NOT NULL AND v_c.bound_organization_id <> p_organization_id THEN
       -- The paid amount was confirmed and charged; access stays. The code is not moved.
       RETURN jsonb_build_object('recorded', false, 'reason', 'code_bound_elsewhere');
@@ -291,6 +332,33 @@ REVOKE ALL ON FUNCTION public.business_partner_apply_period_internal(uuid, uuid,
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.business_partner_apply_period_internal(uuid, uuid, uuid, bigint, integer, timestamptz, timestamptz, timestamptz)
   TO service_role;
+
+-- Admin revoke: only a code not bound to an account. Its open personal-price links stop
+-- being offered at once; a late payment on one is handled by business_partner_apply_period_internal.
+CREATE FUNCTION public.revoke_business_partner_code(p_code_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_c public.business_partner_codes%ROWTYPE; v_n integer;
+BEGIN
+  SELECT * INTO v_c FROM public.business_partner_codes WHERE id = p_code_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'partner_code_invalid' USING ERRCODE = 'P0001'; END IF;
+  IF v_c.bound_organization_id IS NOT NULL THEN RAISE EXCEPTION 'partner_code_bound' USING ERRCODE = 'P0001'; END IF;
+  UPDATE public.business_partner_codes
+  SET revoked_at = coalesce(revoked_at, clock_timestamp()), reserved_by_user_id = NULL, reserved_until = NULL
+  WHERE id = v_c.id;
+  INSERT INTO public.business_subscription_superseded_orders(order_id, organization_id, reason)
+  SELECT s.order_id, s.organization_id, 'partner_code_revoked'
+  FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
+  WHERE s.partner_code_id = v_c.id AND o.status = 'pending'
+  ON CONFLICT (order_id) DO NOTHING;
+  -- Cancelled so the owner gets a fresh ordinary link; a late bank confirmation is still fulfilled.
+  UPDATE public.orders o SET status = 'cancelled', cancelled_at = clock_timestamp(), updated_at = clock_timestamp()
+  FROM public.business_subscription_order_scopes s
+  WHERE s.order_id = o.id AND s.partner_code_id = v_c.id AND o.status = 'pending';
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN jsonb_build_object('ok', true, 'already', v_c.revoked_at IS NOT NULL, 'invalidated_orders', v_n);
+END; $$;
+REVOKE ALL ON FUNCTION public.revoke_business_partner_code(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_business_partner_code(uuid) TO service_role;
 
 -- 8. Guards use the same price source as the checkout.
 CREATE OR REPLACE FUNCTION public.business_subscription_scope_guard() RETURNS trigger
@@ -360,7 +428,8 @@ DECLARE
   v_new_order public.orders%ROWTYPE;
   v_key text;
   v_org uuid; v_locations uuid[]; v_pilot boolean := false; v_amount bigint := 79900;
-  v_quote record; v_unit bigint := 79900;
+  v_quote record; v_unit bigint := 79900; v_q_code uuid; v_q_index integer;
+  v_xscope public.business_subscription_order_scopes%ROWTYPE; v_replace_reason text;
 BEGIN
   IF public.business_consent_caller_in_support_mode() THEN
     RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
@@ -413,8 +482,14 @@ BEGIN
     END IF;
     -- One price per account, the same for every active venue: the standard 79900 or the
     -- confirmed personal partner price. Computed here, never taken from the client.
+    -- The code row this owner holds is locked first, so a reservation cannot change hands
+    -- between reading the price and opening the payment link.
+    PERFORM 1 FROM public.business_partner_codes c
+    WHERE c.reserved_by_user_id = v_user_id AND c.bound_organization_id IS NULL
+    ORDER BY c.id FOR UPDATE;
     SELECT * INTO v_quote FROM public.business_partner_quote_internal(v_org, v_user_id);
     v_unit := coalesce(v_quote.unit_price_minor, 79900);
+    v_q_code := v_quote.code_id; v_q_index := v_quote.period_index;
     v_amount := v_unit * cardinality(v_locations);
     -- No mid-period charge for adding a venue. Renewal can include it after expiry.
     IF EXISTS (SELECT 1 FROM unnest(v_locations) AS v(id)
@@ -457,6 +532,17 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Two owners of one account: only one open link for the same personal-price period.
+  IF v_unit <> 79900 AND EXISTS (
+    SELECT 1 FROM public.business_subscription_order_scopes s JOIN public.orders o ON o.id = s.order_id
+    WHERE s.organization_id = v_org AND s.partner_code_id = v_q_code
+      AND s.partner_period_index = v_q_index AND o.status = 'pending' AND o.user_id <> v_user_id
+      AND o.created_at > clock_timestamp() - interval '72 hours'
+      AND NOT EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders x WHERE x.order_id = o.id)) THEN
+    RAISE EXCEPTION 'partner_period_in_payment' USING ERRCODE = 'P0001';
+  END IF;
+
+  -- At most one open link per owner (orders_one_pending_business_subscription_per_user_idx).
   SELECT o.*
   INTO v_existing
   FROM public.orders AS o
@@ -467,7 +553,33 @@ BEGIN
   LIMIT 1
   FOR UPDATE;
 
-  IF FOUND THEN
+  -- The owner's own unpaid link that no longer matches is replaced, never a dead end:
+  -- an ordinary or same-code link when a code price applies now, or a link of a revoked code.
+  -- It is cancelled so that the new link can exist; a late bank confirmation of it is still
+  -- fulfilled (fulfill_tochka_payment_transactional) and buys exactly the 30 days it paid for.
+  -- Without a code nothing changes for the ordinary owner.
+  IF v_existing.id IS NOT NULL THEN
+    SELECT s.* INTO v_xscope FROM public.business_subscription_order_scopes s WHERE s.order_id = v_existing.id;
+    IF NOT (v_existing.amount_minor = v_amount AND v_existing.currency = 'RUB' AND (NOT coalesce(v_pilot, false)
+        OR (v_xscope.organization_id = v_org AND v_xscope.location_ids = v_locations AND v_xscope.unit_price_minor = v_unit))) THEN
+      IF v_xscope.partner_code_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.business_partner_codes c WHERE c.id = v_xscope.partner_code_id AND c.revoked_at IS NOT NULL) THEN
+        v_replace_reason := 'partner_code_revoked';
+      ELSIF v_unit <> 79900 AND (v_xscope.partner_code_id IS NULL OR v_xscope.partner_code_id = v_q_code) THEN
+        v_replace_reason := 'partner_code_applied';
+      END IF;
+      IF v_replace_reason IS NOT NULL THEN
+        INSERT INTO public.business_subscription_superseded_orders(order_id, organization_id, reason)
+        VALUES (v_existing.id, coalesce(v_xscope.organization_id, v_org), v_replace_reason)
+        ON CONFLICT ON CONSTRAINT business_subscription_superseded_orders_pkey DO NOTHING;
+        UPDATE public.orders SET status = 'cancelled', cancelled_at = clock_timestamp(), updated_at = clock_timestamp()
+        WHERE id = v_existing.id;
+        v_existing := NULL;
+      END IF;
+    END IF;
+  END IF;
+
+  IF v_existing.id IS NOT NULL THEN
     IF v_existing.amount_minor IS DISTINCT FROM v_amount
        OR v_existing.currency IS DISTINCT FROM 'RUB' THEN
       RAISE EXCEPTION 'pending_order_mismatch' USING ERRCODE = 'P0001';
@@ -527,7 +639,7 @@ BEGIN
       -- Keep the reservation while this payment link can still be paid.
       UPDATE public.business_partner_codes
       SET reserved_until = greatest(coalesce(reserved_until, clock_timestamp()), clock_timestamp() + interval '72 hours')
-      WHERE id = v_quote.code_id AND bound_organization_id IS NULL;
+      WHERE id = v_quote.code_id AND bound_organization_id IS NULL AND reserved_by_user_id = v_user_id;
     END IF;
   END IF;
   order_id := v_new_order.id;
@@ -720,6 +832,12 @@ BEGIN
     v_paid_at
   );
 
+  -- A link the cabinet no longer offered was still paid: the 30 days above are kept, recorded for the owner.
+  IF v_opens THEN
+    UPDATE public.business_subscription_superseded_orders SET late_paid_at = v_paid_at
+    WHERE order_id = v_order.id AND late_paid_at IS NULL;
+  END IF;
+
   -- Partner price: the code binds to this account on its first successful real payment,
   -- and each paid period at the personal price is recorded once (order_id is unique).
   IF v_opens AND v_scope.partner_code_id IS NOT NULL THEN
@@ -785,15 +903,742 @@ $$;
 REVOKE ALL ON FUNCTION public.apply_business_subscription_for_order(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;
 
+-- 11. Bank confirmation of a replaced business link: fulfilled instead of left without access.
+-- The function body is the current one (20270205130000) with only the v_superseded branch added.
+CREATE OR REPLACE FUNCTION public.fulfill_tochka_payment_transactional(
+  p_webhook_event_id uuid,
+  p_provider_payment_id text,
+  p_payment_id uuid,
+  p_provider_amount_minor bigint,
+  p_provider_currency text,
+  p_provider_status text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_event public.payment_webhook_events%ROWTYPE;
+  v_payment public.payments%ROWTYPE;
+  v_order public.orders%ROWTYPE;
+  v_now timestamptz := now();
+  v_is_test boolean := false;
+  v_test_reason text := NULL;
+  v_access_before integer := 0;
+  v_access_after integer := 0;
+  v_grant jsonb;
+  v_was_repaired boolean := false;
+  v_was_already_complete boolean := false;
+  v_access_inserted boolean := false;
+  v_outcome text;
+  v_review_reason text := NULL;
+  v_payment_before text;
+  v_order_before text;
+  v_payment_found boolean := false;
+  v_publication_class text;
+  v_order_kind text;
+  v_superseded boolean := false;
+BEGIN
+  IF p_webhook_event_id IS NULL THEN
+    RAISE EXCEPTION 'webhook_event_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT *
+  INTO v_event
+  FROM public.payment_webhook_events AS e
+  WHERE e.id = p_webhook_event_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'webhook_event_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_event.provider IS DISTINCT FROM 'tochka' THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'ignored',
+      processed_at = v_now,
+      updated_at = v_now,
+      last_error = 'unsupported_provider'
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'ignored',
+      'review_reason', 'unsupported_provider',
+      'webhook_event_id', v_event.id,
+      'processing_status', 'ignored'
+    );
+  END IF;
+
+  IF v_event.processing_status IN ('processed', 'duplicate') THEN
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'already_complete',
+      'was_already_complete', true,
+      'was_repaired', false,
+      'payment_id', v_event.payment_id,
+      'order_id', v_event.order_id,
+      'webhook_event_id', v_event.id,
+      'processing_status', v_event.processing_status
+    );
+  END IF;
+
+  IF v_event.processing_status = 'requires_review' THEN
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', v_event.review_reason,
+      'payment_id', v_event.payment_id,
+      'order_id', v_event.order_id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'was_already_complete', true,
+      'was_repaired', false
+    );
+  END IF;
+
+  IF p_provider_status IS DISTINCT FROM 'APPROVED' THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'ignored',
+      processed_at = v_now,
+      updated_at = v_now,
+      last_error = 'unsupported_status'
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'ignored',
+      'review_reason', 'unsupported_status',
+      'webhook_event_id', v_event.id,
+      'processing_status', 'ignored'
+    );
+  END IF;
+
+  -- Locate payment: prefer internal id, else provider operation id.
+  IF p_payment_id IS NOT NULL THEN
+    SELECT *
+    INTO v_payment
+    FROM public.payments AS p
+    WHERE p.id = p_payment_id
+      AND p.provider = 'tochka'
+    FOR UPDATE;
+
+    v_payment_found := FOUND;
+  END IF;
+
+  IF NOT v_payment_found
+     AND p_provider_payment_id IS NOT NULL
+     AND btrim(p_provider_payment_id) <> '' THEN
+    SELECT *
+    INTO v_payment
+    FROM public.payments AS p
+    WHERE p.provider = 'tochka'
+      AND p.provider_payment_id = p_provider_payment_id
+    FOR UPDATE;
+
+    v_payment_found := FOUND;
+  END IF;
+
+  IF NOT v_payment_found THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'payment_not_found',
+      last_error = 'payment_not_found',
+      provider_payment_id = coalesce(
+        provider_payment_id,
+        nullif(btrim(coalesce(p_provider_payment_id, '')), '')
+      )
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'payment_not_found',
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review'
+    );
+  END IF;
+
+  IF p_provider_payment_id IS NOT NULL
+     AND btrim(p_provider_payment_id) <> ''
+     AND v_payment.provider_payment_id IS NOT NULL
+     AND v_payment.provider_payment_id IS DISTINCT FROM btrim(p_provider_payment_id) THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'provider_payment_id_mismatch',
+      last_error = 'provider_payment_id_mismatch',
+      payment_id = v_payment.id,
+      order_id = v_payment.order_id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'provider_payment_id_mismatch',
+      'payment_id', v_payment.id,
+      'order_id', v_payment.order_id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review'
+    );
+  END IF;
+
+  SELECT *
+  INTO v_order
+  FROM public.orders AS o
+  WHERE o.id = v_payment.order_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'order_not_found',
+      last_error = 'order_not_found',
+      payment_id = v_payment.id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'order_not_found',
+      'payment_id', v_payment.id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review'
+    );
+  END IF;
+
+  v_payment_before := v_payment.status;
+  v_order_before := v_order.status;
+
+  -- 8142d69a: a business link the cabinet replaced (a code was applied, or its code was
+  -- revoked) was cancelled only so that a new link could exist. If the bank still confirms
+  -- it, the money buys exactly the 30 days it paid for, like any paid link.
+  v_superseded := v_order.status = 'cancelled'
+    AND coalesce(v_order.order_kind, '') = 'business_subscription'
+    AND EXISTS (SELECT 1 FROM public.business_subscription_superseded_orders AS x WHERE x.order_id = v_order.id);
+
+  -- Amount / currency integrity (integer minor units only).
+  IF v_payment.amount_minor IS DISTINCT FROM v_order.amount_minor
+     OR v_payment.currency IS DISTINCT FROM v_order.currency
+     OR v_payment.currency IS DISTINCT FROM 'RUB'
+     OR p_provider_currency IS DISTINCT FROM 'RUB'
+     OR p_provider_amount_minor IS NULL
+     OR p_provider_amount_minor IS DISTINCT FROM v_payment.amount_minor THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'amount_or_currency_mismatch',
+      last_error = 'amount_or_currency_mismatch',
+      payment_id = v_payment.id,
+      order_id = v_order.id,
+      provider_payment_id = coalesce(v_payment.provider_payment_id, p_provider_payment_id)
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'amount_or_currency_mismatch',
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'payment_status', v_payment.status,
+      'order_status', v_order.status,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_payment.is_test
+    );
+  END IF;
+
+  -- Test classification from trusted row fields (+ provider id / e2e metadata).
+  v_is_test := public.payment_is_test_from_row(
+    coalesce(nullif(btrim(coalesce(p_provider_payment_id, '')), ''), v_payment.provider_payment_id),
+    v_payment.provider_metadata,
+    v_payment.is_test OR v_order.is_test
+  );
+
+  IF v_is_test THEN
+    IF v_payment.is_test AND v_payment.test_reason IS NOT NULL THEN
+      v_test_reason := v_payment.test_reason;
+    ELSIF v_order.is_test AND v_order.test_reason IS NOT NULL THEN
+      v_test_reason := v_order.test_reason;
+    ELSIF coalesce((v_payment.provider_metadata ->> 'e2e_test') IN ('true', 't', '1'), false)
+       OR coalesce(p_provider_payment_id, v_payment.provider_payment_id, '') LIKE 'e2e-%' THEN
+      v_test_reason := 'e2e_test';
+    ELSE
+      v_test_reason := 'server_test_flag';
+    END IF;
+  END IF;
+
+  -- Refunded order cannot return to paid.
+  IF v_order.status = 'refunded' THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'refunded_order',
+      last_error = 'refunded_order',
+      payment_id = v_payment.id,
+      order_id = v_order.id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'refunded_order',
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'payment_status', v_payment.status,
+      'order_status', v_order.status,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_is_test
+    );
+  END IF;
+
+  -- Cancelled / failed order + APPROVED → keep money signal, no silent paid/access.
+  IF v_order.status IN ('cancelled', 'failed') AND NOT v_superseded THEN
+    IF v_payment.status IS DISTINCT FROM 'succeeded' THEN
+      IF v_payment.status NOT IN ('pending', 'failed', 'cancelled') THEN
+        UPDATE public.payment_webhook_events
+        SET
+          processing_status = 'requires_review',
+          processed_at = v_now,
+          updated_at = v_now,
+          review_reason = 'unsupported_payment_status',
+          last_error = 'unsupported_payment_status',
+          payment_id = v_payment.id,
+          order_id = v_order.id
+        WHERE id = v_event.id;
+
+        RETURN jsonb_build_object(
+          'ok', true,
+          'outcome', 'requires_review',
+          'review_reason', 'unsupported_payment_status',
+          'payment_id', v_payment.id,
+          'order_id', v_order.id,
+          'payment_status', v_payment.status,
+          'order_status', v_order.status,
+          'webhook_event_id', v_event.id,
+          'processing_status', 'requires_review',
+          'is_test', v_is_test
+        );
+      END IF;
+
+      UPDATE public.payments
+      SET
+        status = 'succeeded',
+        provider_payment_id = coalesce(
+          nullif(btrim(coalesce(p_provider_payment_id, '')), ''),
+          provider_payment_id
+        ),
+        confirmed_at = coalesce(confirmed_at, v_now),
+        updated_at = v_now,
+        is_test = v_is_test,
+        test_reason = CASE WHEN v_is_test THEN coalesce(test_reason, v_test_reason) ELSE test_reason END,
+        provider_metadata = provider_metadata || jsonb_build_object(
+          'provider_status', p_provider_status,
+          'fulfilled_at', v_now,
+          'fulfill_outcome', 'requires_review_cancelled_or_failed_order'
+        )
+      WHERE id = v_payment.id;
+    END IF;
+
+    UPDATE public.orders
+    SET
+      is_test = CASE WHEN v_is_test THEN true ELSE is_test END,
+      test_reason = CASE
+        WHEN v_is_test THEN coalesce(test_reason, v_test_reason)
+        ELSE test_reason
+      END,
+      updated_at = v_now
+    WHERE id = v_order.id;
+
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = CASE
+        WHEN v_order.status = 'cancelled' THEN 'cancelled_order_late_approved'
+        ELSE 'failed_order_late_approved'
+      END,
+      last_error = NULL,
+      payment_id = v_payment.id,
+      order_id = v_order.id,
+      provider_payment_id = coalesce(
+        nullif(btrim(coalesce(p_provider_payment_id, '')), ''),
+        v_payment.provider_payment_id
+      )
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', CASE
+        WHEN v_order.status = 'cancelled' THEN 'cancelled_order_late_approved'
+        ELSE 'failed_order_late_approved'
+      END,
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'payment_status', 'succeeded',
+      'order_status', v_order.status,
+      'access_granted', false,
+      'access_inserted', false,
+      'was_repaired', false,
+      'was_already_complete', false,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_is_test
+    );
+  END IF;
+
+  -- Payment transition: pending|failed|cancelled|succeeded → succeeded.
+  IF v_payment.status = 'refunded' THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'refunded_payment',
+      last_error = 'refunded_payment',
+      payment_id = v_payment.id,
+      order_id = v_order.id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'refunded_payment',
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_is_test
+    );
+  END IF;
+
+  IF v_payment.status NOT IN ('pending', 'failed', 'cancelled', 'succeeded') THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'unsupported_payment_status',
+      last_error = 'unsupported_payment_status',
+      payment_id = v_payment.id,
+      order_id = v_order.id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'unsupported_payment_status',
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_is_test
+    );
+  END IF;
+
+  IF v_order.status NOT IN ('pending', 'paid') AND NOT v_superseded THEN
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'requires_review',
+      processed_at = v_now,
+      updated_at = v_now,
+      review_reason = 'unsupported_order_status',
+      last_error = 'unsupported_order_status',
+      payment_id = v_payment.id,
+      order_id = v_order.id
+    WHERE id = v_event.id;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'outcome', 'requires_review',
+      'review_reason', 'unsupported_order_status',
+      'payment_id', v_payment.id,
+      'order_id', v_order.id,
+      'webhook_event_id', v_event.id,
+      'processing_status', 'requires_review',
+      'is_test', v_is_test
+    );
+  END IF;
+
+  v_order_kind := coalesce(v_order.order_kind, 'product_purchase');
+
+  IF v_order_kind = 'author_project_capacity' THEN
+    SELECT count(*)::integer
+    INTO v_access_before
+    FROM public.author_project_capacity_grants AS g
+    WHERE g.order_id = v_order.id;
+  ELSIF v_order_kind = 'business_subscription' THEN
+    SELECT count(*)::integer
+    INTO v_access_before
+    FROM public.business_subscription_periods AS s
+    WHERE s.order_id = v_order.id;
+  ELSIF v_order_kind = 'studio_music_license' THEN
+    SELECT count(*)::integer
+    INTO v_access_before
+    FROM public.studio_music_entitlements AS e
+    WHERE e.user_id = v_order.user_id
+      AND e.practice_id = v_order.practice_id
+      AND e.revoked_at IS NULL;
+  ELSE
+    SELECT count(*)::integer
+    INTO v_access_before
+    FROM public.user_practices AS up
+    WHERE up.user_id = v_order.user_id
+      AND up.practice_id = v_order.practice_id;
+  END IF;
+
+  -- Apply payment succeeded (idempotent).
+  UPDATE public.payments
+  SET
+    status = 'succeeded',
+    provider_payment_id = coalesce(
+      nullif(btrim(coalesce(p_provider_payment_id, '')), ''),
+      provider_payment_id
+    ),
+    confirmed_at = coalesce(confirmed_at, v_now),
+    updated_at = v_now,
+    is_test = v_is_test,
+    test_reason = CASE WHEN v_is_test THEN coalesce(test_reason, v_test_reason) ELSE test_reason END,
+    provider_metadata = provider_metadata || jsonb_build_object(
+      'provider_status', p_provider_status,
+      'fulfilled_at', v_now
+    )
+  WHERE id = v_payment.id
+  RETURNING * INTO v_payment;
+
+  -- Apply order paid (pending → paid; paid stays paid).
+  IF v_order.status = 'pending' OR v_superseded THEN
+    UPDATE public.orders
+    SET
+      status = 'paid',
+      paid_at = coalesce(paid_at, v_now),
+      updated_at = v_now,
+      is_test = v_is_test,
+      test_reason = CASE WHEN v_is_test THEN coalesce(test_reason, v_test_reason) ELSE test_reason END
+    WHERE id = v_order.id
+    RETURNING * INTO v_order;
+  ELSE
+    UPDATE public.orders
+    SET
+      paid_at = coalesce(paid_at, v_now),
+      updated_at = v_now,
+      is_test = CASE WHEN v_is_test THEN true ELSE is_test END,
+      test_reason = CASE
+        WHEN v_is_test THEN coalesce(test_reason, v_test_reason)
+        ELSE test_reason
+      END
+    WHERE id = v_order.id
+    RETURNING * INTO v_order;
+  END IF;
+
+  v_order_kind := coalesce(v_order.order_kind, 'product_purchase');
+
+  IF v_order_kind = 'author_project_capacity' THEN
+    v_grant := public.grant_author_project_capacity_for_order(v_order.id);
+    v_access_inserted := coalesce((v_grant ->> 'inserted')::boolean, false);
+  ELSIF v_order_kind = 'business_subscription' THEN
+    v_grant := public.apply_business_subscription_for_order(v_order.id);
+    v_access_inserted := coalesce((v_grant ->> 'inserted')::boolean, false);
+  ELSIF v_order_kind = 'studio_music_license' THEN
+    v_grant := public.grant_studio_music_purchase_entitlement(v_order.id);
+    v_access_inserted := coalesce((v_grant ->> 'inserted')::boolean, false);
+  ELSIF v_order_kind = 'course_upgrade' THEN
+    IF v_order.target_access_level IS NULL OR v_order.target_access_level < 2 THEN
+      RAISE EXCEPTION 'invalid_upgrade_target' USING ERRCODE = '22023';
+    END IF;
+
+    SELECT p.publication_class
+    INTO v_publication_class
+    FROM public.practices AS p
+    WHERE p.id = v_order.practice_id;
+
+    IF v_publication_class IS DISTINCT FROM 'course' THEN
+      RAISE EXCEPTION 'upgrade_not_course' USING ERRCODE = '22023';
+    END IF;
+
+    -- Fulfill from immutable order snapshots (amount already matched
+    -- payment/provider). Do not re-read live upgrade_price.
+    v_grant := public.grant_practice_access(
+      v_order.user_id,
+      v_order.practice_id,
+      v_order.target_access_level,
+      'purchase',
+      jsonb_build_object(
+        'order_id', v_order.id,
+        'payment_id', v_payment.id,
+        'target_access_level', v_order.target_access_level,
+        'granted_via', 'course_upgrade'
+      )
+    );
+    v_access_inserted := coalesce((v_grant ->> 'inserted')::boolean, false);
+
+    IF coalesce((v_grant ->> 'access_level')::integer, 0) < v_order.target_access_level THEN
+      RAISE EXCEPTION 'access_grant_below_target' USING ERRCODE = 'P0001';
+    END IF;
+  ELSE
+    v_grant := public.grant_practice_purchase_access(v_order.id);
+    v_access_inserted := coalesce((v_grant ->> 'inserted')::boolean, false);
+  END IF;
+
+  IF v_order_kind = 'author_project_capacity' THEN
+    SELECT count(*)::integer
+    INTO v_access_after
+    FROM public.author_project_capacity_grants AS g
+    WHERE g.order_id = v_order.id;
+  ELSIF v_order_kind = 'business_subscription' THEN
+    SELECT count(*)::integer
+    INTO v_access_after
+    FROM public.business_subscription_periods AS s
+    WHERE s.order_id = v_order.id;
+  ELSIF v_order_kind = 'studio_music_license' THEN
+    SELECT count(*)::integer
+    INTO v_access_after
+    FROM public.studio_music_entitlements AS e
+    WHERE e.user_id = v_order.user_id
+      AND e.practice_id = v_order.practice_id
+      AND e.revoked_at IS NULL;
+  ELSE
+    SELECT count(*)::integer
+    INTO v_access_after
+    FROM public.user_practices AS up
+    WHERE up.user_id = v_order.user_id
+      AND up.practice_id = v_order.practice_id;
+  END IF;
+
+  IF v_access_after < 1 THEN
+    -- Replay of a paid Studio order after that order's entitlement was
+    -- revoked must not invent a new active grant. grant_* returns
+    -- already_revoked; do not treat that as a missing first-time grant.
+    IF v_order_kind = 'studio_music_license'
+       AND coalesce((v_grant ->> 'already_revoked')::boolean, false) THEN
+      NULL;
+    ELSE
+      RAISE EXCEPTION 'access_grant_missing_after_fulfill' USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  -- Success = valid payment + successful grant, not access_inserted.
+  -- Upgrade typically UPDATE (inserted=false, raised=true). Existing
+  -- entitlement must not classify a first upgrade as repaired/review.
+  IF v_order_kind IN ('course_upgrade', 'studio_music_license', 'author_project_capacity', 'business_subscription') THEN
+    IF v_payment_before = 'succeeded'
+       AND v_order_before = 'paid' THEN
+      v_was_already_complete := true;
+      v_outcome := 'already_complete';
+    ELSIF v_payment_before = 'succeeded'
+       OR v_order_before = 'paid' THEN
+      v_was_repaired := true;
+      v_outcome := 'repaired';
+    ELSE
+      v_outcome := 'completed';
+    END IF;
+  ELSIF v_payment_before = 'succeeded'
+     AND v_order_before = 'paid'
+     AND v_access_before >= 1
+     AND NOT v_access_inserted THEN
+    v_was_already_complete := true;
+    v_outcome := 'already_complete';
+  ELSIF v_payment_before = 'succeeded'
+     OR v_order_before = 'paid'
+     OR v_access_before >= 1 THEN
+    v_was_repaired := true;
+    v_outcome := 'repaired';
+  ELSE
+    v_outcome := 'completed';
+  END IF;
+
+  UPDATE public.payment_webhook_events
+  SET
+    processing_status = CASE
+      WHEN v_was_already_complete THEN 'duplicate'
+      ELSE 'processed'
+    END,
+    processed_at = v_now,
+    updated_at = v_now,
+    last_error = NULL,
+    review_reason = NULL,
+    payment_id = v_payment.id,
+    order_id = v_order.id,
+    provider_payment_id = v_payment.provider_payment_id
+  WHERE id = v_event.id;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'outcome', v_outcome,
+    'review_reason', NULL,
+    'payment_id', v_payment.id,
+    'order_id', v_order.id,
+    'payment_status', v_payment.status,
+    'order_status', v_order.status,
+    'access_granted', (v_access_after >= 1),
+    'access_inserted', v_access_inserted,
+    'access_rows', v_access_after,
+    'was_repaired', v_was_repaired,
+    'was_already_complete', v_was_already_complete,
+    'webhook_event_id', v_event.id,
+    'processing_status', CASE
+      WHEN v_was_already_complete THEN 'duplicate'
+      ELSE 'processed'
+    END,
+    'is_test', v_is_test,
+    'test_reason', v_test_reason
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    -- PL/pgSQL subtransaction: main-body writes roll back; this UPDATE is kept
+    -- when we RETURN (not RAISE), so the event stays retryable as `failed`.
+    UPDATE public.payment_webhook_events
+    SET
+      processing_status = 'failed',
+      updated_at = now(),
+      last_error = left(SQLERRM, 500)
+    WHERE id = p_webhook_event_id
+      AND processing_status NOT IN ('processed', 'duplicate', 'requires_review');
+
+    RETURN jsonb_build_object(
+      'ok', false,
+      'outcome', 'failed',
+      'review_reason', 'transient_or_internal_error',
+      'error_code', SQLSTATE,
+      'webhook_event_id', p_webhook_event_id,
+      'processing_status', 'failed'
+    );
+END;
+$$;
+
+COMMENT ON FUNCTION public.fulfill_tochka_payment_transactional IS
+  'audiolad:business-subscription:v1; audiolad:business-partner-codes:v1 (a replaced business link confirmed late is fulfilled); service_role only';
+
+
 COMMIT;
 -- Safe application creates no code and changes no price: every existing scope keeps 79900.
 -- Rollback (only while no code is bound or no personal-price order is open):
---   restore business_pilot_order_guard, business_subscription_scope_guard,
+--   restore business_pilot_order_guard, business_subscription_scope_guard, fulfill_tochka_payment_transactional,
 --   create_business_subscription_order(uuid) and apply_business_subscription_for_order(uuid)
---   from 20270227120000 / 20270226140000;
+--   from 20270227120000 / 20270226140000 / 20270205130000;
 --   DROP FUNCTION public.create_business_subscription_order(uuid, bigint), reserve_business_partner_code(text),
 --   business_partner_quote_for_caller(), business_partner_quote_json(uuid), business_partner_code_preview(text),
---   business_partner_apply_period_internal(...), business_partner_owner_organization(uuid), business_partner_quote_internal(uuid, uuid);
+--   business_partner_apply_period_internal(...), revoke_business_partner_code(uuid),
+--   business_partner_owner_organization(uuid), business_partner_quote_internal(uuid, uuid);
 --   ALTER TABLE business_subscription_order_scopes DROP COLUMN partner_period_index, partner_code_id, unit_price_minor;
---   DROP TABLE business_partner_entitlement_periods, business_partner_entitlements, business_partner_codes.
+--   DROP TABLE business_subscription_superseded_orders, business_partner_entitlement_periods,
+--   business_partner_entitlements, business_partner_codes.
 -- Never delete orders, payments or business_subscription_periods.
