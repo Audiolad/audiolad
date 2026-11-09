@@ -1,5 +1,6 @@
 import type { CafeAdmissionAdapter } from "./pool";
 import { restrictCafePool } from "./pool";
+import { appendExcludedIds } from "./auto-topup";
 import { parseCafeQueueRequest } from "./request";
 import { rankCafeQueue, type CafeQueueTrack } from "./rank";
 import type { CafeTrackSignals } from "./signals";
@@ -40,6 +41,14 @@ export async function handleCafeQueue(
   const boundaryAlbumKey = request.boundaryAudioItemId
     ? pool.find((track) => track.audioItemId === request.boundaryAudioItemId)?.albumKey ?? null
     : null;
-  const ordered = rankCafeQueue(pool, signals, { ...request, boundaryAlbumKey });
-  return { ok: true, order: ordered.map((track) => track.audioItemId) };
+  const exclude = request.excludeAudioItemIds ?? [];
+  const excludeSet = new Set(exclude);
+  const primary = excludeSet.size === 0 ? pool : pool.filter((track) => !excludeSet.has(track.audioItemId));
+  const ordered = rankCafeQueue(primary, signals, { ...request, boundaryAlbumKey });
+  const orderIds = appendExcludedIds(
+    ordered.map((track) => track.audioItemId),
+    exclude,
+    pool.map((track) => track.audioItemId),
+  );
+  return { ok: true, order: orderIds };
 }
