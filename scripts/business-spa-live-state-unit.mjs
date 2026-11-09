@@ -275,6 +275,11 @@ try {
       },
       watchSpaBuild: () => () => {},
     },
+    "@/lib/business-app/hall-build-reload": {
+      readReloadedBuildId: () => null,
+      rememberReloadedBuildId: () => {},
+      shouldReloadForNewBuild: () => false,
+    },
     "@/lib/business-app/spa-live-report": liveModule,
     "@/lib/business-app/spa-manifest": { parseSpaManifest },
     "@/lib/business-app/spa-online-player": { SpaOnlinePlayer: Controller },

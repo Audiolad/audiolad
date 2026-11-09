@@ -20,6 +20,7 @@ import {
   VENUE_STATUS_LEGEND,
   type VenueStatusDotRow,
 } from "@/lib/business-app/venue-status-dot";
+import { HALL_STALE_BUILD_NOTE } from "@/lib/business-app/hall-build-reload";
 
 type LiveOwnerState = {
   locationId: string;
@@ -30,9 +31,11 @@ type LiveOwnerState = {
 function isVenueRow(value: unknown): value is VenueStatusDotRow {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
-  return typeof row.locationId === "string"
-    && (row.color === "green" || row.color === "yellow" || row.color === "red" || row.color === "grey")
-    && typeof row.label === "string";
+  if (typeof row.locationId !== "string") return false;
+  if (!(row.color === "green" || row.color === "yellow" || row.color === "red" || row.color === "grey")) return false;
+  if (typeof row.label !== "string") return false;
+  if (row.staleBuild != null && typeof row.staleBuild !== "boolean") return false;
+  return true;
 }
 
 export default function BusinessPointSlots() {
@@ -149,6 +152,15 @@ export default function BusinessPointSlots() {
         </button>;
       })}
     </div>
+    {venueDots.some((row) => row.staleBuild) ? (
+      <ul className="space-y-1" data-testid="biz-venue-stale-build-notes" aria-label="Устройства на старой версии">
+        {slots.filter((slot) => slot.location && statusById.get(slot.location.id)?.staleBuild).map((slot) => (
+          <li key={slot.number} className="text-sm text-[var(--biz-text-muted)]" data-testid={`biz-venue-stale-build-${slot.location!.id}`}>
+            Точка {slot.number}: {HALL_STALE_BUILD_NOTE}
+          </li>
+        ))}
+      </ul>
+    ) : null}
     {halls.length > 0 ? (
       <ul className="business-venue-status-legend" aria-label="Обозначения статуса точек" data-testid="biz-venue-status-legend">
         {VENUE_STATUS_LEGEND.map((item) => (

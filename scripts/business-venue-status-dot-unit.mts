@@ -29,6 +29,14 @@ assert.equal(deriveVenueStatusDot({
 assert.equal(deriveVenueStatusDot({
   linked: true, secondsSinceSeen: 120, playbackState: "playing", accessLive: true, freshSeconds: FRESH,
 }).color, "yellow", "stale playing must not stay green");
+assert.equal(deriveVenueStatusDot({
+  linked: true, secondsSinceSeen: 10, playbackState: null, accessLive: true, freshSeconds: FRESH,
+  unconfirmedPlaying: true,
+}).color, "yellow", "unconfirmed playing with fresh heartbeat is yellow");
+assert.match(deriveVenueStatusDot({
+  linked: true, secondsSinceSeen: 10, playbackState: null, accessLive: true, freshSeconds: FRESH,
+  unconfirmedPlaying: true,
+}).label, /не подтверждено/);
 assert.match(deriveVenueStatusDot({
   linked: true, secondsSinceSeen: 120, playbackState: "playing", accessLive: true, freshSeconds: FRESH,
 }).label, /связи/);
