@@ -1,0 +1,40 @@
+name: Business Partner Codes Isolated SQL
+
+# Task 8142d69a: the partner-code SQL harness, including the two-session races
+# (needs a local Unix socket, which reviewer sandboxes do not allow).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/business-partner-codes-isolated.yml"
+      - "scripts/business-partner-codes-isolated.py"
+      - "supabase/migrations/20270302120000_business_partner_codes.sql"
+      - "supabase/migrations/20270304120000_business_partner_code_window_once.sql"
+      - "supabase/tests/business_partner_codes_smoke.sql"
+      - "supabase/tests/business_partner_code_window_once_smoke.sql"
+      - "supabase/tests/business_partner_code_window_once_backfill_fixture.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  business-partner-codes-isolated:
+    name: Business Partner Codes Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Local PostgreSQL toolchain
+        run: |
+          set -euo pipefail
+          ls -d /usr/lib/postgresql/*/bin
+          psql --version
+      - name: Partner codes harness (serial smoke, backfill, safety stops, two-session races)
+        run: |
+          set -euo pipefail
+          python3 scripts/business-partner-codes-isolated.py | tee harness.log
+          grep -q 'same code entered twice at once, one window, end kept: PASS' harness.log
+          grep -q 'two owners enter two new codes at once, each its own 72 hours: PASS' harness.log
+          grep -q 'two parallel sessions, exactly one reservation and one 72-hour window: PASS' harness.log

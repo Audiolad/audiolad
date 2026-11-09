@@ -321,6 +321,7 @@ export type PartnerCodeApiError =
   | "partner_code_invalid"
   | "partner_code_unavailable"
   | "partner_code_already_applied"
+  | "partner_code_expired"
   | "not_organization_owner"
   | "support_mode_consent_forbidden"
   | "venue_device"
@@ -342,7 +343,12 @@ export function partnerCodeClientIp(headers: Headers): string {
 
 /** Only these mean the code itself can never work for this account: the link cookie is dropped. */
 export function partnerCodeErrorIsFinal(code: PartnerCodeApiError | string): boolean {
-  return code === "partner_code_invalid" || code === "partner_code_unavailable" || code === "partner_code_already_applied";
+  return (
+    code === "partner_code_invalid" ||
+    code === "partner_code_unavailable" ||
+    code === "partner_code_already_applied" ||
+    code === "partner_code_expired"
+  );
 }
 
 export function mapPartnerCodeRpcError(message: string): { status: number; error: PartnerCodeApiError } {
@@ -350,6 +356,9 @@ export function mapPartnerCodeRpcError(message: string): { status: number; error
   if (m.includes("partner_code_invalid")) return { status: 404, error: "partner_code_invalid" };
   if (m.includes("partner_code_unavailable")) return { status: 409, error: "partner_code_unavailable" };
   if (m.includes("partner_code_already_applied")) return { status: 409, error: "partner_code_already_applied" };
+  // t1338u/t1339u: the 72 hours are counted once per code and account from the first entry;
+  // after them the same account cannot hold this code again (a new code starts its own 72 hours).
+  if (m.includes("partner_code_expired")) return { status: 410, error: "partner_code_expired" };
   if (m.includes("not_organization_owner")) return { status: 403, error: "not_organization_owner" };
   if (m.includes("support_mode_consent_forbidden")) return { status: 403, error: "support_mode_consent_forbidden" };
   if (m.includes("not_authenticated")) return { status: 401, error: "unauthorized" };
@@ -364,6 +373,8 @@ export function partnerCodeErrorText(code: PartnerCodeApiError | string): string
       return "Этот код уже используется другим аккаунтом.";
     case "partner_code_already_applied":
       return "К аккаунту уже применён персональный код. Второй код не добавляется.";
+    case "partner_code_expired":
+      return "Срок действия этого кода закончился.";
     case "not_organization_owner":
       return "Код может применить владелец аккаунта.";
     case "venue_device":

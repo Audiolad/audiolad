@@ -75,14 +75,77 @@ blocks = [stubs, migration('20261201120000_business_domain_core.sql'),
           'ALTER TABLE orders ADD COLUMN updated_at timestamptz, ADD COLUMN cancelled_at timestamptz;',
           partner_migration_without_fulfill(),
           (root/'supabase/tests/business_partner_codes_smoke.sql').read_text()]
+# t1338u + t1339u: the 72-hour hold counted once per code and account (20270304120000).
+window_once = migration('20270304120000_business_partner_code_window_once.sql')
+window_smoke = (root/'supabase/tests/business_partner_code_window_once_smoke.sql').read_text()
+backfill_fixture = (root/'supabase/tests/business_partner_code_window_once_backfill_fixture.sql').read_text()
+# A late link: opened under the old rules, then its hold end moved before it (cannot be kept exactly).
+late_link_fixture = """
+INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000002b1');
+INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000002b1');
+INSERT INTO business_partner_codes(code, purpose) VALUES ('NNNNNNNNNNNN','custdev');
+SET test.uid='00000000-0000-4000-8000-0000000002b1';
+SELECT public.create_business_organization_with_location('N','Зал 1','cafe','RU','Europe/Moscow');
+SELECT public.reserve_business_partner_code('NNNNNNNNNNNN');
+SELECT * FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+UPDATE business_partner_codes SET reserved_until=clock_timestamp()-interval '1 hour' WHERE code='NNNNNNNNNNNN';
+"""
+
+def must_stop(name, run_blocks, expected):
+    with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-stop-') as tmp:
+        data = Path(tmp)/'data'
+        subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
+        sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
+        sql += "ROLLBACK;\n"
+        sql += "SELECT CASE WHEN to_regclass('public.business_partner_code_windows') IS NULL THEN 'window migration stopped: nothing applied' END;\n"
+        result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
+        if expected not in result.stderr or 'window migration stopped: nothing applied' not in result.stdout:
+            print(result.stdout[-3000:], result.stderr[-3000:])
+            raise SystemExit(name + ': FAIL')
+    print(name + ': PASS')
+
+def single_user(data, run_blocks, markers):
+    sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in run_blocks)+'\n'
+    result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
+    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or any(m not in result.stdout for m in markers):
+        print(result.stdout, result.stderr)
+        raise SystemExit(1)
+
+markers = ['three-point pilot: PASS', 'shared-venue billing: PASS', 'venue slots systemic: PASS', 'partner codes: PASS']
+# Regression: the whole partner-code smoke also passes with the once-only window applied first.
+with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-window-') as tmp:
+    data = Path(tmp)/'data'
+    subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
+    single_user(data, blocks[:-1] + [window_once, blocks[-1], window_smoke], markers + ['partner code window once: PASS'])
+print('partner codes: full smoke with the once-only 72-hour window applied first: PASS')
+# Backfill keeps every held code's exact end, also two codes of one account with different ends.
+backfill_check = """
+SELECT public.check_test((SELECT count(*)=2 FROM business_partner_codes c JOIN business_partner_code_windows w ON w.code_id=c.id
+  AND w.expires_at=c.reserved_until AND w.first_reserved_at=c.reserved_until-interval '72 hours' WHERE c.code IN ('MMMMMMMMMMMM','MMMMMMMMMMM2')), 'backfill: each code keeps its exact end');
+SET test.uid='00000000-0000-4000-8000-0000000002a1';
+DO $$ BEGIN
+  BEGIN PERFORM public.reserve_business_partner_code('MMMMMMMMMMMM'); RAISE EXCEPTION 'backfilled ended code restarted';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF; END;
+END; $$;
+SET test.uid='00000000-0000-4000-8000-0000000002a2';
+CREATE TEMP TABLE bf AS SELECT reserved_until AS t FROM business_partner_codes WHERE code='MMMMMMMMMMM2';
+SELECT public.check_test((public.reserve_business_partner_code('MMMMMMMMMMM2')->>'already')::boolean, 'backfill: live code continues');
+SELECT public.check_test((SELECT reserved_until=(SELECT t FROM bf) FROM business_partner_codes WHERE code='MMMMMMMMMMM2'), 'backfill: live code keeps its end');
+SELECT 'window backfill per code: PASS';
+"""
+with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-backfill-') as tmp:
+    data = Path(tmp)/'data'
+    subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
+    single_user(data, blocks + [backfill_fixture, window_once, backfill_check], markers + ['window backfill per code: PASS'])
+print('partner codes: backfill keeps each held code exact end (two codes of one account, one ended): PASS')
+must_stop('partner codes: window migration stops on an open link created after its hold end',
+          blocks + [late_link_fixture, window_once], 'Pre-check failed: an open personal-price link was created after its hold end')
+
 with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
     data = Path(tmp)/'data'
     subprocess.run([str(pg/'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'], check=True, capture_output=True)
-    sql = '\n'.join(' '.join(re.sub(r'--[^\n]*', '', block).splitlines()) for block in blocks)+'\n'
-    result = subprocess.run([str(pg/'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
-    if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'three-point pilot: PASS' not in result.stdout or 'shared-venue billing: PASS' not in result.stdout or 'venue slots systemic: PASS' not in result.stdout or 'partner codes: PASS' not in result.stdout:
-        print(result.stdout, result.stderr)
-        raise SystemExit(1)
+    # Production order: rows created under 20270302120000, then the window migration backfills them.
+    single_user(data, blocks + [window_once, window_smoke], markers + ['partner code window once: PASS'])
     # Parallel redemption with two real sessions: exactly one owner gets the code.
     sock = Path(tmp)/'sock'; sock.mkdir()
     server = subprocess.Popen([str(pg/'postgres'), '-D', str(data), '-k', str(sock), '-c', 'listen_addresses=', '-p', '55433'],
@@ -101,11 +164,48 @@ with tempfile.TemporaryDirectory(prefix='audiolad-partner-codes-') as tmp:
         wins = sum(1 for proc in procs if proc.returncode == 0)
         losers = [err for proc, (_, err) in zip(procs, outcomes) if proc.returncode != 0]
         held = subprocess.run(psql + ['-c', "SELECT count(*) FROM business_partner_codes WHERE code='KKKKMMMMNNNN' AND reserved_by_user_id IS NOT NULL"], check=True, capture_output=True, text=True).stdout.strip()
-        if wins != 1 or len(losers) != 1 or 'partner_code_unavailable' not in losers[0] or held != '1':
+        windows = subprocess.run(psql + ['-c', "SELECT count(*) FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='KKKKMMMMNNNN'"], check=True, capture_output=True, text=True).stdout.strip()
+        if wins != 1 or len(losers) != 1 or 'partner_code_unavailable' not in losers[0] or held != '1' or windows != '1':
             print(outcomes)
             raise SystemExit('parallel redemption: FAIL')
+        # t1339u races. Setup: account R with two owners r1/r2, codes RRRR2/RRRR3/RRRR4.
+        setup = """
+INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000003a1'), ('00000000-0000-4000-8000-0000000003a2');
+INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000003a1'), ('00000000-0000-4000-8000-0000000003a2');
+INSERT INTO business_partner_codes(code, purpose) VALUES ('RRRRRRRRRRR2','custdev'), ('RRRRRRRRRRR3','custdev'), ('RRRRRRRRRRR4','custdev');
+SET test.uid='00000000-0000-4000-8000-0000000003a1';
+SELECT public.create_business_organization_with_location('R','Зал 1','cafe','RU','Europe/Moscow');
+INSERT INTO business_organization_members(organization_id,user_id,role,created_at)
+  SELECT organization_id,'00000000-0000-4000-8000-0000000003a2','owner',now()+interval '1 second'
+  FROM business_organization_members WHERE user_id='00000000-0000-4000-8000-0000000003a1';
+"""
+        r = subprocess.run(psql, input=setup, capture_output=True, text=True)
+        if r.returncode:
+            raise SystemExit("race setup: FAIL " + r.stderr[-2000:])
+        def race2(pairs):
+            ps = [subprocess.Popen(psql + ['-c', "SET test.uid='%s'; BEGIN; SELECT public.reserve_business_partner_code('%s')->>'ok'; SELECT pg_sleep(0.4); COMMIT;" % pair],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for pair in pairs]
+            outs = [p.communicate(timeout=30) for p in ps]
+            return ps, outs
+        def q(sql):
+            return subprocess.run(psql + ['-c', sql], check=True, capture_output=True, text=True).stdout.strip()
+        # Same owner, same code, twice at once (two tabs): both succeed, one window, the hold ends at it.
+        ps, outs = race2([('00000000-0000-4000-8000-0000000003a1', 'RRRRRRRRRRR2')] * 2)
+        same = q("SELECT count(*)||':'||bool_and(c.reserved_until=w.expires_at) FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='RRRRRRRRRRR2'")
+        if any(p.returncode for p in ps) or same != '1:true':
+            print(outs, same)
+            raise SystemExit('parallel same-code re-entry: FAIL')
+        print('partner codes: same code entered twice at once, one window, end kept: PASS')
+        # Two owners of one account enter two different new codes at once: each code its own window.
+        ps, outs = race2([('00000000-0000-4000-8000-0000000003a1', 'RRRRRRRRRRR3'), ('00000000-0000-4000-8000-0000000003a2', 'RRRRRRRRRRR4')])
+        two = q("SELECT count(*)||':'||bool_and(c.reserved_until=w.expires_at AND w.expires_at > clock_timestamp()+interval '71 hours') FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code IN ('RRRRRRRRRRR3','RRRRRRRRRRR4')")
+        if any(p.returncode for p in ps) or two != '2:true':
+            print(outs, two)
+            raise SystemExit('parallel two new codes: FAIL')
+        print('partner codes: two owners enter two new codes at once, each its own 72 hours: PASS')
     finally:
         server.terminate(); server.wait(timeout=30)
-    print('partner codes: two parallel sessions, exactly one reservation: PASS')
+    print('partner codes: two parallel sessions, exactly one reservation and one 72-hour window: PASS')
+    print('partner codes: 72 hours counted once per code and account from the first entry (repeat visits, payment link, re-reserve, a new code gets fresh 72 hours, back to the first code keeps its end, an ended code never blocks another code, second owner, end with and without an open link, no new personal-price link after the end, existing holds kept exactly): PASS')
     print('partner codes: reservation, parallel redemption, one-time binding on first real payment, failed/cancelled/sandbox payments, delayed payment, no combining, venues added in the window, three periods at the personal price then the standard one, revoke with an open link and a late payment, a code over an open ordinary link, two owners, venue-less quote, an earlier 79900 payment then the code (window from the first code payment), 72-hour hold end in the quote: PASS')
     print('three-point pilot: real A1/A2 activation, pairing, isolated state/heartbeat/commands/A3, RBAC, rights denial, payment binding, legacy credential, shared billing/count/snapshot/idempotency, systemic slots for every organization with raisable cap: PASS')
