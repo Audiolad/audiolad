@@ -5,6 +5,7 @@ import {
 } from "@/lib/business-app/guest-coffee/catalog";
 
 import {
+  CAFE_QUEUE_EXCLUDE_LIMIT,
   CAFE_QUEUE_FEEDBACK_LIMIT,
   isCafeDaypart,
   isCafeEnergyOffset,
@@ -24,6 +25,7 @@ export function parseCafeQueueRequest(body: unknown): CafeQueueRequest | null {
     feedback?: unknown;
     boundaryAudioItemId?: unknown;
     seed?: unknown;
+    excludeAudioItemIds?: unknown;
   };
   if (!isGuestCoffeeProfileValue(GUEST_COFFEE_CHARACTERS, row.character)) return null;
   if (!isGuestCoffeeProfileValue(GUEST_COFFEE_DIRECTIONS, row.direction)) return null;
@@ -47,6 +49,20 @@ export function parseCafeQueueRequest(body: unknown): CafeQueueRequest | null {
   const seed = typeof row.seed === "number" && Number.isInteger(row.seed) && row.seed >= 0 && row.seed <= 0x7fffffff
     ? row.seed
     : undefined;
+  let excludeAudioItemIds: string[] | undefined;
+  if (row.excludeAudioItemIds !== undefined) {
+    if (!Array.isArray(row.excludeAudioItemIds)) return null;
+    if (row.excludeAudioItemIds.length > CAFE_QUEUE_EXCLUDE_LIMIT) return null;
+    const seenEx = new Set<string>();
+    const list: string[] = [];
+    for (const id of row.excludeAudioItemIds) {
+      if (typeof id !== "string" || !AUDIO_ITEM_ID.test(id)) return null;
+      if (seenEx.has(id)) continue;
+      seenEx.add(id);
+      list.push(id);
+    }
+    excludeAudioItemIds = list;
+  }
   return {
     character: row.character,
     direction: row.direction,
@@ -55,5 +71,6 @@ export function parseCafeQueueRequest(body: unknown): CafeQueueRequest | null {
     feedback,
     boundaryAudioItemId: boundary,
     seed,
+    excludeAudioItemIds,
   };
 }
