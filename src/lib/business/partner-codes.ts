@@ -356,8 +356,8 @@ export function mapPartnerCodeRpcError(message: string): { status: number; error
   if (m.includes("partner_code_invalid")) return { status: 404, error: "partner_code_invalid" };
   if (m.includes("partner_code_unavailable")) return { status: 409, error: "partner_code_unavailable" };
   if (m.includes("partner_code_already_applied")) return { status: 409, error: "partner_code_already_applied" };
-  // t1338u: the 72 hours are counted once per account from the first entry; after them the
-  // same account cannot hold this code again.
+  // t1338u/t1339u: the 72 hours are counted once per code and account from the first entry;
+  // after them the same account cannot hold this code again (a new code starts its own 72 hours).
   if (m.includes("partner_code_expired")) return { status: 410, error: "partner_code_expired" };
   if (m.includes("not_organization_owner")) return { status: 403, error: "not_organization_owner" };
   if (m.includes("support_mode_consent_forbidden")) return { status: 403, error: "support_mode_consent_forbidden" };

@@ -1,6 +1,6 @@
 -- Throwaway local fixture only (scripts/business-partner-codes-isolated.py), applied BEFORE 20270304120000.
--- Old shape the backfill cannot keep exactly: two owners of one account hold different codes with
--- different ends. The migration must stop before any change (pre-flight), not guess an end.
+-- Old shape: two owners of one account hold different codes with different ends (one already ended).
+-- With windows per code (t1339u) the backfill keeps each code's exact end; nothing is merged or guessed.
 INSERT INTO auth.users(id) VALUES ('00000000-0000-4000-8000-0000000002a1'), ('00000000-0000-4000-8000-0000000002a2');
 INSERT INTO business_offer_acceptances VALUES ('00000000-0000-4000-8000-0000000002a1'), ('00000000-0000-4000-8000-0000000002a2');
 INSERT INTO business_partner_codes(code, purpose) VALUES ('MMMMMMMMMMMM','custdev'), ('MMMMMMMMMMM2','custdev');

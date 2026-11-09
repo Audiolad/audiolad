@@ -1,5 +1,6 @@
 -- Throwaway local fixture only. Run via scripts/business-partner-codes-isolated.py, never on production.
--- Task 8142d69a, Sergey t1338u: the 72-hour hold is counted once per account from the first entry.
+-- Task 8142d69a, Sergey t1338u + t1339u: the 72-hour hold is counted once per code and account from the
+-- first entry of that code; a new code opens its own fresh 72 hours.
 CREATE TEMP TABLE wo(k text PRIMARY KEY, v uuid, t timestamptz);
 -- Existing hold before the migration: kept with exactly its end (see the backfill).
 SELECT public.check_test((SELECT count(*)=count(w.code_id) FROM business_partner_codes c
@@ -43,14 +44,20 @@ SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end')
 UPDATE business_partner_codes SET reserved_until=clock_timestamp()+interval '100 hours' WHERE code='JJJJJJJJJJJJ';
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'hold never passes the window end');
 UPDATE orders SET status='cancelled' WHERE id=(SELECT v FROM wo WHERE k='o1');
--- Another code and back: the first code keeps its first end.
-SELECT public.reserve_business_partner_code('JJJJJJJJJJJ2');
+-- Another (new) code: its own fresh 72 hours (t1339u); the first code's window is untouched.
+SELECT public.check_test(NOT (public.reserve_business_partner_code('JJJJJJJJJJJ2')->>'already')::boolean, 'new code: a new window');
 SELECT public.check_test((SELECT reserved_by_user_id IS NULL FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'one code held at a time');
--- The 72 hours belong to the account: another code entered before the first payment gets the same end.
-SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'another code: the same account end, no new 72 hours');
-SELECT public.check_test((SELECT expires_at=(SELECT t FROM wo WHERE k='end') FROM business_partner_code_windows WHERE code_id=(SELECT v FROM wo WHERE k='code')), 'another code does not touch the first window');
-SELECT public.reserve_business_partner_code('JJJJJJJJJJJJ');
+SELECT public.check_test((SELECT reserved_until BETWEEN clock_timestamp()+interval '71 hours 59 minutes' AND clock_timestamp()+interval '72 hours'
+  FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'new code: fresh 72 hours, not the first code end');
+SELECT public.check_test((SELECT expires_at=(SELECT t FROM wo WHERE k='end') FROM business_partner_code_windows WHERE code_id=(SELECT v FROM wo WHERE k='code')), 'new code does not touch the first window');
+INSERT INTO wo(k, t) SELECT 'end2', expires_at FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='JJJJJJJJJJJ2';
+-- Re-entering the new code keeps its own end.
+SELECT public.check_test((public.reserve_business_partner_code('JJJJ-JJJJ-JJJ2')->>'already')::boolean, 'new code again: same window');
+SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end2') FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'new code again keeps its end');
+-- Coming back to the first code keeps the first end (no restart, not the new code end).
+SELECT public.check_test((public.reserve_business_partner_code('JJJJJJJJJJJJ')->>'already')::boolean, 'coming back: same window');
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'coming back keeps the first end');
+SELECT public.check_test((SELECT count(*)=2 FROM business_partner_code_windows WHERE organization_id=(SELECT v FROM wo WHERE k='org')), 'one window per code for the account');
 
 -- The 72 hours end while a link opened in time is still open: that link can still be paid.
 INSERT INTO wo(k, v) SELECT 'o2', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
@@ -82,19 +89,30 @@ DO $$ BEGIN
 END; $$;
 SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end') FROM business_partner_codes WHERE code='JJJJJJJJJJJJ'), 'refused entry changes nothing');
 SELECT public.check_test((public.business_partner_quote_for_caller()->>'source')='standard', 'after the end: standard price');
--- After the account end neither code starts new 72 hours: not the other code, not a fresh unused one.
+-- An ended code never blocks another code (t1339u): the second code continues its own 72 hours.
+SELECT public.check_test((public.reserve_business_partner_code('JJJJJJJJJJJ2')->>'already')::boolean, 'after code 1 ended: code 2 continues');
+SELECT public.check_test((SELECT reserved_until=(SELECT t FROM wo WHERE k='end2') FROM business_partner_codes WHERE code='JJJJJJJJJJJ2'), 'code 2 keeps its own end');
+SELECT public.check_test((public.business_partner_quote_for_caller()->>'unit_price_minor')::bigint=39900, 'code 2: personal price again');
+-- A fresh code after the end of code 1: its own fresh 72 hours.
 INSERT INTO business_partner_codes(code, purpose) VALUES ('JJJJJJJJJJJ3','custdev');
+SELECT public.check_test(NOT (public.reserve_business_partner_code('JJJJJJJJJJJ3')->>'already')::boolean, 'fresh code after the end: a new window');
+SELECT public.check_test((SELECT reserved_until BETWEEN clock_timestamp()+interval '71 hours 59 minutes' AND clock_timestamp()+interval '72 hours'
+  FROM business_partner_codes WHERE code='JJJJJJJJJJJ3'), 'fresh code after the end: fresh 72 hours');
+-- A link for a code still inside its 72 hours opens normally, the ended code 1 still refuses.
+INSERT INTO wo(k, v) SELECT 'o3', order_id FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
+SELECT public.check_test((SELECT s.partner_code_id=c.id FROM business_subscription_order_scopes s, business_partner_codes c
+  WHERE s.order_id=(SELECT v FROM wo WHERE k='o3') AND c.code='JJJJJJJJJJJ3'), 'payment link under the fresh code');
+UPDATE orders SET status='cancelled' WHERE id=(SELECT v FROM wo WHERE k='o3');
 DO $$ BEGIN
-  BEGIN PERFORM public.reserve_business_partner_code('JJJJJJJJJJJ2'); RAISE EXCEPTION 'other code restarted the account hold';
-  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF; END;
-  BEGIN PERFORM public.reserve_business_partner_code('JJJJJJJJJJJ3'); RAISE EXCEPTION 'fresh code restarted the account hold';
+  BEGIN PERFORM public.reserve_business_partner_code('JJJJJJJJJJJJ'); RAISE EXCEPTION 'ended code 1 restarted after another code';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF; END;
 END; $$;
-SELECT public.check_test(NOT EXISTS(SELECT 1 FROM business_partner_code_windows w JOIN business_partner_codes c ON c.id=w.code_id WHERE c.code='JJJJJJJJJJJ3'), 'refused fresh code opens no window');
--- The second owner of the same account: the same 72 hours, no restart.
+SELECT public.check_test((SELECT reserved_by_user_id IS NULL FROM business_partner_codes WHERE code='JJJJJJJJJJJJ')
+  AND (SELECT expires_at=(SELECT t FROM wo WHERE k='end') FROM business_partner_code_windows WHERE code_id=(SELECT v FROM wo WHERE k='code')), 'ended code 1 stays ended');
+-- The second owner of the same account: the same window for code 1, no restart.
 SET test.uid='00000000-0000-4000-8000-0000000001a2';
 DO $$ BEGIN
-  BEGIN PERFORM public.reserve_business_partner_code('JJJJJJJJJJJJ'); RAISE EXCEPTION 'second owner restarted the hold';
+  BEGIN PERFORM public.reserve_business_partner_code('JJJJJJJJJJJJ'); RAISE EXCEPTION 'second owner restarted the ended code';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF; END;
 END; $$;
 -- Another account may still take a code whose hold ran out (unchanged rule), with its own 72 hours.

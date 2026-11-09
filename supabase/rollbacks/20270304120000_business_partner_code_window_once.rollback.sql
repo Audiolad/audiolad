@@ -1,4 +1,5 @@
--- Rollback of 20270304120000_business_partner_code_window_once.sql (task 8142d69a, t1338u).
+-- Rollback of 20270304120000_business_partner_code_window_once.sql (task 8142d69a, t1338u + t1339u:
+-- 72 hours once per code and account).
 -- Apply only with Sergey's decision, after a PostgreSQL backup. Deploy the previous application
 -- first if it depends on partner_code_expired (it does not break without it).
 -- Restores the previous behaviour: every reserve_business_partner_code call restarts 72 hours.

@@ -89,7 +89,7 @@ assert.equal(mapBusinessSubscriptionRpcError("partner_terms_changed").status, 40
 assert.equal(mapPartnerCodeRpcError("ERROR: partner_code_unavailable").error, "partner_code_unavailable");
 assert.equal(mapPartnerCodeRpcError("partner_code_already_applied").status, 409);
 assert.equal(mapPartnerCodeRpcError("boom").error, "internal_error");
-// t1338u: after the account's first 72 hours the same account gets a final «expired» answer.
+// t1338u/t1339u: after the code's 72 hours the same account gets a final «expired» answer for that code.
 assert.deepEqual(mapPartnerCodeRpcError("ERROR: partner_code_expired"), { status: 410, error: "partner_code_expired" });
 assert.ok(partnerCodeErrorIsFinal("partner_code_expired"), "an expired code drops the link cookie");
 assert.equal(partnerCodeErrorText("partner_code_expired"), "Срок действия этого кода закончился.");

@@ -1,5 +1,6 @@
 -- Disposable post-apply smoke for task 8142d69a t1338u on the full replayed schema. Rolls back.
--- The 72-hour hold of a partner code is counted once per account, through the real roles.
+-- The 72-hour hold of a partner code is counted once per code and account (t1339u: a new code
+-- opens its own fresh 72 hours), through the real roles.
 \set ON_ERROR_STOP on
 BEGIN;
 
@@ -14,7 +15,7 @@ END; $f$;
 DO $$
 DECLARE
   v_owner uuid := gen_random_uuid(); v_other uuid := gen_random_uuid();
-  v_code uuid; v_code2 uuid; v_end timestamptz; v_order uuid; v_result jsonb; v_refused boolean := false;
+  v_code uuid; v_code2 uuid; v_end timestamptz; v_end2 timestamptz; v_order uuid; v_result jsonb; v_refused boolean := false;
 BEGIN
   INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
     (v_owner, 'partner-window-1@example.test', now()), (v_other, 'partner-window-2@example.test', now());
@@ -48,16 +49,17 @@ BEGIN
     RAISE EXCEPTION 'payment link lost the personal price';
   END IF;
 
-  -- Another code before the first payment: the same account end, no new 72 hours.
+  -- A new code: its own fresh 72 hours; coming back to the first code keeps the first end.
   UPDATE public.orders SET status = 'cancelled', cancelled_at = now() WHERE id = v_order;
   PERFORM pg_temp.as_owner(v_owner);
   SET LOCAL ROLE authenticated;
   PERFORM public.reserve_business_partner_code('VVVVWWWWXXX2');
   PERFORM public.reserve_business_partner_code('VVVVWWWWXXXX');
   RESET ROLE;
+  SELECT expires_at INTO v_end2 FROM public.business_partner_code_windows WHERE code_id = v_code2;
   IF (SELECT reserved_until FROM public.business_partner_codes WHERE id = v_code) IS DISTINCT FROM v_end
-     OR (SELECT expires_at FROM public.business_partner_code_windows WHERE code_id = v_code2) IS DISTINCT FROM v_end THEN
-    RAISE EXCEPTION 'another code started new 72 hours for the same account';
+     OR v_end2 < clock_timestamp() + interval '71 hours 59 minutes' THEN
+    RAISE EXCEPTION 'a new code did not get its own 72 hours or the first code restarted';
   END IF;
 
   -- The 72 hours are over and the link is gone: no new 72 hours for this account.
@@ -73,20 +75,21 @@ BEGIN
     v_refused := true;
   END;
   BEGIN
-    PERFORM public.reserve_business_partner_code('VVVVWWWWXXX2');
-    v_refused := false;
-  EXCEPTION WHEN raise_exception THEN
-    IF SQLERRM <> 'partner_code_expired' THEN RAISE; END IF;
-  END;
-  BEGIN
     PERFORM * FROM public.create_business_subscription_order(gen_random_uuid(), 39900);
     v_refused := false;
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM <> 'partner_terms_changed' THEN RAISE; END IF;
   END;
+  -- The ended first code does not block the second code: it continues its own 72 hours.
+  v_result := public.reserve_business_partner_code('VVVVWWWWXXX2');
   RESET ROLE;
-  IF NOT v_refused OR (SELECT reserved_until FROM public.business_partner_codes WHERE id = v_code) IS DISTINCT FROM v_end THEN
+  IF NOT v_refused OR (SELECT reserved_until FROM public.business_partner_codes WHERE id = v_code) IS NOT NULL
+     OR (SELECT expires_at FROM public.business_partner_code_windows WHERE code_id = v_code) IS DISTINCT FROM v_end THEN
     RAISE EXCEPTION 'an ended hold was restarted for the same account';
+  END IF;
+  IF NOT (v_result->>'already')::boolean
+     OR (SELECT reserved_until FROM public.business_partner_codes WHERE id = v_code2) IS DISTINCT FROM v_end2 THEN
+    RAISE EXCEPTION 'the ended first code blocked or restarted the second code: %', v_result;
   END IF;
 
   -- A browser can neither read the windows nor bypass the cap.
