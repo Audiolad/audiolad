@@ -13,6 +13,7 @@ import {
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
+import { businessEarlyPayCarryoverNote } from "@/lib/business/subscription-period";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
@@ -353,8 +354,10 @@ export function BusinessPayControls({
   showAcceptedNote?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const access = useBusinessChromeAccess();
   const quote = usePartnerQuote(canPay);
   const acceptAnchorId = useOfferAcceptAnchorId();
+  const carryoverNote = businessEarlyPayCarryoverNote(access);
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
@@ -373,6 +376,11 @@ export function BusinessPayControls({
         <>
           <BusinessOfferAcceptedNote />
           {receiptEmail ? <BusinessReceiptEmailField control={receiptEmail} busy={busy} /> : null}
+          {carryoverNote ? (
+            <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
+              {carryoverNote}
+            </p>
+          ) : null}
           <button
             type="button"
             className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
@@ -400,6 +408,22 @@ export function BusinessPayControls({
       )}
       {error ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
     </div>
+  );
+}
+
+export function BusinessEarlyPayCarryoverNote({
+  access,
+  now,
+}: {
+  access: Parameters<typeof businessEarlyPayCarryoverNote>[0];
+  now?: Date;
+}) {
+  const note = businessEarlyPayCarryoverNote(access, now);
+  if (!note) return null;
+  return (
+    <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
+      {note}
+    </p>
   );
 }
 
