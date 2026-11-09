@@ -404,6 +404,15 @@
   opacity: 0.6;
 }
 
+/* t1336u: struck price on the pay CTA – cream on accent/play, not card ink (theme unit forbids text-white). */
+.business-struck-on-button-standard {
+  color: color-mix(in srgb, var(--biz-on-accent) 75%, transparent);
+}
+.business-struck-on-button-current {
+  color: var(--biz-on-accent);
+  font-weight: 700;
+}
+
 /* Shared row. The thin bar tightens it; the venue card centres the round controls. */
 .business-app-player-controls {
   display: flex;

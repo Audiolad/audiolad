@@ -232,9 +232,9 @@ const struck = renderToStaticMarkup(<BusinessStruckPrice standardRub={799} price
 assert.match(struck, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>/);
 assert.match(struck, /text-\[var\(--biz-text-muted\)\]/, "default tone keeps muted ink off the button");
 const struckOnButton = renderToStaticMarkup(<BusinessStruckPrice standardRub={1598} priceRub={798} tone="onButton" testId="biz-home-pay-button-price" />);
-assert.match(struckOnButton, /text-white\/75/, "onButton struck is translucent white");
-assert.match(struckOnButton, /font-bold text-white/, "onButton current is white bold");
-assert.doesNotMatch(struckOnButton, /--biz-text/, "onButton does not pull dark card ink");
+assert.match(struckOnButton, /business-struck-on-button-standard/, "onButton struck uses cream-on-accent class");
+assert.match(struckOnButton, /business-struck-on-button-current/, "onButton current uses cream-on-accent bold class");
+assert.doesNotMatch(struckOnButton, /text-white|text-\[var\(--biz-text/, "onButton avoids raw white and card ink");
 const terms = renderToStaticMarkup(<BusinessPartnerTerms quote={reserved} />);
 const heldTerms = renderToStaticMarkup(
   <BusinessPartnerTerms quote={{ ...held!, reservedUntil: "2099-01-01T09:00:17Z" }} now={new Date("2099-01-01T08:00:00Z")} />,
@@ -276,8 +276,8 @@ assert.match(discountedControls, /data-testid="biz-partner-terms"/);
 assert.match(discountedControls, /<s[^>]*>799\u00a0₽<\/s>/, "799 struck through before payment");
 assert.match(discountedControls, /data-testid="biz-home-pay-button-price"/, "pay button shows struck total");
 assert.match(discountedControls, /<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/, "two venues: ~~1598~~ 798 on the button");
-assert.match(discountedControls, /data-testid="biz-home-pay-button-price-standard"[^>]*class="text-white\/75"|class="text-white\/75"[^>]*data-testid="biz-home-pay-button-price-standard"/, "struck total on pay button is translucent white");
-assert.match(discountedControls, /data-testid="biz-home-pay-button-price-current"[^>]*class="font-bold text-white"|class="font-bold text-white"[^>]*data-testid="biz-home-pay-button-price-current"/, "current total on pay button is white bold");
+assert.match(discountedControls, /business-struck-on-button-standard/, "pay button struck uses on-button class");
+assert.match(discountedControls, /business-struck-on-button-current/, "pay button current uses on-button class");
 assert.doesNotMatch(discountedControls, /Автосписания нет[\s\S]*799 ₽ за 30 дней, картой/, "no plain 799 line next to the offer");
 resetPartnerQuoteStore({ status: "ready", quote: mid });
 const midControls = renderToStaticMarkup(<BusinessPayControls {...controls} />);

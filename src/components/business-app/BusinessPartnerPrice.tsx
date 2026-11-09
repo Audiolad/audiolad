@@ -31,8 +31,8 @@ export function BusinessStruckPrice({
   /** onButton: white bold on the brown/green pay CTA (t1336u). Default keeps dark ink on cards. */
   tone?: "default" | "onButton";
 }) {
-  const standardClass = tone === "onButton" ? "text-white/75" : "text-[var(--biz-text-muted)]";
-  const currentClass = tone === "onButton" ? "font-bold text-white" : "text-[var(--biz-text)]";
+  const standardClass = tone === "onButton" ? "business-struck-on-button-standard" : "text-[var(--biz-text-muted)]";
+  const currentClass = tone === "onButton" ? "business-struck-on-button-current" : "text-[var(--biz-text)]";
   return (
     <span className="whitespace-nowrap" data-testid={testId}>
       <s className={standardClass} data-testid={`${testId}-standard`} aria-label={`Обычная цена ${standardRub} ₽`}>

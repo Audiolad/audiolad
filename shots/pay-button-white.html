@@ -27,7 +27,7 @@ h2{margin:0 0 8px;font-size:1.25rem}
 }
 .inline{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 8px}
 .nowrap{white-space:nowrap}
-.label{font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--biz-text-muted);margin:0 0 10px}
+.business-struck-on-button-standard{color:color-mix(in srgb,#fff8ef 75%,transparent)}.business-struck-on-button-current{color:#fff8ef;font-weight:700}.label{font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--biz-text-muted);margin:0 0 10px}
 </style>
 </head>
 <body>
@@ -52,8 +52,8 @@ h2{margin:0 0 8px;font-size:1.25rem}
       <span class="inline">
         <span>Оплатить</span>
         <span class="nowrap" data-testid="biz-home-pay-button-price">
-          <s class="text-white/75" style="color:rgba(255,255,255,.75)" data-testid="biz-home-pay-button-price-standard">1598&nbsp;₽</s>
-          <strong class="font-bold text-white" style="color:#fff;font-weight:700" data-testid="biz-home-pay-button-price-current">798&nbsp;₽</strong>
+          <s class="business-struck-on-button-standard" style="color:color-mix(in srgb, #fff8ef 75%, transparent)" data-testid="biz-home-pay-button-price-standard">1598&nbsp;₽</s>
+          <strong class="business-struck-on-button-current" style="color:#fff8ef;font-weight:700" data-testid="biz-home-pay-button-price-current">798&nbsp;₽</strong>
         </span>
       </span>
     </button>
