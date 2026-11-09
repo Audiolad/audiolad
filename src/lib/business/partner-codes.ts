@@ -19,8 +19,13 @@ const PARTNER_CODE_RE = /^[2-9A-HJ-NP-Z]{12}$/;
 export const PARTNER_CODE_COOKIE = "al_biz_partner_code";
 export const PARTNER_CODE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
-/** Public landing of the personal link: https://business.audiolad.ru/podarok?code=XXXX-XXXX-XXXX */
+/**
+ * Public landing of the personal link (t1321u): https://coffee.audiolad.ru/podarok?code=XXXX-XXXX-XXXX.
+ * business.audiolad.ru/podarok stays rewritten the same way for links already issued.
+ */
 export const PARTNER_CODE_PUBLIC_PATH = "/podarok";
+/** Canonical host for newly issued personal links. */
+export const PARTNER_CODE_PUBLIC_ORIGIN = "https://coffee.audiolad.ru";
 
 export const PARTNER_CODE_PURPOSES = {
   custdev: "Кастдев",
@@ -58,6 +63,11 @@ export function generatePartnerCode(randomBytes: (size: number) => Uint8Array): 
 
 export function partnerCodeLink(origin: string, code: string): string {
   return `${origin}${PARTNER_CODE_PUBLIC_PATH}?code=${formatPartnerCode(code)}`;
+}
+
+/** Personal link for new codes – always on the coffee host. */
+export function partnerCodePublicLink(code: string): string {
+  return partnerCodeLink(PARTNER_CODE_PUBLIC_ORIGIN, code);
 }
 
 /** Whole rubles strictly below the standard price; no kopecks. */
