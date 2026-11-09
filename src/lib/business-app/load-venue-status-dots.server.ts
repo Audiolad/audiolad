@@ -1,6 +1,9 @@
 import "server-only";
 
-import { HALL_MIRROR_FRESH_SECONDS } from "@/lib/business-app/hall-mirror";
+import {
+  BUSINESS_LIVE_CONNECTIVITY_SECONDS,
+  isPlaybackReportCurrent,
+} from "@/lib/business-app/owner-home-signals";
 import { deriveVenueStatusDot, type VenueStatusDotRow } from "@/lib/business-app/venue-status-dot";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -74,16 +77,28 @@ export async function loadVenueStatusDots(input: {
       const seenAt = Date.parse(String(session.last_seen_at));
       const secondsSinceSeen = Number.isFinite(seenAt) ? Math.max(0, (nowMs - seenAt) / 1000) : null;
       const playback = playbackByPlayer.get(session.player_id);
-      // Drop a playback report that is older than the mirror window when the device is offline –
-      // otherwise a stale "playing" would show green after the phone went away.
-      const playbackState = asPlaybackState(playback?.playback_state);
-      const fresh = secondsSinceSeen != null && secondsSinceSeen <= HALL_MIRROR_FRESH_SECONDS;
+      const rawState = asPlaybackState(playback?.playback_state);
+      const reportedAt = Date.parse(String(playback?.reported_at ?? ""));
+      const reportedAgeSeconds = Number.isFinite(reportedAt) ? Math.max(0, (nowMs - reportedAt) / 1000) : null;
+      const heartbeatFresh = secondsSinceSeen != null && secondsSinceSeen <= BUSINESS_LIVE_CONNECTIVITY_SECONDS;
+      // Same rule as mapOwnerLiveState (isPlaybackReportCurrent): green/playing needs a fresh
+      // reported_at – a heartbeat that only refreshes last_seen_at is not proof of sound.
+      // errorNeedsFreshReport: overnight stale error must not stay red while the phone is online.
+      const reportCurrent = isPlaybackReportCurrent({
+        playbackState: rawState,
+        reportedAgeSeconds,
+        heartbeatFresh,
+        freshSeconds: BUSINESS_LIVE_CONNECTIVITY_SECONDS,
+        errorNeedsFreshReport: true,
+      });
+      const playbackState = reportCurrent ? rawState : null;
+      // Device offline window for the circle itself stays HALL_MIRROR_FRESH_SECONDS via derive.
       return {
         locationId,
         ...deriveVenueStatusDot({
           linked: true,
           secondsSinceSeen,
-          playbackState: fresh ? playbackState : playbackState === "error" ? null : playbackState,
+          playbackState,
           accessLive: true,
         }),
       };

@@ -124,6 +124,8 @@ export default function BusinessPointSlots() {
     <div className="flex flex-wrap gap-2">
       {slots.map((slot) => {
         const status = slot.location ? statusById.get(slot.location.id) : undefined;
+        // Before the first owner-state poll, status is unknown – not "not paired" (grey).
+        const dotKind = status?.color ?? (slot.location ? "pending" : null);
         const label = slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`;
         const ariaLabel = status ? `${label} – ${status.label}` : label;
         return <button key={slot.number} type="button"
@@ -132,14 +134,14 @@ export default function BusinessPointSlots() {
             : "business-app-btn business-app-btn-primary business-app-focus-ring"}
           aria-pressed={slot.location ? domain.location?.id === slot.location.id : undefined}
           aria-label={ariaLabel}
-          data-testid={slot.location ? `biz-venue-status-${status?.color ?? "pending"}` : "biz-add-point"}
+          data-testid={slot.location ? `biz-venue-status-${dotKind ?? "pending"}` : "biz-add-point"}
           disabled={pending || (!!slot.location && slot.location.status !== "active") || (!slot.location && !domain.canPay)}
           onClick={() => run(slot)}>
           {slot.location ? <>
             <span
-              className={`business-venue-status-dot business-venue-status-dot--${status?.color ?? "grey"}`}
+              className={`business-venue-status-dot business-venue-status-dot--${dotKind}`}
               aria-hidden="true"
-              data-color={status?.color ?? "grey"}
+              data-color={dotKind ?? "pending"}
             />
             <span>{label}</span>
             <span className="sr-only">{status ? `Статус: ${status.label}` : "Статус пока неизвестен"}</span>

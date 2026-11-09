@@ -2272,6 +2272,12 @@
   background: var(--biz-neutral);
 }
 
+/* Before first poll: outline only – not the grey «not paired» fill. */
+.business-venue-status-dot--pending {
+  background: transparent;
+  box-shadow: 0 0 0 1.5px var(--biz-neutral-border);
+}
+
 .business-venue-status-legend {
   display: grid;
   gap: 0.35rem;
