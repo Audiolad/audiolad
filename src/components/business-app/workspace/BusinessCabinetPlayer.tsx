@@ -20,6 +20,7 @@ import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/li
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
+import { prepareLoopAudio } from "@/lib/business-app/hall-loop-audio";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
@@ -377,6 +378,10 @@ export function BusinessCabinetPlayerProvider({
     const fader = new FadingAudio(audio);
     fader.setVolume(playbackRef.current.volume);
     fadeRef.current = fader;
+    // t1314u: iPhone / iPad (home-screen app above all): the element never reaches a natural end,
+    // which would close the iOS audio session for good while the screen is locked (WebKit bug
+    // 261858). The controller switches tracks while the element still plays (hall-loop-audio.ts).
+    const loopMode = prepareLoopAudio(audio, navigator);
     const ctl = new Controller(
       {
         audio: fader,
@@ -404,6 +409,7 @@ export function BusinessCabinetPlayerProvider({
         // Locked iPhone (t1303u): hand the next track over before the end, never wait for the
         // network at the boundary.
         backgroundAdvance: () => lockedAppleScreen(document, navigator),
+        loopAdvance: () => loopMode && audio.loop === true,
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
         previousIndex: (currentIndex, length) => cafeQueuePreviousIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
@@ -445,14 +451,18 @@ export function BusinessCabinetPlayerProvider({
       sendReport();
     };
     const onEnded = () => void ctl.onEnded();
+    const onSeeking = () => ctl.onSeeking(audio.currentTime, audio.duration);
     const onError = () => void ctl.onError();
     // Network recovery (P0-3): a stall that does not move on, or the connection coming
     // back, is handled by the controller (backoff retries, resume at the position).
     const onWaiting = () => ctl.onWaiting();
     const onOnline = () => void ctl.onOnline();
     const onVisible = () => {
-      if (document.visibilityState === "visible") void ctl.onOnline();
-      else fader.prepareForBackground();
+      if (document.visibilityState === "visible") {
+        void ctl.onOnline();
+        // A start refused while the screen was locked: try once more now, without a tap.
+        void ctl.onForeground();
+      } else fader.prepareForBackground();
     };
     // Screen lock / background (t1285u): timers and the ramp may freeze there; never leave the
     // hall music at a mid-fade (or zero) volume. A user pause in its fade-out completes now.
@@ -467,6 +477,7 @@ export function BusinessCabinetPlayerProvider({
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", sendReport);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("seeking", onSeeking);
     audio.addEventListener("error", onError);
     const reportTimer = window.setInterval(sendReport, 15_000);
     return () => {
@@ -481,7 +492,9 @@ export function BusinessCabinetPlayerProvider({
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", sendReport);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("seeking", onSeeking);
       audio.removeEventListener("error", onError);
+      if (loopMode) audio.loop = false;
       ctl.dispose();
       ctlRef.current = null;
       fader.dispose();
@@ -559,7 +572,10 @@ export function BusinessCabinetPlayerProvider({
     if (!audio || view.status !== "playing" || seekRef.current <= 0.5) return;
     const target = seekRef.current;
     seekRef.current = 0;
-    if (Number.isFinite(audio.duration) && target < audio.duration) audio.currentTime = target;
+    if (Number.isFinite(audio.duration) && target < audio.duration) {
+      ctlRef.current?.noteManualSeek();
+      audio.currentTime = target;
+    }
   }, [view.status]);
 
   const toggle = useCallback(async () => {
@@ -1054,6 +1070,7 @@ export function BusinessCabinetPlayerProvider({
     // The previous track is fading out after a skip: the bar already shows the chosen one.
     if (ctlRef.current?.fadingOutPrevious) return;
     const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
+    ctlRef.current?.noteManualSeek();
     audio.currentTime = nextTime;
     setView((prev) => ({ ...prev, currentTime: nextTime }));
     remember({ positionSec: nextTime }, false, true);

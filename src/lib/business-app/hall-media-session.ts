@@ -72,6 +72,9 @@ export function syncPlayerMediaSession(
     setHandler(ms, "play", () => run("play"));
     setHandler(ms, "pause", () => run("pause"));
     setHandler(ms, "nexttrack", state.canNext ? () => run("nexttrack") : null);
+    // Otherwise iOS shows ±10 s buttons instead of «next» on the lock screen.
+    setHandler(ms, "seekbackward", null);
+    setHandler(ms, "seekforward", null);
   } catch {
     /* best effort */
   }

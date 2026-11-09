@@ -69,6 +69,15 @@ export type OnlineDeps = {
    * element still plays, and the boundary never waits for the network. Omitted: false.
    */
   backgroundAdvance?: () => boolean;
+  /**
+   * t1314u (Sergey 09.11.2026, iPhone home-screen app): true while the element has `loop` on, so
+   * a track never reaches its natural end. In an iOS home-screen web app the audio session is
+   * closed by a natural end and cannot be reopened while the screen is locked (WebKit bug
+   * 261858): every switch has to happen while the element still plays. Then the next track is
+   * handed over before the end (any visibility) and, as the safety net, on the loop's jump back
+   * to the start (`onSeeking` / `onProgress`). Omitted: false ("ended" moves on as before).
+   */
+  loopAdvance?: () => boolean;
 };
 
 export const RECOVERY_BASE_MS = 1_000;
@@ -101,6 +110,14 @@ export const EARLY_HANDOFF_MIN_PLAYED_SEC = 5;
 export const EARLY_HANDOFF_DURATION_TOLERANCE_SEC = 2;
 /** Audio errors on one track while the browser is online before the track is skipped. */
 export const RECOVERY_SKIP_AFTER_ERRORS = 4;
+/** Loop wrap: the element was at least this far into the track before the jump back. */
+export const LOOP_WRAP_FROM_MIN_SEC = 3;
+/** Loop wrap: the jump lands before this position. */
+export const LOOP_WRAP_TO_MAX_SEC = 1.5;
+/** Loop wrap: with a known duration, the jump starts no earlier than this before the end. */
+export const LOOP_WRAP_END_SLACK_SEC = 5;
+/** A seek made by the user / the player itself is never taken for a loop wrap for this long. */
+export const LOOP_MANUAL_SEEK_GUARD_MS = 1_500;
 export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
 
 /** Browser autoplay policy refusal: only a user gesture helps, retries would loop. */
@@ -159,6 +176,11 @@ export class SpaOnlinePlayer {
   private presigned: { audioItemId: string; url: string; at: number } | null = null;
   /** `op` of the track already handed over early (one handoff per started track). */
   private handoffOp = -1;
+  /** Loop mode: last position of the current source seen by onProgress (-1: none yet). */
+  private loopFrom = -1;
+  private manualSeekAt = -Infinity;
+  /** Autoplay refusal happened while the page was hidden: retried once when it is visible. */
+  private refusedHidden = false;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -305,6 +327,7 @@ export class SpaOnlinePlayer {
     this.resumePoint = null;
     if (resume?.audioItemId === id && resume.positionSec > 0.5 &&
       Math.abs(this.d.audio.currentTime - resume.positionSec) > 2) {
+      this.noteManualSeek();
       try { this.d.audio.currentTime = resume.positionSec; } catch { /* not seekable yet */ }
     }
     this.healthyFrom = Number.isFinite(this.d.audio.currentTime) ? this.d.audio.currentTime : 0;
@@ -400,8 +423,63 @@ export class SpaOnlinePlayer {
     if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
     if (this.errorRetries > 0 && positionSec - this.healthyFrom >= RECOVERY_HEALTHY_SEC) this.errorRetries = 0;
     if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
+    if (this.loopWrap(positionSec, durationSec)) return;
+    if (this.loopMode() && Number.isFinite(positionSec)) this.loopFrom = positionSec;
     this.prefetchNext();
     this.maybeHandoff(positionSec, durationSec);
+  }
+
+  /** <audio> "seeking": in loop mode the jump back to 0:00 at the end of a track. */
+  onSeeking(positionSec: number, durationSec: number): void {
+    if (this.disposed || this.status !== "playing" || this.fadingOutPrevious) return;
+    this.loopWrap(positionSec, durationSec);
+  }
+
+  /** The user (progress bar) or the player moved the playhead: not a loop wrap. */
+  noteManualSeek(): void {
+    this.manualSeekAt = this.now();
+    this.loopFrom = -1;
+  }
+
+  /**
+   * Page visible again: an autoplay refusal that happened while it was hidden (locked iPhone)
+   * is retried once without waiting for a tap. A refusal on a visible page still waits for one.
+   */
+  onForeground(): Promise<void> {
+    if (this.disposed || !this.needsGesture || !this.refusedHidden || this.status !== "paused") return Promise.resolve();
+    this.refusedHidden = false;
+    return this.toggle();
+  }
+
+  private loopMode(): boolean {
+    try {
+      return this.d.loopAdvance?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Loop mode safety net: the element jumped from the end of the track back to its start (it
+   * never "ends"). Move on to the next track now, while the element still plays: the iOS audio
+   * session stays open. Without a ready link the old track keeps sounding until the sign answers.
+   */
+  private loopWrap(to: number, durationSec: number): boolean {
+    if (!this.loopMode() || this.switching || this.leaving || this.handoffOp === this.op) return false;
+    const from = this.loopFrom;
+    if (!Number.isFinite(to) || from < LOOP_WRAP_FROM_MIN_SEC || to >= LOOP_WRAP_TO_MAX_SEC || from - to <= 2) return false;
+    if (Number.isFinite(durationSec) && durationSec > 0 && from < durationSec - LOOP_WRAP_END_SLACK_SEC) return false;
+    if (this.now() - this.manualSeekAt < LOOP_MANUAL_SEEK_GUARD_MS) return false;
+    const cur = this.current;
+    const target = this.nextTarget();
+    const next = target >= 0 ? this.items[target] : null;
+    this.loopFrom = -1;
+    // One-track program: the loop itself is the right thing to do.
+    if (!cur || !next || next.audioItemId === cur.audioItemId) return true;
+    this.handoffOp = this.op;
+    this.retryTrackId = null;
+    void this.playIndex(target, true);
+    return true;
   }
 
   /**
@@ -447,7 +525,7 @@ export class SpaOnlinePlayer {
     if (this.switching || this.leaving || this.handoffOp === this.op) return;
     if (!Number.isFinite(positionSec) || !Number.isFinite(durationSec) || durationSec <= 0) return;
     if (positionSec < EARLY_HANDOFF_MIN_PLAYED_SEC || durationSec - positionSec > EARLY_HANDOFF_SEC) return;
-    if (!this.inBackground()) return;
+    if (!this.inBackground() && !this.loopMode()) return;
     const cur = this.current;
     // A misjudged element duration (VBR MP3 without a header) must not cut the track early:
     // where the catalog knows the length, the element has to agree with it.
@@ -584,6 +662,8 @@ export class SpaOnlinePlayer {
     const op = ++this.op;
     this.clearRetry();
     this.clearStall();
+    this.loopFrom = -1;
+    this.refusedHidden = false;
     const item = this.items[i];
     if (this.expired(item)) return this.onDeadline(false);
     if (this.resumePoint && this.resumePoint.audioItemId !== item.audioItemId) this.resumePoint = null;
@@ -649,11 +729,15 @@ export class SpaOnlinePlayer {
     }
     const fresh = this.fresh(item.audioItemId);
     if (!fresh || this.expired(fresh)) return this.onDeadline(false);
+    // Loop mode (iPhone home-screen app): the old track is still playing here. Pause, then switch:
+    // a pause keeps the iOS audio session open, only a natural end closes it.
+    if (instant && this.loopMode()) this.d.audio.pause();
     this.d.audio.src = r.data.url;
     this.soundingId = item.audioItemId;
     this.presignRetryAt = 0;
     const seek = this.resumePoint?.audioItemId === item.audioItemId ? this.resumePoint.positionSec : 0;
     if (seek > 0.5) {
+      this.noteManualSeek();
       try { this.d.audio.currentTime = seek; } catch { /* applied again after play() */ }
     }
     try {
@@ -676,6 +760,7 @@ export class SpaOnlinePlayer {
     this.clearRetry();
     this.retryAttempt = 0;
     this.needsGesture = true;
+    this.refusedHidden = this.inBackground();
     this.set("paused");
   }
 
