@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import BusinessHallReconnect from "@/components/business-app/BusinessHallReconnect";
 import BusinessWorkspace from "@/components/business-app/workspace/BusinessWorkspace";
+import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
 import { businessMusicRoute } from "@/lib/business-app/point-device";
 import { loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
@@ -21,7 +23,8 @@ export const metadata: Metadata = {
  * /workspace and /player redirect here. Guests keep the demo at /guest/coffee.
  * This page does not load the catalog twice.
  * A paired venue device (`al-point`) always gets its venue's player here, with or without an
- * account signed in on the browser (the account does not pick the venue).
+ * account signed in on the browser (the account does not pick the venue). A hall device whose
+ * venue cannot be read (revoked or unchecked cookie) gets the reconnect screen, never the guest demo.
  */
 export default async function BusinessAppMusicPage() {
   const supabase = await createClient();
@@ -29,7 +32,16 @@ export default async function BusinessAppMusicPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const pointDevice = (await loadPointDeviceVenue()) !== null;
-  if (businessMusicRoute({ signedIn: Boolean(user), pointDevice }) === "guest") redirect("/guest/coffee");
+  // Any device cookie (alive, revoked or unchecked) keeps this browser the hall: never the guest demo.
+  const cabinet = await loadBusinessCabinetMode();
+  const route = businessMusicRoute({
+    signedIn: Boolean(user),
+    pointDevice,
+    hallDevice: cabinet.pointAlive,
+    hallLocked: cabinet.mode === "point",
+  });
+  if (route === "guest") redirect("/guest/coffee");
+  if (route === "hall_reconnect") return <BusinessHallReconnect revoked={cabinet.deviceStatus === "revoked"} />;
   const model = await loadWorkspacePage("cafe");
   return <BusinessWorkspace model={model} />;
 }

@@ -95,8 +95,9 @@ export default async function BusinessAppLayout({
     canPreview: domain.status === "authenticated",
   };
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).
+  // Never on a hall device, whatever its cookie state (t1299u).
   const initialGuestLimit =
-    !pointReports && resolveBusinessAccess(domain).level === "guest" && !hasLiveBusinessAccess(customerAccess)
+    !cabinet.pointAlive && resolveBusinessAccess(domain).level === "guest" && !hasLiveBusinessAccess(customerAccess)
       ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
       : null;
 

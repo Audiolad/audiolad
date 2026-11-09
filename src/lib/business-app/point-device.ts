@@ -24,9 +24,33 @@ export type PointDeviceVenue = {
   pointCanEdit?: boolean;
 };
 
-/** /music: the venue device always gets the player; only a visitor with neither a session nor a device sees the guest preview. */
-export function businessMusicRoute(input: { signedIn: boolean; pointDevice: boolean }): "player" | "guest" {
-  return input.pointDevice || input.signedIn ? "player" : "guest";
+export type BusinessMusicRoute = "player" | "guest" | "hall_reconnect";
+
+/**
+ * /music: the venue device always gets the player; only a visitor with neither a session nor a
+ * device cookie sees the guest preview.
+ * t1299u (Sergey 09.11.2026): a hall browser whose device cookie is revoked or could not be read
+ * still is the hall (`hallDevice`, any `al-point` cookie). It never gets the guest 12-track
+ * acquaintance; without the owner's fresh password (`hallLocked`, cabinet mode "point") it gets
+ * the reconnect screen instead.
+ */
+export function businessMusicRoute(input: {
+  signedIn: boolean;
+  pointDevice: boolean;
+  hallDevice?: boolean;
+  hallLocked?: boolean;
+}): BusinessMusicRoute {
+  if (input.pointDevice) return "player";
+  if (input.hallDevice || input.hallLocked) return input.signedIn && !input.hallLocked ? "player" : "hall_reconnect";
+  return input.signedIn ? "player" : "guest";
+}
+
+/**
+ * /guest/coffee (and coffee host `/`, rewritten to it): a browser with any hall-device cookie opens
+ * the venue player instead of the guest demo. Null keeps the guest page.
+ */
+export function businessGuestCoffeeHallRedirect(hallDevice: boolean): string | null {
+  return hallDevice ? POINT_DEVICE_PLAYER_PATH : null;
 }
 
 /** The venue owner's gift or paid period, as the device's workspace status. */

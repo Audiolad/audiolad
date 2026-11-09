@@ -10,6 +10,7 @@ import { businessNavHref, resolveBusinessAccess } from "../src/lib/business-app/
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import {
   POINT_DEVICE_PLAYER_PATH,
+  businessGuestCoffeeHallRedirect,
   businessMusicRoute,
   pointDeviceWorkspaceAccess,
 } from "../src/lib/business-app/point-device";
@@ -22,6 +23,23 @@ assert.equal(businessMusicRoute({ signedIn: false, pointDevice: true }), "player
 assert.equal(businessMusicRoute({ signedIn: true, pointDevice: true }), "player", "other account + device -> venue player");
 assert.equal(businessMusicRoute({ signedIn: true, pointDevice: false }), "player");
 assert.equal(businessMusicRoute({ signedIn: false, pointDevice: false }), "guest");
+assert.equal(businessMusicRoute({ signedIn: false, pointDevice: false, hallDevice: false, hallLocked: false }), "guest", "plain guest unchanged");
+
+// t1299u: a hall device whose cookie is revoked or unchecked (venue not loaded) never gets the guest demo.
+for (const signedIn of [false, true]) {
+  assert.notEqual(businessMusicRoute({ signedIn, pointDevice: false, hallDevice: true, hallLocked: true }), "guest");
+  assert.equal(businessMusicRoute({ signedIn, pointDevice: false, hallDevice: true, hallLocked: true }), "hall_reconnect", "locked hall -> reconnect");
+  assert.equal(businessMusicRoute({ signedIn, pointDevice: true, hallDevice: true, hallLocked: true }), "player", "alive hall -> venue player");
+}
+assert.equal(businessMusicRoute({ signedIn: false, pointDevice: false, hallDevice: true }), "hall_reconnect", "cookie without account -> reconnect");
+assert.equal(businessMusicRoute({ signedIn: true, pointDevice: false, hallDevice: true, hallLocked: false }), "player", "owner unlock on the hall device -> owner player");
+for (const hallDevice of [false, true]) for (const hallLocked of [false, true]) for (const signedIn of [false, true]) {
+  if (hallDevice || hallLocked) assert.notEqual(businessMusicRoute({ signedIn, pointDevice: false, hallDevice, hallLocked }), "guest");
+}
+
+// Guest coffee page (and coffee host `/`): a hall device is sent to the venue player.
+assert.equal(businessGuestCoffeeHallRedirect(true), "/music");
+assert.equal(businessGuestCoffeeHallRedirect(false), null, "a real guest keeps the 12-track intro");
 
 // Home on the device is the hall home (cabinet-mode.ts), whatever account is signed in; see the home check below.
 
@@ -48,11 +66,36 @@ assert.equal(businessNavHref(musicItem, resolveBusinessAccess(anonymous, true)),
 assert.equal(businessNavHref(musicItem, resolveBusinessAccess(otherAccount, true)), "/music");
 assert.equal(resolveBusinessAccess(otherAccount, true).pointDevice, true);
 assert.equal(resolveBusinessAccess(otherAccount).pointDevice, undefined);
+// t1299u: unsigned hall device with a revoked / unchecked cookie (pointReports false, side venue).
+const shellPointFlag = (pointReports: boolean, side: "owner" | "venue") => pointReports || side === "venue";
+assert.equal(businessNavHref(musicItem, resolveBusinessAccess(anonymous, shellPointFlag(false, "venue"))), "/music", "revoked hall -> /music");
+assert.equal(businessNavHref(musicItem, resolveBusinessAccess(anonymous, shellPointFlag(false, "owner"))), "/guest/coffee", "no cookie -> guest coffee");
 
 // Static contracts on the server routes.
 const music = read("src/app/business-app/music/page.tsx");
 assert.match(music, /loadPointDeviceVenue\(\)/);
-assert.match(music, /businessMusicRoute\(\{ signedIn: Boolean\(user\), pointDevice \}\) === "guest"\) redirect\("\/guest\/coffee"\)/);
+assert.match(music, /hallDevice: cabinet\.pointAlive,/);
+assert.match(music, /hallLocked: cabinet\.mode === "point",/);
+assert.match(music, /if \(route === "guest"\) redirect\("\/guest\/coffee"\);/);
+assert.match(music, /if \(route === "hall_reconnect"\) return <BusinessHallReconnect revoked=\{cabinet\.deviceStatus === "revoked"\} \/>;/);
+assert.ok(music.indexOf("loadBusinessCabinetMode()") < music.indexOf('redirect("/guest/coffee")'), "hall check before the guest redirect");
+
+const guestCoffee = read("src/app/business-app/guest/coffee/page.tsx");
+const guestBody = guestCoffee.slice(guestCoffee.indexOf("export default async function BusinessGuestCoffeePage"));
+assert.ok(
+  guestBody.indexOf("businessGuestCoffeeHallRedirect(await businessHallDeviceCookie())") > 0 &&
+    guestBody.indexOf("businessGuestCoffeeHallRedirect(") < guestBody.indexOf("<BusinessMusicSection"),
+  "hall cookie is checked before the guest studio renders",
+);
+assert.match(guestBody, /if \(hallRedirect\) redirect\(hallRedirect\);/);
+
+const reconnect = read("src/components/business-app/BusinessHallReconnect.tsx");
+assert.match(reconnect, /href="\/point"/);
+assert.doesNotMatch(reconnect, /BusinessSoundStudio|BusinessMusicSection|Собрать атмосферу|799|7 дней|guest\/coffee/);
+assert.doesNotMatch(reconnect, />\s*[A-Za-z][A-Za-z ,.!?]*\s*</, "no English text on screen");
+
+const layout = read("src/app/business-app/layout.tsx");
+assert.match(layout, /!cabinet\.pointAlive && resolveBusinessAccess\(domain\)\.level === "guest"/, "no guest limit strip on any hall device");
 assert.doesNotMatch(music, /if \(!user\) redirect/, "no account alone must not send a device to the guest page");
 
 const home = read("src/app/business-app/page.tsx");
@@ -95,11 +138,11 @@ assert.match(point, /Открыть плеер/);
 assert.doesNotMatch(point, /guest\/coffee/);
 
 const shell = read("src/components/business-app/BusinessAppShell.tsx");
-assert.match(shell, /resolveBusinessAccess\(useBusinessDomain\(\), pointReports\)/);
+assert.match(shell, /resolveBusinessAccess\(useBusinessDomain\(\), pointReports \|\| cabinet\.side === "venue"\)/);
 assert.match(shell, /!access\.pointDevice/);
 assert.match(read("src/components/business-app/BusinessBottomNav.tsx"), /resolveBusinessAccess\(useBusinessDomain\(\), cabinet\.side === "venue"\)/);
 assert.match(read("src/components/business-app/BusinessSidebar.tsx"), /resolveBusinessAccess\(domain, cabinet\.side === "venue"\)/);
 
-for (const source of [music, home, point, deviceServer]) assert.doesNotMatch(source, /\u2014/, "en dash only");
+for (const source of [music, home, point, deviceServer, guestCoffee, reconnect]) assert.doesNotMatch(source, /\u2014/, "en dash only");
 
 console.log("business-point-device-player-unit: ok");
