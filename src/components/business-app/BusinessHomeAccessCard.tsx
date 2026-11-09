@@ -29,7 +29,7 @@ import {
   BusinessPartnerTerms,
   BusinessStruckPrice,
 } from "@/components/business-app/BusinessPartnerPrice";
-import { getPartnerQuote, setPartnerQuote, usePartnerQuote } from "@/components/business-app/partner-quote-store";
+import { getPartnerQuote, refreshPartnerQuoteFromCookie, setPartnerQuote, usePartnerQuote } from "@/components/business-app/partner-quote-store";
 
 function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): string {
   if (domain.status !== "authenticated" || !domain.pilotSlots) return formatBusinessMonthlyPrice();
@@ -121,7 +121,8 @@ export function useBusinessHomePay() {
     }).catch(() => {
       /* The payment link is the action that matters. */
     });
-    try {
+
+    const checkoutOnce = async () => {
       const response = await fetch("/api/business/subscription/checkout", {
         method: "POST",
         credentials: "same-origin",
@@ -139,12 +140,40 @@ export function useBusinessHomePay() {
         payment_url?: string;
         quote?: unknown;
       } | null;
+      return { response, payload };
+    };
+
+    try {
+      let { response, payload } = await checkoutOnce();
       if (!response.ok || typeof payload?.payment_url !== "string") {
         const next = payErrorFromPayload(payload);
         // A newer offer edition was published after this page loaded: show «Принять условия» again.
         if (next.code === "offer_acceptance_required") setAccepted(false);
-        if (next.code === "partner_terms_changed") setPartnerQuote(parsePartnerQuote(payload?.quote));
         if (next.code === "receipt_email_required") setAskReceiptEmail(true);
+        // t1322u: stale reservation / quote – re-reserve from the cookie and retry pay once
+        // with the fresh personal price instead of dropping to 799 ₽.
+        if (next.code === "partner_terms_changed") {
+          const fromPayload = parsePartnerQuote(payload?.quote);
+          if (fromPayload) setPartnerQuote(fromPayload);
+          const refreshed = await refreshPartnerQuoteFromCookie();
+          if (refreshed || fromPayload) {
+            ({ response, payload } = await checkoutOnce());
+            if (response.ok && typeof payload?.payment_url === "string") {
+              window.location.assign(payload.payment_url);
+              return;
+            }
+            const retryError = payErrorFromPayload(payload);
+            if (retryError.code === "partner_terms_changed") {
+              setPartnerQuote(parsePartnerQuote(payload?.quote) ?? refreshed ?? fromPayload);
+            }
+            if (retryError.code === "offer_acceptance_required") setAccepted(false);
+            if (retryError.code === "receipt_email_required") setAskReceiptEmail(true);
+            setError(retryError);
+            setBusy(false);
+            return;
+          }
+          setPartnerQuote(fromPayload);
+        }
         setError(next);
         setBusy(false);
         return;

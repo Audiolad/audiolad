@@ -36,22 +36,39 @@ export function resetPartnerQuoteStore(next: State = { status: "idle", quote: nu
   emit(next);
 }
 
+async function postPartnerQuoteFromCookie(): Promise<PartnerQuote | null> {
+  try {
+    const response = await fetch("/api/business/partner-code", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const payload = (await response.json().catch(() => null)) as { quote?: unknown } | null;
+    const quote = response.ok ? parsePartnerQuote(payload?.quote) : null;
+    emit({ status: "ready", quote });
+    return quote;
+  } catch {
+    emit({ status: "ready", quote: null });
+    return null;
+  }
+}
+
 /** Loads once; also claims a code kept from a personal link opened before sign-up. */
 export function loadPartnerQuote(): void {
   if (state.status !== "idle") return;
   emit({ status: "loading", quote: state.quote });
-  void fetch("/api/business/partner-code", {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  })
-    .then(async (response) => {
-      const payload = (await response.json().catch(() => null)) as { quote?: unknown } | null;
-      emit({ status: "ready", quote: response.ok ? parsePartnerQuote(payload?.quote) : null });
-    })
-    .catch(() => emit({ status: "ready", quote: null }));
+  void postPartnerQuoteFromCookie();
+}
+
+/**
+ * t1322u: after partner_terms_changed, re-reserve from the cookie and reload the quote
+ * before retrying pay – do not fall back to the standard 799 price while the code is still open.
+ */
+export async function refreshPartnerQuoteFromCookie(): Promise<PartnerQuote | null> {
+  emit({ status: "loading", quote: state.quote });
+  return postPartnerQuoteFromCookie();
 }
 
 export function usePartnerQuote(enabled: boolean): PartnerQuote | null {
