@@ -6534,6 +6534,56 @@
       "file": "supabase/migrations/20270229120000_business_point_now_playing_ahead_count.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.report_business_point_now_playing(text, uuid, integer, integer, uuid[], integer) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_quote_internal(uuid, uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_owner_organization(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_quote_json(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_quote_for_caller() TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.reserve_business_partner_code(text) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_code_preview(text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_partner_apply_period_internal(uuid, uuid, uuid, bigint, integer, timestamptz, timestamptz, timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_subscription_order(uuid, bigint) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_subscription_order(uuid) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
     }
   ]
 }
