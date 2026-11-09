@@ -2240,47 +2240,55 @@
 }
 
 
-/* t1309u – status circles on «Мои точки» (left of venue name so buttons stay aligned). */
+/* t1309u / t1323u – status circles on «Мои точки» (left of venue name).
+   Size 2× and saturated fills: theme --biz-yellow/--biz-green are ink tones and
+   looked brown/muddy on the cream background at 390px. */
 .business-venue-status-btn {
   justify-content: flex-start;
   text-align: left;
+  gap: 0.55rem;
 }
 
 .business-venue-status-dot {
   display: inline-block;
   flex: 0 0 auto;
-  width: 0.65rem;
-  height: 0.65rem;
+  width: 1.3rem;
+  height: 1.3rem;
   border-radius: 999px;
-  background: var(--biz-neutral);
-  box-shadow: 0 0 0 1px var(--biz-neutral-border);
+  background: #9ca3af;
+  box-shadow: 0 0 0 1px rgba(42, 36, 28, 0.18);
 }
 
 .business-venue-status-dot--green {
-  background: var(--biz-green);
+  background: #22c55e;
+  box-shadow: 0 0 0 1px #15803d;
 }
 
 .business-venue-status-dot--yellow {
-  background: var(--biz-yellow);
+  /* Bright yellow + darker ring so it stays yellow (not brown) on beige. */
+  background: #FACC15;
+  box-shadow: 0 0 0 1.5px #A16207;
 }
 
 .business-venue-status-dot--red {
-  background: var(--biz-red);
+  background: #ef4444;
+  box-shadow: 0 0 0 1px #b91c1c;
 }
 
 .business-venue-status-dot--grey {
-  background: var(--biz-neutral);
+  background: #9ca3af;
+  box-shadow: 0 0 0 1px rgba(42, 36, 28, 0.22);
 }
 
 /* Before first poll: outline only – not the grey «not paired» fill. */
 .business-venue-status-dot--pending {
   background: transparent;
-  box-shadow: 0 0 0 1.5px var(--biz-neutral-border);
+  box-shadow: 0 0 0 2px var(--biz-neutral-border);
 }
 
 .business-venue-status-legend {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.45rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -2292,5 +2300,5 @@
 .business-venue-status-legend li {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
