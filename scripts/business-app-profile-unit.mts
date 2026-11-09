@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { businessCalendarDaysLeft, businessProfileSubscription } from "../src/lib/business-app/profile-subscription";
 import {
-  BUSINESS_OWNER_NAME_PLACEHOLDER, BUSINESS_PROFILE_NAME_HREF, validateBusinessProfile, businessKindLabel, businessTimezoneLabel,
+  BUSINESS_OWNER_NAME_PLACEHOLDER, BUSINESS_OWNER_SURNAME_HINT, BUSINESS_OWNER_SURNAME_PLACEHOLDER,
+  BUSINESS_PROFILE_LIMITS_TEXT, BUSINESS_PROFILE_NAME_HREF, validateBusinessProfile, businessKindLabel, businessTimezoneLabel,
 } from "../src/lib/business-app/profile";
-import { extractBusinessFirstName } from "../src/lib/business-app/domain-identity";
+import { extractBusinessFirstName, extractBusinessLastName } from "../src/lib/business-app/domain-identity";
 import { buildBusinessGreeting } from "../src/lib/business-app/greeting";
 
 const now = new Date("2026-11-03T12:00:00Z");
@@ -31,23 +32,42 @@ assert.equal(businessCalendarDaysLeft(new Date("2026-11-03T22:00:00Z"), new Date
 assert.equal(businessCalendarDaysLeft(new Date("2026-11-03T22:00:00Z"), new Date("2026-11-03T20:59:00Z"), "Asia/Vladivostok"), 0);
 assert.equal(businessCalendarDaysLeft(new Date("2026-03-30T10:00:00Z"), new Date("2026-03-28T11:00:00Z"), "Europe/Berlin"), 2, "DST: 47 hours spans two calendar days");
 assert.equal(businessCalendarDaysLeft(new Date("2027-01-01T10:00:00Z"), new Date("2026-12-31T10:00:00Z"), "Europe/Moscow"), 1);
-assert.deepEqual(validateBusinessProfile({ ownerName: "  Анна  ", venueName: "  Долина Кофе  " }), { ok: true, ownerName: "Анна", venueName: "Долина Кофе" });
-assert.deepEqual(validateBusinessProfile({ ownerName: "", venueName: null }), { ok: true, ownerName: "", venueName: null }, "no venue yet: only the name");
+assert.deepEqual(validateBusinessProfile({ ownerName: "  Анна  ", venueName: "  Долина Кофе  " }), {
+  ok: true, ownerName: "Анна", ownerSurname: "", venueName: "Долина Кофе",
+}, "missing surname key stays optional empty");
+assert.deepEqual(validateBusinessProfile({ ownerName: "  Анна  ", ownerSurname: "  Иванова  ", venueName: "  Долина Кофе  " }), {
+  ok: true, ownerName: "Анна", ownerSurname: "Иванова", venueName: "Долина Кофе",
+});
+assert.deepEqual(validateBusinessProfile({ ownerName: "", venueName: null }), {
+  ok: true, ownerName: "", ownerSurname: "", venueName: null,
+}, "no venue yet: only the name");
 assert.equal(validateBusinessProfile({ ownerName: "Анна", venueName: "   " }).ok, false, "the cafe name cannot be emptied");
 for (const bad of ["<b>Анна</b>", "Анна>", "\u0000", "\nАнна", "Анна\t", "\u007f", "\u202e"]) {
   assert.equal(validateBusinessProfile({ ownerName: bad, venueName: "Кофе" }).ok, false);
   assert.equal(validateBusinessProfile({ ownerName: "", venueName: bad }).ok, false);
+  assert.equal(validateBusinessProfile({ ownerName: "Анна", ownerSurname: bad, venueName: "Кофе" }).ok, false);
 }
 for (const [ownerName, venueName, ok] of [["А".repeat(80), "Я".repeat(120), true], ["А".repeat(81), "Кофе", false], ["", "Я".repeat(121), false]] as const) {
   assert.equal(validateBusinessProfile({ ownerName, venueName }).ok, ok);
 }
+assert.equal(validateBusinessProfile({ ownerName: "Анна", ownerSurname: "Я".repeat(81), venueName: "Кофе" }).ok, false);
+assert.deepEqual(validateBusinessProfile({ ownerName: "Анна", ownerSurname: "Я".repeat(80), venueName: "Кофе" }), {
+  ok: true, ownerName: "Анна", ownerSurname: "Я".repeat(80), venueName: "Кофе",
+});
 assert.equal(validateBusinessProfile({ ownerName: null, venueName: 123 }).ok, false);
+assert.equal(validateBusinessProfile({ ownerName: "Анна", ownerSurname: 1, venueName: "Кофе" }).ok, false);
 assert.equal(validateBusinessProfile({ ownerName: "", organizationName: "Кофе" }).ok, false, "old shape is rejected");
 assert.equal(validateBusinessProfile(null).ok, false);
 assert.equal(validateBusinessProfile({}).ok, false);
 assert.equal(BUSINESS_OWNER_NAME_PLACEHOLDER, "Ваше имя");
+assert.equal(BUSINESS_OWNER_SURNAME_PLACEHOLDER, "Ваша фамилия");
+assert.equal(BUSINESS_OWNER_SURNAME_HINT, "Фамилия нужна, чтобы подтвердить ваше право легально включать музыку в заведении.");
+assert.match(BUSINESS_PROFILE_LIMITS_TEXT, /Имя и фамилия – до 80/);
+assert.doesNotMatch(BUSINESS_OWNER_SURNAME_HINT, /\u2014/);
 assert.equal(BUSINESS_PROFILE_NAME_HREF, "/profile?edit=name");
 assert.equal(extractBusinessFirstName({ metadataFirstName: "", fullName: "Старое имя", email: "fixture@example.invalid" }), "");
+assert.equal(extractBusinessLastName({ metadataLastName: "  Петрова  " }), "Петрова");
+assert.equal(extractBusinessLastName({}), "", "surname has no full_name fallback");
 assert.match(buildBusinessGreeting(extractBusinessFirstName({ metadataFirstName: "Новое имя" }), now), /Новое имя/);
 assert.equal(businessKindLabel("cafe"), "Кофейня");
 assert.equal(businessKindLabel("unknown"), "unknown");
@@ -59,6 +79,10 @@ const form = readFileSync("src/components/business-app/profile/BusinessProfileFo
 assert.match(form, /router\.refresh\(\)/);
 assert.doesNotMatch(form, /window\.location\.(href|assign|replace|reload)/);
 assert.match(form, /placeholder=\{BUSINESS_OWNER_NAME_PLACEHOLDER\}/);
+assert.match(form, /placeholder=\{BUSINESS_OWNER_SURNAME_PLACEHOLDER\}/);
+assert.match(form, />Фамилия владельца \/ хозяйки</);
+assert.match(form, /BUSINESS_OWNER_SURNAME_HINT/);
+assert.match(form, /data-testid="biz-profile-owner-surname"/);
 assert.doesNotMatch(form, /Например, Анна|Организация/);
 assert.match(form, />Название кофейни</);
 assert.match(form, /get\("edit"\) !== "name"/);
@@ -67,10 +91,16 @@ assert.doesNotMatch(form, /\u2014/);
 const page = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
 assert.doesNotMatch(page, /Изменить в управлении кофейней/, "no duplicate cafe row in the profile");
 assert.match(page, /venueName=\{domain\.location\?\.name \?\? null\}/);
+assert.match(page, /ownerSurname=\{ownerSurname\}/);
+assert.match(page, /extractBusinessLastName/);
+
 const action = readFileSync("src/app/business-app/profile/actions.ts", "utf8");
 assert.match(action, /rpc\("rename_business_location"/, "the header venue name is renamed through the existing owner-only RPC");
 assert.match(action, /p_location_id: location\.id/, "venue resolved on the server");
 assert.match(action, /count !== 1\) return/, "organization sync only for a single-venue account");
+assert.match(action, /last_name: parsed\.ownerSurname/, "surname stored in auth user_metadata like first_name");
+assert.match(action, /first_name: parsed\.ownerName/);
+assert.doesNotMatch(action, /CREATE TABLE|ALTER TABLE|migration/, "no DB migration for surname – auth metadata only");
 const panel = readFileSync("src/components/business-app/VenueControlPanel.tsx", "utf8");
 assert.doesNotMatch(panel, /Название кофейни|biz-venue-name|biz-venue-rename|action: "rename"/, "settings do not edit the cafe name");
 const pointRoute = readFileSync("src/app/api/business/point/route.ts", "utf8");
@@ -105,6 +135,13 @@ for (const cf of ["\\u202A-\\u202E", "\\u200B-\\u200F", "\\u2066-\\u206F", "\\uF
     if (cp >= 0xd800 && cp <= 0xdfff) continue;
     if (/\p{Cf}/u.test(String.fromCodePoint(cp))) assert.ok(ranges.some(([a, b]) => cp >= a && cp <= b), `SQL misses Cf U+${cp.toString(16)}`);
   }
+}
+
+{
+  const licence = readFileSync("src/components/business-app/venue-licence/VenueLicencePage.tsx", "utf8");
+  assert.doesNotMatch(licence, /ownerName|ownerSurname|first_name|last_name|Лицензиат/, "public rights page still has no person name");
+  assert.match(licence, /venue-address/);
+  assert.match(licence, /venue-name/);
 }
 console.log("business-app-profile-unit: OK");
 

@@ -6,6 +6,9 @@ import { saveBusinessProfile } from "@/app/business-app/profile/actions";
 import {
   BUSINESS_OWNER_NAME_FIELD_ID,
   BUSINESS_OWNER_NAME_PLACEHOLDER,
+  BUSINESS_OWNER_SURNAME_FIELD_ID,
+  BUSINESS_OWNER_SURNAME_HINT,
+  BUSINESS_OWNER_SURNAME_PLACEHOLDER,
   BUSINESS_PROFILE_LIMITS_TEXT,
   focusBusinessOwnerNameField,
   validateBusinessProfile,
@@ -13,13 +16,15 @@ import {
 import "./profile.css";
 
 /**
- * Owner name and the name of the venue shown in the header switcher. `venueName: null` – no
- * venue yet. Only the organization owner may rename the venue.
+ * Owner name, optional surname, and the name of the venue shown in the header switcher.
+ * `venueName: null` – no venue yet. Only the organization owner may rename the venue.
+ * Surname is optional (Sergey, t1305u) and stored in auth user_metadata.last_name.
  */
-export default function BusinessProfileForm({ ownerName, venueName, canEditVenue }: {
-  ownerName: string; venueName: string | null; canEditVenue: boolean;
+export default function BusinessProfileForm({ ownerName, ownerSurname, venueName, canEditVenue }: {
+  ownerName: string; ownerSurname: string; venueName: string | null; canEditVenue: boolean;
 }) {
   const [name, setName] = useState(ownerName);
+  const [surname, setSurname] = useState(ownerSurname);
   const [venue, setVenue] = useState(venueName ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -39,13 +44,22 @@ export default function BusinessProfileForm({ ownerName, venueName, canEditVenue
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(""); setError("");
-    const parsed = validateBusinessProfile({ ownerName: name, venueName: venueName === null ? null : venue });
+    const parsed = validateBusinessProfile({
+      ownerName: name,
+      ownerSurname: surname,
+      venueName: venueName === null ? null : venue,
+    });
     if (!parsed.ok) { setError(parsed.error); return; }
     setBusy(true);
     try {
-      const result = await saveBusinessProfile({ ownerName: parsed.ownerName, venueName: parsed.venueName });
+      const result = await saveBusinessProfile({
+        ownerName: parsed.ownerName,
+        ownerSurname: parsed.ownerSurname,
+        venueName: parsed.venueName,
+      });
       if (!result.ok) { setError(result.error); router.refresh(); return; }
       setName(result.ownerName);
+      setSurname(result.ownerSurname);
       if (result.venueName !== null) setVenue(result.venueName);
       setMessage("Сохранено");
       router.refresh();
@@ -58,6 +72,14 @@ export default function BusinessProfileForm({ ownerName, venueName, canEditVenue
       <input id={BUSINESS_OWNER_NAME_FIELD_ID} name="ownerName" value={name} placeholder={BUSINESS_OWNER_NAME_PLACEHOLDER}
         autoComplete="given-name" disabled={busy} onChange={(e) => { setName(e.target.value); edit(); }}
         aria-describedby="business-profile-limits" data-testid="biz-profile-owner-name" />
+      <label htmlFor={BUSINESS_OWNER_SURNAME_FIELD_ID}>Фамилия владельца / хозяйки</label>
+      <input id={BUSINESS_OWNER_SURNAME_FIELD_ID} name="ownerSurname" value={surname}
+        placeholder={BUSINESS_OWNER_SURNAME_PLACEHOLDER} autoComplete="family-name" disabled={busy}
+        onChange={(e) => { setSurname(e.target.value); edit(); }}
+        aria-describedby="business-profile-surname-hint business-profile-limits"
+        data-testid="biz-profile-owner-surname" />
+      <p id="business-profile-surname-hint" className="text-sm text-[var(--biz-text-muted)]"
+        data-testid="biz-profile-owner-surname-hint">{BUSINESS_OWNER_SURNAME_HINT}</p>
       {venueName !== null ? <>
         <label htmlFor="business-venue-name">Название кофейни</label>
         <input id="business-venue-name" name="venueName" value={venue} placeholder="Моя кофейня" maxLength={120}

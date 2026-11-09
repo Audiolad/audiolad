@@ -25,3 +25,10 @@ export function extractBusinessFirstName(input: {
 
   return "";
 }
+
+/** Surname from auth user_metadata.last_name. No full_name / email fallback – surname is optional. */
+export function extractBusinessLastName(input: {
+  metadataLastName?: string | null;
+}): string {
+  return typeof input.metadataLastName === "string" ? input.metadataLastName.trim() : "";
+}

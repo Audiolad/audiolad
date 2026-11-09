@@ -11,7 +11,7 @@ import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-sig
 import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
 import { hasAcceptedCurrentBusinessOffer } from "@/lib/business/offer";
 
-export { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
+export { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
 export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 
 export type BusinessDomainLocation = {

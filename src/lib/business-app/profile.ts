@@ -20,7 +20,14 @@ export function focusBusinessOwnerNameField() {
   return true;
 }
 
-export const BUSINESS_PROFILE_LIMITS_TEXT = "Имя – до 80 символов, название кофейни – до 120 символов.";
+export const BUSINESS_OWNER_SURNAME_MAX = 80;
+export const BUSINESS_OWNER_SURNAME_FIELD_ID = "business-owner-surname";
+export const BUSINESS_OWNER_SURNAME_PLACEHOLDER = "Ваша фамилия";
+/** Plain reason under the surname field (Sergey, t1305u). */
+export const BUSINESS_OWNER_SURNAME_HINT =
+  "Фамилия нужна, чтобы подтвердить ваше право легально включать музыку в заведении.";
+export const BUSINESS_PROFILE_LIMITS_TEXT =
+  "Имя и фамилия – до 80 символов, название кофейни – до 120 символов.";
 
 /**
  * `venueName: null` means the account has no venue yet (only the name is saved).
@@ -31,18 +38,32 @@ export function validateBusinessProfile(input: unknown) {
       typeof input.ownerName !== "string" || (input.venueName !== null && typeof input.venueName !== "string")) {
     return { ok: false, error: "Проверьте имя и название кофейни." } as const;
   }
+  // Surname is optional (empty string). Missing key → treat as empty so older clients keep working.
+  const rawSurname = "ownerSurname" in input && typeof (input as { ownerSurname?: unknown }).ownerSurname === "string"
+    ? (input as { ownerSurname: string }).ownerSurname
+    : "ownerSurname" in input
+      ? null
+      : "";
+  if (rawSurname === null) {
+    return { ok: false, error: "Проверьте имя и название кофейни." } as const;
+  }
   const rawVenue = input.venueName as string | null;
   // Validate before trim so leading/trailing control characters are rejected too.
-  if (/[<>\p{Cc}\p{Cf}]/u.test(input.ownerName + (rawVenue ?? ""))) {
+  if (/[<>\p{Cc}\p{Cf}]/u.test(input.ownerName + rawSurname + (rawVenue ?? ""))) {
     return { ok: false, error: "Уберите угловые скобки и управляющие символы." } as const;
   }
   const ownerName = input.ownerName.trim();
+  const ownerSurname = rawSurname.trim();
   const venueName = rawVenue === null ? null : rawVenue.trim();
-  if ([...ownerName].length > BUSINESS_OWNER_NAME_MAX || (venueName !== null && [...venueName].length > BUSINESS_VENUE_NAME_MAX)) {
+  if (
+    [...ownerName].length > BUSINESS_OWNER_NAME_MAX ||
+    [...ownerSurname].length > BUSINESS_OWNER_SURNAME_MAX ||
+    (venueName !== null && [...venueName].length > BUSINESS_VENUE_NAME_MAX)
+  ) {
     return { ok: false, error: BUSINESS_PROFILE_LIMITS_TEXT } as const;
   }
   if (venueName === "") return { ok: false, error: "Введите название кофейни." } as const;
-  return { ok: true, ownerName, venueName } as const;
+  return { ok: true, ownerName, ownerSurname, venueName } as const;
 }
 
 const KINDS: Record<string, string> = {
