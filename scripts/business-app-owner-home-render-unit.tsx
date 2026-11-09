@@ -122,6 +122,8 @@ assert.deepEqual(visibleLines(trialCard), [
   "Оплата по договору:",
   BUSINESS_OFFER_TITLE,
   `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Принят один раз для всего аккаунта.`,
+  // t1313u: early-pay stack note (trialEnds 2026-11-22 + 30d → 22 декабря 2026 МСК)
+  "Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 22 декабря 2026.",
   "Оплатить",
 ]);
 // Every «Оплатить» links exactly the accepted edition.

@@ -10,6 +10,7 @@ import {
   BusinessPayError,
   useOfferAcceptAnchorId,
   BusinessReceiptEmailField,
+  BusinessEarlyPayCarryoverNote,
   useBusinessHomePay,
 } from "@/components/business-app/BusinessHomeAccessCard";
 import { BizDocumentsIcon, BizMusicIcon, BizSettingsIcon } from "@/components/business-app/BusinessIcons";
@@ -172,15 +173,18 @@ export default function BusinessHomeChecklist({
               ) : null}
               {accepted ? <BusinessOfferAcceptedNote testId="biz-home-pay-offer" /> : null}
               {accepted ? (
-                <button
-                  type="button"
-                  className={stepButtonClass(paid)}
-                  onClick={pay}
-                  disabled={busy}
-                  data-testid="biz-home-pay-button"
-                >
-                  {paid ? "Продлить" : "Оплатить"}
-                </button>
+                <>
+                  <BusinessEarlyPayCarryoverNote access={access} />
+                  <button
+                    type="button"
+                    className={stepButtonClass(paid)}
+                    onClick={pay}
+                    disabled={busy}
+                    data-testid="biz-home-pay-button"
+                  >
+                    {paid ? "Продлить" : "Оплатить"}
+                  </button>
+                </>
               ) : (
                 <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-pay-after-terms">
                   Кнопка оплаты появится, когда вы примете условия – шаг выше.
