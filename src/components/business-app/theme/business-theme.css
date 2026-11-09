@@ -83,6 +83,17 @@
   --biz-neutral-border: #ddd3c6;
   --biz-neutral-ink: #5e5349;
 
+  /* t1323u – status dots on «Мои точки»: saturated fills (theme ink yellow/green
+     looked brown/muddy on cream at 390px). Keep separate from --biz-yellow ink. */
+  --biz-status-dot-green: #22c55e;
+  --biz-status-dot-green-ring: #15803d;
+  --biz-status-dot-yellow: #FACC15;
+  --biz-status-dot-yellow-ring: #A16207;
+  --biz-status-dot-red: #ef4444;
+  --biz-status-dot-red-ring: #b91c1c;
+  --biz-status-dot-grey: #9ca3af;
+  --biz-status-dot-grey-ring: rgba(42, 36, 28, 0.22);
+
   /* Media and depth. */
   --biz-progress-track: #eadcc8;
   --biz-cover:
