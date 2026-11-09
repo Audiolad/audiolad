@@ -8,6 +8,7 @@ import {
   BusinessOfferAcceptedNote,
   BusinessOfferAcceptedStepNote,
   BusinessPayError,
+  useOfferAcceptAnchorId,
   BusinessReceiptEmailField,
   useBusinessHomePay,
 } from "@/components/business-app/BusinessHomeAccessCard";
@@ -92,6 +93,7 @@ export default function BusinessHomeChecklist({
 }) {
   const { access, hasTerm, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } =
     useBusinessHomePay();
+  const acceptAnchorId = useOfferAcceptAnchorId();
   const withAccess = showAccess && canPay && hasTerm && access.endsAt != null;
   const label = access.endsAt ? formatMoscowDateTime(new Date(access.endsAt)) : "";
   const paid = access.mode === "paid";
@@ -123,12 +125,13 @@ export default function BusinessHomeChecklist({
                 className="business-app-btn business-app-btn-cta business-app-focus-ring"
                 onClick={accept}
                 disabled={busy}
+                id={acceptAnchorId}
                 data-testid="biz-home-accept"
               >
                 Принять условия
               </button>
             )}
-            {error && !accepted ? <BusinessPayError error={error} /> : null}
+            {error && !accepted ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
           </Step>
         ) : null}
         {withAccess ? (
@@ -184,7 +187,7 @@ export default function BusinessHomeChecklist({
                 </p>
               )}
             </div>
-            {error && accepted ? <BusinessPayError error={error} /> : null}
+            {error && accepted ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
           </Step>
         ) : null}
       </ol>

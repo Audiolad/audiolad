@@ -37,7 +37,7 @@ function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): str
 }
 function businessPaymentNote(domain: ReturnType<typeof useBusinessDomain>): string {
   return domain.status === "authenticated" && domain.pilotSlots
-    ? `${businessPaymentLabel(domain)} за 30 дней за все активные точки. Одна оплата, общая дата продления.`
+    ? `Тариф – ${BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за одну точку на 30 дней. Итого ${businessPaymentLabel(domain)} за все активные точки. Одна оплата, общая дата продления.`
     : businessGiftPriceNote();
 }
 
@@ -140,6 +140,8 @@ export function useBusinessHomePay() {
       } | null;
       if (!response.ok || typeof payload?.payment_url !== "string") {
         const next = payErrorFromPayload(payload);
+        // A newer offer edition was published after this page loaded: show «Принять условия» again.
+        if (next.code === "offer_acceptance_required") setAccepted(false);
         if (next.code === "partner_terms_changed") setPartnerQuote(parsePartnerQuote(payload?.quote));
         if (next.code === "receipt_email_required") setAskReceiptEmail(true);
         setError(next);
@@ -262,12 +264,21 @@ export function BusinessOfferTermsLink({ testId = "biz-home-offer-link" }: { tes
 
 /** Clear text above every «Принять условия»: what is accepted, once per account, with the document link. */
 export function BusinessOfferAcceptNote() {
+  const domain = useBusinessDomain();
+  const newEdition = domain.status === "authenticated" && Boolean(domain.offerNewEditionPending);
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
-      Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек. Нажимая «Принять
-      условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
+      {newEdition
+        ? "Опубликована новая редакция договора-оферты. Примите её перед следующей оплатой – один раз для всего аккаунта и всех точек. Музыка в точках играет как раньше."
+        : "Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек."}{" "}
+      Нажимая «Принять условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
     </p>
   );
+}
+
+/** In-page target of «Перейти и принять»: the «Принять условия» button next to it (unique per block). */
+export function useOfferAcceptAnchorId(): string {
+  return `biz-offer-accept-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
 /** Shown next to every «Оплатить»: the payment is made under this offer edition. */
@@ -343,6 +354,7 @@ export function BusinessPayControls({
 }) {
   const domain = useBusinessDomain();
   const quote = usePartnerQuote(canPay);
+  const acceptAnchorId = useOfferAcceptAnchorId();
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
@@ -379,22 +391,26 @@ export function BusinessPayControls({
             className={`business-app-btn business-app-btn-${buttonVariant} business-app-focus-ring`}
             onClick={onAccept}
             disabled={busy}
+            id={acceptAnchorId}
             data-testid="biz-home-accept"
           >
             Принять условия
           </button>
         </>
       )}
-      {error ? <BusinessPayError error={error} /> : null}
+      {error ? <BusinessPayError error={error} acceptAnchorId={acceptAnchorId} /> : null}
     </div>
   );
 }
 
-export function BusinessPayError({ error }: { error: PayError }) {
+export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; acceptAnchorId: string }) {
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
-        Сначала примите договор-оферту: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.
+        Для оплаты нужна текущая редакция договора-оферты: <BusinessOfferTermsLink testId="biz-home-pay-error-offer-link" />.{" "}
+        <a href={`#${acceptAnchorId}`} className="font-semibold underline underline-offset-2 business-app-focus-ring" data-testid="biz-home-pay-error-accept-link">
+          Перейти и принять
+        </a>
       </p>
     );
   }

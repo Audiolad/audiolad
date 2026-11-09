@@ -43,14 +43,37 @@ const sha = createHash("sha256").update(file, "utf8").digest("hex");
 assert.equal(BUSINESS_OFFER_SOURCE.sha256, sha, "offer hash is stale");
 assert.equal(BUSINESS_OFFER_EDITION.contentHash, sha, "BUSINESS_OFFER_EDITION hash is stale: new text = new edition");
 assert.equal(BUSINESS_OFFER_SOURCE.version, BUSINESS_OFFER_EDITION.version);
-const migration = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
+// Every published edition keeps its own additive seed row; the accepted text is never edited in place.
+const migration = readFileSync("supabase/migrations/20270303120000_business_offer_edition_2.sql", "utf8");
 assert.match(migration, new RegExp(`'${BUSINESS_OFFER_EDITION.version.replace(/\./g, "\\.")}',\\s*'${sha}'`), "SQL seed must carry the same edition");
+assert.match(migration, /ON CONFLICT \(document_key, document_version\) DO NOTHING/);
+assert.doesNotMatch(migration, /^\s*(UPDATE|DELETE|DROP|ALTER)\b/im, "edition 2 seed is additive only");
+assert.equal(BUSINESS_OFFER_EDITION.version, "offer-v2-2026-11-09");
+assert.equal(BUSINESS_OFFER_EDITION.label, "Редакция 2 от 09.11.2026");
+{
+  // Edition 1 stays published and its accepted text stays readable, byte for byte.
+  const v1Sql = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
+  const v1Hash = "9d4046f36c20f5702697eac0af26de1c3579c6929c61d8ac4441c0b39617c7dc";
+  assert.match(v1Sql, new RegExp(`'offer-v1-2026-11-04',\\s*'${v1Hash}'`));
+  const v1 = readFileSync("docs/business/public/archive/business-offer-v1-2026-11-04.md", "utf8");
+  assert.equal(createHash("sha256").update(v1, "utf8").digest("hex"), v1Hash, "archived edition 1 is verbatim");
+  // Edition 2 changes only section 4.
+  const section = (md: string, n: number) => md.split(/^## /m).find((part) => part.startsWith(`${n}. `)) ?? "";
+  for (const n of [1, 2, 3, 5, 6, 7, 8, 9, 10]) assert.equal(section(file, n), section(v1, n), `section ${n} unchanged`);
+}
 assert.match(BUSINESS_OFFER_EDITION.label, /^Редакция \d+ от \d{2}\.\d{2}\.\d{4}$/);
 assert.equal(BUSINESS_OFFER_HREF, "/documents/business-offer");
 
 // 2. Required content, wording rules.
 const text = file;
-assert.match(text, new RegExp(`799 ₽ за одну точку на ${BUSINESS_PAID_PERIOD_DAYS} дней`));
+// Edition 2 (Sergey 09.11.2026): no fixed price in the offer; the current tariff is shown in the cabinet.
+assert.doesNotMatch(text, /\d+\s*₽/, "no fixed price in the offer text");
+assert.match(text, new RegExp(`Стоимость доступа к одной точке на ${BUSINESS_PAID_PERIOD_DAYS} дней устанавливается действующими тарифами Сервиса`));
+assert.match(text, /Действующий тариф указывается в личном кабинете до оплаты/);
+assert.match(text, /Изменённая стоимость применяется со следующей оплаты, уже оплаченные периоды не пересчитываются/);
+assert.match(text, /\*\*персональные коды на скидку\*\*/);
+assert.match(text, /периоды со специальной ценой отсчитываются с первой оплаты, внесённой по этому предложению или коду/);
+assert.match(text, /становится обычной – по действующему тарифу \(пункт 1 этого раздела\)/);
 assert.match(text, new RegExp(`${BUSINESS_GIFT_DAYS} дней`));
 assert.match(text, /Автоматических списаний нет/);
 assert.match(text, /начинаются с окончания текущего периода/);
