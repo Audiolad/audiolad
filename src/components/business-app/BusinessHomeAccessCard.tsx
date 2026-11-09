@@ -13,6 +13,7 @@ import {
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
+import { businessEarlyPayCarryoverNote } from "@/lib/business/subscription-period";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
@@ -353,8 +354,10 @@ export function BusinessPayControls({
   showAcceptedNote?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const access = useBusinessChromeAccess();
   const quote = usePartnerQuote(canPay);
   const acceptAnchorId = useOfferAcceptAnchorId();
+  const carryoverNote = businessEarlyPayCarryoverNote(access);
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
@@ -369,6 +372,11 @@ export function BusinessPayControls({
           </p>
         </>
       )}
+      {carryoverNote ? (
+        <p className="text-sm leading-6 text-[var(--biz-text)]" role="status" data-testid="biz-home-carryover-note">
+          {carryoverNote}
+        </p>
+      ) : null}
       {accepted ? (
         <>
           <BusinessOfferAcceptedNote />
