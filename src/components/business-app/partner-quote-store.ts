@@ -71,10 +71,15 @@ export async function refreshPartnerQuoteFromCookie(): Promise<PartnerQuote | nu
   return postPartnerQuoteFromCookie();
 }
 
+/**
+ * Always re-reads the server quote when payment UI mounts (t1328u).
+ * A soft navigation from /podarok can otherwise leave a stale «standard» quote
+ * that was loaded before the reservation finished.
+ */
 export function usePartnerQuote(enabled: boolean): PartnerQuote | null {
   const snapshot = useSyncExternalStore(subscribe, () => state, () => state);
   useEffect(() => {
-    if (enabled) loadPartnerQuote();
+    if (enabled) void refreshPartnerQuoteFromCookie();
   }, [enabled]);
   return enabled ? snapshot.quote : null;
 }

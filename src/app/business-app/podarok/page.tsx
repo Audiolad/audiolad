@@ -42,5 +42,5 @@ export default async function BusinessPartnerCodePage({ searchParams }: PageProp
       </section>
     );
   }
-  return <BusinessPartnerLanding offer={offer} signedIn={Boolean(user)} />;
+  return <BusinessPartnerLanding key={offer.code} offer={offer} signedIn={Boolean(user)} />;
 }
