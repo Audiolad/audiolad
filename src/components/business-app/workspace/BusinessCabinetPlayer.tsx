@@ -8,7 +8,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -213,14 +212,6 @@ async function fetchTrackBlob(url: string, signal: AbortSignal): Promise<Blob> {
   }
 }
 
-function subscribeOnline(cb: () => void): () => void {
-  window.addEventListener("online", cb);
-  window.addEventListener("offline", cb);
-  return () => {
-    window.removeEventListener("online", cb);
-    window.removeEventListener("offline", cb);
-  };
-}
 
 /** The hall reports its buffered count when it changes, else at most this often. */
 
@@ -309,8 +300,6 @@ export function BusinessCabinetPlayerProvider({
   /** t1331u: hall device only – copies of the next tracks for a short outage. */
   const bufferRef = useRef<HallOfflineBuffer | null>(null);
   const reportQueueRef = useRef<HallReportQueue | null>(null);
-  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine !== false, () => true);
-
   const adopt = useCallback((next: WorkspacePageModel) => {
     const current = modelRef.current;
     // Navigation may arrive after a newer status response. Reject conflicting
