@@ -127,6 +127,9 @@ const AUDIO_ITEM_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 export const CAFE_QUEUE_FEEDBACK_LIMIT = 24;
 
+/** Cap for optional POST excludeAudioItemIds (recent ring). */
+export const CAFE_QUEUE_EXCLUDE_LIMIT = 200;
+
 /** Whole hour on the device clock, using the venue windows. 11:00 is already day. */
 export function cafeDaypartFromHour(hour: number, hours: CafeDaypartHours = CAFE_DAYPART_HOURS_DEFAULT): CafeDaypart {
   if (!Number.isFinite(hour)) return "day";
@@ -224,4 +227,9 @@ export type CafeQueueRequest = {
   /** Track playing when the playlist is rebuilt. Its album stays off the new first slot. */
   boundaryAudioItemId?: string;
   seed?: number;
+  /**
+   * Optional: recently played ids. Ranked without them first; they are appended
+   * at the end so «без повторов» stays honest after an auto top-up.
+   */
+  excludeAudioItemIds?: string[];
 };

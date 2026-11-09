@@ -26,6 +26,7 @@ import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
 import { voteCafeFeedback, type CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
+import { CAFE_QUEUE_TOPUP_NOTE } from "@/lib/business-app/cafe-queue/auto-topup";
 import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
@@ -464,6 +465,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 {moreLabel}
               </p>
             ) : null}
+            <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-queue-autotopup">
+              {CAFE_QUEUE_TOPUP_NOTE}
+            </p>
           </section>
         </>
       ) : null}
