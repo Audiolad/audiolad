@@ -16,6 +16,13 @@ import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
+import {
+  hallBuildMismatch,
+  readReloadedBuildId,
+  rememberReloadedBuildId,
+  resolveHallClientBuildId,
+  shouldReloadForNewBuild,
+} from "@/lib/business-app/hall-build-reload";
 import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
@@ -359,15 +366,70 @@ export function BusinessCabinetPlayerProvider({
     reportRef.current = reportPlayback;
   }, [reportPlayback]);
 
+  // Stale-build reload: heartbeat carries client build id; server echoes current.
+  // Reload only when visible and (paused OR right after a track change); never mid-track.
+  const pendingBuildRef = useRef<string | null>(null);
+  const lastTrackForReloadRef = useRef<string | null>(null);
+  const justChangedTrackRef = useRef(false);
+  const trySafeBuildReload = useCallback(() => {
+    const pending = pendingBuildRef.current;
+    if (!pending) return;
+    const audio = audioRef.current;
+    const ctl = ctlRef.current;
+    const musicPaused = !audio || audio.paused || audio.ended
+      || !ctl || ctl.status === "paused" || ctl.status === "idle"
+      || ctl.status === "error" || ctl.status === "no_access";
+    const already = readReloadedBuildId(typeof window !== "undefined" ? window.sessionStorage : null);
+    if (!shouldReloadForNewBuild({
+      pageVisible: typeof document !== "undefined" && document.visibilityState === "visible",
+      musicPaused,
+      justChangedTrack: justChangedTrackRef.current,
+      pendingServerBuild: pending,
+      alreadyReloadedFor: already,
+    })) return;
+    rememberReloadedBuildId(
+      typeof window !== "undefined" ? window.sessionStorage : null,
+      pending,
+    );
+    pendingBuildRef.current = null;
+    justChangedTrackRef.current = false;
+    // localStorage playback restore (readLocal) keeps the queue position across the reload.
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
     if (!canBeat) return;
-    const beat = () => {
-      void postPointReport({ kind: "heartbeat" });
+    let cancelled = false;
+    const beat = async () => {
+      try {
+        const appVersion = await resolveHallClientBuildId();
+        if (cancelled) return;
+        const result = await postPointReport({
+          kind: "heartbeat",
+          appVersion: appVersion ?? undefined,
+        });
+        if (cancelled || !result.ok) return;
+        const serverBuildId = result.serverBuildId ?? null;
+        if (hallBuildMismatch(appVersion, serverBuildId) && serverBuildId) {
+          pendingBuildRef.current = serverBuildId;
+          trySafeBuildReload();
+        }
+      } catch {
+        /* best effort */
+      }
     };
-    beat();
-    const timer = window.setInterval(beat, 30_000);
-    return () => window.clearInterval(timer);
-  }, [canBeat]);
+    void beat();
+    const timer = window.setInterval(() => void beat(), 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") trySafeBuildReload();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [canBeat, trySafeBuildReload]);
 
   const catalogKey = model && open ? workspaceControllerKey(model) : "";
 
@@ -417,6 +479,18 @@ export function BusinessCabinetPlayerProvider({
           if (!current) return;
           // The «Включить музыку» tap must be reachable: never keep it inside a closed bar.
           if (current.needsGesture) setBarDismissed(false);
+          const trackId = current.audibleItemId ?? current.current?.audioItemId ?? null;
+          if (trackId && trackId !== lastTrackForReloadRef.current) {
+            const hadPrevious = lastTrackForReloadRef.current != null;
+            lastTrackForReloadRef.current = trackId;
+            // Boundary only: first start is not a "track change" for reload purposes.
+            if (hadPrevious) {
+              justChangedTrackRef.current = true;
+              trySafeBuildReload();
+              // Clear the boundary flag shortly so mid-track never reloads.
+              window.setTimeout(() => { justChangedTrackRef.current = false; }, 2_500);
+            }
+          }
           setView((prev) => ({
             ...prev,
             status: current.status,
@@ -424,6 +498,9 @@ export function BusinessCabinetPlayerProvider({
             needsGesture: current.needsGesture,
             index: current.index < 0 ? prev.index : current.index,
           }));
+          if (current.status === "paused" || current.status === "idle") {
+            trySafeBuildReload();
+          }
         },
       },
       workspaceItems(current.tracks, workspaceAudioDeadline(current)),

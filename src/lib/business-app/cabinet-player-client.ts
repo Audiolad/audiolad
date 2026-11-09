@@ -2,7 +2,9 @@ import type { HallNowPlayingReport } from "@/lib/business-app/hall-mirror";
 import type { SpaLiveReport } from "@/lib/business-app/spa-live-report";
 
 type Fetch = typeof fetch;
-type Result = { ok: true; data: null } | { ok: false; reason: string };
+export type PointReportResult =
+  | { ok: true; data: null; serverBuildId?: string | null }
+  | { ok: false; reason: string };
 
 const JSON_POST = {
   method: "POST",
@@ -42,35 +44,48 @@ export function getCabinetDeviceSecret(
  * The route writes the venue player tables; it does not call the spa allowlist RPCs.
  */
 export async function postPointReport(
-  payload: { kind: "heartbeat" } | {
+  payload: ({ kind: "heartbeat" } | {
     kind: "playback";
     report: SpaLiveReport;
     sample?: { eventId: string; sessionId: string; seq: number; positionMs: number } | null;
     /** Owner mirror snapshot (hall-mirror.ts). */
     nowPlaying?: HallNowPlayingReport;
+  }) & {
+    /** Client build id (deploy commit / BUILD_ID) stored in business_player_runtime.app_version. */
+    appVersion?: string | null;
   },
   f: Fetch = fetch,
-): Promise<Result> {
+): Promise<PointReportResult> {
   try {
+    const body: Record<string, unknown> = { action: "report", ...payload };
+    if (payload.appVersion == null || payload.appVersion === "") delete body.appVersion;
     const res = await f("/api/business/point", {
       ...JSON_POST,
-      body: JSON.stringify({ action: "report", ...payload }),
+      body: JSON.stringify(body),
     });
-    const json = (await res.json().catch(() => null)) as Result | null;
-    if (json && typeof json === "object" && "ok" in json) return json;
+    const json = (await res.json().catch(() => null)) as PointReportResult | null;
+    if (json && typeof json === "object" && "ok" in json) {
+      if (json.ok === true) {
+        const serverBuildId = typeof (json as { serverBuildId?: unknown }).serverBuildId === "string"
+          ? (json as { serverBuildId: string }).serverBuildId
+          : null;
+        return { ok: true, data: null, serverBuildId };
+      }
+      return json;
+    }
     return { ok: false, reason: "report_failed" };
   } catch {
     return { ok: false, reason: "report_failed" };
   }
 }
 
-export async function postCabinetReport(payload: CabinetReportPayload, f: Fetch = fetch): Promise<Result> {
+export async function postCabinetReport(payload: CabinetReportPayload, f: Fetch = fetch): Promise<PointReportResult> {
   try {
     const res = await f("/api/business/player/report", {
       ...JSON_POST,
       body: JSON.stringify({ ...payload, source: "cabinet" }),
     });
-    const json = (await res.json().catch(() => null)) as Result | null;
+    const json = (await res.json().catch(() => null)) as PointReportResult | null;
     if (json && typeof json === "object" && "ok" in json) return json;
     return { ok: false, reason: "report_failed" };
   } catch {
