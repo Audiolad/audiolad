@@ -18,6 +18,8 @@ import {
   parsePartnerQuote,
   parsePartnerUnitPriceRub,
   partnerCodeLink,
+  partnerCodePublicLink,
+  PARTNER_CODE_PUBLIC_ORIGIN,
   partnerCodeStatus,
   partnerConfirmedUnitPriceMinor,
   partnerDiscountPercent,
@@ -57,7 +59,10 @@ assert.equal(normalizePartnerCode("ABCD-EFGH-JKM0"), null, "0 is not in the alph
 assert.equal(normalizePartnerCode("ABC"), null);
 assert.equal(normalizePartnerCode(42), null);
 assert.equal(formatPartnerCode("ABCDEFGHJKMN"), "ABCD-EFGH-JKMN");
-assert.equal(partnerCodeLink("https://business.audiolad.ru", "ABCDEFGHJKMN"), "https://business.audiolad.ru/podarok?code=ABCD-EFGH-JKMN");
+assert.equal(partnerCodeLink("https://business.audiolad.ru", "ABCDEFGHJKMN"), "https://business.audiolad.ru/podarok?code=ABCD-EFGH-JKMN", "legacy business links still format");
+assert.equal(partnerCodeLink("https://coffee.audiolad.ru", "ABCDEFGHJKMN"), "https://coffee.audiolad.ru/podarok?code=ABCD-EFGH-JKMN");
+assert.equal(PARTNER_CODE_PUBLIC_ORIGIN, "https://coffee.audiolad.ru");
+assert.equal(partnerCodePublicLink("ABCDEFGHJKMN"), "https://coffee.audiolad.ru/podarok?code=ABCD-EFGH-JKMN", "t1321u: new links use coffee host");
 
 // Admin parameters: whole rubles below 799; never 399.50.
 assert.equal(parsePartnerUnitPriceRub("399"), 399);
@@ -126,7 +131,14 @@ assert.equal(partnerReservationNoteLead(held, new Date("2026-11-09T08:00:00Z")),
 assert.equal(partnerReservationNoteLead(held, new Date("2026-11-12T08:00:00Z")), null, "no note after the hold");
 assert.equal(partnerReservationNoteLead(last), null, "no hold note once the code is bound");
 assert.equal(parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1, total_minor: 39900, reserved_until: "2026-11-12T07:05:00Z" })?.reservedUntil, null);
-assert.equal(PARTNER_CODE_RESERVATION_HINT, "После применения код закрепляется за вами на 72 часа – оплатите сразу, чтобы персональная цена сохранилась.");
+assert.equal(
+  PARTNER_CODE_RESERVATION_HINT,
+  "Код сохранён в этом браузере на 30 дней – цена 399 ₽ применится при оплате, даже если сначала вы пройдёте 7 бесплатных дней.",
+  "t1322u: gift-first hint, no pressure to pay now",
+);
+assert.doesNotMatch(PARTNER_CODE_RESERVATION_HINT, /оплатите сразу|оплатите сейчас/);
+assert.doesNotMatch(PARTNER_CODE_RESERVATION_HINT, /льготн|GRACE/i);
+
 // Rate-limit key: nginx X-Real-IP first, otherwise the last X-Forwarded-For hop (nginx appends it).
 assert.equal(partnerCodeClientIp(new Headers({ "x-real-ip": "203.0.113.7", "x-forwarded-for": "1.1.1.1, 203.0.113.7" })), "203.0.113.7");
 assert.equal(partnerCodeClientIp(new Headers({ "x-forwarded-for": "1.1.1.1, 198.51.100.2" })), "198.51.100.2", "a spoofed first hop is ignored");
@@ -206,6 +218,14 @@ resetPartnerQuoteStore();
 // Routing: the link and the API are served on the business host.
 assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/podarok"), { action: "rewrite_business_app", pathname: "/business-app/podarok" });
 assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/api/business/partner-code"), { action: "pass_through" });
+{
+  const prev = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
+  assert.deepEqual(resolveBusinessProxyAction("coffee.audiolad.ru", "/podarok"), { action: "rewrite_business_app", pathname: "/business-app/podarok" }, "coffee host serves /podarok");
+  assert.deepEqual(resolveBusinessProxyAction("coffee.audiolad.ru", "/api/business/partner-code"), { action: "pass_through" });
+  if (prev === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = prev;
+}
 
 // Copy and wiring guards.
 const files = [
@@ -233,6 +253,11 @@ const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "u
 assert.doesNotMatch(home, /BusinessPartnerCodePanel/, "no permanent code field on the home");
 const card = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
 assert.match(card, /confirmed_unit_price_minor: partnerConfirmedUnitPriceMinor\(getPartnerQuote\(\)\)/, "pay sends the price that was shown");
+assert.match(card, /refreshPartnerQuoteFromCookie/, "t1322u: stale partner quote re-reserves from cookie");
+assert.match(card, /partner_terms_changed[\s\S]*refreshPartnerQuoteFromCookie[\s\S]*checkoutOnce/, "t1322u: terms_changed retries pay once after refresh");
+const quoteStore = readFileSync("src/components/business-app/partner-quote-store.ts", "utf8");
+assert.match(quoteStore, /export async function refreshPartnerQuoteFromCookie/);
+assert.match(quoteStore, /body: "\{\}"/, "cookie re-reserve posts empty body");
 const route = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
 assert.match(route, /p_expected_unit_price_minor: confirmedUnitPriceMinor/);
 const landing = readFileSync("src/components/business-app/BusinessPartnerLanding.tsx", "utf8");
@@ -243,6 +268,27 @@ assert.match(partnerRoute, /checkAnalyticsRateLimit/, "the code endpoint is rate
 assert.match(partnerRoute, /partnerCodeErrorIsFinal/, "the link cookie survives non-final errors");
 const revoke = readFileSync("src/app/(platform)/admin/business-partner-codes/actions.ts", "utf8");
 assert.match(revoke, /rpc\("revoke_business_partner_code"/, "revoke goes through the one transactional function");
+// t1320u: created code lives in the table/card row, not as a sticky result inside «Новый код».
+const adminPanel = readFileSync("src/components/admin/BusinessPartnerCodesPanel.tsx", "utf8");
+assert.doesNotMatch(adminPanel, /admin-partner-code-created/, "no sticky created block in the form");
+assert.doesNotMatch(adminPanel, /setCreated\(/, "form no longer keeps a created-code result");
+assert.match(adminPanel, /admin-partner-copy-code/, "row has copy-code");
+assert.match(adminPanel, /admin-partner-copy-link/, "row has copy-link");
+assert.match(adminPanel, /Скопировать код/);
+assert.match(adminPanel, /Скопировать ссылку/);
+assert.match(adminPanel, /Скопировано/);
+assert.match(adminPanel, /admin-partner-codes-cards/, "mobile cards at 390px");
+assert.match(adminPanel, /setHighlightCode\(result\.code\)/, "new row is highlighted after create");
+assert.match(adminPanel, /scrollIntoView/, "new row is scrolled into view");
+assert.match(adminPanel, /router\.refresh\(\)/, "list refreshes after create/revoke");
+assert.match(adminPanel, /partnerCodePublicLink\(row\.code\)/, "row link uses coffee public helper");
+assert.doesNotMatch(adminPanel, /partnerCodeLink\(/, "admin panel does not take a free-form origin");
+const adminPage = readFileSync("src/app/(platform)/admin/business-partner-codes/page.tsx", "utf8");
+assert.doesNotMatch(adminPage, /BUSINESS_ORIGIN/, "admin no longer issues business host links");
+assert.doesNotMatch(adminPage, /origin=\{/, "panel builds the coffee link itself");
+assert.match(readFileSync("src/lib/business/partner-codes.ts", "utf8"), /PARTNER_CODE_PUBLIC_ORIGIN = "https:\/\/coffee\.audiolad\.ru"/);
+
+assert.doesNotMatch(adminPanel, /—/, "admin panel: en dash only");
 assert.match(card, /partner_period_in_payment/);
 const migration = readFileSync("supabase/migrations/20270302120000_business_partner_codes.sql", "utf8");
 assert.match(migration, /^-- PREPARE ONLY/);
