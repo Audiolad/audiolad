@@ -127,32 +127,94 @@ function playThrough(w: ReturnType<typeof world>, from: number, to: number, dura
   assert.equal(w.p.current?.audioItemId, "track-2");
 }
 
-// 4. No ready link at the wrap: the old track keeps sounding (the loop), so the session stays
-//    open while the link is signed; then pause → src → play. Never silence, never teardown.
+// 4. No ready link at the wrap: the old track keeps sounding (the loop) and keeps its title, so
+//    the session stays open and the screen never names a track that is not playing; the link is
+//    signed now and the switch (pause → src → play) happens the moment it arrives.
 {
   const w = world();
   await w.p.toggle();
   await flush();
   w.setHold(true);
-  w.p.queueChanged(); // keeps the ready link (same next track)
-  // drop the ready link by pretending it is stale
-  w.tick(31 * 60_000);
+  w.tick(31 * 60_000); // the ready link is stale now
   playThrough(w, 100, 198, 200);
   w.log.length = 0;
   w.p.onSeeking(0.1, 200);
   assert.deepEqual(w.log, [], "nothing torn down while signing: the loop keeps the old track sounding");
   assert.equal(w.audio.paused, false);
+  assert.equal(w.p.current?.audioItemId, "track-1", "title stays on the track that really plays");
+  assert.equal(w.p.status, "playing");
+  w.p.onProgress(0.5, 200); // the old track keeps looping meanwhile: no second wrap, no switch
+  assert.deepEqual(w.log, []);
   const resolve = w.held.at(-1);
-  assert.ok(resolve, "the boundary signs the next track");
+  assert.ok(resolve, "the next track is signed at the wrap");
   resolve({ ok: true, data: { url: "https://s/track-2" } });
   await flush();
-  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"]);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"], "switch as soon as the link arrives, no second sign");
   assert.equal(w.p.current?.audioItemId, "track-2");
+}
+
+// 4b. The sign at the wrap fails: the boundary falls back to playIndex (signs again, handles
+//     no_access / skip / reconnect as everywhere).
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  w.setHold(true);
+  w.tick(31 * 60_000);
+  playThrough(w, 100, 198, 200);
+  w.p.onSeeking(0.1, 200);
+  const before = w.held.length;
+  w.held.at(-1)?.({ ok: false, reason: "network" });
+  await flush();
+  assert.equal(w.held.length, before + 1, "playIndex signs again");
+  w.held.at(-1)?.({ ok: true, data: { url: "https://s/track-2" } });
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-2");
+  assert.equal(w.p.status, "playing");
+}
+
+// 4c. Review F1: a VBR MP3 whose element reports 200 s while the audio (and the catalog) is
+//     170 s: the wrap at 169.9 s → 0.1 s is measured against the shorter length and moves on.
+{
+  const w = world({ items: [item(1, 170), item(2, 170), item(3, 170)] });
+  await w.p.toggle();
+  await flush();
+  playThrough(w, 100, 169.75, 200);
+  w.audio.currentTime = 169.9;
+  w.p.onProgress(169.9, 200);
+  w.log.length = 0;
+  w.p.onProgress(0.1, 200);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"], "wrap with an over-reported element duration");
+  await flush();
+  assert.equal(w.p.current?.audioItemId, "track-2");
+}
+
+// 4d. F1 without a catalog length: the element over-reports (200 s, audio ends at 169.9 s) –
+//     no end check at all, the wrap still moves on (never one track forever).
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  playThrough(w, 100, 169.75, 200);
+  w.log.length = 0;
+  w.p.onProgress(0.1, 200);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"]);
+}
+
+// 4e. Review F2: the first timeupdate after the wrap comes late (1.8 s): still a wrap.
+{
+  const w = world();
+  await w.p.toggle();
+  await flush();
+  playThrough(w, 0, 198, 200); // sparse background timeupdates: none in the handoff window
+  w.log.length = 0;
+  w.p.onProgress(1.8, 200);
+  assert.deepEqual(w.log, ["pause", "play:https://s/track-2"]);
 }
 
 // 5. Seeks made by the user (progress bar back to the start) or by the player are not a wrap.
 {
-  const w = world();
+  const w = world({ items: [item(1, 200), item(2, 200), item(3, 200)] });
   await w.p.toggle();
   await flush();
   playThrough(w, 0, 198, 200);
@@ -162,11 +224,19 @@ function playThrough(w: ReturnType<typeof world>, from: number, to: number, dura
   w.p.onProgress(0.25, 200);
   assert.deepEqual(w.log, [], "manual seek to 0:00 replays the same track");
   assert.equal(w.p.current?.audioItemId, "track-1");
-  // A jump back from the middle (not near the end) is not a wrap either.
+  // A manual seek to 4 s from near the end (inside the wider wrap landing zone) is not a wrap.
+  w.tick(5_000);
+  playThrough(w, 61, 198, 200);
+  w.p.noteManualSeek();
+  w.p.onProgress(4, 200);
+  assert.deepEqual(w.log, [], "manual seek within LOOP_WRAP_TO_MAX_SEC replays, does not skip");
+  assert.equal(w.p.current?.audioItemId, "track-1");
+  // With a catalog length: an unmarked jump back from the middle is not a wrap either.
   w.tick(5_000);
   playThrough(w, 0.5, 60, 200);
   w.p.onSeeking(0.2, 200);
   assert.deepEqual(w.log, []);
+  assert.equal(w.p.current?.audioItemId, "track-1");
 }
 
 // 6. Many tracks in a row with a locked screen, only via wraps: 1→2→3→1→2, never torn down,

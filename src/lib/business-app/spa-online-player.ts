@@ -112,9 +112,16 @@ export const EARLY_HANDOFF_DURATION_TOLERANCE_SEC = 2;
 export const RECOVERY_SKIP_AFTER_ERRORS = 4;
 /** Loop wrap: the element was at least this far into the track before the jump back. */
 export const LOOP_WRAP_FROM_MIN_SEC = 3;
-/** Loop wrap: the jump lands before this position. */
-export const LOOP_WRAP_TO_MAX_SEC = 1.5;
-/** Loop wrap: with a known duration, the jump starts no earlier than this before the end. */
+/**
+ * Loop wrap: the jump lands before this position. Generous: the first timeupdate after the wrap
+ * may come late in the background (manual seeks are excluded by noteManualSeek, not by this).
+ */
+export const LOOP_WRAP_TO_MAX_SEC = 5;
+/**
+ * Loop wrap: the jump starts no earlier than this before the end. The end is the SHORTER of the
+ * element and catalog lengths (a VBR MP3 may report a duration far longer than the audio); without
+ * a catalog length there is no end check at all – one track repeating forever is worse.
+ */
 export const LOOP_WRAP_END_SLACK_SEC = 5;
 /** A seek made by the user / the player itself is never taken for a loop wrap for this long. */
 export const LOOP_MANUAL_SEEK_GUARD_MS = 1_500;
@@ -179,6 +186,11 @@ export class SpaOnlinePlayer {
   /** Loop mode: last position of the current source seen by onProgress (-1: none yet). */
   private loopFrom = -1;
   private manualSeekAt = -Infinity;
+  /**
+   * `op` whose loop wrapped while the next link was not ready: the old track keeps sounding (and
+   * the UI keeps its title) until the link arrives, then the switch happens at once.
+   */
+  private wrapPendingOp = -1;
   /** Autoplay refusal happened while the page was hidden: retried once when it is visible. */
   private refusedHidden = false;
 
@@ -468,9 +480,10 @@ export class SpaOnlinePlayer {
     if (!this.loopMode() || this.switching || this.leaving || this.handoffOp === this.op) return false;
     const from = this.loopFrom;
     if (!Number.isFinite(to) || from < LOOP_WRAP_FROM_MIN_SEC || to >= LOOP_WRAP_TO_MAX_SEC || from - to <= 2) return false;
-    if (Number.isFinite(durationSec) && durationSec > 0 && from < durationSec - LOOP_WRAP_END_SLACK_SEC) return false;
-    if (this.now() - this.manualSeekAt < LOOP_MANUAL_SEEK_GUARD_MS) return false;
     const cur = this.current;
+    const end = this.wrapEnd(durationSec, cur?.durationSeconds);
+    if (end !== null && from < end - LOOP_WRAP_END_SLACK_SEC) return false;
+    if (this.now() - this.manualSeekAt < LOOP_MANUAL_SEEK_GUARD_MS) return false;
     const target = this.nextTarget();
     const next = target >= 0 ? this.items[target] : null;
     this.loopFrom = -1;
@@ -478,8 +491,38 @@ export class SpaOnlinePlayer {
     if (!cur || !next || next.audioItemId === cur.audioItemId) return true;
     this.handoffOp = this.op;
     this.retryTrackId = null;
-    void this.playIndex(target, true);
+    if (this.readyFor(next.audioItemId) || this.expired(next)) {
+      void this.playIndex(target, true);
+      return true;
+    }
+    // No ready link: keep the old track (and its title) sounding through the loop, sign the
+    // next one now and switch the moment it arrives (prefetchNext).
+    this.wrapPendingOp = this.op;
+    this.presignRetryAt = 0;
+    this.prefetchNext();
     return true;
+  }
+
+  /**
+   * End used by the wrap check: the shorter of the element and catalog lengths. Without a catalog
+   * length the element's own duration is not trusted (a VBR MP3 may over-report it by far): no end
+   * check then, so a track can never repeat forever.
+   */
+  private wrapEnd(elementSec: number, catalogSec: number | null | undefined): number | null {
+    if (typeof catalogSec !== "number" || !Number.isFinite(catalogSec) || catalogSec <= 0) return null;
+    return Number.isFinite(elementSec) && elementSec > 0 ? Math.min(elementSec, catalogSec) : catalogSec;
+  }
+
+  /**
+   * A loop wrap waited for the next link: it arrived (playIndex takes it, no network) or the sign
+   * failed (playIndex signs again and handles no_access / skip / reconnect as at any boundary).
+   */
+  private settleWrapPending(): void {
+    if (this.wrapPendingOp !== this.op || this.disposed || this.status !== "playing") return;
+    this.wrapPendingOp = -1;
+    const target = this.nextTarget();
+    if (target < 0) return;
+    void this.playIndex(target, true);
   }
 
   /**
@@ -561,6 +604,7 @@ export class SpaOnlinePlayer {
     const failed = () => {
       if (this.presigning === id) this.presigning = null;
       this.presignRetryAt = this.now() + PRESIGN_RETRY_MS;
+      this.settleWrapPending();
     };
     let pending: Promise<OnlineSignResult>;
     try {
@@ -577,6 +621,7 @@ export class SpaOnlinePlayer {
       // The queue moved on while this was signing: keep the link of the current next track.
       if (id !== this.nextTargetId()) return;
       this.presigned = { audioItemId: id, url: r.data.url, at: this.now() };
+      this.settleWrapPending();
     }, failed);
   }
 
