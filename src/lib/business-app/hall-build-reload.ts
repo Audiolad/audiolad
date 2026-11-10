@@ -83,20 +83,45 @@ export type HallPlayerIntent = {
   status: string | null | undefined;
   /** Controller is auto-recovering (error / stall retry) – music is still meant to play. */
   recovering?: boolean;
+  /**
+   * Autoplay was refused (e.g. locked iPhone): status is "paused" but the hall still means to
+   * play – a foreground retry or one tap resumes the same media session. Not a user pause.
+   */
+  needsGesture?: boolean;
+  /** Access restored, automatic resume pending (interim "paused"). */
+  resumePending?: boolean;
 };
 
 /**
  * Deliberately silent hall: a reload here cannot stop music. Playing, loading, error
- * (it retries / skips on its own) and any recovery all count as "music is meant to play".
+ * (it retries / skips on its own), any recovery, an autoplay refusal waiting for a foreground
+ * retry or a tap, and a pending resume after access restoration all count as "music is meant
+ * to play".
  * The element state is checked too: a paused status with a still-sounding element (fade)
  * is not silent yet.
  */
+/** Controller-shaped view for hallMusicSilent. */
+export function hallIntentOf(ctl: {
+  status: string;
+  recovering: boolean;
+  needsGesture: boolean;
+  resumePending: boolean;
+} | null | undefined): HallPlayerIntent | null {
+  if (!ctl) return null;
+  return {
+    status: ctl.status,
+    recovering: ctl.recovering,
+    needsGesture: ctl.needsGesture,
+    resumePending: ctl.resumePending,
+  };
+}
+
 export function hallMusicSilent(
   ctl: HallPlayerIntent | null | undefined,
   audio: { paused: boolean; ended: boolean } | null | undefined,
 ): boolean {
   if (!ctl) return !audio || audio.paused || audio.ended;
-  if (ctl.recovering === true) return false;
+  if (ctl.recovering === true || ctl.needsGesture === true || ctl.resumePending === true) return false;
   const status = ctl.status ?? "idle";
   if (status !== "paused" && status !== "idle" && status !== "no_access") return false;
   return !audio || audio.paused || audio.ended;

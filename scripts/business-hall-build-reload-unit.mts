@@ -103,10 +103,13 @@ assert.match(cabinet, /resolveHallClientBuildId/);
 assert.doesNotMatch(cabinet, /justChangedTrack/, "t1346u: no boundary reload in the hall player");
 assert.match(cabinet, /hallMusicSilent/);
 assert.match(cabinet, /remotePausedRef/, "owner's remote pause keeps the hall on its build");
+assert.match(cabinet, /remoteCommandBusyRef/, "no reload while an owner command is applied / acknowledged");
+assert.match(cabinet, /hallIntentOf\(ctl\)/);
 
 const spa = readFileSync(new URL("../src/components/business-app/SpaOnlinePlayer.tsx", import.meta.url), "utf8");
 assert.doesNotMatch(spa, /justChangedTrack/, "t1346u: no boundary reload in the SPA player");
 assert.match(spa, /hallMusicSilent/);
+assert.doesNotMatch(spa, /после смены трека/, "copy matches: no update after a track change");
 assert.doesNotMatch(spa, /musicPaused: (true|false)/, "never a hard-coded musicPaused");
 
 // t1346u: deliberate silence only. Every "music is meant to play" state blocks a reload.
@@ -121,6 +124,8 @@ assert.equal(hallMusicSilent({ status: "loading" }, quiet), false, "next track l
 assert.equal(hallMusicSilent({ status: "error" }, quiet), false, "error retries / skips on its own");
 assert.equal(hallMusicSilent({ status: "paused", recovering: true }, quiet), false, "recovering");
 assert.equal(hallMusicSilent({ status: "paused" }, sounding), false, "pause fade still audible");
+assert.equal(hallMusicSilent({ status: "paused", needsGesture: true }, quiet), false, "autoplay refusal is not a user pause");
+assert.equal(hallMusicSilent({ status: "paused", resumePending: true }, quiet), false, "access restore resumes on its own");
 for (const status of ["playing", "loading", "error"]) {
   assert.equal(shouldReloadForNewBuild({
     pageVisible: true,

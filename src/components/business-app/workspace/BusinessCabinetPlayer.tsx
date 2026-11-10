@@ -21,6 +21,7 @@ import { createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, wri
 import { HallReportQueue } from "@/lib/business-app/hall-report-queue";
 import {
   hallBuildMismatch,
+  hallIntentOf,
   hallMusicSilent,
   readReloadedBuildId,
   rememberReloadedBuildId,
@@ -464,12 +465,15 @@ export function BusinessCabinetPlayerProvider({
   // Paused from the owner's phone: the owner will resume remotely, and a reloaded page could
   // not start music without a tap in the hall. Stay on this build until a local tap.
   const remotePausedRef = useRef(false);
+  // An owner command is being applied / acknowledged: the controller emits "paused" before the
+  // remote-pause latch is set (iPhone pauses without a fade). Never reload in that window.
+  const remoteCommandBusyRef = useRef(false);
   const trySafeBuildReload = useCallback(() => {
     const pending = pendingBuildRef.current;
-    if (!pending || remotePausedRef.current) return;
+    if (!pending || remotePausedRef.current || remoteCommandBusyRef.current) return;
     const ctl = ctlRef.current;
     const musicPaused = hallMusicSilent(
-      ctl ? { status: ctl.status, recovering: ctl.recovering } : null,
+      hallIntentOf(ctl),
       audioRef.current,
     );
     const already = readReloadedBuildId(typeof window !== "undefined" ? window.sessionStorage : null);
@@ -922,7 +926,10 @@ export function BusinessCabinetPlayerProvider({
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
-        if (json.commands.length > 0) refreshPointSoundRef.current();
+        if (json.commands.length > 0) {
+          refreshPointSoundRef.current();
+          remoteCommandBusyRef.current = true;
+        }
         await runPointCommands(json.commands, {
           ready: () => !!ctlRef.current && !!modelRef.current?.tracks.length
             && accessRef.current?.allowsPlayback() === true,
@@ -959,6 +966,7 @@ export function BusinessCabinetPlayerProvider({
       } catch {
         /* No ack: the command becomes reclaimable after its lease, until expires_at. */
       } finally {
+        remoteCommandBusyRef.current = false;
         inFlight = false;
       }
     };

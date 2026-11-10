@@ -270,6 +270,17 @@ export class SpaOnlinePlayer {
     return this.retryTimer !== null;
   }
 
+  /** restoreVerifiedAccess is between its interim "paused" and the automatic resume. */
+  private restoringAccess = false;
+
+  /**
+   * t1346u: the hall is about to play on its own (access restored with a resume pending).
+   * A "paused" status seen meanwhile is not a deliberate pause – never reload for a build.
+   */
+  get resumePending(): boolean {
+    return this.restoringAccess;
+  }
+
   private clearDeadline() {
     if (this.deadlineTimer !== null) (this.d.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>)))(this.deadlineTimer);
     this.deadlineTimer = null;
@@ -783,9 +794,15 @@ export class SpaOnlinePlayer {
     this.failures = 0;
     this.errorRetries = 0;
     this.retryTrackId = null;
-    this.set(items.length > 0 ? "paused" : "idle");
-    // A denied sign already selected the next track. Re-sign it, never reuse a URL.
-    if (denied?.resume && this.index >= 0) await this.playIndex(this.index, true);
+    const resume = !!denied?.resume && this.index >= 0;
+    this.restoringAccess = resume;
+    try {
+      this.set(items.length > 0 ? "paused" : "idle");
+      // A denied sign already selected the next track. Re-sign it, never reuse a URL.
+      if (resume) await this.playIndex(this.index, true);
+    } finally {
+      this.restoringAccess = false;
+    }
   }
 
   /** `instant`: natural advance after "ended" – the next track starts without a fade-in. */

@@ -6,6 +6,7 @@ import BusinessPlayerControls from "@/components/business-app/BusinessPlayerCont
 import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
 import {
+  hallIntentOf,
   hallMusicSilent,
   readReloadedBuildId,
   rememberReloadedBuildId,
@@ -48,7 +49,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       if (!pending || typeof window === "undefined") return;
       const ctl = ctlRef.current;
       const musicPaused = hallMusicSilent(
-        ctl ? { status: ctl.status, recovering: ctl.recovering } : null,
+        hallIntentOf(ctl),
         audioRef.current,
       );
       const already = readReloadedBuildId(window.sessionStorage);
@@ -139,7 +140,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
               const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
               if (shouldReloadForNewBuild({
                 pageVisible,
-                musicPaused: hallMusicSilent({ status: c.status, recovering: c.recovering }, audio),
+                musicPaused: hallMusicSilent(hallIntentOf(c), audio),
                 pendingServerBuild: pendingBuildRef.current,
                 alreadyReloadedFor: already,
               })) {
@@ -239,7 +240,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       )}
       {newBuild ? (
         <p className="mt-4 text-[0.82rem] business-app-muted" data-testid="spa-new-build">
-          Доступна новая версия. Страница обновится сама на паузе или после смены трека.
+          Доступна новая версия. Страница обновится сама, когда музыка будет на паузе.
         </p>
       ) : null}
       <audio ref={audioRef} preload="none" playsInline />
