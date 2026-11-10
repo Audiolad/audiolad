@@ -478,9 +478,9 @@ export function BusinessCabinetPlayerProvider({
   const syncWakeLock = useCallback(() => {
     wakeLockRef.current?.setWanted(wakeIntentRef.current.wanted(ctlRef.current, remotePausedRef.current));
   }, []);
-  /** Wrap a start so the screen stays on while the play promise is pending (review #1213 F3). */
+  /** Wrap a start so the screen stays on while the play promise is pending (independent review). */
   const wakeWhileStarting = useCallback(
-    (run: () => Promise<void>) => wakeIntentRef.current.whileStarting(run, syncWakeLock),
+    (run: () => Promise<boolean | void>) => wakeIntentRef.current.whileStarting(run, syncWakeLock),
     [syncWakeLock],
   );
   useEffect(() => {
@@ -903,7 +903,8 @@ export function BusinessCabinetPlayerProvider({
       if (soundInstallRef.current) await soundInstallRef.current;
       if (signal?.aborted) {
         aborted = true;
-        return;
+        // Never reached the controller: an earlier deliberate pause stays in force.
+        return false;
       }
       await ctl.next();
     });
@@ -1464,8 +1465,8 @@ export function BusinessCabinetPlayerProvider({
     const audio = audioRef.current;
     const fader = fadeRef.current;
     setBarDismissed(true);
-    // Closing the bar is a deliberate stop: the hall screen may go dark.
-    wakeIntentRef.current.markPaused();
+    // Closing the bar is a deliberate stop: the hall screen may go dark, even after an owner pause.
+    wakeIntentRef.current.markPaused({ stop: true });
     syncWakeLock();
     if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
       await ctl.toggle();

@@ -284,12 +284,24 @@ function hall() {
       await p.toggle();
     } else await tracker.whileStarting(() => p.toggle(), sync);
   };
-  const next = async () => {
+  const next = async (opts: { install?: Promise<void>; signal?: AbortSignal } = {}) => {
     remote.paused = false;
-    await tracker.whileStarting(() => p.next(), sync);
+    await tracker.whileStarting(async () => {
+      if (opts.install) await opts.install;
+      if (opts.signal?.aborted) return false;
+      await p.next();
+    }, sync);
+  };
+  // Provider dismissBar: a deliberate local stop.
+  const dismiss = async () => {
+    tracker.markPaused({ stop: true });
+    sync();
+    if (p.status === "playing" || p.status === "loading") await p.toggle();
+    fader.pause();
+    audio.removeAttribute();
   };
   return {
-    p, lock, env, toggle, next, sync, remote,
+    p, lock, env, toggle, next, dismiss, sync, remote, audio,
     refuse(v: boolean) { refuse = v; },
     holdPlay(v: boolean) { holdPlay = v; },
     holdSign(v: boolean) { holdSign = v; },
@@ -417,6 +429,97 @@ const home = readFileSync(new URL("../src/components/business-app/BusinessHallHo
 assert.match(home, /cabinet\.mode === "point" \? \(\s*<p[^>]*data-testid="biz-hall-wake-hint"/, "hint on the hall device only");
 for (const other of ["src/components/business-app/SpaOnlinePlayer.tsx", "src/components/business-app/sound/BusinessGuestPlayback.tsx"]) {
   assert.doesNotMatch(readFileSync(new URL(`../${other}`, import.meta.url), "utf8"), /wakeLock|HallWakeLock/, `${other}: no wake lock`);
+}
+
+// D1: an aborted Next (never reached the controller) keeps the earlier deliberate pause.
+{
+  const h = hall();
+  h.refuse(true);
+  await h.toggle();
+  h.refuse(false);
+  h.holdSign(true);
+  const n = h.next();
+  await flush();
+  await h.toggle();
+  h.releaseSigns();
+  await n;
+  await flush();
+  assert.equal(h.p.needsGesture, true, "stale flag still set on the controller");
+  assert.equal(h.lock.held, false);
+  let install!: () => void;
+  const ctrl = new AbortController();
+  const aborted = h.next({ install: new Promise<void>((r) => { install = r; }), signal: ctrl.signal });
+  await flush();
+  assert.equal(h.lock.held, true, "screen on while the start waits");
+  ctrl.abort();
+  install();
+  await aborted;
+  await flush();
+  assert.equal(h.p.status, "paused");
+  assert.equal(h.lock.held, false, "aborted start restores the deliberate pause (D1)");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// D2: closing the bar after an owner pause releases the screen; an owner resume takes it again.
+{
+  const h = hall();
+  await h.toggle();
+  await h.toggle();
+  h.remote.paused = true;
+  h.sync();
+  await flush();
+  assert.equal(h.lock.held, true);
+  await h.dismiss();
+  h.sync();
+  await flush();
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.lock.held, false, "local close beats the owner pause latch (D2)");
+  await h.toggle(); // owner resume (same provider toggle)
+  await flush();
+  assert.equal(h.p.status, "playing");
+  assert.equal(h.lock.held, true);
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// D3: a deliberate pause supersedes a start in flight at once.
+{
+  const h = hall();
+  h.holdSign(true);
+  const n = h.toggle(); // first start: signing pending
+  await flush();
+  assert.equal(h.p.status, "loading");
+  assert.equal(h.lock.held, true);
+  await h.toggle(); // pause while loading
+  await flush();
+  assert.equal(h.lock.held, false, "released before the obsolete sign settles (D3)");
+  h.releaseSigns();
+  await n;
+  await flush();
+  assert.equal(h.p.status, "paused");
+  assert.equal(h.lock.held, false);
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// Tracker accounting: exceptions and overlapping starts balance.
+{
+  const t = new HallWakeIntentTracker();
+  const ctl = { status: "paused", recovering: false, needsGesture: false, resumePending: false };
+  await assert.rejects(t.whileStarting(async () => { throw new Error("x"); }, () => {}));
+  assert.equal(t.wanted(ctl, false), false, "no leak after a throw");
+  let a!: () => void;
+  let b!: () => void;
+  const pa = t.whileStarting(() => new Promise<void>((r) => { a = r; }), () => {});
+  const pb = t.whileStarting(() => new Promise<void>((r) => { b = r; }), () => {});
+  assert.equal(t.wanted(ctl, false), true);
+  a();
+  await pa;
+  assert.equal(t.wanted(ctl, false), true, "second start still in flight");
+  b();
+  await pb;
+  assert.equal(t.wanted(ctl, false), false);
 }
 
 console.log("business-hall-wake-lock-unit: ok");

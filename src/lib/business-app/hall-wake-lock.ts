@@ -69,35 +69,63 @@ export type HallWakeController = {
 };
 
 /**
- * Provider-side intent the controller does not know: a deliberate pause (stale needsGesture /
- * resumePending must not keep the screen on – review #1213 F1/F2) and a start in flight
- * (`audio.play()` may wait without a "loading" notification – review #1213 F3).
+ * Provider-side intent the controller does not know (independent review of the wake lock PR):
+ * - a deliberate pause – stale needsGesture / resumePending must not keep the screen on;
+ * - a deliberate local stop (bar closed) – supersedes an earlier owner pause latch;
+ * - a start in flight – `audio.play()` may wait without a "loading" notification. A later
+ *   deliberate pause supersedes it at once; a start that never reached the controller
+ *   (aborted) leaves the earlier pause in place.
  */
 export class HallWakeIntentTracker {
   private localPaused = false;
-  private resuming = 0;
+  private localStopped = false;
+  private readonly starts = new Set<object>();
   private lastStatus = "idle";
 
   /** Controller onChange: a fresh start into "playing" ends a deliberate pause. */
   observe(status: string): void {
-    if (status === "playing" && this.lastStatus !== "playing") this.localPaused = false;
+    if (status === "playing" && this.lastStatus !== "playing") {
+      this.localPaused = false;
+      this.localStopped = false;
+    }
     this.lastStatus = status;
   }
 
-  /** Local pause, bar closed or a pause from the owner's phone. */
-  markPaused(): void {
+  /**
+   * Local pause, bar closed (`stop`) or a pause from the owner's phone. Supersedes starts in
+   * flight; `stop` also overrides the owner pause latch (the hall chose to stop here).
+   */
+  markPaused(opts: { stop?: boolean } = {}): void {
     this.localPaused = true;
+    if (opts.stop) this.localStopped = true;
+    this.starts.clear();
   }
 
-  /** Wrap a start (play / next / previous); `sync` re-evaluates the lock before and after. */
-  async whileStarting(run: () => Promise<void>, sync: () => void): Promise<void> {
-    this.localPaused = false;
-    this.resuming += 1;
+  /**
+   * Wrap a start (play / next / previous); `sync` re-evaluates the lock before and after.
+   * `run` returns false when it gave up before reaching the controller (aborted command):
+   * the earlier deliberate pause then stays in force.
+   */
+  async whileStarting(run: () => Promise<boolean | void>, sync: () => void): Promise<void> {
+    const before = { paused: this.localPaused, stopped: this.localStopped };
+    const token = {};
+    this.starts.add(token);
     sync();
+    let started = true;
     try {
-      await run();
+      started = (await run()) !== false;
     } finally {
-      this.resuming = Math.max(0, this.resuming - 1);
+      const current = this.starts.delete(token);
+      // Superseded by a deliberate pause meanwhile: that pause wins.
+      if (current) {
+        if (started) {
+          this.localPaused = false;
+          this.localStopped = false;
+        } else {
+          this.localPaused = before.paused;
+          this.localStopped = before.stopped;
+        }
+      }
       sync();
     }
   }
@@ -109,9 +137,9 @@ export class HallWakeIntentTracker {
       recovering: ctl.recovering,
       needsGesture: ctl.needsGesture,
       resumePending: ctl.resumePending,
-      remotePaused,
+      remotePaused: remotePaused && !this.localStopped,
       localPaused: this.localPaused,
-      resuming: this.resuming > 0,
+      resuming: this.starts.size > 0,
     });
   }
 }
