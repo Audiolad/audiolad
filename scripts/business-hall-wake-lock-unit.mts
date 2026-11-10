@@ -33,7 +33,9 @@ assert.equal(hallWantsScreenAwake({ status: "paused", resumePending: true }), tr
 assert.equal(hallWantsScreenAwake({ status: "paused", remotePaused: true }), true, "owner pause keeps commands alive");
 assert.equal(hallWantsScreenAwake({ status: "idle", remotePaused: true }), false);
 assert.equal(hallWantsScreenAwake({ status: "no_access", recovering: true, remotePaused: true }), false, "no access always releases");
-assert.equal(hallWantsScreenAwake({ status: "idle", needsGesture: true, resumePending: true, resuming: true }), false, "idle always releases (review F2)");
+assert.equal(hallWantsScreenAwake({ status: "idle", needsGesture: true, resumePending: true, recovering: true }), false, "idle releases (review F2)");
+assert.equal(hallWantsScreenAwake({ status: "idle", resuming: true }), true, "a start from idle holds (review G1)");
+assert.equal(hallWantsScreenAwake({ status: "no_access", resuming: true }), false);
 assert.equal(hallWantsScreenAwake({ status: "paused", needsGesture: true, localPaused: true }), false, "deliberate pause beats a stale autoplay flag (F2)");
 assert.equal(hallWantsScreenAwake({ status: "paused", resumePending: true, localPaused: true }), false, "deliberate pause beats a stale restore flag (F1)");
 assert.equal(hallWantsScreenAwake({ status: "error", localPaused: true }), false);
@@ -546,6 +548,59 @@ for (const other of ["src/components/business-app/SpaOnlinePlayer.tsx", "src/com
   await flush();
   assert.equal(h.p.status, "paused");
   assert.equal(h.lock.held, false, "later deliberate pause stays in force");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+{
+  // Order 3: A (aborted) settles before B, which is refused autoplay – B's intent holds.
+  const h = hall();
+  await h.toggle();
+  await h.toggle();
+  let install!: () => void;
+  const ctrl = new AbortController();
+  const a = h.next({ install: new Promise<void>((r) => { install = r; }), signal: ctrl.signal });
+  ctrl.abort();
+  h.refuse(true);
+  h.holdPlay(false);
+  const b = h.toggle();
+  install();
+  await a;
+  await b;
+  await flush();
+  assert.equal(h.p.needsGesture, true);
+  assert.equal(h.lock.held, true, "A before B: autoplay intent holds");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// G1: first Next from idle while the sound install is pending holds the screen.
+{
+  const h = hall();
+  assert.equal(h.p.status, "idle");
+  let install!: () => void;
+  const n = h.next({ install: new Promise<void>((r) => { install = r; }) });
+  await flush();
+  assert.equal(h.p.status, "idle");
+  assert.equal(h.lock.held, true, "start from idle holds during the install wait (G1)");
+  install();
+  await n;
+  await flush();
+  assert.equal(h.p.status, "playing");
+  assert.equal(h.lock.held, true);
+  // A deliberate pause during such a wait releases at once.
+  await h.toggle();
+  let install2!: () => void;
+  const n2 = h.next({ install: new Promise<void>((r) => { install2 = r; }) });
+  await flush();
+  assert.equal(h.lock.held, true);
+  await h.dismiss();
+  h.sync();
+  await flush();
+  assert.equal(h.lock.held, false, "close supersedes the waiting start");
+  install2();
+  await n2;
+  await flush();
   h.lock.dispose();
   h.p.dispose();
 }

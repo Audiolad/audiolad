@@ -43,18 +43,20 @@ export type HallWakeIntent = {
 };
 
 /**
- * True while the hall means to play: playing, loading, a start in flight, a pause sent from the
- * owner's phone, and – unless the hall paused on purpose – error (retries / skips on its own),
- * recovery, an autoplay refusal or a pending resume. Idle, no access and a deliberate local
- * pause release the screen.
+ * True while the hall means to play: a start in flight (also from idle), playing, loading, a pause
+ * sent from the owner's phone, and – unless the hall paused on purpose – error (retries / skips
+ * on its own), recovery, an autoplay refusal or a pending resume. No access, idle without a start
+ * and a deliberate local pause release the screen.
  */
 export function hallWantsScreenAwake(intent: HallWakeIntent | null | undefined): boolean {
   if (!intent) return false;
   const status = intent.status ?? "idle";
-  if (status === "no_access" || status === "idle") return false;
+  if (status === "no_access") return false;
+  // A requested start holds the screen even from idle (first Next waits for the sound install).
+  if (intent.resuming === true) return true;
+  if (status === "idle") return false;
   if (status === "playing" || status === "loading") return true;
   if (status === "paused" && intent.remotePaused === true) return true;
-  if (intent.resuming === true) return true;
   if (intent.localPaused === true) return false;
   if (status === "error") return true;
   return intent.recovering === true || intent.needsGesture === true || intent.resumePending === true;
