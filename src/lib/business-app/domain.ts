@@ -8,7 +8,7 @@ import { extractBusinessFirstName, extractBusinessLastName } from "@/lib/busines
 import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
-import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
+import { ownerCanPayFromThisBrowser, savedBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
 import { hasAcceptedCurrentBusinessOffer, hasAcceptedEarlierBusinessOfferOnly } from "@/lib/business/offer";
 
 export { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
@@ -56,6 +56,8 @@ export type BusinessOwnerHomeContext =
       offerNewEditionPending?: boolean;
       /** Owner account without email (guest start): payment asks for an email for the receipt. */
       needsReceiptEmail?: boolean;
+      /** The receipt email remembered from the last payment (t1343u); prefilled, still editable. */
+      savedReceiptEmail?: string | null;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
       signals: BusinessOwnerHomeSignals | null;
     };
@@ -118,6 +120,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     offerNewEditionPending = hasAcceptedEarlierBusinessOfferOnly(acceptance);
   }
   const needsReceiptEmail = canPay && !(user.email?.trim() ?? "");
+  const savedReceiptEmail = needsReceiptEmail ? savedBusinessReceiptEmail(user.user_metadata) : null;
 
   if (!membership?.organization_id) {
     return {
@@ -130,6 +133,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       offerAccepted,
       offerNewEditionPending,
       needsReceiptEmail,
+      savedReceiptEmail,
       signals: null,
     };
   }
@@ -188,6 +192,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       offerAccepted,
       offerNewEditionPending,
       needsReceiptEmail,
+      savedReceiptEmail,
       signals,
     };
   }
@@ -225,6 +230,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     offerAccepted,
     offerNewEditionPending,
     needsReceiptEmail,
+    savedReceiptEmail,
     location: {
       id: location.id,
       organizationId: location.organization_id,

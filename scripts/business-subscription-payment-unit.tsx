@@ -9,7 +9,7 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-grants/policy";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { BUSINESS_GRACE_MS } from "../src/lib/business/plan";
-import { mapBusinessSubscriptionRpcError, normalizeBusinessReceiptEmail, ownerCanPayFromThisBrowser, resolveBusinessReceiptEmail } from "../src/lib/business/subscription-checkout";
+import { BUSINESS_RECEIPT_EMAIL_META_KEY, businessReceiptEmailToRemember, mapBusinessSubscriptionRpcError, normalizeBusinessReceiptEmail, ownerCanPayFromThisBrowser, resolveBusinessReceiptEmail, savedBusinessReceiptEmail } from "../src/lib/business/subscription-checkout";
 import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/copy";
 import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
 import { resolveSignInIntroCopy } from "../src/lib/auth/buy-sign-in";
@@ -150,7 +150,47 @@ assert.equal(normalizeBusinessReceiptEmail("a b@c.ru"), null);
 assert.equal(normalizeBusinessReceiptEmail(`${"x".repeat(250)}@c.ru`), null);
 assert.equal(normalizeBusinessReceiptEmail("a@c.ru\n"), "a@c.ru");
 const checkoutSource = readFileSync("src/app/api/business/subscription/checkout/route.ts", "utf8");
-assert.match(checkoutSource, /resolveBusinessReceiptEmail\(user\.email, body\?\.receipt_email\)/);
+assert.match(checkoutSource, /resolveBusinessReceiptEmail\(user\.email, body\?\.receipt_email, savedReceiptEmail\)/);
+
+// t1343u: the receipt email of an account without email is remembered and prefilled.
+assert.equal(BUSINESS_RECEIPT_EMAIL_META_KEY, "receipt_email");
+assert.equal(savedBusinessReceiptEmail({ receipt_email: " Guest@Example.Test " }), "guest@example.test");
+assert.equal(savedBusinessReceiptEmail({ receipt_email: "bad" }), null);
+assert.equal(savedBusinessReceiptEmail(null), null);
+assert.equal(savedBusinessReceiptEmail({ first_name: "Анна" }), null);
+// Typed wins over remembered; remembered is used when nothing is typed; account email still wins.
+assert.equal(resolveBusinessReceiptEmail(null, "new@example.test", "old@example.test"), "new@example.test");
+assert.equal(resolveBusinessReceiptEmail(null, undefined, "old@example.test"), "old@example.test");
+assert.equal(resolveBusinessReceiptEmail(null, "not-an-email", "old@example.test"), "old@example.test");
+assert.equal(resolveBusinessReceiptEmail("owner@example.test", undefined, "old@example.test"), "owner@example.test");
+// Remember only for an account without email, only when new.
+assert.equal(businessReceiptEmailToRemember(null, "guest@example.test", null), "guest@example.test");
+assert.equal(businessReceiptEmailToRemember("", "new@example.test", "old@example.test"), "new@example.test");
+assert.equal(businessReceiptEmailToRemember(null, "old@example.test", "old@example.test"), null);
+assert.equal(businessReceiptEmailToRemember("owner@example.test", "owner@example.test", null), null);
+assert.equal(businessReceiptEmailToRemember(null, "bad", null), null);
+// Saved after the payment link exists (best effort), only the one key – user_metadata merges.
+assert.ok(checkoutSource.indexOf("businessReceiptEmailToRemember(") > checkoutSource.indexOf("if (!started.ok)"), "remember after checkout start");
+assert.match(checkoutSource, /auth\.admin\.updateUserById\(user\.id, \{\s*user_metadata: \{ \[BUSINESS_RECEIPT_EMAIL_META_KEY\]: rememberEmail \}/);
+assert.doesNotMatch(checkoutSource, /console\.error\([^)]*rememberEmail/, "no email in logs");
+{
+  const prefilled = card({ ...ownerDomain, offerAccepted: true, needsReceiptEmail: true, savedReceiptEmail: "guest@example.test" }, grace);
+  assert.match(prefilled, /data-testid="biz-home-receipt-email-input"/);
+  assert.match(prefilled, /value="guest@example\.test"/, "remembered email prefilled");
+  assert.match(prefilled, /Чек придёт на эту почту\. Изменить её можно здесь или в профиле\./);
+  assert.doesNotMatch(prefilled, /В аккаунте нет почты/);
+  assert.doesNotMatch(prefilled, /—/);
+  assert.match(guestStart, /Мы запомним её для следующих оплат\./);
+  assert.match(guestStart, /value=""/);
+  const domainSource = readFileSync("src/lib/business-app/domain.ts", "utf8");
+  assert.match(domainSource, /savedReceiptEmail = needsReceiptEmail \? savedBusinessReceiptEmail\(user\.user_metadata\) : null/);
+  const actions = readFileSync("src/app/business-app/profile/actions.ts", "utf8");
+  assert.match(actions, /export async function saveBusinessReceiptEmail/);
+  assert.match(actions, /updateUser\(\{ data: \{ \[BUSINESS_RECEIPT_EMAIL_META_KEY\]: receiptEmail \} \}\)/);
+  const page = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+  assert.match(page, /domain\.needsReceiptEmail \? \(\s*<BusinessReceiptEmailForm receiptEmail=\{domain\.savedReceiptEmail \?\? null\} \/>/);
+  assert.match(page, /Сюда же приходят чеки об оплате\./);
+}
 assert.match(checkoutSource, /error: "receipt_email_required" \}, \{ status: 400 \}/);
 assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /needsReceiptEmail = canPay && !\(user\.email\?\.trim\(\) \?\? ""\)/);
 assert.match(accepted, /data-testid="biz-home-pay-button"/);

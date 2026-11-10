@@ -73,7 +73,15 @@ export function useBusinessHomePay() {
   const [askReceiptEmail, setAskReceiptEmail] = useState(
     domain.status === "authenticated" && Boolean(domain.needsReceiptEmail),
   );
-  const [receiptEmail, setReceiptEmailState] = useState("");
+  // t1343u: the email remembered from the last payment is prefilled and stays editable.
+  const savedReceiptEmail = domain.status === "authenticated" ? (domain.savedReceiptEmail ?? "") : "";
+  const [receiptEmail, setReceiptEmailState] = useState(savedReceiptEmail);
+  const [receiptEmailSource, setReceiptEmailSource] = useState(savedReceiptEmail);
+  if (receiptEmailSource !== savedReceiptEmail) {
+    // Changed in the profile (router.refresh): show the new address next to «Оплатить».
+    setReceiptEmailSource(savedReceiptEmail);
+    setReceiptEmailState(savedReceiptEmail);
+  }
   const setReceiptEmail = (value: string) => {
     setReceiptEmailState(value);
     if (error?.code === "receipt_email_required") setError(null);
@@ -335,9 +343,15 @@ export function BusinessOfferAcceptedStepNote() {
   );
 }
 
-/** Guest-start accounts have no email; the receipt still needs one. Not saved to the account. */
+/**
+ * Guest-start accounts have no email; the receipt still needs one. The address is remembered
+ * after the payment link is created (user_metadata.receipt_email, t1343u) and shown in the profile.
+ */
 export function BusinessReceiptEmailField({ control, busy }: { control: NonNullable<ReceiptEmailControl>; busy: boolean }) {
   const id = useId();
+  const domain = useBusinessDomain();
+  const saved = domain.status === "authenticated" ? (domain.savedReceiptEmail ?? "") : "";
+  const remembered = Boolean(saved) && normalizeBusinessReceiptEmail(control.value) === saved;
   return (
     <div className="space-y-1" data-testid="biz-home-receipt-email">
       <label htmlFor={id} className="block text-sm font-semibold text-[var(--biz-text)]">
@@ -357,7 +371,9 @@ export function BusinessReceiptEmailField({ control, busy }: { control: NonNulla
         data-testid="biz-home-receipt-email-input"
       />
       <p id={`${id}-hint`} className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        В аккаунте нет почты. Укажите, куда прислать чек об оплате.
+        {remembered
+          ? "Чек придёт на эту почту. Изменить её можно здесь или в профиле."
+          : "В аккаунте нет почты. Укажите, куда прислать чек об оплате. Мы запомним её для следующих оплат."}
       </p>
     </div>
   );

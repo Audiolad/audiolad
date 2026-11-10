@@ -13,6 +13,7 @@ import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
 import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
 import BusinessTimezoneForm from "@/components/business-app/profile/BusinessTimezoneForm";
+import BusinessReceiptEmailForm from "@/components/business-app/profile/BusinessReceiptEmailForm";
 import BusinessProfileSubscription from "@/components/business-app/profile/BusinessProfileSubscription";
 import { businessKindLabel, businessTimezoneLabel } from "@/lib/business-app/profile";
 import { extractBusinessFirstName, extractBusinessLastName } from "@/lib/business-app/domain-identity";
@@ -78,6 +79,11 @@ export default async function BusinessProfilePage() {
               <div>
                 <dt className="text-[var(--biz-text-muted)]">Почта</dt>
                 <dd className="font-semibold text-[var(--biz-text)]">{email}</dd>
+                {domain.status === "authenticated" && domain.canPay ? (
+                  <dd className="text-[var(--biz-text-muted)]" data-testid="biz-profile-receipt-email-account">
+                    Сюда же приходят чеки об оплате.
+                  </dd>
+                ) : null}
               </div>
             ) : null}
             {domain.location ? (
@@ -105,6 +111,9 @@ export default async function BusinessProfilePage() {
           {domain.location && membership?.role === "owner" ? (
             <BusinessTimezoneForm timezone={domain.location.timezone || "Europe/Moscow"}
               currentLabel={businessTimezoneLabel(domain.location.timezone || "Europe/Moscow")} />
+          ) : null}
+          {domain.status === "authenticated" && domain.needsReceiptEmail ? (
+            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
           ) : null}
           {domain.location ? null : (
             <p>

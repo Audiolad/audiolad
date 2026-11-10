@@ -6,6 +6,10 @@ import {
   shouldNotifyPlatformOwnerOfSale,
 } from "@/lib/admin/sales";
 import { sendPlatformOwnerSaleEmail } from "@/lib/email/send-platform-owner-sale-email";
+import {
+  BUSINESS_SUBSCRIPTION_ORDER_KIND,
+  savedBusinessReceiptEmail,
+} from "@/lib/business/subscription-checkout";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type OwnerSalePaymentRow = {
@@ -27,7 +31,76 @@ type OwnerSaleOrderRow = {
   author_id_snapshot: string | null;
   paid_at: string | null;
   checkout_origin_path: string | null;
+  order_kind?: string | null;
 };
+
+type OwnerSaleAuthUser = {
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+function metaString(meta: Record<string, unknown> | null | undefined, key: string): string {
+  const value = meta?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Buyer name and email for the sale email (t1344u). `profiles` is filled for regular
+ * accounts; a guest-start АудиоЛад Бизнес owner has no account email and keeps the name in
+ * auth user_metadata (first_name / last_name) and the receipt email in
+ * user_metadata.receipt_email (t1343u). Profile values win; auth fills the gaps.
+ */
+export function resolveOwnerSaleBuyer(input: {
+  profileFullName: string | null | undefined;
+  profileEmail: string | null | undefined;
+  authUser: OwnerSaleAuthUser | null;
+}): { buyerName: string; buyerEmail: string | null } {
+  const meta = input.authUser?.user_metadata ?? null;
+  const metaName = [metaString(meta, "first_name"), metaString(meta, "last_name")].filter(Boolean).join(" ")
+    || metaString(meta, "full_name");
+  const buyerEmail = input.profileEmail?.trim()
+    || input.authUser?.email?.trim()
+    || savedBusinessReceiptEmail(meta)
+    || null;
+  const fullName = input.profileFullName?.trim() || metaName || null;
+  return { buyerName: buildAdminSaleBuyerName(fullName, buyerEmail), buyerEmail };
+}
+
+async function loadOwnerSaleAuthUser(supabase: SupabaseClient, userId: string): Promise<OwnerSaleAuthUser | null> {
+  try {
+    const admin = (supabase as { auth?: { admin?: SupabaseClient["auth"]["admin"] } }).auth?.admin;
+    if (!admin) return null;
+    const { data, error } = await admin.getUserById(userId);
+    if (error || !data?.user) return null;
+    return { email: data.user.email ?? null, user_metadata: data.user.user_metadata ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/** АудиоЛад Бизнес: the organization of the paying owner instead of «Автор» (t1344u). */
+async function loadOwnerSaleOrganizationName(supabase: SupabaseClient, userId: string): Promise<string | null> {
+  try {
+    const { data: member } = await supabase
+      .from("business_organization_members")
+      .select("organization_id, created_at")
+      .eq("user_id", userId)
+      .eq("role", "owner")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const organizationId = (member as { organization_id?: string } | null)?.organization_id;
+    if (!organizationId) return null;
+    const { data: org } = await supabase
+      .from("business_organizations")
+      .select("id, name")
+      .eq("id", organizationId)
+      .maybeSingle();
+    return (org as { name?: string | null } | null)?.name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Notify the platform owner after a payment is actually confirmed.
@@ -73,7 +146,7 @@ export async function notifyPlatformOwnerOfConfirmedSale(input: {
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select(
-        "id, user_id, status, practice_title_snapshot, author_id_snapshot, paid_at, checkout_origin_path",
+        "id, user_id, status, practice_title_snapshot, author_id_snapshot, paid_at, checkout_origin_path, order_kind",
       )
       .eq("id", input.orderId)
       .maybeSingle();
@@ -103,20 +176,29 @@ export async function notifyPlatformOwnerOfConfirmedSale(input: {
     const paidAt =
       paymentRow.confirmed_at ?? orderRow.paid_at ?? paymentRow.created_at;
     const productTitle = orderRow.practice_title_snapshot?.trim() || "Продукт";
-    const buyerName = buildAdminSaleBuyerName(
-      buyer?.full_name ?? null,
-      buyer?.email ?? null,
-    );
+    const isBusiness = orderRow.order_kind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
+    const needsAuthUser = isBusiness || !buyer?.email?.trim() || !buyer?.full_name?.trim();
+    const [authUser, organizationName] = await Promise.all([
+      needsAuthUser ? loadOwnerSaleAuthUser(supabase, orderRow.user_id) : Promise.resolve(null),
+      isBusiness ? loadOwnerSaleOrganizationName(supabase, orderRow.user_id) : Promise.resolve(null),
+    ]);
+    const { buyerName, buyerEmail } = resolveOwnerSaleBuyer({
+      profileFullName: buyer?.full_name ?? null,
+      profileEmail: buyer?.email ?? null,
+      authUser,
+    });
 
     const result = await send({
       paymentId: paymentRow.id,
       orderId: orderRow.id,
       productTitle,
       authorName: author?.name ?? null,
+      // Business has no author: the line shows the organization, or is left out.
+      ...(isBusiness ? { authorLabel: "Заведение", authorName: organizationName } : {}),
       amountMinor: paymentRow.amount_minor,
       currency: paymentRow.currency,
       buyerName,
-      buyerEmail: buyer?.email ?? null,
+      buyerEmail,
       paidAt,
       paymentStatus: getAdminPaymentStatusLabel(paymentRow.status),
       checkoutOriginPath: orderRow.checkout_origin_path,

@@ -8,7 +8,10 @@ import {
   BUSINESS_STANDARD_UNIT_PRICE_MINOR,
   mapBusinessSubscriptionRpcError,
   parseConfirmedUnitPriceMinor,
+  businessReceiptEmailToRemember,
   resolveBusinessReceiptEmail,
+  savedBusinessReceiptEmail,
+  BUSINESS_RECEIPT_EMAIL_META_KEY,
 } from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
   }
 
   // Optional body { receipt_email }: only for an account without email (guest start).
+  // Without it the remembered one (user_metadata.receipt_email, t1343u) is used.
   // { confirmed_unit_price_minor }: the per-venue price shown next to «Оплатить» (8142d69a).
   const body = (await request.json().catch(() => null)) as {
     receipt_email?: unknown;
@@ -60,7 +64,8 @@ export async function POST(request: Request) {
   if (confirmedUnitPriceMinor === null) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
-  const customerEmail = resolveBusinessReceiptEmail(user.email, body?.receipt_email) ?? "";
+  const savedReceiptEmail = savedBusinessReceiptEmail(user.user_metadata);
+  const customerEmail = resolveBusinessReceiptEmail(user.email, body?.receipt_email, savedReceiptEmail) ?? "";
   if (!customerEmail) {
     return NextResponse.json({ error: "receipt_email_required" }, { status: 400 });
   }
@@ -145,6 +150,20 @@ export async function POST(request: Request) {
 
   if (!started.ok) {
     return NextResponse.json({ error: started.error }, { status: started.status });
+  }
+
+  // t1343u: remember the receipt email of an account without its own email, so the next
+  // payment and the profile show it. Best effort: the payment link is already created.
+  const rememberEmail = businessReceiptEmailToRemember(user.email, customerEmail, savedReceiptEmail);
+  if (rememberEmail) {
+    try {
+      const { error: rememberError } = await serviceRoleClient.auth.admin.updateUserById(user.id, {
+        user_metadata: { [BUSINESS_RECEIPT_EMAIL_META_KEY]: rememberEmail },
+      });
+      if (rememberError) console.error("business_receipt_email_remember_failed");
+    } catch {
+      console.error("business_receipt_email_remember_failed");
+    }
   }
 
   const response = NextResponse.json({
