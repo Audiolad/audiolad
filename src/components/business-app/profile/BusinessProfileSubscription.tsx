@@ -14,7 +14,7 @@ export default function BusinessProfileSubscription({ timezone, nowIso, showPaym
   timezone: string;
   nowIso: string;
   offerAccepted?: boolean;
-  /** Owner only (t1342u): «История оплат» right under «Продлить» / «Оплатить». */
+  /** Owner only (t1342u): «История оплат» under «Продлить» / «Оплатить», with a little extra space (t1352u). */
   showPaymentHistory?: boolean;
 }) {
   const { access, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } = useBusinessHomePay();
@@ -37,7 +37,7 @@ export default function BusinessProfileSubscription({ timezone, nowIso, showPaym
         onAccept={accept} onPay={pay} payLabel={summary.button} buttonVariant="cta" showAcceptedNote
         receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null} />
       {showPaymentHistory ? (
-        <p>
+        <p className="pt-2">
           <Link className="underline" href={BUSINESS_PAYMENT_HISTORY_HREF} data-testid="biz-profile-payment-history-link">
             {BUSINESS_PAYMENT_HISTORY_LINK_LABEL}
           </Link>
