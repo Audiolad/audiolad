@@ -503,6 +503,53 @@ for (const other of ["src/components/business-app/SpaOnlinePlayer.tsx", "src/com
   h.p.dispose();
 }
 
+// E1: an older aborted start never rolls back newer intent (both settlement orders).
+{
+  const h = hall();
+  await h.toggle();
+  await h.toggle(); // deliberate pause
+  await flush();
+  assert.equal(h.lock.held, false);
+  let install!: () => void;
+  const ctrl = new AbortController();
+  const a = h.next({ install: new Promise<void>((r) => { install = r; }), signal: ctrl.signal });
+  ctrl.abort();
+  h.refuse(true);
+  await h.toggle(); // newer start B: autoplay refused, waits for a tap
+  await flush();
+  assert.equal(h.p.needsGesture, true);
+  assert.equal(h.lock.held, true);
+  install(); // A settles after B
+  await a;
+  await h.p.applyManifest([item(1), item(2)] as never);
+  h.sync();
+  await flush();
+  assert.equal(h.lock.held, true, "older aborted start keeps newer autoplay intent (E1)");
+  h.lock.dispose();
+  h.p.dispose();
+}
+{
+  // Order 2: B settles, then a later deliberate pause, then A aborts – the pause stays.
+  const h = hall();
+  await h.toggle();
+  await h.toggle();
+  let install!: () => void;
+  const ctrl = new AbortController();
+  const a = h.next({ install: new Promise<void>((r) => { install = r; }), signal: ctrl.signal });
+  ctrl.abort();
+  await h.toggle(); // B plays
+  await flush();
+  assert.equal(h.p.status, "playing");
+  await h.toggle(); // later deliberate pause
+  install();
+  await a;
+  await flush();
+  assert.equal(h.p.status, "paused");
+  assert.equal(h.lock.held, false, "later deliberate pause stays in force");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
 // Tracker accounting: exceptions and overlapping starts balance.
 {
   const t = new HallWakeIntentTracker();

@@ -74,7 +74,7 @@ export type HallWakeController = {
  * - a deliberate local stop (bar closed) – supersedes an earlier owner pause latch;
  * - a start in flight – `audio.play()` may wait without a "loading" notification. A later
  *   deliberate pause supersedes it at once; a start that never reached the controller
- *   (aborted) leaves the earlier pause in place.
+ *   (aborted) changes no pause state at all.
  */
 export class HallWakeIntentTracker {
   private localPaused = false;
@@ -107,7 +107,6 @@ export class HallWakeIntentTracker {
    * the earlier deliberate pause then stays in force.
    */
   async whileStarting(run: () => Promise<boolean | void>, sync: () => void): Promise<void> {
-    const before = { paused: this.localPaused, stopped: this.localStopped };
     const token = {};
     this.starts.add(token);
     sync();
@@ -116,15 +115,11 @@ export class HallWakeIntentTracker {
       started = (await run()) !== false;
     } finally {
       const current = this.starts.delete(token);
-      // Superseded by a deliberate pause meanwhile: that pause wins.
-      if (current) {
-        if (started) {
-          this.localPaused = false;
-          this.localStopped = false;
-        } else {
-          this.localPaused = before.paused;
-          this.localStopped = before.stopped;
-        }
+      // Superseded by a deliberate pause meanwhile: that pause wins. A start that never reached
+      // the controller changes nothing – it must not roll back newer intent.
+      if (current && started) {
+        this.localPaused = false;
+        this.localStopped = false;
       }
       sync();
     }
