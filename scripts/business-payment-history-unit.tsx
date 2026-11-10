@@ -148,6 +148,12 @@ const server = readFileSync("src/lib/business-app/payment-history.server.ts", "u
 assert.ok(!/\.(insert|update|upsert|delete|rpc)\(/.test(server), "read-only");
 const subscription = readFileSync("src/components/business-app/profile/BusinessProfileSubscription.tsx", "utf8");
 assert.ok(subscription.indexOf("<BusinessPayControls") < subscription.indexOf("biz-profile-payment-history-link"), "link right under the pay button");
+assert.match(subscription, /<p className="pt-2">/, "t1352u: a little extra space under «Продлить»");
+const profilePage = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+assert.match(profilePage, /data-testid="biz-profile-sign-out"/);
+assert.match(profilePage, /flex justify-end/);
+assert.ok(profilePage.indexOf("<BusinessProfileSubscription") < profilePage.indexOf("biz-profile-sign-out"), "logout after the history link, bottom of the same card");
+assert.ok(profilePage.indexOf("biz-profile-sign-out") < profilePage.indexOf("biz-profile-help-section"));
 
 console.log("business payment history unit: ok");
 }

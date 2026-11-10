@@ -124,11 +124,14 @@ export default async function BusinessProfilePage() {
           )}
           <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()}
             showPaymentHistory={membership?.role === "owner"} />
-          <SignOutForm action={signOut}>
-            <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
-              Выйти
-            </button>
-          </SignOutForm>
+          {/* t1352u: «Выйти» in the bottom-right corner of this card, away from «История оплат». */}
+          <div className="flex justify-end pt-3" data-testid="biz-profile-sign-out">
+            <SignOutForm action={signOut}>
+              <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
+                Выйти
+              </button>
+            </SignOutForm>
+          </div>
         </section>
         </>
       )}

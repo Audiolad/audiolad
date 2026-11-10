@@ -122,6 +122,15 @@ assert.match(page, /ownerSurname=\{ownerSurname\}/);
 assert.match(page, /extractBusinessLastName/);
 assert.match(page, /canEditOrganization=\{membership\?\.role === "owner"\}/);
 
+// t1352u: «Выйти» in the bottom-right corner of the same profile card, away from «История оплат».
+assert.match(page, /data-testid="biz-profile-sign-out"/);
+assert.match(page, /className="flex justify-end pt-3"/);
+assert.match(page, /<SignOutForm action=\{signOut\}>/);
+assert.match(page, />\s*Выйти\s*</);
+assert.ok(page.indexOf("<BusinessProfileSubscription") < page.indexOf("biz-profile-sign-out"), "logout stays under the subscription block");
+assert.ok(page.indexOf("biz-profile-sign-out") < page.indexOf("biz-profile-help-section"), "logout stays in the profile card, not the help card");
+assert.doesNotMatch(page, /\u2014/, "en dash only");
+
 const action = readFileSync("src/app/business-app/profile/actions.ts", "utf8");
 assert.match(action, /rpc\("rename_business_organization"/, "profile renames the organization, not a hall");
 assert.match(action, /p_organization_id: domain\.organizationId/);
