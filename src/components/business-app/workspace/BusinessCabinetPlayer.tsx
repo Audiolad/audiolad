@@ -33,6 +33,7 @@ import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrd
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
 import { prepareLoopAudio } from "@/lib/business-app/hall-loop-audio";
+import { HallWakeLock, hallWantsScreenAwake, type WakeLockNavigator } from "@/lib/business-app/hall-wake-lock";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
@@ -468,6 +469,26 @@ export function BusinessCabinetPlayerProvider({
   // An owner command is being applied / acknowledged: the controller emits "paused" before the
   // remote-pause latch is set (iPhone pauses without a fade). Never reload in that window.
   const remoteCommandBusyRef = useRef(false);
+  // t1350u: hall device only – the screen stays on while the hall music is meant to play, so
+  // Android battery saving cannot freeze the page between two tracks. Screen-only: it never
+  // touches the audio element, the build reload above, the iPhone handoff or the fades.
+  const wakeLockRef = useRef<HallWakeLock | null>(null);
+  const syncWakeLock = useCallback(() => {
+    const lock = wakeLockRef.current;
+    if (!lock) return;
+    const ctl = ctlRef.current;
+    lock.setWanted(hallWantsScreenAwake(ctl ? { ...hallIntentOf(ctl), status: ctl.status, remotePaused: remotePausedRef.current } : null));
+  }, []);
+  useEffect(() => {
+    if (!canBeat || typeof navigator === "undefined" || typeof document === "undefined") return;
+    const lock = new HallWakeLock(navigator as unknown as WakeLockNavigator, document);
+    wakeLockRef.current = lock;
+    syncWakeLock();
+    return () => {
+      lock.dispose();
+      if (wakeLockRef.current === lock) wakeLockRef.current = null;
+    };
+  }, [canBeat, syncWakeLock]);
   const trySafeBuildReload = useCallback(() => {
     const pending = pendingBuildRef.current;
     if (!pending || remotePausedRef.current || remoteCommandBusyRef.current) return;
@@ -679,6 +700,7 @@ export function BusinessCabinetPlayerProvider({
             void bufferRef.current?.purge();
             reportQueueRef.current?.clear();
           } else bufferPlanRef.current();
+          syncWakeLock();
           if (current.status === "paused" || current.status === "idle") {
             trySafeBuildReload();
           }
@@ -755,10 +777,11 @@ export function BusinessCabinetPlayerProvider({
       if (loopMode) audio.loop = false;
       ctl.dispose();
       ctlRef.current = null;
+      syncWakeLock();
       fader.dispose();
       if (fadeRef.current === fader) fadeRef.current = null;
     };
-  }, [catalogKey, open, remember]);
+  }, [catalogKey, open, remember, syncWakeLock]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -842,6 +865,7 @@ export function BusinessCabinetPlayerProvider({
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     remotePausedRef.current = false;
+    syncWakeLock();
     const index = playbackRef.current.index;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
@@ -856,13 +880,14 @@ export function BusinessCabinetPlayerProvider({
     const positionSec = ctl.fadingOutPrevious ? 0 : (audioRef.current?.currentTime ?? 0);
     remember({ index: ctl.index < 0 ? index : ctl.index, positionSec }, ctl.status === "playing");
     reportPlayback();
-  }, [remember, reportPlayback]);
+  }, [remember, reportPlayback, syncWakeLock]);
 
   const next = useCallback(async (signal?: AbortSignal) => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     remotePausedRef.current = false;
+    syncWakeLock();
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -871,7 +896,7 @@ export function BusinessCabinetPlayerProvider({
     await ctl.next();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
-  }, [remember, reportPlayback]);
+  }, [remember, reportPlayback, syncWakeLock]);
 
   const previous = useCallback(async () => {
     const ctl = ctlRef.current;
@@ -947,7 +972,10 @@ export function BusinessCabinetPlayerProvider({
             const done = !!audio && (type === "pause"
               ? (status === "paused" || status === "idle") && audio.paused
               : status === "playing" && !audio.paused);
-            if (type === "pause" && done) remotePausedRef.current = true;
+            if (type === "pause" && done) {
+              remotePausedRef.current = true;
+              syncWakeLock();
+            }
             return done;
           },
           ack: async (command) => {
@@ -984,7 +1012,7 @@ export function BusinessCabinetPlayerProvider({
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", wake);
     };
-  }, [canBeat]);
+  }, [canBeat, syncWakeLock]);
 
   // Owner mirror of the live hall device (t1283u). Owner browser only; the hall device itself
   // is the source of truth and never reads this.
