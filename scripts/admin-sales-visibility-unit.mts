@@ -769,18 +769,32 @@ async function testAdminSalesBusinessBuyerFallback() {
       { id: BUSINESS_USER, email: null, full_name: null },
       { id: PLAIN_USER, email: "maria@example.test", full_name: "Мария" },
     ],
-    business_organization_members: [{ user_id: BUSINESS_USER, organization_id: "org-1", created_at: SALE.paidAt }],
-    business_organizations: [{ id: "org-1", name: "Кофейня Тест" }],
+    business_organization_members: [
+      { user_id: BUSINESS_USER, organization_id: "org-2", role: "owner", created_at: "2026-11-05T00:00:00.000Z" },
+      { user_id: BUSINESS_USER, organization_id: "org-0", role: "manager", created_at: "2026-10-01T00:00:00.000Z" },
+      { user_id: BUSINESS_USER, organization_id: "org-1", role: "owner", created_at: "2026-11-01T00:00:00.000Z" },
+    ],
+    business_organizations: [
+      { id: "org-0", name: "Чужая кофейня" },
+      { id: "org-1", name: "Кофейня Тест" },
+      { id: "org-2", name: "Вторая кофейня" },
+    ],
   };
   const authLookups: string[] = [];
+  // Filtering mock: in / eq / order really apply, so owner filtering and ordering are tested.
   const makeService = (authFails: boolean) => ({
     from(table: string) {
+      let data = [...((tables[table] ?? []) as Array<Record<string, unknown>>)];
       const chain = {
         select() { return chain; },
-        in() { return chain; },
-        eq() { return chain; },
-        order() { return chain; },
-        then(resolve: (v: unknown) => unknown) { return Promise.resolve({ data: tables[table] ?? [], error: null }).then(resolve); },
+        in(column: string, values: unknown[]) { data = data.filter((r) => values.includes(r[column])); return chain; },
+        eq(column: string, value: unknown) { data = data.filter((r) => r[column] === value); return chain; },
+        order(column: string, opts?: { ascending?: boolean }) {
+          const dir = opts?.ascending === false ? -1 : 1;
+          data.sort((a, b) => String(a[column]).localeCompare(String(b[column])) * dir);
+          return chain;
+        },
+        then(resolve: (v: unknown) => unknown) { return Promise.resolve({ data, error: null }).then(resolve); },
       };
       return chain;
     },
@@ -809,6 +823,33 @@ async function testAdminSalesBusinessBuyerFallback() {
   const fallback = await mapAdminSaleRows(makeService(true) as never, rows as never);
   assert.equal(fallback.find((i) => i.paymentId === "pay-biz")!.buyerName, "Покупатель");
   assert.equal(fallback.find((i) => i.paymentId === "pay-biz")!.authorName, "Кофейня Тест");
+
+  // Review P2: a receipt-only address equal to an author's email must not make a sale a self-purchase.
+  {
+    const AUTHOR_ID = "author-x";
+    const AUTHOR_OWNER = "99999999-9999-4999-8999-999999999999";
+    const BUYER = "66666666-6666-4666-8666-666666666666";
+    const saved = { ...tables };
+    tables.profiles = [
+      { id: BUYER, email: null, full_name: null },
+      { id: AUTHOR_OWNER, email: "author@example.test", full_name: "Автор Пример" },
+    ];
+    tables.authors = [{ id: AUTHOR_ID, name: "Автор Пример" }];
+    tables.author_members = [{ author_id: AUTHOR_ID, user_id: AUTHOR_OWNER, role: "owner" }];
+    const receiptService = {
+      ...makeService(false),
+      auth: { admin: { getUserById: async () => ({
+        data: { user: { email: null, user_metadata: { receipt_email: "author@example.test" } } }, error: null,
+      }) } },
+    };
+    const practiceRow = { ...rows[1], id: "pay-x", orders: { ...rows[1].orders, id: "ord-x", user_id: BUYER, author_id_snapshot: AUTHOR_ID } };
+    const [item] = await mapAdminSaleRows(receiptService as never, [practiceRow] as never);
+    assert.equal(item.buyerEmail, "author@example.test", "receipt email is shown");
+    assert.equal(item.buyerKind, "external", "receipt email never proves self-purchase");
+    assert.equal(item.authorLabel, "Автор");
+    assert.equal(item.authorName, "Автор Пример");
+    Object.assign(tables, saved);
+  }
 
   const queries = read("src/lib/admin/sales-queries.ts");
   assert.match(queries, /checkout_origin_path,\s*order_kind\s*\)/);

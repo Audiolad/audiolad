@@ -103,6 +103,12 @@ export function mapAdminSaleListItem(input: {
   /** t1345u: АудиоЛад Бизнес subscription – the organization is shown instead of an author. */
   isBusinessSubscription?: boolean;
   organizationName?: string | null;
+  /**
+   * Email for the self-purchase badge: only the profile / account email. A receipt-only
+   * address (user_metadata.receipt_email) is shown but never proves account ownership.
+   * Defaults to buyerEmail.
+   */
+  buyerKindEmail?: string | null;
 }): AdminSaleListItem {
   const business = input.isBusinessSubscription === true;
   return {
@@ -122,7 +128,7 @@ export function mapAdminSaleListItem(input: {
     orderStatus: input.orderStatus,
     buyerKind: detectAdminSaleBuyerKind({
       buyerUserId: input.buyerUserId,
-      buyerEmail: input.buyerEmail,
+      buyerEmail: input.buyerKindEmail === undefined ? input.buyerEmail : input.buyerKindEmail,
       authorMemberUserIds: input.authorMemberUserIds,
       authorMemberEmails: input.authorMemberEmails,
     }),
@@ -313,6 +319,8 @@ function toListItem(
     authUser: buyerUserId ? (related.authUsers.get(buyerUserId) ?? null) : null,
   });
   const isBusinessSubscription = order?.order_kind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
+  const authUser = buyerUserId ? related.authUsers.get(buyerUserId) : undefined;
+  const buyerKindEmail = buyer?.email?.trim() || authUser?.email?.trim() || null;
 
   return mapAdminSaleListItem({
     paymentId: row.id,
@@ -331,6 +339,7 @@ function toListItem(
     orderStatus: order?.status ?? null,
     authorMemberUserIds: members?.userIds,
     authorMemberEmails: members?.emails,
+    buyerKindEmail,
     isBusinessSubscription,
     organizationName: buyerUserId ? (related.organizationsByOwner.get(buyerUserId) ?? null) : null,
   });
