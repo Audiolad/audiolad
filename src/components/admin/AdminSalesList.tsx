@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import {
+  adminSaleAuthorText,
   formatAdminSaleAmount,
   getAdminSaleBuyerKindLabel,
   getAdminSaleStatusLabel,
@@ -80,7 +81,7 @@ export default function AdminSalesList({ data }: AdminSalesListProps) {
                 <th className="px-4 py-3 font-medium">Покупатель</th>
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Продукт</th>
-                <th className="px-4 py-3 font-medium">Автор</th>
+                <th className="px-4 py-3 font-medium">Автор / заведение</th>
                 <th className="px-4 py-3 font-medium">Сумма</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
                 <th className="px-4 py-3 font-medium" />
@@ -105,7 +106,7 @@ export default function AdminSalesList({ data }: AdminSalesListProps) {
                     {sale.buyerEmail ?? "—"}
                   </td>
                   <td className="px-4 py-4 text-[#25135c]">{sale.productTitle}</td>
-                  <td className="px-4 py-4 text-[#796ba0]">{sale.authorName}</td>
+                  <td className="px-4 py-4 text-[#796ba0]">{adminSaleAuthorText(sale)}</td>
                   <td className="px-4 py-4 text-[#25135c]">
                     {formatAdminSaleAmount(sale.amountMinor, sale.currency)}
                   </td>
@@ -141,7 +142,7 @@ export default function AdminSalesList({ data }: AdminSalesListProps) {
                 <h3 className="text-base font-semibold text-[#25135c]">
                   {sale.productTitle}
                 </h3>
-                <p className="mt-1 text-sm text-[#796ba0]">{sale.authorName}</p>
+                <p className="mt-1 text-sm text-[#796ba0]">{adminSaleAuthorText(sale)}</p>
               </div>
               <BuyerKindBadge kind={sale.buyerKind} />
             </div>

@@ -104,8 +104,10 @@ export default async function AdminSaleDetailPage({
           <DetailRow label="Продукт" value={sale.productTitle} />
           <DetailRow label="Slug продукта" value={sale.practiceSlug ?? "—"} />
           <DetailRow label="ID продукта" value={sale.practiceId ?? "—"} />
-          <DetailRow label="Автор" value={sale.authorName} />
-          <DetailRow label="ID автора" value={sale.authorId ?? "—"} />
+          <DetailRow label={sale.authorLabel} value={sale.authorName} />
+          {sale.authorLabel === "Автор" ? (
+            <DetailRow label="ID автора" value={sale.authorId ?? "—"} />
+          ) : null}
           <DetailRow
             label="Сумма"
             value={formatAdminSaleAmount(sale.amountMinor, sale.currency)}

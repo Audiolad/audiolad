@@ -1,15 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveOwnerSaleBuyer, type SaleBuyerAuthUser } from "@/lib/admin/sale-buyer";
 import {
-  buildAdminSaleBuyerName,
   getAdminPaymentStatusLabel,
   shouldNotifyPlatformOwnerOfSale,
 } from "@/lib/admin/sales";
 import { sendPlatformOwnerSaleEmail } from "@/lib/email/send-platform-owner-sale-email";
-import {
-  BUSINESS_SUBSCRIPTION_ORDER_KIND,
-  savedBusinessReceiptEmail,
-} from "@/lib/business/subscription-checkout";
+import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type OwnerSalePaymentRow = {
@@ -34,37 +31,9 @@ type OwnerSaleOrderRow = {
   order_kind?: string | null;
 };
 
-type OwnerSaleAuthUser = {
-  email?: string | null;
-  user_metadata?: Record<string, unknown> | null;
-};
+type OwnerSaleAuthUser = SaleBuyerAuthUser;
 
-function metaString(meta: Record<string, unknown> | null | undefined, key: string): string {
-  const value = meta?.[key];
-  return typeof value === "string" ? value.trim() : "";
-}
-
-/**
- * Buyer name and email for the sale email (t1344u). `profiles` is filled for regular
- * accounts; a guest-start АудиоЛад Бизнес owner has no account email and keeps the name in
- * auth user_metadata (first_name / last_name) and the receipt email in
- * user_metadata.receipt_email (t1343u). Profile values win; auth fills the gaps.
- */
-export function resolveOwnerSaleBuyer(input: {
-  profileFullName: string | null | undefined;
-  profileEmail: string | null | undefined;
-  authUser: OwnerSaleAuthUser | null;
-}): { buyerName: string; buyerEmail: string | null } {
-  const meta = input.authUser?.user_metadata ?? null;
-  const metaName = [metaString(meta, "first_name"), metaString(meta, "last_name")].filter(Boolean).join(" ")
-    || metaString(meta, "full_name");
-  const buyerEmail = input.profileEmail?.trim()
-    || input.authUser?.email?.trim()
-    || savedBusinessReceiptEmail(meta)
-    || null;
-  const fullName = input.profileFullName?.trim() || metaName || null;
-  return { buyerName: buildAdminSaleBuyerName(fullName, buyerEmail), buyerEmail };
-}
+export { resolveOwnerSaleBuyer };
 
 async function loadOwnerSaleAuthUser(supabase: SupabaseClient, userId: string): Promise<OwnerSaleAuthUser | null> {
   try {

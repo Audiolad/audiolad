@@ -6,9 +6,11 @@ import {
   type AdminSaleListItem,
   type AdminSalesPageData,
 } from "@/lib/admin/sales";
+import { resolveOwnerSaleBuyer, type SaleBuyerAuthUser } from "@/lib/admin/sale-buyer";
+import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-type PaymentListRow = {
+export type PaymentListRow = {
   id: string;
   order_id: string;
   status: string;
@@ -30,6 +32,7 @@ type PaymentListRow = {
         author_id_snapshot: string | null;
         paid_at: string | null;
         checkout_origin_path: string | null;
+        order_kind?: string | null;
       }
     | {
         id: string;
@@ -41,6 +44,7 @@ type PaymentListRow = {
         author_id_snapshot: string | null;
         paid_at: string | null;
         checkout_origin_path: string | null;
+        order_kind?: string | null;
       }[]
     | null;
 };
@@ -54,6 +58,17 @@ type ProfileRow = {
 type AuthorRow = {
   id: string;
   name: string;
+};
+
+type BusinessOwnerMemberRow = {
+  user_id: string;
+  organization_id: string;
+  created_at: string | null;
+};
+
+type BusinessOrganizationRow = {
+  id: string;
+  name: string | null;
 };
 
 type AuthorMemberRow = {
@@ -85,7 +100,11 @@ export function mapAdminSaleListItem(input: {
   orderStatus: string | null;
   authorMemberUserIds?: readonly string[] | null;
   authorMemberEmails?: readonly string[] | null;
+  /** t1345u: АудиоЛад Бизнес subscription – the organization is shown instead of an author. */
+  isBusinessSubscription?: boolean;
+  organizationName?: string | null;
 }): AdminSaleListItem {
+  const business = input.isBusinessSubscription === true;
   return {
     paymentId: input.paymentId,
     orderId: input.orderId,
@@ -95,7 +114,8 @@ export function mapAdminSaleListItem(input: {
     buyerEmail: input.buyerEmail,
     productTitle: input.productTitle?.trim() || "Продукт",
     authorId: input.authorId,
-    authorName: input.authorName?.trim() || "—",
+    authorName: (business ? input.organizationName?.trim() : input.authorName?.trim()) || "—",
+    authorLabel: business ? "Заведение" : "Автор",
     amountMinor: input.amountMinor,
     currency: input.currency || "RUB",
     paymentStatus: input.paymentStatus,
@@ -116,6 +136,8 @@ async function loadSaleRelatedMaps(
   profiles: Map<string, ProfileRow>;
   authors: Map<string, AuthorRow>;
   membersByAuthor: Map<string, { userIds: string[]; emails: string[] }>;
+  authUsers: Map<string, SaleBuyerAuthUser>;
+  organizationsByOwner: Map<string, string>;
 }> {
   const orders = rows.map((row) => asOrder(row.orders)).filter(Boolean);
   const buyerIds = [
@@ -192,7 +214,87 @@ async function loadSaleRelatedMaps(
     membersByAuthor.set(member.author_id, current);
   }
 
-  return { profiles, authors, membersByAuthor };
+  // t1345u: buyers without profile name or email (guest-start АудиоЛад Бизнес owners) and
+  // Business payers – name / email fall back to auth (user_metadata, receipt_email).
+  const businessBuyerIds = [
+    ...new Set(
+      orders
+        .filter((order) => order?.order_kind === BUSINESS_SUBSCRIPTION_ORDER_KIND)
+        .map((order) => order?.user_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const authLookupIds = buyerIds.filter((id) => {
+    const profile = profiles.get(id);
+    return businessBuyerIds.includes(id) || !profile?.email?.trim() || !profile?.full_name?.trim();
+  });
+  const [authUsers, organizationsByOwner] = await Promise.all([
+    loadSaleAuthUsers(service, authLookupIds),
+    loadBusinessOrganizationsByOwner(service, businessBuyerIds),
+  ]);
+
+  return { profiles, authors, membersByAuthor, authUsers, organizationsByOwner };
+}
+
+async function loadSaleAuthUsers(
+  service: ReturnType<typeof createServiceRoleClient>,
+  userIds: string[],
+): Promise<Map<string, SaleBuyerAuthUser>> {
+  const result = new Map<string, SaleBuyerAuthUser>();
+  const admin = (service as { auth?: { admin?: ReturnType<typeof createServiceRoleClient>["auth"]["admin"] } }).auth?.admin;
+  if (!admin || userIds.length === 0) return result;
+  await Promise.all(
+    userIds.map(async (id) => {
+      try {
+        const { data, error } = await admin.getUserById(id);
+        if (error || !data?.user) return;
+        result.set(id, { email: data.user.email ?? null, user_metadata: data.user.user_metadata ?? null });
+      } catch {
+        // Auth is a fallback only: the row keeps the profile values.
+      }
+    }),
+  );
+  return result;
+}
+
+/** Owner user id → organization name (the earliest owner membership), АудиоЛад Бизнес only. */
+async function loadBusinessOrganizationsByOwner(
+  service: ReturnType<typeof createServiceRoleClient>,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (userIds.length === 0) return result;
+  try {
+    const { data: members, error: membersError } = await service
+      .from("business_organization_members")
+      .select("user_id, organization_id, created_at")
+      .in("user_id", userIds)
+      .eq("role", "owner")
+      .order("created_at", { ascending: true });
+    if (membersError || !members?.length) return result;
+    const firstOrgByUser = new Map<string, string>();
+    for (const row of members as BusinessOwnerMemberRow[]) {
+      if (!firstOrgByUser.has(row.user_id)) firstOrgByUser.set(row.user_id, row.organization_id);
+    }
+    const orgIds = [...new Set(firstOrgByUser.values())];
+    const { data: orgs, error: orgsError } = await service
+      .from("business_organizations")
+      .select("id, name")
+      .in("id", orgIds);
+    if (orgsError) return result;
+    const names = new Map<string, string>();
+    for (const org of (orgs ?? []) as BusinessOrganizationRow[]) {
+      const name = org.name?.trim();
+      if (name) names.set(org.id, name);
+    }
+    for (const [userId, orgId] of firstOrgByUser) {
+      const name = names.get(orgId);
+      if (name) result.set(userId, name);
+    }
+  } catch {
+    // The organization line is informational: a read error leaves «—».
+  }
+  return result;
 }
 
 function toListItem(
@@ -204,14 +306,22 @@ function toListItem(
   const authorId = order?.author_id_snapshot ?? null;
   const author = authorId ? related.authors.get(authorId) : null;
   const members = authorId ? related.membersByAuthor.get(authorId) : null;
+  const buyerUserId = order?.user_id ?? null;
+  const { buyerName, buyerEmail } = resolveOwnerSaleBuyer({
+    profileFullName: buyer?.full_name ?? null,
+    profileEmail: buyer?.email ?? null,
+    authUser: buyerUserId ? (related.authUsers.get(buyerUserId) ?? null) : null,
+  });
+  const isBusinessSubscription = order?.order_kind === BUSINESS_SUBSCRIPTION_ORDER_KIND;
 
   return mapAdminSaleListItem({
     paymentId: row.id,
     orderId: order?.id ?? row.order_id,
     paidAt: row.confirmed_at ?? order?.paid_at ?? row.created_at,
     buyerUserId: order?.user_id ?? null,
-    buyerFullName: buyer?.full_name ?? null,
-    buyerEmail: buyer?.email ?? null,
+    // Already resolved; buildAdminSaleBuyerName keeps a resolved name as is.
+    buyerFullName: buyerName,
+    buyerEmail,
     productTitle: order?.practice_title_snapshot ?? null,
     authorId,
     authorName: author?.name ?? null,
@@ -221,7 +331,18 @@ function toListItem(
     orderStatus: order?.status ?? null,
     authorMemberUserIds: members?.userIds,
     authorMemberEmails: members?.emails,
+    isBusinessSubscription,
+    organizationName: buyerUserId ? (related.organizationsByOwner.get(buyerUserId) ?? null) : null,
   });
+}
+
+/** Rows → list items with buyer / author / organization lookups (exported for tests). */
+export async function mapAdminSaleRows(
+  service: ReturnType<typeof createServiceRoleClient>,
+  rows: PaymentListRow[],
+): Promise<AdminSaleListItem[]> {
+  const related = await loadSaleRelatedMaps(service, rows);
+  return rows.map((row) => toListItem(row, related));
 }
 
 const SALE_SELECT = `
@@ -244,7 +365,8 @@ const SALE_SELECT = `
     practice_slug_snapshot,
     author_id_snapshot,
     paid_at,
-    checkout_origin_path
+    checkout_origin_path,
+    order_kind
   )
 `;
 
@@ -272,10 +394,8 @@ export async function listAdminSales(input?: {
   }
 
   const rows = (data ?? []) as PaymentListRow[];
-  const related = await loadSaleRelatedMaps(service, rows);
-
   return {
-    sales: rows.map((row) => toListItem(row, related)),
+    sales: await mapAdminSaleRows(service, rows),
     total: count ?? 0,
     page,
     pageSize,
@@ -308,8 +428,7 @@ export async function getAdminSale(
   }
 
   const row = data as PaymentListRow;
-  const related = await loadSaleRelatedMaps(service, [row]);
-  const listItem = toListItem(row, related);
+  const [listItem] = await mapAdminSaleRows(service, [row]);
   const order = asOrder(row.orders);
 
   return {

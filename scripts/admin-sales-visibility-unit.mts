@@ -12,13 +12,14 @@ import {
   getVisibleAdminNavItems,
 } from "@/lib/admin/nav";
 import {
+  adminSaleAuthorText,
   buildPlatformOwnerSaleSubject,
   detectAdminSaleBuyerKind,
   formatAdminSaleAmount,
   resolvePlatformOwnerSaleNotifyIntent,
   shouldNotifyPlatformOwnerOfSale,
 } from "@/lib/admin/sales";
-import { mapAdminSaleListItem } from "@/lib/admin/sales-queries";
+import { mapAdminSaleListItem, mapAdminSaleRows } from "@/lib/admin/sales-queries";
 import {
   createAdminSalesDetailHandler,
   createAdminSalesListHandler,
@@ -69,6 +70,7 @@ const SALE = {
   productTitle: "Медитация на деньги",
   authorId: "44444444-4444-4444-8444-444444444444",
   authorName: "Оля Невская",
+  authorLabel: "Автор" as const,
   amountMinor: 149000,
   currency: "RUB",
   paymentStatus: "succeeded",
@@ -737,6 +739,87 @@ async function testBusinessOwnerSaleBuyerAndOrganization() {
   }
 }
 
+// t1345u: admin sales list/detail – buyer fallback to auth and «Заведение» for Business.
+async function testAdminSalesBusinessBuyerFallback() {
+  const author = mapAdminSaleListItem({
+    paymentId: SALE.paymentId, orderId: SALE.orderId, paidAt: SALE.paidAt, buyerUserId: SALE.buyerUserId,
+    buyerFullName: "Мария", buyerEmail: "maria@example.test", productTitle: "Утренний ритуал",
+    authorId: SALE.authorId, authorName: "Оля Невская", amountMinor: 99000, currency: "RUB",
+    paymentStatus: "succeeded", orderStatus: "paid",
+  });
+  assert.equal(author.authorLabel, "Автор");
+  assert.equal(adminSaleAuthorText(author), "Оля Невская");
+
+  const BUSINESS_USER = "77777777-7777-4777-8777-777777777777";
+  const PLAIN_USER = "88888888-8888-4888-8888-888888888888";
+  const rows = [
+    { id: "pay-biz", order_id: "ord-biz", status: "succeeded", amount_minor: 79800, currency: "RUB",
+      confirmed_at: SALE.paidAt, created_at: SALE.paidAt, provider: "tochka", provider_payment_id: null, is_test: false,
+      orders: { id: "ord-biz", user_id: BUSINESS_USER, status: "paid", practice_id: null,
+        practice_title_snapshot: "АудиоЛад Бизнес – доступ на 30 дней", practice_slug_snapshot: null,
+        author_id_snapshot: null, paid_at: SALE.paidAt, checkout_origin_path: null, order_kind: "business_subscription" } },
+    { id: "pay-plain", order_id: "ord-plain", status: "succeeded", amount_minor: 99000, currency: "RUB",
+      confirmed_at: SALE.paidAt, created_at: SALE.paidAt, provider: "tochka", provider_payment_id: null, is_test: false,
+      orders: { id: "ord-plain", user_id: PLAIN_USER, status: "paid", practice_id: null,
+        practice_title_snapshot: "Утренний ритуал", practice_slug_snapshot: null,
+        author_id_snapshot: null, paid_at: SALE.paidAt, checkout_origin_path: null, order_kind: "practice" } },
+  ];
+  const tables: Record<string, unknown[]> = {
+    profiles: [
+      { id: BUSINESS_USER, email: null, full_name: null },
+      { id: PLAIN_USER, email: "maria@example.test", full_name: "Мария" },
+    ],
+    business_organization_members: [{ user_id: BUSINESS_USER, organization_id: "org-1", created_at: SALE.paidAt }],
+    business_organizations: [{ id: "org-1", name: "Кофейня Тест" }],
+  };
+  const authLookups: string[] = [];
+  const makeService = (authFails: boolean) => ({
+    from(table: string) {
+      const chain = {
+        select() { return chain; },
+        in() { return chain; },
+        eq() { return chain; },
+        order() { return chain; },
+        then(resolve: (v: unknown) => unknown) { return Promise.resolve({ data: tables[table] ?? [], error: null }).then(resolve); },
+      };
+      return chain;
+    },
+    auth: { admin: { getUserById: async (id: string) => {
+      authLookups.push(id);
+      if (authFails) throw new Error("auth down");
+      return { data: { user: { email: null, user_metadata: { first_name: "Иван", last_name: "Тестов", receipt_email: "owner@example.test" } } }, error: null };
+    } } },
+  });
+
+  const items = await mapAdminSaleRows(makeService(false) as never, rows as never);
+  const biz = items.find((i) => i.paymentId === "pay-biz")!;
+  const plain = items.find((i) => i.paymentId === "pay-plain")!;
+  assert.equal(biz.buyerName, "Иван Тестов");
+  assert.equal(biz.buyerEmail, "owner@example.test");
+  assert.equal(biz.authorLabel, "Заведение");
+  assert.equal(biz.authorName, "Кофейня Тест");
+  assert.equal(adminSaleAuthorText(biz), "Заведение: Кофейня Тест");
+  assert.equal(plain.buyerName, "Мария");
+  assert.equal(plain.buyerEmail, "maria@example.test");
+  assert.equal(plain.authorLabel, "Автор");
+  assert.equal(plain.authorName, "—");
+  assert.deepEqual(authLookups, [BUSINESS_USER], "auth only for buyers with gaps or Business");
+
+  // Auth unavailable: profile values stay, nothing throws.
+  const fallback = await mapAdminSaleRows(makeService(true) as never, rows as never);
+  assert.equal(fallback.find((i) => i.paymentId === "pay-biz")!.buyerName, "Покупатель");
+  assert.equal(fallback.find((i) => i.paymentId === "pay-biz")!.authorName, "Кофейня Тест");
+
+  const queries = read("src/lib/admin/sales-queries.ts");
+  assert.match(queries, /checkout_origin_path,\s*order_kind\s*\)/);
+  assert.doesNotMatch(queries, /console\.(log|error)\([^)]*(email|metadata)/i, "no PII in logs");
+  const detail = read("src/app/(platform)/admin/sales/[id]/page.tsx");
+  assert.match(detail, /<DetailRow label=\{sale\.authorLabel\} value=\{sale\.authorName\} \/>/);
+  const list = read("src/components/admin/AdminSalesList.tsx");
+  assert.equal((list.match(/adminSaleAuthorText\(sale\)/g) ?? []).length, 2);
+  assert.match(list, /Автор \/ заведение/);
+}
+
 async function main() {
   await testNotifyOnlyOnConfirmedSuccess();
   await testDuplicateWebhookDoesNotSendSecondEmail();
@@ -746,6 +829,7 @@ async function main() {
   testCheckoutAndPaymentSuccessPathStillWorks();
   await testOwnerSaleEmailTemplate();
   await testBusinessOwnerSaleBuyerAndOrganization();
+  await testAdminSalesBusinessBuyerFallback();
   console.log("admin-sales-visibility-unit: ok");
 }
 
