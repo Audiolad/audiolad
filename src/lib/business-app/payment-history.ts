@@ -110,9 +110,11 @@ export function presentBusinessPaymentHistory(rows: readonly BusinessPaymentHist
 /* ---------------------------------------------------------------------------
  * Collecting the rows. All three tables are service-role only, so the caller must
  * already be the verified owner of organizationId (see payment-history.server.ts).
- * A payment belongs to the history when its checkout snapshot names this organization,
- * or – for orders paid before snapshots existed – when it has no snapshot and was paid
- * by this owner. A snapshot of another organization never shows here.
+ * A payment belongs to the history only when this owner paid it (orders.user_id and
+ * business_subscription_periods.user_id are the caller) AND its checkout snapshot names this
+ * organization – or, for orders paid before snapshots existed, it has no snapshot. Another
+ * account's payment never shows here, even a co-owner's of the same organization, and a
+ * snapshot of another organization never shows here either.
  * Test payments (opens_access = false) did not add days and are not listed.
  * ------------------------------------------------------------------------- */
 
@@ -143,9 +145,8 @@ export type PaymentHistoryOrderRow = {
 };
 
 export type PaymentHistoryReader = {
-  scopesForOrganization(organizationId: string): Promise<PaymentHistoryScopeRow[]>;
   scopesForOrders(orderIds: string[]): Promise<PaymentHistoryScopeRow[]>;
-  realPeriodsForOrders(orderIds: string[]): Promise<PaymentHistoryPeriodRow[]>;
+  /** Every real (opens_access) period paid by this account. */
   realPeriodsForUser(userId: string): Promise<PaymentHistoryPeriodRow[]>;
   ordersByIds(orderIds: string[]): Promise<PaymentHistoryOrderRow[]>;
 };
@@ -157,14 +158,10 @@ export async function collectBusinessPaymentHistoryRows(
   const { userId, organizationId } = input;
   if (!userId || !organizationId) return [];
 
-  const orgScopes = await reader.scopesForOrganization(organizationId);
-  const orgOrderIds = orgScopes.filter((s) => s.organization_id === organizationId).map((s) => s.order_id);
-  const [byOrder, byUser] = await Promise.all([
-    orgOrderIds.length ? reader.realPeriodsForOrders(orgOrderIds) : Promise.resolve([]),
-    reader.realPeriodsForUser(userId),
-  ]);
   const periods = new Map<string, PaymentHistoryPeriodRow>();
-  for (const p of [...byOrder, ...byUser]) if (p.opens_access === true) periods.set(p.order_id, p);
+  for (const p of await reader.realPeriodsForUser(userId)) {
+    if (p.opens_access === true && p.user_id === userId) periods.set(p.order_id, p);
+  }
   if (!periods.size) return [];
 
   const ids = [...periods.keys()];
@@ -178,7 +175,9 @@ export async function collectBusinessPaymentHistoryRows(
     if (!order || order.order_kind !== "business_subscription") continue;
     if (order.status !== "paid" && order.status !== "refunded") continue;
     const scope = scopeByOrder.get(period.order_id) ?? null;
-    if (scope ? scope.organization_id !== organizationId : period.user_id !== userId || order.user_id !== userId) continue;
+    // The payer is always the caller; the snapshot (if any) is this organization.
+    if (period.user_id !== userId || order.user_id !== userId) continue;
+    if (scope && scope.organization_id !== organizationId) continue;
     const venueCount = scope && Array.isArray(scope.location_ids) ? scope.location_ids.length : 1;
     rows.push({
       orderId: period.order_id,

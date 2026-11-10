@@ -36,6 +36,8 @@ const scopes: PaymentHistoryScopeRow[] = [
   { order_id: "o-other-org", organization_id: ORG2, location_ids: [L1], unit_price_minor: 79900, partner_code_id: null },
   // Another account's organization.
   { order_id: "o-foreign", organization_id: ORG2, location_ids: [L1], unit_price_minor: 79900, partner_code_id: null },
+  // A co-owner (another account) of the SAME organization paid: still another account – never shown.
+  { order_id: "o-coowner", organization_id: ORG, location_ids: [L1], unit_price_minor: 79900, partner_code_id: null },
 ];
 const period = (order_id: string, user_id: string, applied_at: string, amount_minor: number, opens_access = true): PaymentHistoryPeriodRow => ({
   order_id, user_id, applied_at, amount_minor, opens_access,
@@ -50,6 +52,7 @@ const periods: PaymentHistoryPeriodRow[] = [
   period("o-other-org", OWNER, "2026-10-25T10:00:00Z", 79900),
   period("o-foreign", OTHER, "2026-10-26T10:00:00Z", 79900),
   period("o-foreign-legacy", OTHER, "2026-10-27T10:00:00Z", 79900),
+  period("o-coowner", OTHER, "2026-11-08T10:00:00Z", 79900),
 ];
 const orders: PaymentHistoryOrderRow[] = [
   ...periods.map((p) => ({ id: p.order_id, user_id: p.user_id, status: "paid", order_kind: "business_subscription", paid_at: p.applied_at })),
@@ -57,9 +60,7 @@ const orders: PaymentHistoryOrderRow[] = [
 
 const calls: string[] = [];
 const reader: PaymentHistoryReader = {
-  async scopesForOrganization(org) { calls.push(`scopesForOrganization:${org}`); return scopes.filter((s) => s.organization_id === org); },
   async scopesForOrders(ids) { return scopes.filter((s) => ids.includes(s.order_id)); },
-  async realPeriodsForOrders(ids) { return periods.filter((p) => ids.includes(p.order_id) && p.opens_access); },
   async realPeriodsForUser(user) { calls.push(`realPeriodsForUser:${user}`); return periods.filter((p) => p.user_id === user && p.opens_access); },
   async ordersByIds(ids) { return orders.filter((o) => ids.includes(o.id)); },
 };
@@ -67,19 +68,29 @@ const reader: PaymentHistoryReader = {
 async function main() {
 const rows = await collectBusinessPaymentHistoryRows(reader, { userId: OWNER, organizationId: ORG });
 assert.deepEqual(rows.map((r) => r.orderId).sort(), ["o-legacy", "o-partner", "o-refund", "o-standard"],
-  "own organization + own legacy only; no test payment, other organization or other account");
-assert.deepEqual(calls.sort(), [`realPeriodsForUser:${OWNER}`, `scopesForOrganization:${ORG}`], "queries are scoped to the caller");
+  "own organization + own legacy only; no test payment, other organization, co-owner or other account");
+assert.deepEqual(calls, [`realPeriodsForUser:${OWNER}`], "the only list read is scoped to the caller");
 assert.deepEqual(await collectBusinessPaymentHistoryRows(reader, { userId: "", organizationId: ORG }), []);
 assert.deepEqual(await collectBusinessPaymentHistoryRows(reader, { userId: OWNER, organizationId: "" }), []);
 
-// A reader that leaks rows still never shows another organization or account.
+// A reader that leaks rows still never shows another organization or account
+// (co-owner of the same organization included).
 const leaky: PaymentHistoryReader = {
   ...reader,
   async realPeriodsForUser() { return periods; },
-  async realPeriodsForOrders() { return periods; },
 };
 assert.deepEqual((await collectBusinessPaymentHistoryRows(leaky, { userId: OWNER, organizationId: ORG })).map((r) => r.orderId).sort(),
   ["o-legacy", "o-partner", "o-refund", "o-standard"], "defence in depth against a wide read");
+// Period says the caller, but the order was paid by another account: not shown.
+const mismatched: PaymentHistoryReader = {
+  ...reader,
+  async ordersByIds(ids) { return orders.filter((o) => ids.includes(o.id)).map((o) => (o.id === "o-standard" ? { ...o, user_id: OTHER } : o)); },
+};
+assert.ok(!(await collectBusinessPaymentHistoryRows(mismatched, { userId: OWNER, organizationId: ORG })).some((r) => r.orderId === "o-standard"));
+// The co-owner sees only their own payments: theirs for the shared organization and their own
+// legacy (no snapshot) payment – never the other organization's snapshot, never OWNER's payments.
+assert.deepEqual((await collectBusinessPaymentHistoryRows(reader, { userId: OTHER, organizationId: ORG })).map((r) => r.orderId).sort(),
+  ["o-coowner", "o-foreign-legacy"]);
 
 // A pending/failed order with a period row (should not exist) is not shown.
 const pendingReader: PaymentHistoryReader = {

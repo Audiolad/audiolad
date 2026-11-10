@@ -17,6 +17,7 @@ type Db = ReturnType<typeof createServiceRoleClient>;
 const SCOPE_COLUMNS = "order_id, organization_id, location_ids, unit_price_minor, partner_code_id";
 const PERIOD_COLUMNS = "order_id, user_id, period_start, period_end, amount_minor, opens_access, applied_at";
 const ID_CHUNK = 200;
+const PAGE = 1000;
 
 function chunks(ids: string[]): string[][] {
   const out: string[][] = [];
@@ -37,21 +38,21 @@ async function byIdChunks<T>(ids: string[], read: (part: string[]) => PromiseLik
 /** Read-only, service role: orders, business_subscription_periods, business_subscription_order_scopes. */
 export function createPaymentHistoryReader(db: Db): PaymentHistoryReader {
   return {
-    async scopesForOrganization(organizationId) {
-      return must<PaymentHistoryScopeRow>(await db.from("business_subscription_order_scopes")
-        .select(SCOPE_COLUMNS).eq("organization_id", organizationId).limit(1000));
-    },
     scopesForOrders(orderIds) {
       return byIdChunks<PaymentHistoryScopeRow>(orderIds, (part) =>
         db.from("business_subscription_order_scopes").select(SCOPE_COLUMNS).in("order_id", part));
     },
-    realPeriodsForOrders(orderIds) {
-      return byIdChunks<PaymentHistoryPeriodRow>(orderIds, (part) =>
-        db.from("business_subscription_periods").select(PERIOD_COLUMNS).in("order_id", part).eq("opens_access", true));
-    },
     async realPeriodsForUser(userId) {
-      return must<PaymentHistoryPeriodRow>(await db.from("business_subscription_periods")
-        .select(PERIOD_COLUMNS).eq("user_id", userId).eq("opens_access", true).limit(1000));
+      // Paged, newest first: a long history is never cut silently.
+      const rows: PaymentHistoryPeriodRow[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const page = must<PaymentHistoryPeriodRow>(await db.from("business_subscription_periods")
+          .select(PERIOD_COLUMNS).eq("user_id", userId).eq("opens_access", true)
+          .order("applied_at", { ascending: false }).order("order_id", { ascending: false })
+          .range(from, from + PAGE - 1));
+        rows.push(...page);
+        if (page.length < PAGE) return rows;
+      }
     },
     ordersByIds(orderIds) {
       return byIdChunks<PaymentHistoryOrderRow>(orderIds, (part) =>
