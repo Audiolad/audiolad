@@ -5,6 +5,8 @@ export const PLATFORM_OWNER_SALE_EMAIL = "1@audiolad.ru";
 
 export type AdminSaleBuyerKind = "self_purchase" | "external";
 
+export type AdminSaleAuthorLabel = "Автор" | "Заведение";
+
 export type AdminSaleListItem = {
   paymentId: string;
   orderId: string;
@@ -15,6 +17,8 @@ export type AdminSaleListItem = {
   productTitle: string;
   authorId: string | null;
   authorName: string;
+  /** «Автор» for author products; «Заведение» for АудиоЛад Бизнес subscriptions (t1345u). */
+  authorLabel: AdminSaleAuthorLabel;
   amountMinor: number;
   currency: string;
   paymentStatus: string;
@@ -175,6 +179,11 @@ export function buildAdminSaleBuyerName(
   }
 
   return "Покупатель";
+}
+
+/** List cell: the author name, or «Заведение: …» for АудиоЛад Бизнес (t1345u). */
+export function adminSaleAuthorText(sale: Pick<AdminSaleListItem, "authorLabel" | "authorName">): string {
+  return sale.authorLabel === "Автор" ? sale.authorName : `${sale.authorLabel}: ${sale.authorName}`;
 }
 
 export function buildPlatformOwnerSaleSubject(input: {
