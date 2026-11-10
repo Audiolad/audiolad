@@ -156,10 +156,10 @@ assertCoffeeExpertRegistry();
 const counts = countExperts();
 assert.equal(counts.foreignMen, 9);
 assert.equal(counts.foreignWomen, 10);
-assert.equal(counts.russianWomen, 6);
+assert.equal(counts.russianWomen, 7);
 assert.equal(counts.russianMen, 8);
-assert.equal(counts.total, 33);
-assert.equal(counts.women, 16);
+assert.equal(counts.total, 34);
+assert.equal(counts.women, 17);
 assert.equal(counts.men, 17);
 
 for (const expert of COFFEE_EXPERTS) {
