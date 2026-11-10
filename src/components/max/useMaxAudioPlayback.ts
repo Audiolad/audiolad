@@ -6,6 +6,7 @@ import {
   captureMaxRecoveryPosition,
   clampMaxSeek,
   decideMaxSignedUrlRecovery,
+  describeMaxPlayRejection,
   hasMaxAudioElementSource,
   isStaleMaxAudioRequest,
   maxTrackSwitchVisibleReset,
@@ -15,6 +16,7 @@ import {
   shouldApplyMaxSeekRestore,
   shouldIgnoreMaxTeardownMediaError,
   shouldPlayMaxAppliedSource,
+  shouldReflectMaxPlayEvent,
   shouldAdvanceAfterMaxPreviewEnd,
   shouldClearMaxPreviewEndedAfterSeek,
   shouldReplayMaxPreviewFromStart,
@@ -24,6 +26,7 @@ import {
   shouldRevokeMaxAudioObjectUrl,
   shouldStartMaxPrimaryPlayFetch,
   skipMaxPlayback,
+  unlockMaxAudioElementInGesture,
 } from "@/lib/max/max-audio-playback";
 import type { MaxPlaybackSession, MaxPlaybackTrack } from "@/lib/max/playback-types";
 
@@ -50,6 +53,17 @@ function playbackErrorMessage(reason: string): string {
     return "Предпрослушивание пока недоступно.";
   }
   return "Не удалось загрузить аудио.";
+}
+
+const PLAY_START_ERROR = "Не удалось начать воспроизведение.";
+
+function reportPlayRejection(error: unknown, stage: string) {
+  const diagnostic = describeMaxPlayRejection(
+    error,
+    typeof navigator === "undefined" ? null : navigator.userAgent,
+    stage,
+  );
+  console.warn("[max-playback] play rejected", diagnostic);
 }
 
 export function useMaxAudioPlayback({
@@ -180,8 +194,9 @@ export function useMaxAudioPlayback({
       if (shouldPlayNow) {
         try {
           await audio.play();
-        } catch {
-          setError("Не удалось начать воспроизведение.");
+        } catch (playError) {
+          reportPlayRejection(playError, "after_source");
+          setError(PLAY_START_ERROR);
           setIsPlaying(false);
         }
       }
@@ -268,16 +283,18 @@ export function useMaxAudioPlayback({
       intendedPlayingRef.current = true;
       audio.currentTime = 0;
       setCurrentTime(0);
-      void audio.play().catch(() => {
-        setError("Не удалось начать воспроизведение.");
+      void audio.play().catch((playError: unknown) => {
+        reportPlayRejection(playError, "replay");
+        setError(PLAY_START_ERROR);
       });
       return;
     }
 
     intendedPlayingRef.current = true;
     if (hasSource && audio) {
-      void audio.play().catch(() => {
-        setError("Не удалось начать воспроизведение.");
+      void audio.play().catch((playError: unknown) => {
+        reportPlayRejection(playError, "resume");
+        setError(PLAY_START_ERROR);
       });
       return;
     }
@@ -288,6 +305,11 @@ export function useMaxAudioPlayback({
       })
     ) {
       return;
+    }
+    // First press: no signed URL yet. Unlock the element inside this click so
+    // the play() after the fetch is allowed in desktop MAX.
+    if (audio) {
+      unlockMaxAudioElementInGesture(audio);
     }
     void loadTrack(trackIndex, true);
   }, [isPreparing, loadTrack, previewEnded, session.playbackMode, trackIndex]);
@@ -344,6 +366,10 @@ export function useMaxAudioPlayback({
         return;
       }
       intendedPlayingRef.current = true;
+      const audio = audioRef.current;
+      if (audio) {
+        unlockMaxAudioElementInGesture(audio);
+      }
       void loadTrack(index, true);
     },
     [loadTrack, tracks.length],
@@ -379,7 +405,12 @@ export function useMaxAudioPlayback({
 
     const onTime = () => setCurrentTime(audio.currentTime);
     const onDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      if (!shouldReflectMaxPlayEvent(hasMaxAudioElementSource(audio))) {
+        return;
+      }
+      setIsPlaying(true);
+    };
     const onPlaying = () => {
       setIsPlaying(true);
       hadPlayingRef.current = true;

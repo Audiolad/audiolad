@@ -277,7 +277,7 @@
     "test:practice-pdp-social-preview": "npx tsx scripts/practice-pdp-social-preview-unit.mjs",
     "test:public-request-origin": "npx tsx scripts/public-request-origin-unit.ts",
     "test:max-playlists": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-playlists-route-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-playlists-listing-unit.mjs && npx tsx scripts/max-playlists-ui-unit.mjs",
-    "test:max-audio-player": "npx tsx scripts/max-audio-player-unit.mjs && npx tsx scripts/max-multitrack-nav-unit.mjs",
+    "test:max-audio-player": "npx tsx scripts/max-audio-player-unit.mjs && npx tsx scripts/max-multitrack-nav-unit.mjs && npx tsx scripts/max-desktop-first-play-unit.mjs",
     "test:max-bottom-nav": "node scripts/max-bottom-nav-unit.mjs",
     "test:max-profile": "npx tsx scripts/max-profile-unit.mjs",
     "test:max-profile-route": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-profile-route-unit.mjs",
