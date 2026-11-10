@@ -6,6 +6,7 @@ import BusinessPlayerControls from "@/components/business-app/BusinessPlayerCont
 import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
 import {
+  hallMusicSilent,
   readReloadedBuildId,
   rememberReloadedBuildId,
   shouldReloadForNewBuild,
@@ -38,25 +39,23 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   const [view, setView] = useState<View>(() => ({ items: parseItems(initialManifest), status: "idle", current: null, message: null }));
   const [newBuild, setNewBuild] = useState(false);
   const pendingBuildRef = useRef<string | null>(null);
-  const justChangedTrackRef = useRef(false);
-  const lastTrackRef = useRef<string | null>(null);
 
-  // Newer deploy: reload only when visible and (paused OR right after a track change).
+  // Newer deploy (t1346u): reload only when visible and deliberately silent – never while music
+  // is meant to play, not even at a track boundary (autoplay after a reload needs a tap).
   useEffect(() => {
     const tryReload = () => {
       const pending = pendingBuildRef.current;
       if (!pending || typeof window === "undefined") return;
-      const audio = audioRef.current;
       const ctl = ctlRef.current;
-      const musicPaused = !audio || audio.paused || audio.ended
-        || !ctl || ctl.status === "paused" || ctl.status === "idle"
-        || ctl.status === "error" || ctl.status === "no_access";
+      const musicPaused = hallMusicSilent(
+        ctl ? { status: ctl.status, recovering: ctl.recovering } : null,
+        audioRef.current,
+      );
       const already = readReloadedBuildId(window.sessionStorage);
       const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
       if (!shouldReloadForNewBuild({
         pageVisible,
         musicPaused,
-        justChangedTrack: justChangedTrackRef.current,
         pendingServerBuild: pending,
         alreadyReloadedFor: already,
       })) return;
@@ -129,34 +128,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
             });
             const track = c.current?.audioItemId ?? null;
             if (c.status === "loading" || (c.status === "paused" && audio.paused) || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
-            if (track && track !== lastTrackRef.current) {
-              const hadPrevious = lastTrackRef.current != null;
-              lastTrackRef.current = track;
-              if (hadPrevious) {
-                justChangedTrackRef.current = true;
-                if (pendingBuildRef.current && typeof window !== "undefined") {
-                  const already = readReloadedBuildId(window.sessionStorage);
-                  const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
-                  if (shouldReloadForNewBuild({
-                    pageVisible,
-                    musicPaused: false,
-                    justChangedTrack: true,
-                    pendingServerBuild: pendingBuildRef.current,
-                    alreadyReloadedFor: already,
-                  })) {
-                    rememberReloadedBuildId(window.sessionStorage, pendingBuildRef.current);
-                    pendingBuildRef.current = null;
-                    window.location.reload();
-                    return;
-                  }
-                }
-                if (typeof window !== "undefined") {
-                  window.setTimeout(() => { justChangedTrackRef.current = false; }, 2_500);
-                } else {
-                  justChangedTrackRef.current = false;
-                }
-              }
-            }
+            // A track boundary is never a reload moment (t1346u): music is still meant to play.
             if (c.status !== lastState || track !== lastTrack) {
               lastState = c.status;
               lastTrack = track;
@@ -167,8 +139,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
               const pageVisible = typeof document === "undefined" || document.visibilityState === "visible";
               if (shouldReloadForNewBuild({
                 pageVisible,
-                musicPaused: true,
-                justChangedTrack: false,
+                musicPaused: hallMusicSilent({ status: c.status, recovering: c.recovering }, audio),
                 pendingServerBuild: pendingBuildRef.current,
                 alreadyReloadedFor: already,
               })) {

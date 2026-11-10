@@ -1,8 +1,12 @@
 /**
  * Hall / point device: after a deploy, open tabs keep the old JS until a reload.
  * Heartbeat carries the client build id; the server echoes the current one. A mismatch
- * triggers a reload only at a safe moment (visible + paused, or right after a track change),
- * never mid-track, with a sessionStorage guard against reload loops.
+ * triggers a reload only when the hall is deliberately silent (visible + paused / idle /
+ * no access) – NEVER while music is meant to play, not even at a track boundary: after a
+ * reload the browser blocks autoplay without a tap (iPhone, Samsung), so a boundary reload
+ * silenced both halls after the 2026-11-10 deploy (t1346u). A playing hall keeps its current
+ * JS until the next pause; the owner sees «Устройство на старой версии». A sessionStorage
+ * guard prevents reload loops.
  */
 
 /** Calm owner-home note (Russian, en dash). */
@@ -44,10 +48,17 @@ export function hallBuildMismatch(
 export type HallSafeReloadInput = {
   /** document.visibilityState === "visible" */
   pageVisible: boolean;
-  /** Music is paused / stopped / idle (not actively playing). */
+  /**
+   * The hall is deliberately silent: the player status is paused / idle / no_access and the
+   * element is not playing. Must come from the controller's intent (see hallMusicSilent),
+   * not from audio.paused alone – the element is briefly paused between two tracks.
+   */
   musicPaused: boolean;
-  /** Controller just advanced to another track (boundary, not mid-track). */
-  justChangedTrack: boolean;
+  /**
+   * Legacy (#1200): a track boundary used to allow a reload while playing. Ignored now –
+   * kept so older call sites type-check; a boundary is never a reason to reload.
+   */
+  justChangedTrack?: boolean;
   /** Server reported a newer build than this tab. */
   pendingServerBuild: string | null;
   /** Build id already reloaded for in this tab (sessionStorage). */
@@ -55,8 +66,8 @@ export type HallSafeReloadInput = {
 };
 
 /**
- * True only when a reload will not cut a track mid-play and will not loop.
- * Never reloads while music is playing unless we are at a track-change boundary.
+ * True only when a reload cannot stop the music and will not loop.
+ * Never reloads while music is meant to play – not mid-track, not at a track boundary.
  */
 export function shouldReloadForNewBuild(input: HallSafeReloadInput): boolean {
   const pending = normalizeHallAppVersion(input.pendingServerBuild);
@@ -64,8 +75,31 @@ export function shouldReloadForNewBuild(input: HallSafeReloadInput): boolean {
   const already = normalizeHallAppVersion(input.alreadyReloadedFor);
   if (already && already === pending) return false;
   if (!input.pageVisible) return false;
-  if (input.musicPaused) return true;
-  return input.justChangedTrack === true;
+  return input.musicPaused === true;
+}
+
+export type HallPlayerIntent = {
+  /** Controller status: "playing" | "loading" | "paused" | "idle" | "no_access" | "error". */
+  status: string | null | undefined;
+  /** Controller is auto-recovering (error / stall retry) – music is still meant to play. */
+  recovering?: boolean;
+};
+
+/**
+ * Deliberately silent hall: a reload here cannot stop music. Playing, loading, error
+ * (it retries / skips on its own) and any recovery all count as "music is meant to play".
+ * The element state is checked too: a paused status with a still-sounding element (fade)
+ * is not silent yet.
+ */
+export function hallMusicSilent(
+  ctl: HallPlayerIntent | null | undefined,
+  audio: { paused: boolean; ended: boolean } | null | undefined,
+): boolean {
+  if (!ctl) return !audio || audio.paused || audio.ended;
+  if (ctl.recovering === true) return false;
+  const status = ctl.status ?? "idle";
+  if (status !== "paused" && status !== "idle" && status !== "no_access") return false;
+  return !audio || audio.paused || audio.ended;
 }
 
 export function readReloadedBuildId(

@@ -11,6 +11,7 @@ import {
   HALL_BUILD_RELOAD_STORAGE_KEY,
   HALL_STALE_BUILD_NOTE,
   hallBuildMismatch,
+  hallMusicSilent,
   normalizeHallAppVersion,
   pickHallBuildId,
   readReloadedBuildId,
@@ -46,7 +47,7 @@ assert.equal(shouldReloadForNewBuild({
 assert.equal(shouldReloadForNewBuild({
   pageVisible: true, musicPaused: false, justChangedTrack: true,
   pendingServerBuild: SHA_B, alreadyReloadedFor: null,
-}), true, "track boundary + visible → reload");
+}), false, "t1346u: a track boundary while playing never reloads (autoplay after reload needs a tap)");
 
 assert.equal(shouldReloadForNewBuild({
   pageVisible: true, musicPaused: false, justChangedTrack: false,
@@ -99,7 +100,36 @@ assert.doesNotMatch(hallReload, /CLIENT_BUILD_TTL/);
 const cabinet = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(cabinet, /shouldReloadForNewBuild/);
 assert.match(cabinet, /resolveHallClientBuildId/);
-assert.match(cabinet, /justChangedTrack/);
+assert.doesNotMatch(cabinet, /justChangedTrack/, "t1346u: no boundary reload in the hall player");
+assert.match(cabinet, /hallMusicSilent/);
+assert.match(cabinet, /remotePausedRef/, "owner's remote pause keeps the hall on its build");
+
+const spa = readFileSync(new URL("../src/components/business-app/SpaOnlinePlayer.tsx", import.meta.url), "utf8");
+assert.doesNotMatch(spa, /justChangedTrack/, "t1346u: no boundary reload in the SPA player");
+assert.match(spa, /hallMusicSilent/);
+assert.doesNotMatch(spa, /musicPaused: (true|false)/, "never a hard-coded musicPaused");
+
+// t1346u: deliberate silence only. Every "music is meant to play" state blocks a reload.
+const quiet = { paused: true, ended: false };
+const sounding = { paused: false, ended: false };
+assert.equal(hallMusicSilent({ status: "paused" }, quiet), true, "user pause → silent");
+assert.equal(hallMusicSilent({ status: "idle" }, quiet), true);
+assert.equal(hallMusicSilent({ status: "no_access" }, quiet), true);
+assert.equal(hallMusicSilent({ status: "playing" }, quiet), false, "between two tracks the element is paused – still playing");
+assert.equal(hallMusicSilent({ status: "playing" }, { paused: true, ended: true }), false, "ended at a boundary – still playing");
+assert.equal(hallMusicSilent({ status: "loading" }, quiet), false, "next track loading");
+assert.equal(hallMusicSilent({ status: "error" }, quiet), false, "error retries / skips on its own");
+assert.equal(hallMusicSilent({ status: "paused", recovering: true }, quiet), false, "recovering");
+assert.equal(hallMusicSilent({ status: "paused" }, sounding), false, "pause fade still audible");
+for (const status of ["playing", "loading", "error"]) {
+  assert.equal(shouldReloadForNewBuild({
+    pageVisible: true,
+    musicPaused: hallMusicSilent({ status }, quiet),
+    justChangedTrack: true,
+    pendingServerBuild: SHA_B,
+    alreadyReloadedFor: null,
+  }), false, `no reload while ${status}`);
+}
 assert.match(cabinet, /appVersion:/);
 
 const slots = readFileSync(new URL("../src/components/business-app/BusinessPointSlots.tsx", import.meta.url), "utf8");

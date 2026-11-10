@@ -21,6 +21,7 @@ import { createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, wri
 import { HallReportQueue } from "@/lib/business-app/hall-report-queue";
 import {
   hallBuildMismatch,
+  hallMusicSilent,
   readReloadedBuildId,
   rememberReloadedBuildId,
   resolveHallClientBuildId,
@@ -455,23 +456,26 @@ export function BusinessCabinetPlayerProvider({
   }, [reportPlayback]);
 
   // Stale-build reload: heartbeat carries client build id; server echoes current.
-  // Reload only when visible and (paused OR right after a track change); never mid-track.
+  // t1346u: reload ONLY while the hall is deliberately silent (paused / idle / no access) and
+  // visible. Never while music is meant to play – not even at a track boundary: after a reload
+  // iPhone and Samsung block autoplay without a tap, so the hall would go quiet.
   const pendingBuildRef = useRef<string | null>(null);
   const lastTrackForReloadRef = useRef<string | null>(null);
-  const justChangedTrackRef = useRef(false);
+  // Paused from the owner's phone: the owner will resume remotely, and a reloaded page could
+  // not start music without a tap in the hall. Stay on this build until a local tap.
+  const remotePausedRef = useRef(false);
   const trySafeBuildReload = useCallback(() => {
     const pending = pendingBuildRef.current;
-    if (!pending) return;
-    const audio = audioRef.current;
+    if (!pending || remotePausedRef.current) return;
     const ctl = ctlRef.current;
-    const musicPaused = !audio || audio.paused || audio.ended
-      || !ctl || ctl.status === "paused" || ctl.status === "idle"
-      || ctl.status === "error" || ctl.status === "no_access";
+    const musicPaused = hallMusicSilent(
+      ctl ? { status: ctl.status, recovering: ctl.recovering } : null,
+      audioRef.current,
+    );
     const already = readReloadedBuildId(typeof window !== "undefined" ? window.sessionStorage : null);
     if (!shouldReloadForNewBuild({
       pageVisible: typeof document !== "undefined" && document.visibilityState === "visible",
       musicPaused,
-      justChangedTrack: justChangedTrackRef.current,
       pendingServerBuild: pending,
       alreadyReloadedFor: already,
     })) return;
@@ -480,7 +484,6 @@ export function BusinessCabinetPlayerProvider({
       pending,
     );
     pendingBuildRef.current = null;
-    justChangedTrackRef.current = false;
     // localStorage playback restore (readLocal) keeps the queue position across the reload.
     window.location.reload();
   }, []);
@@ -654,12 +657,8 @@ export function BusinessCabinetPlayerProvider({
             const hadPrevious = lastTrackForReloadRef.current != null;
             lastTrackForReloadRef.current = trackId;
             recentPlayedRef.current = rememberPlayedId(recentPlayedRef.current, trackId);
-            // Boundary only: first start is not a "track change" for reload purposes.
+            // A track boundary is never a reload moment (t1346u): music is still meant to play.
             if (hadPrevious) {
-              justChangedTrackRef.current = true;
-              trySafeBuildReload();
-              // Clear the boundary flag shortly so mid-track never reloads.
-              window.setTimeout(() => { justChangedTrackRef.current = false; }, 2_500);
               // Near the end of the unique queue: rebuild between tracks (locked iPhone safe).
               tryQueueTopUpRef.current();
             }
@@ -838,6 +837,7 @@ export function BusinessCabinetPlayerProvider({
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
+    remotePausedRef.current = false;
     const index = playbackRef.current.index;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
@@ -858,6 +858,7 @@ export function BusinessCabinetPlayerProvider({
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
+    remotePausedRef.current = false;
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
@@ -936,9 +937,11 @@ export function BusinessCabinetPlayerProvider({
             if (type !== "pause") await waitWhileLoading(() => ctlRef.current?.status ?? "idle", POINT_RESUME_SETTLE_MS);
             const status = ctlRef.current?.status;
             const audio = audioRef.current;
-            return !!audio && (type === "pause"
+            const done = !!audio && (type === "pause"
               ? (status === "paused" || status === "idle") && audio.paused
               : status === "playing" && !audio.paused);
+            if (type === "pause" && done) remotePausedRef.current = true;
+            return done;
           },
           ack: async (command) => {
             const ack = await fetch("/api/business/point", {
