@@ -115,7 +115,7 @@ export async function saveBusinessTimezone(input: { timezone: string }) {
  */
 export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) {
   const receiptEmail = normalizeBusinessReceiptEmail(input?.receiptEmail);
-  if (!receiptEmail) return { ok: false, error: "Укажите почту в виде name@example.ru." } as const;
+  if (!receiptEmail) return { ok: false, error: "Проверьте почту – похоже, в адресе ошибка." } as const;
   if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
     return { ok: false, error: "Почту для чеков меняет владелец в личном кабинете." } as const;
   }

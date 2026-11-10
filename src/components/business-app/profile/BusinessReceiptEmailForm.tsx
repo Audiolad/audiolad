@@ -22,7 +22,7 @@ export default function BusinessReceiptEmailForm({ receiptEmail }: { receiptEmai
     event.preventDefault();
     setMessage(""); setError("");
     const email = normalizeBusinessReceiptEmail(value);
-    if (!email) { setError("Укажите почту в виде name@example.ru."); return; }
+    if (!email) { setError("Проверьте почту – похоже, в адресе ошибка."); return; }
     setBusy(true);
     try {
       const result = await saveBusinessReceiptEmail({ receiptEmail: email });
