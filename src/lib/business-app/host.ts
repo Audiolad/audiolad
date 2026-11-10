@@ -74,6 +74,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/team": `${BUSINESS_SITE_PATH}/team`,
   "/preferences": `${BUSINESS_SITE_PATH}/settings`,
   "/profile": `${BUSINESS_SITE_PATH}/profile`,
+  // t1342u: owner «История оплат» (owner-only like /profile, see BUSINESS_OWNER_ONLY_PATHS).
+  "/profile/payments": `${BUSINESS_SITE_PATH}/profile/payments`,
   "/help": `${BUSINESS_SITE_PATH}/help`,
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
   // 8142d69a: personal partner link (?code=…). Keep forever: links are sent to people.
