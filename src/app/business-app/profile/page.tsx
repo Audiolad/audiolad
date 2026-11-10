@@ -112,6 +112,9 @@ export default async function BusinessProfilePage() {
             <BusinessTimezoneForm timezone={domain.location.timezone || "Europe/Moscow"}
               currentLabel={businessTimezoneLabel(domain.location.timezone || "Europe/Moscow")} />
           ) : null}
+          {domain.status === "authenticated" && domain.needsReceiptEmail ? (
+            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
+          ) : null}
           {domain.location ? null : (
             <p>
               <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href="/onboarding">
@@ -119,9 +122,6 @@ export default async function BusinessProfilePage() {
               </Link>
             </p>
           )}
-          {domain.status === "authenticated" && domain.needsReceiptEmail ? (
-            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
-          ) : null}
           <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()} />
           <SignOutForm action={signOut}>
             <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
