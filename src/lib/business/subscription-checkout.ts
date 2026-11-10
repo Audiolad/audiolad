@@ -42,14 +42,42 @@ export function normalizeBusinessReceiptEmail(raw: unknown): string | null {
   return RECEIPT_EMAIL_PATTERN.test(email) ? email : null;
 }
 
+/** user_metadata key for the receipt email of an account without its own email (t1343u). */
+export const BUSINESS_RECEIPT_EMAIL_META_KEY = "receipt_email";
+
+/** The remembered receipt email from auth user_metadata, or null. */
+export function savedBusinessReceiptEmail(meta: unknown): string | null {
+  if (!meta || typeof meta !== "object") return null;
+  return normalizeBusinessReceiptEmail((meta as Record<string, unknown>)[BUSINESS_RECEIPT_EMAIL_META_KEY]);
+}
+
 /**
- * The account email wins. Without it the email typed for the receipt is used.
- * Nothing is stored: the address only goes to the payment provider for the receipt.
+ * The account email wins. Without it the email typed for the receipt is used, then the
+ * remembered one (auth user_metadata.receipt_email, t1343u).
  */
-export function resolveBusinessReceiptEmail(accountEmail: string | null | undefined, typed: unknown): string | null {
+export function resolveBusinessReceiptEmail(
+  accountEmail: string | null | undefined,
+  typed: unknown,
+  saved: string | null = null,
+): string | null {
   const account = accountEmail?.trim() ?? "";
   if (account) return account;
-  return normalizeBusinessReceiptEmail(typed);
+  return normalizeBusinessReceiptEmail(typed) ?? normalizeBusinessReceiptEmail(saved);
+}
+
+/**
+ * Which receipt email to remember after a checkout start: only for an account without its
+ * own email, only a valid one, only when it differs from what is already saved.
+ */
+export function businessReceiptEmailToRemember(
+  accountEmail: string | null | undefined,
+  used: string,
+  saved: string | null,
+): string | null {
+  if (accountEmail?.trim()) return null;
+  const email = normalizeBusinessReceiptEmail(used);
+  if (!email || email === normalizeBusinessReceiptEmail(saved)) return null;
+  return email;
 }
 
 /** The payer is the owner account, and only from a browser that is not the hall device. */

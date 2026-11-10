@@ -8,6 +8,10 @@ import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server
 import { validateBusinessProfile } from "@/lib/business-app/profile";
 import { isVenueTimezone } from "@/lib/business-app/venue-timezones";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  BUSINESS_RECEIPT_EMAIL_META_KEY,
+  normalizeBusinessReceiptEmail,
+} from "@/lib/business/subscription-checkout";
 
 /**
  * Saves the owner name and required surname (auth user_metadata.first_name / last_name) and the
@@ -102,4 +106,26 @@ export async function saveBusinessTimezone(input: { timezone: string }) {
     .update({ timezone }).eq("id", location.id).eq("organization_id", location.organizationId);
   if (error) return { ok: false, error: "Не удалось сохранить часовой пояс. Попробуйте ещё раз." } as const;
   return { ok: true, timezone } as const;
+}
+
+/**
+ * «Почта для чеков» (t1343u): an owner account without its own email keeps the receipt
+ * address in auth user_metadata.receipt_email. The checkout uses it when nothing else is
+ * typed and remembers a newly typed one. An account with its own email gets receipts there.
+ */
+export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) {
+  const receiptEmail = normalizeBusinessReceiptEmail(input?.receiptEmail);
+  if (!receiptEmail) return { ok: false, error: "Укажите почту в виде name@example.ru." } as const;
+  if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
+    return { ok: false, error: "Почту для чеков меняет владелец в личном кабинете." } as const;
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Войдите в аккаунт ещё раз." } as const;
+  if (user.email?.trim()) {
+    return { ok: false, error: "Чеки приходят на почту аккаунта." } as const;
+  }
+  const { error } = await supabase.auth.updateUser({ data: { [BUSINESS_RECEIPT_EMAIL_META_KEY]: receiptEmail } });
+  if (error) return { ok: false, error: "Не удалось сохранить почту. Попробуйте ещё раз." } as const;
+  return { ok: true, receiptEmail } as const;
 }

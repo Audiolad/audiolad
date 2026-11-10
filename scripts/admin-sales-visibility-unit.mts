@@ -42,7 +42,7 @@ import {
   renderPlatformOwnerSaleEmailText,
 } from "@/lib/email/templates/platform-owner-sale";
 import { brandEmailTemplateRenderer } from "@/lib/email/templates/renderer";
-import { notifyPlatformOwnerOfConfirmedSale } from "@/lib/payments/notify-platform-owner-sale";
+import { notifyPlatformOwnerOfConfirmedSale, resolveOwnerSaleBuyer } from "@/lib/payments/notify-platform-owner-sale";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -652,6 +652,91 @@ async function testOwnerSaleEmailTemplate() {
   }
 }
 
+// t1344u: a guest-start АудиоЛад Бизнес owner has no account email and no profiles.full_name.
+async function testBusinessOwnerSaleBuyerAndOrganization() {
+  assert.deepEqual(
+    resolveOwnerSaleBuyer({ profileFullName: "Анна", profileEmail: "anna@example.test", authUser: null }),
+    { buyerName: "Анна", buyerEmail: "anna@example.test" },
+  );
+  assert.deepEqual(
+    resolveOwnerSaleBuyer({
+      profileFullName: null,
+      profileEmail: null,
+      authUser: { email: null, user_metadata: { first_name: "Иван", last_name: "Тестов", receipt_email: "Owner@Example.Test" } },
+    }),
+    { buyerName: "Иван Тестов", buyerEmail: "owner@example.test" },
+  );
+  assert.deepEqual(
+    resolveOwnerSaleBuyer({ profileFullName: "", profileEmail: "", authUser: { email: "acc@example.test", user_metadata: {} } }),
+    { buyerName: "acc", buyerEmail: "acc@example.test" },
+  );
+  assert.deepEqual(
+    resolveOwnerSaleBuyer({ profileFullName: null, profileEmail: null, authUser: null }),
+    { buyerName: "Покупатель", buyerEmail: null },
+  );
+
+  const rows: Record<string, unknown> = {
+    payments: { id: SALE.paymentId, order_id: SALE.orderId, status: "succeeded", amount_minor: 79800, currency: "RUB",
+      confirmed_at: SALE.paidAt, created_at: SALE.paidAt, is_test: false },
+    orders: { id: SALE.orderId, user_id: SALE.buyerUserId, status: "paid", practice_title_snapshot: "АудиоЛад Бизнес – доступ на 30 дней",
+      author_id_snapshot: null, paid_at: SALE.paidAt, checkout_origin_path: null, order_kind: "business_subscription" },
+    profiles: { id: SALE.buyerUserId, email: null, full_name: null },
+    business_organization_members: { organization_id: "org-1", created_at: SALE.paidAt },
+    business_organizations: { id: "org-1", name: "Кофейня Тест" },
+  };
+  const makeClient = (organization: boolean) => ({
+    from(table: string) {
+      const chain = {
+        select() { return chain; },
+        eq() { return chain; },
+        order() { return chain; },
+        limit() { return chain; },
+        maybeSingle: async () => ({ data: organization || !table.startsWith("business_") ? rows[table] ?? null : null, error: null }),
+      };
+      return chain;
+    },
+    auth: { admin: { getUserById: async () => ({
+      data: { user: { email: null, user_metadata: { first_name: "Иван", last_name: "Тестов", receipt_email: "owner@example.test" } } },
+      error: null,
+    }) } },
+  });
+  for (const organization of [true, false]) {
+    const calls: Array<Record<string, unknown>> = [];
+    await notifyPlatformOwnerOfConfirmedSale({
+      paymentId: SALE.paymentId,
+      orderId: SALE.orderId,
+      supabase: makeClient(organization) as never,
+      send: async (input) => { calls.push(input as never); return { ok: true }; },
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].buyerName, "Иван Тестов");
+    assert.equal(calls[0].buyerEmail, "owner@example.test");
+    assert.equal(calls[0].authorLabel, "Заведение");
+    assert.equal(calls[0].authorName, organization ? "Кофейня Тест" : null);
+    const text = renderPlatformOwnerSaleEmailText(calls[0] as never);
+    assert.match(text, /Покупатель: Иван Тестов/);
+    assert.match(text, /Email покупателя: owner@example\.test/);
+    assert.doesNotMatch(text, /Автор:/);
+    if (organization) assert.match(text, /Заведение: Кофейня Тест/);
+    else assert.doesNotMatch(text, /Заведение:/);
+  }
+
+  const rendered = await brandEmailTemplateRenderer.render({
+    templateKey: "platform_owner_sale",
+    templateVersion: "platform-owner-sale-v1-20260821",
+    payload: {
+      productTitle: "АудиоЛад Бизнес – доступ на 30 дней", authorName: "Кофейня Тест", authorLabel: "Заведение",
+      amountMinor: 79800, buyerName: "Иван Тестов", buyerEmail: "owner@example.test", paidAt: SALE.paidAt,
+      orderId: SALE.orderId, paymentId: SALE.paymentId, paymentStatus: "Оплачено",
+    },
+  });
+  assert.equal(rendered.ok, true);
+  if (rendered.ok) {
+    assert.match(rendered.text ?? "", /Заведение: Кофейня Тест/);
+    assert.doesNotMatch(rendered.text ?? "", /Автор:/);
+  }
+}
+
 async function main() {
   await testNotifyOnlyOnConfirmedSuccess();
   await testDuplicateWebhookDoesNotSendSecondEmail();
@@ -660,6 +745,7 @@ async function main() {
   testThirdPartyAuthorProductDisplayed();
   testCheckoutAndPaymentSuccessPathStillWorks();
   await testOwnerSaleEmailTemplate();
+  await testBusinessOwnerSaleBuyerAndOrganization();
   console.log("admin-sales-visibility-unit: ok");
 }
 

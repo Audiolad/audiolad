@@ -19,6 +19,11 @@ export const PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_VERSION =
 export type PlatformOwnerSaleEmailInput = {
   productTitle: string;
   authorName: string | null;
+  /**
+   * Set for orders without an author (АудиоЛад Бизнес, t1344u): replaces «Автор» with this
+   * label; the line is left out when authorName is empty.
+   */
+  authorLabel?: string | null;
   amountMinor: number;
   currency?: string;
   buyerName: string;
@@ -68,9 +73,13 @@ function formatPaidAt(value: string): string {
 }
 
 function saleLines(input: PlatformOwnerSaleEmailInput): string[] {
+  const authorLabel = input.authorLabel?.trim();
+  const authorName = input.authorName?.trim();
   const lines = [
     `Продукт: ${input.productTitle.trim() || "Продукт"}`,
-    `Автор: ${input.authorName?.trim() || "—"}`,
+    ...(authorLabel
+      ? (authorName ? [`${authorLabel}: ${authorName}`] : [])
+      : [`Автор: ${authorName || "—"}`]),
     `Сумма: ${formatAdminSaleAmount(input.amountMinor, input.currency ?? "RUB")}`,
     `Покупатель: ${input.buyerName.trim() || "Покупатель"}`,
     `Email покупателя: ${input.buyerEmail?.trim() || "—"}`,

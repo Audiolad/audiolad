@@ -571,6 +571,7 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
       const currency = readString(input.payload, "currency") ?? undefined;
       const authorName = readString(input.payload, "authorName");
+      const authorLabel = readString(input.payload, "authorLabel");
       const buyerEmail = readString(input.payload, "buyerEmail");
       const checkoutOriginPath = readString(input.payload, "checkoutOriginPath");
 
@@ -584,6 +585,7 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
         html: renderPlatformOwnerSaleEmailHtml({
           productTitle,
           authorName,
+          authorLabel,
           amountMinor: amountMinorRaw,
           currency,
           buyerName,
@@ -598,6 +600,7 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
         text: renderPlatformOwnerSaleEmailText({
           productTitle,
           authorName,
+          authorLabel,
           amountMinor: amountMinorRaw,
           currency,
           buyerName,

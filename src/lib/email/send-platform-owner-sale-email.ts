@@ -84,6 +84,7 @@ export async function sendPlatformOwnerSaleEmail(
     payload: {
       productTitle: input.productTitle,
       authorName: input.authorName,
+      authorLabel: input.authorLabel,
       amountMinor: input.amountMinor,
       currency: input.currency,
       buyerName: input.buyerName,
