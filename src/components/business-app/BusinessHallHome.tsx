@@ -7,6 +7,7 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import { useBusinessCabinetMode, useBusinessEntry } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
 import { hasLiveBusinessAccess, type BusinessChromeAccess } from "@/lib/access-grants/access-line";
+import { HALL_WAKE_LOCK_HINT } from "@/lib/business-app/hall-wake-lock";
 
 /** The hall never discloses access dates or why renewal is needed. */
 export function businessHallAccessNotice(access: BusinessChromeAccess | null): { kind: "expired" | "grace"; text: string } | null {
@@ -47,6 +48,11 @@ export default function BusinessHallHome() {
         <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
           Музыка в зале.
         </p>
+        {cabinet.mode === "point" ? (
+          <p className="mt-1 max-w-2xl text-[0.9rem] leading-snug text-[var(--biz-text-muted)]" data-testid="biz-hall-wake-hint">
+            {HALL_WAKE_LOCK_HINT}
+          </p>
+        ) : null}
       </header>
       <div className="business-app-owner-home space-y-4">
         {notice ? (
