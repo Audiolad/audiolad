@@ -122,7 +122,8 @@ export default async function BusinessProfilePage() {
               </Link>
             </p>
           )}
-          <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()} />
+          <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()}
+            showPaymentHistory={membership?.role === "owner"} />
           <SignOutForm action={signOut}>
             <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
               Выйти

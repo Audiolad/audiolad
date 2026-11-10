@@ -1,14 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BusinessPayControls, useBusinessHomePay } from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessPartnerCodePanel from "@/components/business-app/BusinessPartnerCodePanel";
 import { BusinessPartnerHomeBanner } from "@/components/business-app/BusinessPartnerPrice";
 import { usePartnerQuote } from "@/components/business-app/partner-quote-store";
+import { BUSINESS_PAYMENT_HISTORY_HREF, BUSINESS_PAYMENT_HISTORY_LINK_LABEL } from "@/lib/business-app/payment-history";
 import { businessProfileSubscription } from "@/lib/business-app/profile-subscription";
 
 // The offer state comes from the shared domain (useBusinessHomePay); the prop is kept for the page call.
-export default function BusinessProfileSubscription({ timezone, nowIso }: { timezone: string; nowIso: string; offerAccepted?: boolean }) {
+export default function BusinessProfileSubscription({ timezone, nowIso, showPaymentHistory = false }: {
+  timezone: string;
+  nowIso: string;
+  offerAccepted?: boolean;
+  /** Owner only (t1342u): «История оплат» right under «Продлить» / «Оплатить». */
+  showPaymentHistory?: boolean;
+}) {
   const { access, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } = useBusinessHomePay();
   const quote = usePartnerQuote(canPay);
   const [now, setNow] = useState(() => new Date(nowIso));
@@ -28,6 +36,13 @@ export default function BusinessProfileSubscription({ timezone, nowIso }: { time
       <BusinessPayControls canPay={canPay} accepted={accepted} busy={busy} error={error}
         onAccept={accept} onPay={pay} payLabel={summary.button} buttonVariant="cta" showAcceptedNote
         receiptEmail={askReceiptEmail ? { value: receiptEmail, onChange: setReceiptEmail } : null} />
+      {showPaymentHistory ? (
+        <p>
+          <Link className="underline" href={BUSINESS_PAYMENT_HISTORY_HREF} data-testid="biz-profile-payment-history-link">
+            {BUSINESS_PAYMENT_HISTORY_LINK_LABEL}
+          </Link>
+        </p>
+      ) : null}
       <BusinessPartnerCodePanel canPay={canPay} />
     </section>
   );
