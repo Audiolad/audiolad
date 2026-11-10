@@ -106,6 +106,7 @@ import { MOLITVA_ANGELU_HRANITELYU_SLUSHAT_ONLAYN_ARTICLE } from "./content/moli
 import { MOLITVA_ANGELU_HRANITELYU_SLUSHAT_BESPLATNO_ARTICLE } from "./content/molitva-angelu-hranitelyu-slushat-besplatno";
 import { MOLITVA_ANGELU_HRANITELYU_AUDIO_ARTICLE } from "./content/molitva-angelu-hranitelyu-audio";
 import { KAK_PRIZVAT_ANGELA_HRANITELYA_ARTICLE } from "./content/kak-prizvat-angela-hranitelya";
+import { KAK_PERESTAT_SRAVNIVAT_SEBYA_S_DRUGIMI_ARTICLE } from "./content/kak-perestat-sravnivat-sebya-s-drugimi";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -217,6 +218,7 @@ const ARTICLE_DEFINITIONS = [
   MOLITVA_ANGELU_HRANITELYU_SLUSHAT_BESPLATNO_ARTICLE,
   MOLITVA_ANGELU_HRANITELYU_AUDIO_ARTICLE,
   KAK_PRIZVAT_ANGELA_HRANITELYA_ARTICLE,
+  KAK_PERESTAT_SRAVNIVAT_SEBYA_S_DRUGIMI_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
