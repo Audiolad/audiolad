@@ -119,7 +119,7 @@ assert.equal(resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/api/business/player
 }
 
 // The /spa player no longer depends on build-specific server actions.
-// Safe reload is gated by shouldReloadForNewBuild (paused / track boundary only).
+// Safe reload is gated by shouldReloadForNewBuild (deliberately silent only, never at a track boundary – t1346u).
 const player = readFileSync("src/components/business-app/SpaOnlinePlayer.tsx", "utf8");
 assert.doesNotMatch(player, /spa\/actions/);
 assert.match(player, /shouldReloadForNewBuild/);
