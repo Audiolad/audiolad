@@ -33,7 +33,7 @@ import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrd
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio } from "@/lib/business-app/player-fade";
 import { prepareLoopAudio } from "@/lib/business-app/hall-loop-audio";
-import { HallWakeLock, hallWantsScreenAwake, type WakeLockNavigator } from "@/lib/business-app/hall-wake-lock";
+import { HallWakeIntentTracker, HallWakeLock, type WakeLockNavigator } from "@/lib/business-app/hall-wake-lock";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
@@ -473,12 +473,16 @@ export function BusinessCabinetPlayerProvider({
   // Android battery saving cannot freeze the page between two tracks. Screen-only: it never
   // touches the audio element, the build reload above, the iPhone handoff or the fades.
   const wakeLockRef = useRef<HallWakeLock | null>(null);
+  /** Deliberate pause / start in flight – what the controller itself does not know. */
+  const wakeIntentRef = useRef(new HallWakeIntentTracker());
   const syncWakeLock = useCallback(() => {
-    const lock = wakeLockRef.current;
-    if (!lock) return;
-    const ctl = ctlRef.current;
-    lock.setWanted(hallWantsScreenAwake(ctl ? { ...hallIntentOf(ctl), status: ctl.status, remotePaused: remotePausedRef.current } : null));
+    wakeLockRef.current?.setWanted(wakeIntentRef.current.wanted(ctlRef.current, remotePausedRef.current));
   }, []);
+  /** Wrap a start so the screen stays on while the play promise is pending (review #1213 F3). */
+  const wakeWhileStarting = useCallback(
+    (run: () => Promise<void>) => wakeIntentRef.current.whileStarting(run, syncWakeLock),
+    [syncWakeLock],
+  );
   useEffect(() => {
     if (!canBeat || typeof navigator === "undefined" || typeof document === "undefined") return;
     const lock = new HallWakeLock(navigator as unknown as WakeLockNavigator, document);
@@ -700,6 +704,8 @@ export function BusinessCabinetPlayerProvider({
             void bufferRef.current?.purge();
             reportQueueRef.current?.clear();
           } else bufferPlanRef.current();
+          // Any fresh start (also one not wrapped below) ends a deliberate pause.
+          wakeIntentRef.current.observe(current.status);
           syncWakeLock();
           if (current.status === "paused" || current.status === "idle") {
             trySafeBuildReload();
@@ -865,38 +871,46 @@ export function BusinessCabinetPlayerProvider({
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     remotePausedRef.current = false;
-    syncWakeLock();
     const index = playbackRef.current.index;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
     if (ctl.status === "playing" || ctl.status === "loading") {
+      // Deliberate pause (here or from the owner's phone): the screen may go dark.
+      wakeIntentRef.current.markPaused();
+      syncWakeLock();
       await ctl.toggle();
     } else if (ctl.status === "paused" && ctl.current) {
-      await ctl.toggle();
+      await wakeWhileStarting(() => ctl.toggle());
     } else {
-      await ctl.playIndex(index);
+      await wakeWhileStarting(() => ctl.playIndex(index));
     }
     // Mid skip the element still holds the previous track's time: the chosen one starts at 0.
     const positionSec = ctl.fadingOutPrevious ? 0 : (audioRef.current?.currentTime ?? 0);
     remember({ index: ctl.index < 0 ? index : ctl.index, positionSec }, ctl.status === "playing");
     reportPlayback();
-  }, [remember, reportPlayback, syncWakeLock]);
+  }, [remember, reportPlayback, syncWakeLock, wakeWhileStarting]);
 
   const next = useCallback(async (signal?: AbortSignal) => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !accessRef.current?.allowsPlayback()) return;
     remotePausedRef.current = false;
-    syncWakeLock();
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
-    if (soundInstallRef.current) await soundInstallRef.current;
-    if (signal?.aborted) return;
-    await ctl.next();
+    let aborted = false;
+    await wakeWhileStarting(async () => {
+      if (soundInstallRef.current) await soundInstallRef.current;
+      if (signal?.aborted) {
+        aborted = true;
+        return;
+      }
+      await ctl.next();
+    });
+    if (aborted) return;
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
-  }, [remember, reportPlayback, syncWakeLock]);
+  }, [remember, reportPlayback, wakeWhileStarting]);
 
   const previous = useCallback(async () => {
     const ctl = ctlRef.current;
@@ -910,11 +924,13 @@ export function BusinessCabinetPlayerProvider({
       const shown = playbackRef.current.index;
       if (shown >= 0 && shown < current.tracks.length) ctl.index = shown;
     }
-    if (soundInstallRef.current) await soundInstallRef.current;
-    await ctl.previous();
+    await wakeWhileStarting(async () => {
+      if (soundInstallRef.current) await soundInstallRef.current;
+      await ctl.previous();
+    });
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
-  }, [remember, reportPlayback]);
+  }, [remember, reportPlayback, wakeWhileStarting]);
 
   useEffect(() => {
     toggleRef.current = toggle;
@@ -1113,10 +1129,10 @@ export function BusinessCabinetPlayerProvider({
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
-    await ctlRef.current?.playIndex(index);
+    await wakeWhileStarting(async () => { await ctlRef.current?.playIndex(index); });
     remember({ index, positionSec: 0 }, true);
     reportPlayback();
-  }, [remember, reportPlayback]);
+  }, [remember, reportPlayback, wakeWhileStarting]);
 
   const setVolume = useCallback((value: number) => {
     remember({ volume: value }, false);
@@ -1448,6 +1464,9 @@ export function BusinessCabinetPlayerProvider({
     const audio = audioRef.current;
     const fader = fadeRef.current;
     setBarDismissed(true);
+    // Closing the bar is a deliberate stop: the hall screen may go dark.
+    wakeIntentRef.current.markPaused();
+    syncWakeLock();
     if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
       await ctl.toggle();
     }
@@ -1460,7 +1479,7 @@ export function BusinessCabinetPlayerProvider({
       audio.removeAttribute("src");
       audio.load();
     }
-  }, []);
+  }, [syncWakeLock]);
 
   const revealNowPlaying = useCallback(() => {
     document.querySelector("[data-testid='biz-now-playing']")?.scrollIntoView({ behavior: "smooth", block: "start" });

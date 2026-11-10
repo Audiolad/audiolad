@@ -7,8 +7,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
+import { FadingAudio } from "../src/lib/business-app/player-fade";
 import {
   HALL_WAKE_LOCK_HINT,
+  HallWakeIntentTracker,
   HallWakeLock,
   hallWakeLockSupported,
   hallWantsScreenAwake,
@@ -30,6 +33,14 @@ assert.equal(hallWantsScreenAwake({ status: "paused", resumePending: true }), tr
 assert.equal(hallWantsScreenAwake({ status: "paused", remotePaused: true }), true, "owner pause keeps commands alive");
 assert.equal(hallWantsScreenAwake({ status: "idle", remotePaused: true }), false);
 assert.equal(hallWantsScreenAwake({ status: "no_access", recovering: true, remotePaused: true }), false, "no access always releases");
+assert.equal(hallWantsScreenAwake({ status: "idle", needsGesture: true, resumePending: true, resuming: true }), false, "idle always releases (review F2)");
+assert.equal(hallWantsScreenAwake({ status: "paused", needsGesture: true, localPaused: true }), false, "deliberate pause beats a stale autoplay flag (F2)");
+assert.equal(hallWantsScreenAwake({ status: "paused", resumePending: true, localPaused: true }), false, "deliberate pause beats a stale restore flag (F1)");
+assert.equal(hallWantsScreenAwake({ status: "error", localPaused: true }), false);
+assert.equal(hallWantsScreenAwake({ status: "paused", resuming: true }), true, "start in flight (F3)");
+assert.equal(hallWantsScreenAwake({ status: "paused", resuming: true, localPaused: true }), true, "a new start wins");
+assert.equal(hallWantsScreenAwake({ status: "paused", localPaused: true, remotePaused: true }), true, "owner pause keeps the page alive");
+assert.equal(hallWantsScreenAwake({ status: "playing", localPaused: true }), true, "playing always holds");
 
 // --- fakes ---
 type FakeSentinel = { released: boolean; release: () => Promise<void>; addEventListener: (t: "release", fn: () => void) => void; fire: () => void };
@@ -201,6 +212,195 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
   await flush();
   assert.equal(throwing.held, false);
   throwing.dispose();
+}
+
+// A synchronous throw once must not block later requests (review F4).
+{
+  const env = fakeEnv();
+  const real = env.nav.wakeLock!.request;
+  let calls = 0;
+  env.nav.wakeLock!.request = (type) => {
+    calls++;
+    if (calls === 1) throw new Error("sync");
+    return real(type);
+  };
+  const lock = new HallWakeLock(env.nav, env.doc);
+  lock.setWanted(true);
+  await flush();
+  assert.equal(lock.held, false);
+  lock.setWanted(false);
+  lock.setWanted(true);
+  await flush();
+  assert.equal(calls, 2, "second request made");
+  assert.equal(lock.held, true);
+  lock.dispose();
+}
+
+// --- controller sequences (real SpaOnlinePlayer), provider wiring as in BusinessCabinetPlayer ---
+const item = (n: number) => ({
+  position: n, audioItemId: `track-${n}`, trackCode: null, title: `T${n}`, durationSeconds: null,
+  gainDb: null, playableUntil: null, offlineAllowed: false, offlineCacheUntil: null,
+});
+function hall() {
+  let refuse = false;
+  let holdPlay = false;
+  let holdSign = false;
+  const heldPlays: (() => void)[] = [];
+  const heldSigns: (() => void)[] = [];
+  const audio = {
+    src: "", currentTime: 0, volume: 1, paused: true, ended: false,
+    play() {
+      if (refuse) { const e = new Error("gesture"); e.name = "NotAllowedError"; return Promise.reject(e); }
+      if (holdPlay) return new Promise<void>((r) => heldPlays.push(() => { this.paused = false; r(); }));
+      this.paused = false;
+      return Promise.resolve();
+    },
+    pause() { this.paused = true; },
+    removeAttribute() { this.src = ""; },
+    load() {},
+  };
+  const fader = new FadingAudio(audio as never, { enabled: false });
+  const tracker = new HallWakeIntentTracker();
+  const remote = { paused: false };
+  const env = fakeEnv();
+  const lock = new HallWakeLock(env.nav, env.doc);
+  // eslint-disable-next-line prefer-const
+  let p: SpaOnlinePlayer;
+  const sync = () => lock.setWanted(tracker.wanted(p, remote.paused));
+  p = new SpaOnlinePlayer({
+    audio: fader as never,
+    sign: (id: string) => holdSign
+      ? new Promise((r) => heldSigns.push(() => r({ ok: true, data: { url: `https://example.invalid/${id}` } })))
+      : Promise.resolve({ ok: true, data: { url: `https://example.invalid/${id}` } }),
+    backgroundAdvance: () => false,
+    onChange() { tracker.observe(p.status); sync(); },
+  } as never, [item(1), item(2)] as never);
+  // Provider toggle / next (BusinessCabinetPlayer).
+  const toggle = async () => {
+    remote.paused = false;
+    if (p.status === "playing" || p.status === "loading") {
+      tracker.markPaused();
+      sync();
+      await p.toggle();
+    } else await tracker.whileStarting(() => p.toggle(), sync);
+  };
+  const next = async () => {
+    remote.paused = false;
+    await tracker.whileStarting(() => p.next(), sync);
+  };
+  return {
+    p, lock, env, toggle, next, sync, remote,
+    refuse(v: boolean) { refuse = v; },
+    holdPlay(v: boolean) { holdPlay = v; },
+    holdSign(v: boolean) { holdSign = v; },
+    releasePlays() { heldPlays.splice(0).forEach((f) => f()); },
+    releaseSigns() { heldSigns.splice(0).forEach((f) => f()); },
+  };
+}
+
+// Plain play → pause releases, play again acquires.
+{
+  const h = hall();
+  await h.toggle();
+  await flush();
+  assert.equal(h.p.status, "playing");
+  assert.equal(h.lock.held, true);
+  await h.toggle();
+  await flush();
+  assert.equal(h.lock.held, false, "local pause releases");
+  await h.toggle();
+  await flush();
+  assert.equal(h.lock.held, true);
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// F1: local pause during access restoration – no stale resumePending lock.
+{
+  const h = hall();
+  await h.toggle();
+  await h.p.applyManifest(null as never);
+  await flush();
+  assert.equal(h.p.status, "no_access");
+  assert.equal(h.lock.held, false);
+  h.holdSign(true);
+  const restore = h.p.restoreVerifiedAccess([item(1), item(2)] as never);
+  await flush();
+  assert.equal(h.p.status, "loading");
+  await h.toggle(); // local pause while the resume signs
+  h.releaseSigns();
+  await restore;
+  await flush();
+  assert.equal(h.p.status, "paused");
+  assert.equal(h.lock.held, false, "deliberate pause releases after restoration (F1)");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// F2: autoplay refusal, Next with pending sign, local pause – released; idle releases too.
+{
+  const h = hall();
+  h.refuse(true);
+  await h.toggle();
+  await flush();
+  assert.equal(h.p.needsGesture, true);
+  assert.equal(h.lock.held, true, "autoplay refusal keeps the screen on for the tap");
+  h.refuse(false);
+  h.holdSign(true);
+  const n = h.next();
+  await flush();
+  await h.toggle();
+  h.releaseSigns();
+  await n;
+  await flush();
+  assert.equal(h.p.status, "paused");
+  assert.equal(h.lock.held, false, "stale needsGesture does not hold the screen (F2)");
+  await h.p.applyManifest([] as never);
+  h.sync();
+  await flush();
+  assert.equal(h.lock.held, false, "idle releases");
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// F3: resume waits on audio.play() without "loading" – the screen stays on meanwhile.
+{
+  const h = hall();
+  await h.toggle();
+  await h.toggle();
+  await flush();
+  assert.equal(h.lock.held, false);
+  h.holdPlay(true);
+  const resume = h.toggle();
+  await flush();
+  assert.equal(h.p.status, "paused", "controller still paused while play() is pending");
+  assert.equal(h.lock.held, true, "start in flight holds the screen (F3)");
+  h.releasePlays();
+  await resume;
+  await flush();
+  assert.equal(h.p.status, "playing");
+  assert.equal(h.lock.held, true);
+  h.lock.dispose();
+  h.p.dispose();
+}
+
+// Owner pause keeps the page alive; owner resume continues; a local tap releases.
+{
+  const h = hall();
+  await h.toggle();
+  await h.toggle(); // remote pause runs the same provider toggle
+  h.remote.paused = true;
+  h.sync();
+  await flush();
+  assert.equal(h.lock.held, true, "remote pause keeps the screen on");
+  await h.toggle(); // remote resume
+  await flush();
+  assert.equal(h.p.status, "playing");
+  await h.toggle(); // local pause
+  await flush();
+  assert.equal(h.lock.held, false);
+  h.lock.dispose();
+  h.p.dispose();
 }
 
 // --- wiring contracts ---

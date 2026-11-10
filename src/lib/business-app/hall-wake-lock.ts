@@ -33,20 +33,87 @@ export type HallWakeIntent = {
    * (a dark Android screen freezes it and the command never arrives).
    */
   remotePaused?: boolean;
+  /**
+   * The hall paused on purpose (local tap on pause, bar closed, owner pause): stale controller
+   * flags (needsGesture / resumePending) no longer keep the screen on. Cleared on the next start.
+   */
+  localPaused?: boolean;
+  /** A start (play / next / previous) is in flight: `audio.play()` may wait without "loading". */
+  resuming?: boolean;
 };
 
 /**
- * True while the hall means to play: playing, loading, error (retries / skips on its own),
- * recovery, an autoplay refusal or a pending resume, and a pause sent from the owner's phone.
- * A local pause, idle and no access release the screen.
+ * True while the hall means to play: playing, loading, a start in flight, a pause sent from the
+ * owner's phone, and – unless the hall paused on purpose – error (retries / skips on its own),
+ * recovery, an autoplay refusal or a pending resume. Idle, no access and a deliberate local
+ * pause release the screen.
  */
 export function hallWantsScreenAwake(intent: HallWakeIntent | null | undefined): boolean {
   if (!intent) return false;
   const status = intent.status ?? "idle";
-  if (status === "no_access") return false;
-  if (status === "playing" || status === "loading" || status === "error") return true;
-  if (intent.recovering === true || intent.needsGesture === true || intent.resumePending === true) return true;
-  return status === "paused" && intent.remotePaused === true;
+  if (status === "no_access" || status === "idle") return false;
+  if (status === "playing" || status === "loading") return true;
+  if (status === "paused" && intent.remotePaused === true) return true;
+  if (intent.resuming === true) return true;
+  if (intent.localPaused === true) return false;
+  if (status === "error") return true;
+  return intent.recovering === true || intent.needsGesture === true || intent.resumePending === true;
+}
+
+/** Controller-shaped view (SpaOnlinePlayer) for the wake intent. */
+export type HallWakeController = {
+  status: string;
+  recovering: boolean;
+  needsGesture: boolean;
+  resumePending: boolean;
+};
+
+/**
+ * Provider-side intent the controller does not know: a deliberate pause (stale needsGesture /
+ * resumePending must not keep the screen on – review #1213 F1/F2) and a start in flight
+ * (`audio.play()` may wait without a "loading" notification – review #1213 F3).
+ */
+export class HallWakeIntentTracker {
+  private localPaused = false;
+  private resuming = 0;
+  private lastStatus = "idle";
+
+  /** Controller onChange: a fresh start into "playing" ends a deliberate pause. */
+  observe(status: string): void {
+    if (status === "playing" && this.lastStatus !== "playing") this.localPaused = false;
+    this.lastStatus = status;
+  }
+
+  /** Local pause, bar closed or a pause from the owner's phone. */
+  markPaused(): void {
+    this.localPaused = true;
+  }
+
+  /** Wrap a start (play / next / previous); `sync` re-evaluates the lock before and after. */
+  async whileStarting(run: () => Promise<void>, sync: () => void): Promise<void> {
+    this.localPaused = false;
+    this.resuming += 1;
+    sync();
+    try {
+      await run();
+    } finally {
+      this.resuming = Math.max(0, this.resuming - 1);
+      sync();
+    }
+  }
+
+  wanted(ctl: HallWakeController | null | undefined, remotePaused: boolean): boolean {
+    if (!ctl) return false;
+    return hallWantsScreenAwake({
+      status: ctl.status,
+      recovering: ctl.recovering,
+      needsGesture: ctl.needsGesture,
+      resumePending: ctl.resumePending,
+      remotePaused,
+      localPaused: this.localPaused,
+      resuming: this.resuming > 0,
+    });
+  }
 }
 
 type Sentinel = {
@@ -76,7 +143,7 @@ export function hallWakeLockSupported(nav: WakeLockNavigator | null | undefined)
 export class HallWakeLock {
   private wanted = false;
   private sentinel: Sentinel | null = null;
-  private pending: Promise<void> | null = null;
+  private pending: object | null = null;
   private disposed = false;
   private readonly onVisibility = () => {
     if (this.doc.visibilityState === "visible") this.sync();
@@ -116,7 +183,11 @@ export class HallWakeLock {
     if (this.held || this.pending) return;
     // Requests from a hidden page are refused; the visibilitychange listener retries.
     if (this.doc.visibilityState !== "visible") return;
-    this.pending = this.acquire();
+    const token = {};
+    this.pending = token;
+    void this.acquire().finally(() => {
+      if (this.pending === token) this.pending = null;
+    });
   }
 
   private async acquire(): Promise<void> {
@@ -126,7 +197,6 @@ export class HallWakeLock {
     } catch {
       sentinel = null;
     }
-    this.pending = null;
     if (!sentinel) return;
     if (this.disposed || !this.wanted) {
       void sentinel.release().catch(() => {});
