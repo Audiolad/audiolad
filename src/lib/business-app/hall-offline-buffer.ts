@@ -85,6 +85,11 @@ export type HallBufferDeps = {
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (t: unknown) => void;
   maxTracks?: number;
+  /**
+   * t1365u: next tracks kept in memory as Blob objects (default HALL_BUFFER_WARM). The hall iPhone
+   * keeps fewer: it starts from the stream and needs a copy in memory only for a reconnect.
+   */
+  warmTracks?: number;
   softCapBytes?: number;
   concurrency?: number;
 };
@@ -229,7 +234,8 @@ export class HallOfflineBuffer {
 
   /** Tracks whose copies are kept in memory: sounding, selected and the next HALL_BUFFER_WARM. */
   private warmIds(): string[] {
-    const ids = this.plan.slice(0, HALL_BUFFER_WARM);
+    const warm = Math.max(0, Math.floor(this.d.warmTracks ?? HALL_BUFFER_WARM));
+    const ids = this.plan.slice(0, warm);
     for (const id of [this.selected, this.pinned]) if (id && !ids.includes(id)) ids.unshift(id);
     return ids;
   }
