@@ -88,6 +88,14 @@ export type OnlineDeps = {
   localSource?: (audioItemId: string, durationSec: number | null) => string | null;
   /** The element now sounds this track (`local`: from the device copy). */
   onSource?: (audioItemId: string | null, local: boolean) => void;
+  /**
+   * t1365u (hall iPhone, 11.11.2026): true where a fresh pre-signed stream should win over the
+   * device copy at a normal start, so the element does not load a whole blob: track into the web
+   * page's memory at every boundary. The copy still wins when there is no fresh pre-sign (locked
+   * screen: never wait for the network), while reconnecting, and when signing fails (offline).
+   * Omitted: false (copy first, as before).
+   */
+  streamFirst?: () => boolean;
 };
 
 export const RECOVERY_BASE_MS = 1_000;
@@ -626,6 +634,14 @@ export class SpaOnlinePlayer {
     return !!item && this.local(item) !== null;
   }
 
+  private streamFirst(): boolean {
+    try {
+      return this.d.streamFirst?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Device copy of this track (hall offline buffer) that lasts the whole track, or null. */
   private local(item: SpaManifestItem): string | null {
     if (!this.d.localSource) return null;
@@ -846,9 +862,13 @@ export class SpaOnlinePlayer {
     }
     const pre = this.takePresigned(item.audioItemId);
     // t1331u: a device copy wins over the network (no request at the boundary, plays offline).
-    const copy = this.local(item);
+    // t1365u: on a stream-first device a fresh pre-signed stream wins at a normal start; the copy
+    // stays the source for a reconnect and for a start without a ready link.
+    const reconnecting = this.resumePoint?.audioItemId === item.audioItemId;
+    const preferStream = pre !== null && !reconnecting && this.online() && this.streamFirst();
+    let copy = preferStream ? null : this.local(item);
     // Every started track is still checked by the server: a pre-signed or copied start re-asks it.
-    const recheck = pre !== null || copy !== null;
+    let recheck = pre !== null || copy !== null;
     let r: OnlineSignResult;
     try {
       r = copy ? { ok: true, data: { url: copy } } : pre ? { ok: true, data: { url: pre.url } } : await this.d.sign(item.audioItemId);
@@ -856,6 +876,15 @@ export class SpaOnlinePlayer {
       r = { ok: false, reason: "network" };
     }
     if (op !== this.op || this.disposed) return;
+    if (!r.ok && TRANSIENT_SIGN_REASONS.has(r.reason) && copy === null) {
+      // The network refused the start, but the device holds the track: play it from the copy.
+      const fallback = this.local(item);
+      if (fallback) {
+        copy = fallback;
+        recheck = true;
+        r = { ok: true, data: { url: fallback } };
+      }
+    }
     if (!r.ok) {
       if (r.reason === "no_access") return this.denied();
       if (SKIP_REASONS.has(r.reason)) {

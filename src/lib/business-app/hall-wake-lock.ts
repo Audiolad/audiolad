@@ -127,6 +127,14 @@ export class HallWakeIntentTracker {
     }
   }
 
+  /**
+   * t1365u: the hall / owner chose silence (local pause, closed bar, owner pause) and no start is
+   * in flight. Cleared by the next start into "playing".
+   */
+  get deliberatelyPaused(): boolean {
+    return this.localPaused && this.starts.size === 0;
+  }
+
   wanted(ctl: HallWakeController | null | undefined, remotePaused: boolean): boolean {
     if (!ctl) return false;
     return hallWantsScreenAwake({
