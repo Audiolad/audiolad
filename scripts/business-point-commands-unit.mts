@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { isPointCommandId, isPointCommandType, pointCommandAction, runPointCommands, waitWhileLoading } from "../src/lib/business-app/point-commands";
+import { isPointCommandId, isPointCommandType, pointCommandAction, pointCommandApplied, runPointCommands, waitWhileLoading } from "../src/lib/business-app/point-commands";
 import { startWakeTicker } from "../src/lib/business-app/wake-ticker";
 
 assert.equal(isPointCommandType("pause"), true);
@@ -140,8 +140,13 @@ assert.match(player, /action: "commands"/);
 assert.match(player, /5_000/);
 assert.match(player, /inFlight/);
 assert.match(player, /action: "ack", id: command.id, claimId: command.claim_id/);
-assert.match(player, /status === "playing" && !audio.paused/);
-assert.match(player, /await fadeRef.current.fadeOut\(\)/);
+// The player's apply check lives in point-commands.ts (pointCommandApplied), wired to the real refs.
+const commandsLib = await import("node:fs").then((fs) =>
+  fs.readFileSync(new URL("../src/lib/business-app/point-commands.ts", import.meta.url), "utf8"),
+);
+assert.match(player, /applied: pointCommandApplied\(\{\n\s*status: \(\) => ctlRef\.current\?\.status,\n\s*audio: \(\) => audioRef\.current,\n\s*fade: \(\) => fadeRef\.current,/);
+assert.match(commandsLib, /status === "playing" && !audio.paused/);
+assert.match(commandsLib, /if \(type === "pause" && fade\?\.fadingOut\) await fade\.fadeOut\(\);/);
 assert.match(route, /p_claim_id: body.claimId/);
 assert.doesNotMatch(player, /audiolad\.point\.applied-commands/);
 // A command triggers a sound-settings refresh in parallel: it may only reorder upcoming
@@ -151,7 +156,28 @@ assert.doesNotMatch(player, /audiolad\.point\.applied-commands/);
   assert.match(take, /keepCurrent: true/);
   const rebuild = player.slice(player.indexOf("const rebuildFromProfile = useCallback"), player.indexOf("}, [applyAtmosphereQueue]);"));
   assert.match(rebuild, /if \(input\.keepCurrent\) \{[^}]*return "applied";\n\s*\}\n\s*applyAtmosphereQueue\(indices\);/);
-  assert.match(player, /await waitWhileLoading\(\(\) => ctlRef\.current\?\.status \?\? "idle", POINT_RESUME_SETTLE_MS\)/);
+  assert.match(commandsLib, /await waitWhileLoading\(\(\) => deps\.status\(\) \?\? "idle", deps\.settleMs \?\? POINT_RESUME_SETTLE_MS, 200, deps\.sleep\);/);
+}
+
+// pointCommandApplied: resume waits out "loading"; pause waits for the fade, then confirms.
+{
+  let st = "loading";
+  let slept = 0;
+  let owner = 0;
+  const audio = { paused: false };
+  const applied = pointCommandApplied({
+    status: () => st, audio: () => audio, fade: () => null, ownerPaused: () => { owner += 1; },
+    settleMs: 1_000, sleep: async (ms) => { slept += ms; if (slept >= 400) st = "playing"; },
+  });
+  assert.equal(await applied("resume"), true);
+  assert.equal(slept, 400);
+  assert.equal(owner, 0);
+  let faded = false;
+  const fade = { fadingOut: true, fadeOut: async () => { faded = true; audio.paused = true; st = "paused"; return true; } };
+  const pausing = pointCommandApplied({ status: () => st, audio: () => audio, fade: () => fade, ownerPaused: () => { owner += 1; } });
+  assert.equal(await pausing("pause"), true);
+  assert.equal(faded, true);
+  assert.equal(owner, 1, "confirmed pause reaches the owner-pause hook");
 }
 
 console.log("business-point-commands-unit: ok");
