@@ -21,6 +21,7 @@
     "start": "node scripts/lib/guard-production-start.mjs && next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:admin-timeseries-dates": "npx tsx scripts/admin-timeseries-axis-dates-unit.tsx",
     "test:history-listen-audio": "npx tsx scripts/history-listen-audio-unit.mts",
     "test:shared-audio-warmup": "npx tsx scripts/shared-audio-warmup-unit.mts",
     "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",

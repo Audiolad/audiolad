@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 
 import type { AdminAnalyticsTimeseriesPoint } from "@/lib/admin/analytics-queries";
 import { formatListeningDuration } from "@/lib/admin/format-listening-time";
+import {
+  TIMESERIES_PAD_X,
+  TIMESERIES_PAD_Y,
+  TIMESERIES_PLOT_HEIGHT,
+  buildTimeseriesAxisLayout,
+} from "@/lib/admin/timeseries-axis";
 
 const SERIES = [
   { key: "visitors", label: "Посетители", color: "#7042c5" },
@@ -41,11 +47,18 @@ export default function AdminAnalyticsTimeseriesChart({
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
 
+  const axis = useMemo(
+    () =>
+      buildTimeseriesAxisLayout(
+        points.map((point) => point.bucket),
+        granularity,
+      ),
+    [granularity, points],
+  );
+
   const { max, pathMap } = useMemo(() => {
-    const width = 640;
-    const height = 220;
-    const padX = 28;
-    const padY = 20;
+    const height = TIMESERIES_PLOT_HEIGHT;
+    const padY = TIMESERIES_PAD_Y;
     const maxValue = Math.max(
       1,
       ...points.flatMap((point) =>
@@ -61,11 +74,7 @@ export default function AdminAnalyticsTimeseriesChart({
 
         const d = points
           .map((point, index) => {
-            const x =
-              padX +
-              (points.length === 1
-                ? (width - padX * 2) / 2
-                : (index / (points.length - 1)) * (width - padX * 2));
+            const x = axis.xAt(index);
             const y =
               height -
               padY -
@@ -79,7 +88,7 @@ export default function AdminAnalyticsTimeseriesChart({
     ) as Record<SeriesKey, string>;
 
     return { max: maxValue, pathMap: paths };
-  }, [activeSeries, points]);
+  }, [activeSeries, axis, points]);
 
   const listeningPath = useMemo(() => {
     const samples = points.map((point) => point.listenedMinutes);
@@ -91,19 +100,13 @@ export default function AdminAnalyticsTimeseriesChart({
       return { d: "", maxMinutes, titles: [] as Array<{ x: number; y: number; label: string }> };
     }
 
-    const width = 640;
-    const height = 220;
-    const padX = 28;
-    const padY = 20;
+    const height = TIMESERIES_PLOT_HEIGHT;
+    const padY = TIMESERIES_PAD_Y;
     const titles: Array<{ x: number; y: number; label: string }> = [];
     let segmentStart = true;
     const d = samples
       .map((minutes, index) => {
-        const x =
-          padX +
-          (points.length === 1
-            ? (width - padX * 2) / 2
-            : (index / Math.max(points.length - 1, 1)) * (width - padX * 2));
+        const x = axis.xAt(index);
         if (minutes == null) {
           segmentStart = true;
           return "";
@@ -122,7 +125,7 @@ export default function AdminAnalyticsTimeseriesChart({
       .join(" ");
 
     return { d, maxMinutes, titles };
-  }, [listeningEnabled, points]);
+  }, [axis, listeningEnabled, points]);
 
   return (
     <section
@@ -194,16 +197,23 @@ export default function AdminAnalyticsTimeseriesChart({
       ) : (
         <div className="mt-4 overflow-x-auto">
           <svg
-            viewBox="0 0 640 220"
-            className="h-56 w-full min-w-[320px]"
+            viewBox={`0 0 ${axis.width} ${axis.height}`}
+            className="w-full"
+            style={{
+              height: `${axis.height}px`,
+              // Never shrink below the layout width: dates stay readable (11px) on
+              // phones and long periods; the wrapper scrolls horizontally instead.
+              minWidth: `${axis.width}px`,
+            }}
             role="img"
             aria-label="Динамика показателей"
+            data-testid="admin-timeseries-svg"
           >
             <line
-              x1="28"
-              y1="200"
-              x2="612"
-              y2="200"
+              x1={TIMESERIES_PAD_X}
+              y1={axis.axisY}
+              x2={axis.width - TIMESERIES_PAD_X}
+              y2={axis.axisY}
               stroke="#eadff8"
               strokeWidth="1"
             />
@@ -211,7 +221,7 @@ export default function AdminAnalyticsTimeseriesChart({
               {max.toLocaleString("ru-RU")}
             </text>
             {listeningEnabled && listeningPath.maxMinutes > 0 ? (
-              <text x="500" y="24" className="fill-[#1f7a4d]" fontSize="11">
+              <text x={axis.width - 140} y="24" className="fill-[#1f7a4d]" fontSize="11">
                 {formatListeningDuration(listeningPath.maxMinutes * 60_000)}
               </text>
             ) : null}
@@ -245,11 +255,36 @@ export default function AdminAnalyticsTimeseriesChart({
                   </g>
                 ))
               : null}
+            <g data-testid="admin-timeseries-x-axis">
+              {axis.ticks.map((tick) => (
+                <g key={`${tick.index}-${tick.label}`} data-bucket={points[tick.index]?.bucket}>
+                  <title>{tick.title}</title>
+                  <line
+                    x1={tick.x}
+                    y1={axis.axisY}
+                    x2={tick.x}
+                    y2={axis.axisY + 4}
+                    stroke="#d9cdee"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={tick.x}
+                    y={axis.labelY}
+                    textAnchor={axis.rotated ? "end" : "middle"}
+                    transform={
+                      axis.rotated
+                        ? `rotate(${axis.labelAngle} ${tick.x.toFixed(1)} ${axis.labelY})`
+                        : undefined
+                    }
+                    className="fill-[#9485b4]"
+                    fontSize="11"
+                  >
+                    {tick.label}
+                  </text>
+                </g>
+              ))}
+            </g>
           </svg>
-          <div className="mt-1 flex justify-between text-[11px] text-[#9485b4]">
-            <span>{points[0]?.bucket}</span>
-            <span>{points[points.length - 1]?.bucket}</span>
-          </div>
         </div>
       )}
     </section>
