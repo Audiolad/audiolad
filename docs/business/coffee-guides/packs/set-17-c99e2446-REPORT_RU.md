@@ -45,7 +45,7 @@
 Связанные существующие материалы: `/b/coffee/prodvizhenie-kofeyni`, `/b/coffee/banner-dlya-kofeyni`, `/b/coffee/listovka-kofeyni`, `/b/coffee/vyveska-dlya-kofeyni`, `/b/coffee/afisha-kofeyni`.
 
 
-### ИП или ООО для кофейни: что выбрать владельцу
+### ИП кофейня или ООО: что выбрать владельцу
 
 Слаг: `ip-ili-ooo-dlya-kofeyni` – свободен. Основной запрос: «ип кофейня» – 1627.
 
