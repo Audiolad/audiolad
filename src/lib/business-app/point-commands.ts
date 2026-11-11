@@ -36,6 +36,40 @@ export async function waitWhileLoading(
   for (let waited = 0; status() === "loading" && waited < maxMs; waited += stepMs) await sleep(stepMs);
 }
 
+/**
+ * The venue device's `applied` check for one owner command (shared by the hall player and tests).
+ * A confirmed pause always calls `ownerPaused`, also when the hall was already silent
+ * (paused / idle / an iOS autoplay refusal) and `pointCommandAction` did nothing: the owner's
+ * pause must still clear «the hall was playing», or a reloaded page would start by itself.
+ */
+export function pointCommandApplied(deps: {
+  status(): string | undefined;
+  audio(): { readonly paused: boolean } | null | undefined;
+  fade(): { readonly fadingOut: boolean; fadeOut(): Promise<unknown> } | null | undefined;
+  /** Confirmed owner pause: latch it, clear the playing marker, re-sync the wake lock. */
+  ownerPaused(): void;
+  settleMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}): (type: PointCommandType) => Promise<boolean> {
+  return async (type) => {
+    // Soft pause resolves before the fade has actually silenced the element.
+    const fade = deps.fade();
+    if (type === "pause" && fade?.fadingOut) await fade.fadeOut();
+    // Resume / next while a track is still loading (sign, reconnect): wait for it here
+    // instead of failing and waiting out the 30 s lease.
+    if (type !== "pause") {
+      await waitWhileLoading(() => deps.status() ?? "idle", deps.settleMs ?? POINT_RESUME_SETTLE_MS, 200, deps.sleep);
+    }
+    const status = deps.status();
+    const audio = deps.audio();
+    const done = !!audio && (type === "pause"
+      ? (status === "paused" || status === "idle") && audio.paused
+      : status === "playing" && !audio.paused);
+    if (type === "pause" && done) deps.ownerPaused();
+    return done;
+  };
+}
+
 export type ClaimedPointCommand = {
   id: string;
   type: PointCommandType;

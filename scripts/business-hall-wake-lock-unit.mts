@@ -422,7 +422,7 @@ assert.doesNotMatch(HALL_WAKE_LOCK_HINT, /-/, "en dash only");
 assert.match(HALL_WAKE_LOCK_HINT, /–/);
 const player = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(player, /if \(!canBeat \|\| typeof navigator === "undefined"[^\n]*\) return;\n\s*const lock = new HallWakeLock\(/, "hall device only");
-assert.match(player, /remotePausedRef\.current = true;\n\s*syncWakeLock\(\);/, "owner pause keeps the lock");
+assert.match(player, /ownerPaused: \(\) => \{\n\s*remotePausedRef\.current = true;[\s\S]{0,400}?\n\s*syncWakeLock\(\);\n\s*\},/, "owner pause keeps the lock");
 assert.equal((player.match(/syncWakeLock\(\);/g) ?? []).length >= 5, true, "synced on change / pause / toggle / next / dispose");
 assert.doesNotMatch(player.slice(player.indexOf("const syncWakeLock"), player.indexOf("const syncWakeLock") + 800), /reload|audio\.(play|pause)/, "screen-only");
 const lib = readFileSync(new URL("../src/lib/business-app/hall-wake-lock.ts", import.meta.url), "utf8");
