@@ -28,6 +28,7 @@ import { HallWakeIntentTracker } from "../src/lib/business-app/hall-wake-lock";
 import { HallOfflineBuffer, type BufferStore } from "../src/lib/business-app/hall-offline-buffer";
 import { SpaOnlinePlayer, type OnlineSignResult } from "../src/lib/business-app/spa-online-player";
 import { FadingAudio } from "../src/lib/business-app/player-fade";
+import { pointCommandApplied, runPointCommands } from "../src/lib/business-app/point-commands";
 
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0)); };
 
@@ -327,6 +328,112 @@ async function bufferWarm(warmTracks?: number) {
   assert.equal(ios.onDisk, 3, "still 10-track (here 3) reserve on disk");
 }
 
+// 6b. Review of b2853392 (blocker 1): the owner's pause clears «the hall was playing» through the
+// real command handler (runPointCommands + pointCommandApplied, wired like the player), also when
+// the hall is already silent – paused after an iOS autoplay refusal, or idle – and the pause
+// itself is a no-op. A page reloaded right after must not start the music by itself.
+{
+  const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const pauseCommand = (n: number) => ({
+    id: uuid(n), type: "pause", claim_id: uuid(n + 100), claim_until: new Date(Date.now() + 30_000).toISOString(),
+  });
+  async function ownerPauseOn(status: "paused" | "idle" | "playing", needsGesture: boolean) {
+    const storage = memoryStorage();
+    let now = 1_000_000;
+    const writer = new HallPlayingMarkerWriter(storage, () => now);
+    const intent = new HallWakeIntentTracker();
+    const ctl = { status: "playing" as string, needsGesture: false };
+    const audio = { paused: false };
+    // The hall played, then went silent for a reason nobody chose (or still plays).
+    intent.observe("playing");
+    writer.observe(SCOPE, "playing", intent.deliberatelyPaused);
+    now += 60_000;
+    ctl.status = status;
+    ctl.needsGesture = needsGesture;
+    audio.paused = status !== "playing";
+    intent.observe(status);
+    writer.observe(SCOPE, status, intent.deliberatelyPaused);
+    if (status !== "playing") assert.ok(readHallPlayingMarker(storage), "unexplained silence keeps the marker");
+    let remotePaused = false;
+    let toggles = 0;
+    let acks = 0;
+    let wakeSyncs = 0;
+    await runPointCommands([pauseCommand(1)], {
+      ready: () => true,
+      status: () => ctl.status,
+      toggle: async () => {
+        toggles += 1;
+        // Player toggle on a playing hall: deliberate pause, then the controller pauses.
+        intent.markPaused();
+        ctl.status = "paused";
+        audio.paused = true;
+        intent.observe("paused");
+        writer.observe(SCOPE, "paused", intent.deliberatelyPaused);
+      },
+      next: async () => { throw new Error("no next for a pause"); },
+      applied: pointCommandApplied({
+        status: () => ctl.status,
+        audio: () => audio,
+        fade: () => null,
+        ownerPaused: () => {
+          remotePaused = true;
+          intent.markPaused();
+          writer.clear();
+          wakeSyncs += 1;
+        },
+      }),
+      ack: async () => { acks += 1; },
+      stopped: () => false,
+    });
+    // «Reload»: fresh refs, the remote-pause latch is gone, only localStorage survives.
+    const fresh = shouldAutoResumeHall({ marker: readHallPlayingMarker(storage), scope: SCOPE, now: now + 1_000 });
+    return { toggles, acks, remotePaused, wakeSyncs, marker: readHallPlayingMarker(storage), fresh, deliberate: intent.deliberatelyPaused };
+  }
+  for (const [status, gesture] of [["paused", true], ["paused", false], ["idle", false]] as const) {
+    const r = await ownerPauseOn(status, gesture);
+    const label = `${status}${gesture ? "+needsGesture" : ""}`;
+    assert.equal(r.toggles, 0, `${label}: the pause itself is a no-op`);
+    assert.equal(r.acks, 1, `${label}: acknowledged`);
+    assert.equal(r.remotePaused, true, `${label}: owner pause latched`);
+    assert.equal(r.wakeSyncs, 1, `${label}: wake lock re-synced`);
+    assert.equal(r.marker, null, `${label}: owner pause clears the marker`);
+    assert.equal(r.deliberate, true, `${label}: owner pause counts as deliberate (no first-touch resume)`);
+    assert.equal(r.fresh, false, `${label}: a reloaded page stays silent after the owner's pause`);
+  }
+  const playing = await ownerPauseOn("playing", false);
+  assert.equal(playing.toggles, 1, "playing hall: paused through toggle");
+  assert.equal(playing.acks, 1);
+  assert.equal(playing.marker, null);
+  assert.equal(playing.fresh, false);
+  // Control: without the owner's pause the same silent hall still auto-resumes after a reload.
+  {
+    const storage = memoryStorage();
+    const writer = new HallPlayingMarkerWriter(storage, () => 1_000_000);
+    writer.observe(SCOPE, "playing", false);
+    writer.observe(SCOPE, "paused", false);
+    assert.equal(shouldAutoResumeHall({ marker: readHallPlayingMarker(storage), scope: SCOPE, now: 1_061_000 }), true);
+  }
+  // A pause that did not silence the element is not confirmed: nothing is cleared, no ack.
+  {
+    let owner = 0;
+    const applied = pointCommandApplied({
+      status: () => "paused", audio: () => ({ paused: false }), fade: () => null, ownerPaused: () => { owner += 1; },
+    });
+    assert.equal(await applied("pause"), false);
+    assert.equal(owner, 0);
+    const noAudio = pointCommandApplied({ status: () => "idle", audio: () => null, fade: () => null, ownerPaused: () => { owner += 1; } });
+    assert.equal(await noAudio("pause"), false);
+    assert.equal(owner, 0);
+    // Resume / next never touch the owner-pause path.
+    const resume = pointCommandApplied({
+      status: () => "playing", audio: () => ({ paused: false }), fade: () => null, ownerPaused: () => { owner += 1; },
+    });
+    assert.equal(await resume("resume"), true);
+    assert.equal(await resume("next_track"), true);
+    assert.equal(owner, 0);
+  }
+}
+
 // 7. Source guards: the provider wires all of it, and adds no owner message or hall hint.
 {
   const src = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
@@ -335,6 +442,9 @@ async function bufferWarm(warmTracks?: number) {
   assert.match(src, /streamFirst: \(\) => streamFirstRef\.current/, "stream first on the hall iPhone");
   assert.match(src, /warmTracks: isAppleTouchDevice\(navigator\) \? 1 : undefined/);
   assert.match(src, /playingMarkerRef\.current\?\.clear\(\);/, "closing the bar clears the marker");
+  // The player's command handler is the tested pointCommandApplied, and its owner pause clears the marker.
+  assert.match(src, /applied: pointCommandApplied\(\{/, "player uses the tested command check");
+  assert.match(src, /ownerPaused: \(\) => \{\n\s+remotePausedRef\.current = true;[\s\S]{0,400}?wakeIntentRef\.current\.markPaused\(\);\n\s+playingMarkerRef\.current\?\.clear\(\);\n\s+syncWakeLock\(\);/, "owner pause clears the marker");
   // #1213 wake lock untouched: still synced from the controller.
   assert.match(src, /wakeIntentRef\.current\.observe\(current\.status\);\n\s+syncWakeLock\(\);/);
   const lib = readFileSync(new URL("../src/lib/business-app/hall-auto-resume.ts", import.meta.url), "utf8");

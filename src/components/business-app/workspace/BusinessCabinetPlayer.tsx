@@ -28,7 +28,7 @@ import {
   resolveHallClientBuildId,
   shouldReloadForNewBuild,
 } from "@/lib/business-app/hall-build-reload";
-import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/lib/business-app/point-commands";
+import { pointCommandApplied, runPointCommands } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { FadingAudio, isAppleTouchDevice } from "@/lib/business-app/player-fade";
@@ -1037,23 +1037,20 @@ export function BusinessCabinetPlayerProvider({
           status: () => ctlRef.current?.status ?? "idle",
           toggle: (signal) => commandTransport(signal, () => toggleRef.current()),
           next: (signal) => commandTransport(signal, () => nextRef.current(signal)),
-          applied: async (type) => {
-            // Soft pause resolves before the fade has actually silenced the element.
-            if (type === "pause" && fadeRef.current?.fadingOut) await fadeRef.current.fadeOut();
-            // Resume / next while a track is still loading (sign, reconnect): wait for it here
-            // instead of failing and waiting out the 30 s lease.
-            if (type !== "pause") await waitWhileLoading(() => ctlRef.current?.status ?? "idle", POINT_RESUME_SETTLE_MS);
-            const status = ctlRef.current?.status;
-            const audio = audioRef.current;
-            const done = !!audio && (type === "pause"
-              ? (status === "paused" || status === "idle") && audio.paused
-              : status === "playing" && !audio.paused);
-            if (type === "pause" && done) {
+          applied: pointCommandApplied({
+            status: () => ctlRef.current?.status,
+            audio: () => audioRef.current,
+            fade: () => fadeRef.current,
+            ownerPaused: () => {
               remotePausedRef.current = true;
+              // t1365u (review of b2853392): also when the hall was already silent (paused /
+              // idle / iOS autoplay refusal) and the pause itself was a no-op – the owner chose
+              // silence, so a reloaded page must not start the music by itself.
+              wakeIntentRef.current.markPaused();
+              playingMarkerRef.current?.clear();
               syncWakeLock();
-            }
-            return done;
-          },
+            },
+          }),
           ack: async (command) => {
             const ack = await fetch("/api/business/point", {
               method: "POST",
