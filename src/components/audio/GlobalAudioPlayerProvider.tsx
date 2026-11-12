@@ -90,6 +90,10 @@ import {
   type RepeatMode,
 } from "@/lib/listen/repeat-mode";
 
+import {
+  canStartAlbumRadio, readAlbumRadioEnabled, writeAlbumRadioEnabled, subscribeAlbumRadioEnabled,
+} from "@/lib/listen/album-radio-preference.mjs";
+
 export const GLOBAL_MINI_PLAYER_HEIGHT_PX = 72;
 
 type PlayerEngineApi = ReturnType<typeof useSequentialPlayer>;
@@ -133,6 +137,9 @@ type SessionContextValue = {
   confirmInternalQueueNavigation: (practiceId: string) => void;
   noticeMessage: string | null;
   clearNoticeMessage: () => void;
+  albumRadioEnabled: boolean;
+  albumRadioAvailable: boolean;
+  setAlbumRadioEnabled: (enabled: boolean) => void;
   repeatMode: RepeatMode;
   cycleRepeatMode: () => void;
 };
@@ -149,6 +156,7 @@ type PlaybackHandoff = {
 };
 
 type QueueAdvancePrefetch = {
+  preparedAt?: number;
   queueId: string;
   fromIndex: number;
   index: number;
@@ -289,6 +297,7 @@ function GlobalPlayerEngine({
   skipAutoplayUrlSync: boolean;
   onTracksExhausted: (
     fromPracticeId: string,
+    naturalEnd?: boolean,
   ) => Promise<"advanced" | "completed" | "none">;
   onRequestPreviousProduct: () => Promise<boolean>;
   getRepeatMode: () => RepeatMode;
@@ -669,6 +678,14 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   );
   const [activeQueue, setActiveQueue] = useState<PlaylistQueue | null>(null);
   const [queueCompleted, setQueueCompleted] = useState(false);
+  const albumRadioEnabled = useSyncExternalStore(subscribeAlbumRadioEnabled, readAlbumRadioEnabled, () => true);
+  const [albumRadioAvailableFor, setAlbumRadioAvailableFor] = useState<string | null>(null);
+  const albumRadioAvailable = Boolean(session && isCatalogGlobalPlayerSession(session) && albumRadioAvailableFor === session.practiceId);
+  type RadioSeed = { source: Extract<PlaylistQueue["source"], { kind: "album_radio" }>; title: string; entries: PlaylistQueueEntry[]; trackIds: string[] };
+  const radioSeedRef = useRef<RadioSeed | null>(null);
+  const radioPreparationRef = useRef<Promise<void> | null>(null);
+  const radioStartingRef = useRef(false);
+  const radioAdvanceReasonRef = useRef("album_end");
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const repeatMode = useSyncExternalStore(
     subscribePlayerRepeatMode,
@@ -756,6 +773,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     const preservePlayback = options?.preservePlayback === true;
     const nextSession: LoadSessionInput = normalizeGlobalPlayerSessionContract({
       ...input,
+      ...(isCatalogGlobalPlayerSession(input) ? { playbackAttribution: input.playbackAttribution } : {}),
       requestAutoplay,
     });
     const current = sessionRef.current;
@@ -1131,10 +1149,24 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       }
 
       transitionLockRef.current = true;
+      const transitionGeneration = sessionGenerationRef.current;
+      const transitionStillCurrent = () => transitionGeneration === sessionGenerationRef.current &&
+        (queue.source.kind !== "album_radio" || readAlbumRadioEnabled());
+      const radioAdvanceReason = radioAdvanceReasonRef.current;
       const direction = options.direction ?? "forward";
       const playBeforeNavigate = options.playBeforeNavigate === true;
 
       try {
+        const radioAttribution = (index: number) => queue.source.kind === "album_radio" ? {
+          playbackAttribution: {
+            playback_mode: "album_radio", radio_run_id: queue.source.runId,
+            radio_source_album_id: queue.source.practiceId, radio_source_author_slug: queue.source.authorSlug,
+            radio_index: index, radio_transition: queue.currentIndex < 0,
+            radio_previous_outcome: radioAdvanceReason,
+            radio_previous_audio_id: queue.entries[queue.currentIndex]?.kind === "audio_item"
+              ? (queue.entries[queue.currentIndex] as Extract<PlaylistQueueEntry, { kind: "audio_item" }>).audioItemId : "",
+          },
+        } : {};
         let index = startIndex;
         let runtimeSkipped = queue.runtimeSkippedCount;
         let playFirstSession: CatalogGlobalPlayerSession | null = null;
@@ -1153,6 +1185,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           if (
             prefetch &&
             prefetch.queueId === queue.id &&
+            (queue.source.kind !== "album_radio" || Date.now() - (prefetch.preparedAt ?? 0) < 60000) &&
             prefetch.fromIndex === startIndex &&
             prefetch.url &&
             prefetchEntry &&
@@ -1187,6 +1220,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             }
           }
 
+          if (!transitionStillCurrent()) return "failed";
           if (
             playFirstSession &&
             playFirstEntry &&
@@ -1212,6 +1246,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
               nextAudioItemId: playFirstAudioItemId,
             });
 
+            if (!transitionStillCurrent()) {
+              if (audio?.getAttribute("src") === playFirstUrl) audio.pause();
+              return "failed";
+            }
             const nextQueue: PlaylistQueue = {
               ...queue,
               currentIndex: index,
@@ -1242,6 +1280,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             loadSession(
               {
                 ...playFirstSession,
+                ...radioAttribution(index),
                 requestAutoplay: options.autoplay,
                 forceStartAtBeginning: options.fromStart,
                 suppressListenUrlSync:
@@ -1316,6 +1355,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             continue;
           }
 
+          if (!transitionStillCurrent()) return "failed";
           const session = loaded.session;
 
           const nextQueue: PlaylistQueue = {
@@ -1354,6 +1394,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
           loadSession({
             ...session,
+            ...radioAttribution(index),
             requestAutoplay: options.autoplay,
             forceStartAtBeginning: options.fromStart,
             suppressListenUrlSync:
@@ -1499,12 +1540,112 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     }
   }, [router, stopAndClear]);
 
+  useEffect(() => {
+    if (activeQueue && activeQueue.source.kind !== "album_radio") return;
+    if (!session || !isCatalogGlobalPlayerSession(session) || session.isAuthorPreview || session.playbackMode === "preview" || session.albumRadioEligible === false) {
+      radioSeedRef.current = null;
+      return;
+    }
+    // During radio the original album remains the immutable recommendation anchor.
+    const source = activeQueue?.source.kind === "album_radio" ? activeQueue.source : {
+      kind: "album_radio" as const, runId: `${Date.now()}-${Math.random().toString(36).slice(2)}`, authorSlug: session.authorSlug, productSlug: session.productSlug,
+      practiceId: session.practiceId, returnHref: `/practice/${session.authorSlug}/${session.productSlug}`,
+    };
+    if (activeQueue && (!albumRadioEnabled || activeQueue.entries.length - activeQueue.currentIndex > 3 || activeQueue.entries.length >= 512)) return;
+    const abort = new AbortController();
+    const timeout = window.setTimeout(() => abort.abort(), 15000);
+    if (!activeQueue) radioSeedRef.current = null;
+    const prepare = async () => {
+      try {
+        const exclude = activeQueue?.entries.flatMap((entry) => entry.kind === "audio_item" ? [entry.audioItemId] : []) ?? [];
+        const response = await fetch("/api/listen/album-radio", {
+          method: "POST", credentials: "same-origin", signal: abort.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ author: source.authorSlug, slug: source.productSlug, exclude, enabled: albumRadioEnabled }),
+        });
+        const data = await response.json();
+        if (abort.signal.aborted || !response.ok || !data.ok || !Array.isArray(data.entries) || !Array.isArray(data.trackIds)) return;
+        if (!activeQueue) {
+          const seed: RadioSeed = { source, title: data.title ?? "", entries: data.entries, trackIds: data.trackIds };
+          radioSeedRef.current = seed;
+          setAlbumRadioAvailableFor(canStartAlbumRadio({ naturalEnd: true, enabled: true, repeatMode: "off", queue: null, session, seed }) ? session.practiceId : null);
+          // Reuse the existing signed URL handoff, before album end (iOS lock screen).
+          if (albumRadioEnabled && seed.entries[0]) {
+            const resolved = await resolveQueueEntryPlayback(seed.entries[0], { fromStart: true, signal: abort.signal });
+            if (resolved && !abort.signal.aborted && !activeQueueRef.current && radioSeedRef.current === seed) {
+              queueAdvancePrefetchRef.current = { queueId: `album-radio:${source.practiceId}`, fromIndex: 0, index: 0,
+                entryKey: queueEntryIdentityKey(seed.entries[0]), ...resolved, preparedAt: Date.now(), runtimeSkipped: 0 };
+            }
+          }
+        } else if (activeQueueRef.current === activeQueue && data.entries.length) {
+          const next = { ...activeQueue, entries: [...activeQueue.entries, ...data.entries].slice(0, 512) };
+          activeQueueRef.current = next;
+          setActiveQueue(next);
+        }
+      } catch { /* Offline / sparse catalog: keep playing the current album/track. */ }
+      finally { window.clearTimeout(timeout); }
+    };
+    const pending = prepare();
+    radioPreparationRef.current = pending;
+    return () => { abort.abort(); window.clearTimeout(timeout); };
+  }, [session, activeQueue, albumRadioEnabled]);
+
+  useEffect(() => {
+    if (activeQueue || !session || !albumRadioEnabled || !albumRadioAvailable) return;
+    const abort = new AbortController();
+    const timer = window.setInterval(() => {
+      const seed = radioSeedRef.current;
+      if (!seed?.entries[0]) return;
+      void resolveQueueEntryPlayback(seed.entries[0], { fromStart: true, signal: abort.signal }).then((resolved) => {
+        if (resolved && !abort.signal.aborted && radioSeedRef.current === seed && !activeQueueRef.current) {
+          queueAdvancePrefetchRef.current = { queueId: `album-radio:${seed.source.practiceId}`, fromIndex: 0, index: 0,
+            entryKey: queueEntryIdentityKey(seed.entries[0]), ...resolved, preparedAt: Date.now(), runtimeSkipped: 0 };
+        }
+      });
+    }, 45000);
+    return () => { abort.abort(); window.clearInterval(timer); };
+  }, [activeQueue, session, albumRadioEnabled, albumRadioAvailable]);
+
+  const setAlbumRadioEnabled = useCallback((enabled: boolean) => {
+    writeAlbumRadioEnabled(enabled);
+    // Finish the current track; prevent any later continuation, including an in-flight refill.
+    if (!enabled) queueAdvancePrefetchRef.current = null;
+  }, []);
+
   const onTracksExhausted = useCallback(
     async (
       fromPracticeId: string,
+      naturalEnd = false,
     ): Promise<"advanced" | "completed" | "none"> => {
-      const queue = activeQueueRef.current;
+      let queue = activeQueueRef.current;
       const currentSession = sessionRef.current;
+      if (!queue && naturalEnd && readAlbumRadioEnabled() && readStoredRepeatMode() === "off" && !radioStartingRef.current) {
+        radioStartingRef.current = true;
+        const generation = sessionGenerationRef.current;
+        try {
+          await radioPreparationRef.current;
+          const seed = radioSeedRef.current;
+          if (generation !== sessionGenerationRef.current || sessionRef.current !== currentSession ||
+              !canStartAlbumRadio({ naturalEnd, enabled: readAlbumRadioEnabled(), repeatMode: readStoredRepeatMode(),
+                queue: activeQueueRef.current, session: currentSession, seed })) return "none";
+          if (!seed?.entries.length) {
+            setNoticeMessage("Похожая музыка пока недоступна. Альбом завершён.");
+            return "none";
+          }
+          radioAdvanceReasonRef.current = "album_end";
+          const radioQueue: PlaylistQueue = { id: `album-radio:${seed.source.practiceId}`, title: `Радио по альбому – ${seed.title}`,
+            source: seed.source, entries: seed.entries, currentIndex: -1, skippedCount: 0, runtimeSkippedCount: 0,
+            navigationPolicy: isListenPlayerPathname(pathname) ? "follow_listen_route" : "stay_on_source" };
+          return await activateEntryAtIndex(radioQueue, 0, { autoplay: true, fromStart: true, playBeforeNavigate: true }) === "advanced" ? "advanced" : "completed";
+        } finally { radioStartingRef.current = false; }
+      }
+      if (queue?.source.kind === "album_radio") {
+        if (!readAlbumRadioEnabled()) { setQueueCompleted(true); return "completed"; }
+        const generation = sessionGenerationRef.current;
+        await radioPreparationRef.current;
+        if (generation !== sessionGenerationRef.current || !readAlbumRadioEnabled()) return "none";
+        queue = activeQueueRef.current;
+      }
 
       if (!queue || queueCompleted || !currentSession) {
         return "none";
@@ -1535,6 +1676,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       }
 
       lastExhaustedPracticeIdRef.current = exhaustKey;
+      if (queue.source.kind === "album_radio") radioAdvanceReasonRef.current = naturalEnd ? "natural_end" : "skipped";
 
       const result = await activateEntryAtIndex(queue, queue.currentIndex + 1, {
         autoplay: true,
@@ -1553,6 +1695,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       }
 
       if (result === "completed") {
+        if (queue.source.kind === "album_radio") {
+          setNoticeMessage("Похожая музыка закончилась. Радио остановлено.");
+          return "completed";
+        }
         if (readStoredRepeatMode() === "all") {
           const restart = await restartPlaylistQueue();
           return restart.ok ? "advanced" : "completed";
@@ -1563,7 +1709,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
       return "none";
     },
-    [activateEntryAtIndex, queueCompleted, restartPlaylistQueue],
+    [activateEntryAtIndex, pathname, queueCompleted, restartPlaylistQueue],
   );
 
   const onRequestPreviousProduct = useCallback(async (): Promise<boolean> => {
@@ -1573,6 +1719,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return false;
     }
 
+    if (queue.source.kind === "album_radio") radioAdvanceReasonRef.current = "previous";
     const result = await activateEntryAtIndex(queue, queue.currentIndex - 1, {
       autoplay: true,
       fromStart: true,
@@ -1625,6 +1772,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         }
 
         queueAdvancePrefetchRef.current = {
+          preparedAt: Date.now(),
           queueId,
           fromIndex,
           index,
@@ -1832,10 +1980,16 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       confirmInternalQueueNavigation,
       noticeMessage,
       clearNoticeMessage,
+      albumRadioEnabled,
+      albumRadioAvailable,
+      setAlbumRadioEnabled,
       repeatMode,
       cycleRepeatMode,
     }),
     [
+      albumRadioEnabled,
+      albumRadioAvailable,
+      setAlbumRadioEnabled,
       activeQueue,
       clearNoticeMessage,
       clearPlaylistQueue,

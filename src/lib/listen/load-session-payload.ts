@@ -21,6 +21,7 @@ import { isCoursePublication } from "@/lib/course-content/validators";
 import { shouldApplyEntitledPublishedAudioFilter } from "@/lib/listen/course-audio-status";
 import {
   canAccessCourseContent,
+  isPracticeCatalogListed,
   resolveProductAccess,
 } from "@/lib/products/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -364,6 +365,9 @@ export async function loadListenSessionPayload(
       ok: true,
       session: {
         practiceId: practiceRow.id,
+        albumRadioEligible: practiceRow.product_kind === "music" &&
+          (practiceRow.publication_class == null || practiceRow.publication_class === "release") && !practiceRow.deleted_at &&
+          isPracticeCatalogListed(practiceRow),
         authorSlug: resolvedAuthorSlug,
         productSlug: practiceRow.slug,
         practiceTitle: practiceRow.title,

@@ -74,6 +74,10 @@ type GlobalPlayerSessionBase = {
 export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
   /** Omitted / "catalog" — catalog product listen session. */
   sourceType?: "catalog";
+  /** Server-validated listed music release, for full-only continuation. */
+  albumRadioEligible?: boolean;
+  /** Attribution only; real listening time remains playback_usage_facts. */
+  playbackAttribution?: Record<string, string | number | boolean>;
   practiceId: string;
   authorSlug: string;
   productSlug: string;
