@@ -12,7 +12,9 @@ import {
   BUSINESS_BRAND_MARK_SRC,
   BUSINESS_BRAND_METADATA,
   BUSINESS_BRAND_NAME,
+  CLASSIC_BRAND_ICON_VERSION,
   CLASSIC_BRAND_METADATA,
+  classicBrandAssetUrl,
   getHostBrandMetadata,
   isBusinessBrandAssetPath,
 } from "../src/lib/business-app/brand-icons.ts";
@@ -26,9 +28,9 @@ const classic = getHostBrandMetadata("audiolad.ru");
 assert.equal(classic, CLASSIC_BRAND_METADATA);
 assert.equal(getHostBrandMetadata("www.audiolad.ru"), CLASSIC_BRAND_METADATA);
 assert.equal(getHostBrandMetadata("school.audiolad.ru"), CLASSIC_BRAND_METADATA);
-assert.equal(classic.manifest, "/manifest.webmanifest");
+assert.equal(classic.manifest, `/manifest.webmanifest?v=${CLASSIC_BRAND_ICON_VERSION}`);
 assert.deepEqual(classic.icons.apple, [
-  { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+  { url: classicBrandAssetUrl("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" },
 ]);
 
 const biz = getHostBrandMetadata("business.audiolad.ru");
@@ -76,7 +78,17 @@ for (const f of ["favicon.ico", "icon.svg", "icon.png", "icon.ico", "apple-icon.
   assert.ok(!existsSync(join(root, "src/app", f)), `src/app/${f} would leak onto business host`);
 }
 assert.ok(existsSync(pub("/favicon.ico")));
-assert.equal(classic.icons.icon[0].url, "/favicon.ico?favicon.2vob68tjqpejf.ico");
+assert.equal(classic.icons.icon[0].url, classicBrandAssetUrl("/favicon.ico"));
+assert.equal(CLASSIC_BRAND_ICON_VERSION, "violet1");
+for (const u of classicUrls) {
+  assert.ok(u.includes(`?v=${CLASSIC_BRAND_ICON_VERSION}`), `classic cache-bust ${u}`);
+  assert.ok(existsSync(pub(u)), `missing ${u}`);
+}
+for (const i of cm.icons) {
+  assert.ok(i.src.includes(`?v=${CLASSIC_BRAND_ICON_VERSION}`), `classic manifest cache-bust ${i.src}`);
+  assert.ok(existsSync(pub(i.src)), i.src);
+}
+assert.ok(cm.icons.some((i) => i.src.startsWith("/icon-maskable-512.png") && i.purpose === "maskable"));
 
 // Leather lotus (photograph, not the old espresso-on-cream flat mark): real PNG sizes,
 // opaque (RGB or palette, no alpha), leather-brown corners, a sharp mark in the centre,
