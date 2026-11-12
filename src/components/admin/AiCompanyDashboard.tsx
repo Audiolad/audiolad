@@ -622,6 +622,7 @@ const LIFECYCLE_BUTTON: Record<LifecycleAction, string> = {
   cancel: "border border-[#f3b4c3] bg-white text-[#9f1239]",
   complete: "border border-green-300 bg-white text-green-900",
   stop: "border border-[#f3b4c3] bg-white text-[#9f1239]",
+  restore: "border border-[#cdbbef] bg-white text-[#4b2a8a]",
 };
 
 const FIELD = "mt-1 w-full rounded-lg border border-[#d9cdf0] bg-white px-3 py-2 text-sm";
@@ -777,7 +778,9 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
                   ? "Исполнитель получит команду остановиться. После его подтверждения задача уйдёт в план или в архив."
                   : open === "return"
                     ? "Задача вернётся исполнителю вместе с вашим комментарием."
-                    : "Только если работа уже сделана и есть доказательство (ссылка на PR или страницу)."}
+                    : open === "restore"
+                      ? "Задача вернётся из архива в прежнее состояние или в «План». Исполнителю ничего не отправляется."
+                      : "Только если работа уже сделана и есть доказательство (ссылка на PR или страницу)."}
           </p>
           {open === "stop" ? (
             <fieldset className="mt-3 text-sm">
