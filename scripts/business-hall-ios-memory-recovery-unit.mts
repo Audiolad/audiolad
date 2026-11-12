@@ -744,4 +744,102 @@ for (const background of [false, true]) {
   }
 }
 
+// A9 (review 3). The real lazy buffer + controller, offline: the sounding track (streamed) has no
+// copy, the next one is on disk – the reconnect loads the next copy and moves on to it at once,
+// not after the whole resume window.
+{
+  const c = clock();
+  const rows = new Map<string, number>();
+  const store: BufferStore = {
+    kind: "cache",
+    async get(id) { return rows.has(id) ? { blob: new Blob([new Uint8Array(16)], { type: "audio/mpeg" }), downloadedAt: rows.get(id)! } : null; },
+    async put() { throw new Error("blob path must not be used"); },
+    async putResponse(id, response, downloadedAt) { await response.body?.cancel(); rows.set(id, downloadedAt); return 8 * MB; },
+    async meta(id) { return rows.has(id) ? { size: 8 * MB, downloadedAt: rows.get(id)! } : null; },
+    async delete(id) { rows.delete(id); },
+    async keys() { return [...rows.keys()]; },
+    async clear() { rows.clear(); },
+  };
+  let online = true;
+  let urlN = 0;
+  const buffer = new HallOfflineBuffer({
+    store,
+    sign: async (id) => ({ ok: true, data: { url: `https://s/${id}` } }),
+    async fetchBlob() { throw new Error("no blob"); },
+    async fetchResponse() { return new Response("x"); },
+    streamToStore: true,
+    lazyCopies: true,
+    maxTracks: HALL_BUFFER_IOS_TRACKS,
+    createUrl: () => `blob:copy/${++urlN}`,
+    revokeUrl: () => {},
+    window: () => ({ until: null }),
+    isOnline: () => online,
+    now: c.now,
+    setTimer: c.setTimer,
+    clearTimer: c.clearTimer,
+  });
+  const audio = {
+    src: "", currentTime: 0, paused: true, ended: false,
+    async play() { if (!online && !this.src.startsWith("blob:")) throw new Error("network"); this.paused = false; },
+    pause() { this.paused = true; },
+    removeAttribute() { this.src = ""; this.currentTime = 0; },
+    load() {},
+  };
+  const tracks = [item(1), item(2), item(3)];
+  const p = new SpaOnlinePlayer({
+    audio,
+    now: c.now,
+    random: () => 0.5,
+    isOnline: () => online,
+    setTimer: c.setTimer,
+    clearTimer: c.clearTimer,
+    sign: async (id): Promise<OnlineSignResult> => (online ? { ok: true, data: { url: `https://s/${id}` } } : { ok: false, reason: "network" }),
+    localSource: (id, d) => buffer.localSource(id, d),
+    prepareLocal: (id) => buffer.prepare(id),
+    onSource: (id) => { if (id) buffer.pin(id); },
+    onChange() {},
+  }, tracks);
+  await p.toggle();
+  await flush();
+  assert.equal(audio.src, "https://s/track-1", "track-1 from the stream");
+  buffer.setPlan(["track-2", "track-3"], "track-1");
+  await c.advance(HALL_BUFFER_IOS_START_DELAY_MS + 1_000);
+  for (let i = 0; i < 4; i++) { await buffer.refill(true); await flush(); }
+  assert.deepEqual([...rows.keys()].sort(), ["track-2", "track-3"], "next tracks on disk");
+  assert.equal(buffer.stats().inMemory, 0, "nothing in memory before the loss");
+  online = false;
+  await p.onError();
+  await c.advance(3_000);
+  assert.equal(p.current?.audioItemId, "track-2", "moved on to the saved next track");
+  assert.ok(audio.src.startsWith("blob:copy/"), `played from the device (${audio.src})`);
+  assert.equal(p.status, "playing");
+  assert.ok(buffer.stats().inMemory <= 2, "at most two copies in memory");
+  buffer.dispose();
+  p.dispose();
+}
+
+// Journal (review 3): a successful send removes exactly the sent events, also when the queue
+// overflowed meanwhile.
+{
+  const c = clock();
+  let release: ((ok: boolean) => void) | null = null;
+  const sent: { k: string; d: Record<string, unknown> }[][] = [];
+  const j = new HallDeviceJournal({
+    send: (batch) => { sent.push(batch.map((e) => ({ k: e.k, d: e.d as Record<string, unknown> }))); return new Promise<boolean>((r) => { release = r; }); },
+    now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer,
+  });
+  for (let i = 0; i < 60; i++) { j.log("snapshot", { i }); await c.advance(HALL_JOURNAL_KIND_GAP_MS); }
+  void j.flush();
+  await flush();
+  const first = sent[sent.length - 1].map((e) => e.d.i);
+  for (let i = 60; i < 72; i++) { j.log("snapshot", { i }); await c.advance(HALL_JOURNAL_KIND_GAP_MS); }
+  (release as unknown as (ok: boolean) => void)(true);
+  await flush();
+  const left = (j as unknown as { queue: { d: { i: number } }[] }).queue.map((e) => e.d.i);
+  assert.ok(first.every((i) => !left.includes(i as number)), "sent ones gone");
+  assert.equal(left.length, 60 - first.filter((i) => (i as number) >= 12).length, "unsent ones kept");
+  assert.ok(left.includes(24), "an unsent event that was 13th–24th is kept");
+  j.dispose();
+}
+
 console.log("business-hall-ios-memory-recovery-unit: OK");

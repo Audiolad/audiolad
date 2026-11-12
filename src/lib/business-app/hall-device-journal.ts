@@ -214,7 +214,8 @@ export class HallDeviceJournal {
       ok = false;
     }
     this.sending = false;
-    if (ok) this.queue.splice(0, batch.length);
+    // Remove exactly the events sent (review 3: the queue may have shifted while sending).
+    if (ok) this.queue = this.queue.filter((e) => !batch.includes(e));
     if (this.disposed) return;
     if (this.queue.length > 0) this.schedule(ok ? HALL_JOURNAL_URGENT_FLUSH_MS : HALL_JOURNAL_FLUSH_MS);
   }

@@ -328,7 +328,8 @@ export class HallOfflineBuffer {
    */
   prepare(id: string): void {
     if (this.disposed || !this.d.lazyCopies || !this.entries.has(id)) return;
-    if (!this.demanded.includes(id)) this.demanded = [id];
+    // At most two copies in memory: the sounding track and the next one (a reconnect asks for both).
+    if (!this.demanded.includes(id)) this.demanded = [...this.demanded, id].slice(-2);
     void this.warm();
   }
 

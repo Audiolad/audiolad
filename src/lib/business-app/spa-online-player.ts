@@ -569,8 +569,13 @@ export class SpaOnlinePlayer {
         since: this.now(),
       };
     }
-    // t1390u: lazy copies (hall iPhone) – load this track's copy now; the retry below finds it.
-    try { this.d.prepareLocal?.(item.audioItemId); } catch { /* best effort */ }
+    // t1390u: lazy copies (hall iPhone) – load this track's copy now, and the next track's (review 3:
+    // offline the retry moves on to the next saved track when this one has no copy).
+    try {
+      this.d.prepareLocal?.(item.audioItemId);
+      const nextId = this.nextTargetId();
+      if (nextId && nextId !== item.audioItemId) this.d.prepareLocal?.(nextId);
+    } catch { /* best effort */ }
     this.emit("recover", { attempt: this.retryAttempt + 1, local: this.sourceLocal });
     // The stream failed but this device holds a copy of the same track: continue from the copy at
     // the same position at once (no backoff). A failing copy itself waits like any other source.
