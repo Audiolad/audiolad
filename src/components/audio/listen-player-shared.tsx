@@ -477,7 +477,7 @@ export function ListenPlayerProvider({
   const [restartingQueue, setRestartingQueue] = useState(false);
   const queueLabel =
     activeQueue && !queueCompleted
-      ? `Плейлист: ${activeQueue.currentIndex + 1} из ${activeQueue.entries.length}`
+      ? `${activeQueue.source.kind === "album_radio" ? "Радио по альбому" : "Плейлист"}: ${activeQueue.currentIndex + 1} из ${activeQueue.entries.length}`
       : null;
 
   const {

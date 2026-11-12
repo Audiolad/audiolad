@@ -1,5 +1,7 @@
 "use client";
 
+import { useGlobalAudioPlayer } from "@/components/audio/GlobalAudioPlayerProvider";
+import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { useEffect, useRef } from "react";
 
 import {
@@ -18,6 +20,7 @@ export default function AuthorPageViewTracker({
   path,
 }: AuthorPageViewTrackerProps) {
   const trackedRef = useRef(false);
+  const { session } = useGlobalAudioPlayer();
 
   useEffect(() => {
     if (trackedRef.current) {
@@ -37,8 +40,14 @@ export default function AuthorPageViewTracker({
       event_name: "author_page_view",
       path,
       author_id: authorId,
+      properties: session && isCatalogGlobalPlayerSession(session) &&
+        session.playbackAttribution?.playback_mode === "album_radio" &&
+        path === `/authors/${session.authorSlug}` ? {
+          ...session.playbackAttribution,
+          radio_new_artist: session.authorSlug !== session.playbackAttribution.radio_source_author_slug,
+        } : {},
     });
-  }, [authorId, path]);
+  }, [authorId, path, session]);
 
   return null;
 }

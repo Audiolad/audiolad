@@ -1,5 +1,7 @@
 "use client";
 
+import AlbumRadioControl from "@/components/audio/AlbumRadioControl";
+
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import FormattedPlainText from "@/components/FormattedPlainText";
@@ -91,6 +93,7 @@ export default function ListenPlayerMobile() {
 
   return (
     <div className="relative z-10">
+      <AlbumRadioControl />
       {isDismissedIdle && sessionPayload ? (
         <section className="mt-6 text-center">
           <p className="text-sm text-white/70">

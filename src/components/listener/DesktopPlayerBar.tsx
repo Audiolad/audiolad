@@ -1,5 +1,7 @@
 "use client";
 
+import AlbumRadioControl from "@/components/audio/AlbumRadioControl";
+
 import { useEffect, type ReactNode } from "react";
 
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
@@ -214,6 +216,7 @@ function DesktopPlayerActiveState({
           </div>
 
           <div className="min-w-0 flex-1">
+            <AlbumRadioControl compact />
             <p
               className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#25135c]"
               title={title}

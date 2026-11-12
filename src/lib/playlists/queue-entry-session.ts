@@ -66,6 +66,10 @@ export async function resolvePlaylistQueueEntrySession(
   });
 
   if (listen.ok) {
+    if (entry.kind === "audio_item" && entry.fullOnly &&
+        (listen.session.albumRadioEligible !== true || listen.session.playbackMode === "preview" || listen.session.isAuthorPreview)) {
+      return { ok: false, reason: "unavailable" };
+    }
     const filtered = applyQueueEntryTrackFilter(listen.session, entry);
 
     if (!filtered) {
@@ -75,7 +79,8 @@ export async function resolvePlaylistQueueEntrySession(
     return { ok: true, session: filtered };
   }
 
-  if (!shouldFallbackListenSessionToCatalogPreview(listen.reason)) {
+  if ((entry.kind === "audio_item" && entry.fullOnly) ||
+      !shouldFallbackListenSessionToCatalogPreview(listen.reason)) {
     return listen;
   }
 

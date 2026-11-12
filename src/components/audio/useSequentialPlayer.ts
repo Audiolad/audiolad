@@ -132,6 +132,7 @@ type UseSequentialPlayerOptions = {
    */
   onTracksExhausted?: (
     fromPracticeId: string,
+    naturalEnd?: boolean,
   ) => Promise<TracksExhaustedResult>;
   /** Called when Previous is pressed on the first track (after restart threshold). */
   onRequestPreviousProduct?: () => Promise<boolean>;
@@ -1580,7 +1581,7 @@ export function useSequentialPlayer({
       }
 
       if (onTracksExhaustedRef.current) {
-        void onTracksExhaustedRef.current(practiceId).then((result) => {
+        void onTracksExhaustedRef.current(practiceId, true).then((result) => {
           if (!isHandlerCurrent()) {
             return;
           }

@@ -1,5 +1,7 @@
 "use client";
 
+import AlbumRadioControl from "@/components/audio/AlbumRadioControl";
+
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import FormattedPlainText from "@/components/FormattedPlainText";
@@ -95,6 +97,7 @@ export default function ListenPlayerDesktop() {
       <div className="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-[#e9c3b5]/15 blur-3xl motion-reduce:blur-none" />
 
       <div className="relative z-10 flex flex-col gap-3 p-4 xl:gap-3 xl:p-4 2xl:gap-3.5 2xl:p-4">
+        <AlbumRadioControl />
         {/* 1. Top: cover + practice info */}
         <section className="grid min-w-0 grid-cols-[minmax(220px,min(40%,290px))_minmax(0,1fr)] items-start gap-4 xl:gap-5 2xl:grid-cols-[minmax(240px,min(32%,325px))_minmax(0,1fr)]">
           <div className="w-full max-w-[290px] justify-self-start 2xl:max-w-[325px]">

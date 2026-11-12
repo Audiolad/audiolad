@@ -102,6 +102,7 @@ export function notePendingConfirmedPlay(
     practiceId: string;
     trackId: string;
     path: string;
+    playbackAttribution?: Record<string, string | number | boolean>;
     now: number;
   },
   store: PendingConfirmedPlaysStore = getPendingConfirmedPlaysStore(),
@@ -115,6 +116,7 @@ export function notePendingConfirmedPlay(
     trackId: input.trackId,
     path: input.path,
     listeningContextId: state.listeningStartedAt,
+    playbackAttribution: input.playbackAttribution,
     now: input.now,
   });
   noteListenTrackerPlayingActivity(state, input.now);

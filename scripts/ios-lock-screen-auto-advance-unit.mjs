@@ -60,7 +60,7 @@ function testEndedDoesNotAwaitProgressBeforeAdvance() {
     "handleEnded must not await queue exhaust before returning",
   );
   assert(
-    handleEnded.includes("void onTracksExhaustedRef.current(practiceId)"),
+    handleEnded.includes("void onTracksExhaustedRef.current(practiceId, true)"),
     "queue exhaust is kicked off without blocking ended",
   );
 
