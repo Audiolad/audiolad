@@ -413,7 +413,7 @@ for (const background of [false, true]) {
   assert.equal(putResponses, 3);
   assert.equal(blobFetches, 0, "no Blob download");
   assert.equal(blobsRead.length, 0, "nothing read back into the page");
-  assert.deepEqual(buffer.stats(), { tracks: 3, bytes: 24 * MB, inMemory: 0 });
+  assert.deepEqual(buffer.stats(), { tracks: 3, bytes: 24 * MB, inMemory: 0, downloading: 0 });
   assert.equal(buffer.localSource("a", 180), null, "lazy: no copy in memory without a reconnect");
   await flush();
   assert.equal(buffer.stats().inMemory, 0);
@@ -650,7 +650,7 @@ for (const background of [false, true]) {
   await flush();
   assert.equal(blobFetches, 0, "no Blob download on the iPhone");
   assert.deepEqual(signs, [], "no buffer requests without a streaming store");
-  assert.deepEqual(buffer.stats(), { tracks: 0, bytes: 0, inMemory: 0 });
+  assert.deepEqual(buffer.stats(), { tracks: 0, bytes: 0, inMemory: 0, downloading: 0 });
   buffer.dispose();
 }
 

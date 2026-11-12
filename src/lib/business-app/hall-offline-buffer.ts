@@ -334,10 +334,11 @@ export class HallOfflineBuffer {
   }
 
   /** t1390u telemetry: copies on the device, their bytes and how many sit in page memory. */
-  stats(): { tracks: number; bytes: number; inMemory: number } {
+  stats(): { tracks: number; bytes: number; inMemory: number; downloading: number } {
     let inMemory = 0;
     for (const e of this.entries.values()) if (e.blob) inMemory++;
-    return { tracks: this.entries.size, bytes: this.bytes(), inMemory };
+    // t1390u follow-up: downloads in flight go into the «last breath» of the page.
+    return { tracks: this.entries.size, bytes: this.bytes(), inMemory, downloading: this.downloading.size };
   }
 
   /** The element now plays this track (null: nothing). The previous pinned copy may go. */
