@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { AUDIOLAD_HORIZONTAL_LOGO_PATH } from "@/lib/brand/classic-logos";
+
 const HORIZONTAL_LOGO_WIDTH = 600;
 const HORIZONTAL_LOGO_HEIGHT = 200;
 
@@ -42,7 +44,7 @@ export default function AudioladHorizontalLogo({
       : audioladHorizontalLogoLinkClassName);
   const image = (
     <Image
-      src="/brand/audiolad-logo-horizontal.png"
+      src={AUDIOLAD_HORIZONTAL_LOGO_PATH}
       alt="АудиоЛад"
       width={HORIZONTAL_LOGO_WIDTH}
       height={HORIZONTAL_LOGO_HEIGHT}

@@ -77,7 +77,7 @@ function testStudioIsolation() {
     "project library is protected at its dedicated route",
   );
   assert(
-    studioBrand.includes('src="/brand/audiolad-logo-light.webp"') &&
+    studioBrand.includes('src={AUDIOLAD_LIGHT_LOGO_PATH}') &&
       studioBrand.includes("Студия") &&
       !studioPage.includes("uppercase tracking"),
     "studio uses the official compact brand asset",

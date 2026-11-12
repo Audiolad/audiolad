@@ -186,7 +186,7 @@ async function main() {
   }
 
   const logo = await fetchResponse(
-    "/_next/image?url=%2Fbrand%2Faudiolad-logo-horizontal.png&w=640&q=75",
+    "/_next/image?url=%2Fbrand%2Faudiolad-logo-horizontal.png%3Fv%3Dviolet2&w=640&q=75",
     { accept: "image/webp,image/png,image/*;q=0.8", ua: IPHONE_SAFARI_UA },
   );
   if (logo.status !== 200 || !logo.contentType.startsWith("image/")) {

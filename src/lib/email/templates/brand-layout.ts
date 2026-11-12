@@ -1,3 +1,4 @@
+import { withClassicWordmarkVersion } from "../../brand/classic-logos";
 import { escapeHtml } from "./escape-html";
 
 export const BRAND_EMAIL_TEMPLATE_VERSION = "typography-v4-20260720";
@@ -533,7 +534,7 @@ export function renderBrandEmailShell(input: BrandEmailShellInput): string {
                     <td align="center" style="padding: 0 0 28px">
                       <img
                         class="email-logo"
-                        src="${escapeHtml(input.logoUrl)}"
+                        src="${escapeHtml(withClassicWordmarkVersion(input.logoUrl))}"
                         alt="АудиоЛад"
                         width="280"
                         height="93"

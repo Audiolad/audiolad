@@ -8,6 +8,7 @@ import PersonalMaterialGuestFooter from "@/components/personal-materials/guest/P
 import PersonalMaterialHeader from "@/components/personal-materials/guest/PersonalMaterialHeader";
 import PersonalMaterialRecommendation from "@/components/personal-materials/guest/PersonalMaterialRecommendation";
 import PersonalMaterialSaveCta from "@/components/personal-materials/guest/PersonalMaterialSaveCta";
+import { AUDIOLAD_HORIZONTAL_LOGO_PATH } from "@/lib/brand/classic-logos";
 import { shouldRenderOptionalBlock } from "@/lib/personal-materials/access";
 import {
   formatGuestMaterialDate,
@@ -31,7 +32,7 @@ export default function PersonalMaterialGuestPage({
       <div className="mx-auto w-full max-w-[820px]">
         <div className="mb-6 flex items-center justify-between gap-4">
           <Image
-            src="/brand/audiolad-logo-horizontal.png"
+            src={AUDIOLAD_HORIZONTAL_LOGO_PATH}
             alt="АудиоЛад"
             width={140}
             height={32}

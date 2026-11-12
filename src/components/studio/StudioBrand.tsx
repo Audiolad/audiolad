@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { AUDIOLAD_LIGHT_LOGO_PATH } from "@/lib/brand/classic-logos";
+
 export function StudioBrand({
   compact = false,
 }: {
@@ -8,9 +10,9 @@ export function StudioBrand({
   return (
     <div className={compact ? "flex items-center gap-1.5" : "flex items-center gap-3"}>
       <Image
-        src="/brand/audiolad-logo-light.webp"
+        src={AUDIOLAD_LIGHT_LOGO_PATH}
         alt="АудиоЛад"
-        width={768}
+        width={674}
         height={197}
         priority
         className={compact ? "h-7 w-auto" : "h-10 w-auto sm:h-12"}

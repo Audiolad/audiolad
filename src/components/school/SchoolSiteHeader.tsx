@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 import UserAvatar from "@/components/profile/UserAvatar";
-import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
+import { AUDIOLAD_HORIZONTAL_LOGO_PATH } from "@/lib/brand/classic-logos";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
+import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
 type SchoolSiteHeaderProps = {
   shellData: ListenerShellData;
@@ -45,7 +46,7 @@ export default function SchoolSiteHeader({ shellData }: SchoolSiteHeaderProps) {
           aria-label="АудиоЛад – на главную"
         >
           <Image
-            src="/brand/audiolad-logo-horizontal.png"
+            src={AUDIOLAD_HORIZONTAL_LOGO_PATH}
             alt="АудиоЛад"
             width={600}
             height={200}

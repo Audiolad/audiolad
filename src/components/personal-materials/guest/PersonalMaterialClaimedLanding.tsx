@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import PasswordInput from "@/components/ui/PasswordInput";
+import { AUDIOLAD_HORIZONTAL_LOGO_PATH } from "@/lib/brand/classic-logos";
 import { createClient } from "@/lib/supabase/client";
 
 type PersonalMaterialClaimedLandingProps = {
@@ -79,7 +80,7 @@ export default function PersonalMaterialClaimedLanding({
       <div className="mx-auto w-full max-w-[820px]">
         <div className="mb-6 flex items-center justify-between gap-4">
           <Image
-            src="/brand/audiolad-logo-horizontal.png"
+            src={AUDIOLAD_HORIZONTAL_LOGO_PATH}
             alt="АудиоЛад"
             width={140}
             height={32}
