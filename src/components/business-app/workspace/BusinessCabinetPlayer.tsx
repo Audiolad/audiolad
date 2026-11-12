@@ -28,10 +28,19 @@ import {
   resolveHallClientBuildId,
   shouldReloadForNewBuild,
 } from "@/lib/business-app/hall-build-reload";
-import { POINT_RESUME_SETTLE_MS, runPointCommands, waitWhileLoading } from "@/lib/business-app/point-commands";
+import { pointCommandApplied, runPointCommands } from "@/lib/business-app/point-commands";
 import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import { FadingAudio } from "@/lib/business-app/player-fade";
+import { FadingAudio, isAppleTouchDevice } from "@/lib/business-app/player-fade";
+import {
+  HALL_AUTO_RESUME_MAX_AGE_MS,
+  HALL_TOUCH_RESUME_SKIP_SELECTOR,
+  HallPlayingMarkerWriter,
+  clearHallPlayingMarker,
+  hallMeantToPlay,
+  readHallPlayingMarker,
+  shouldAutoResumeHall,
+} from "@/lib/business-app/hall-auto-resume";
 import { prepareLoopAudio } from "@/lib/business-app/hall-loop-audio";
 import { HallWakeIntentTracker, HallWakeLock, type WakeLockNavigator } from "@/lib/business-app/hall-wake-lock";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
@@ -236,6 +245,18 @@ function writeLocal(spaceId: string, playback: WorkspacePlayback, locationId?: s
   }
 }
 
+function hallLocalStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** t1365u: the auto-resume waits this long at most for the controller / access after a load. */
+const HALL_AUTO_RESUME_READY_MS = 20_000;
+const HALL_AUTO_RESUME_POLL_MS = 250;
+
 function hallKey(hall: HallNowPlaying): string {
   return `${hall.state}:${hall.audioItemId ?? ""}`;
 }
@@ -404,6 +425,11 @@ export function BusinessCabinetPlayerProvider({
   }, []);
 
   const canBeat = pointReports;
+  /** t1365u: hall iPhone / iPad – start from a fresh pre-signed stream, not a blob: copy. */
+  const streamFirstRef = useRef(false);
+  useLayoutEffect(() => {
+    streamFirstRef.current = canBeat && typeof navigator !== "undefined" && isAppleTouchDevice(navigator);
+  }, [canBeat]);
   const reportPlayback = useCallback(() => {
     if (!canBeat) return;
     const audio = audioRef.current;
@@ -475,6 +501,16 @@ export function BusinessCabinetPlayerProvider({
   const wakeLockRef = useRef<HallWakeLock | null>(null);
   /** Deliberate pause / start in flight – what the controller itself does not know. */
   const wakeIntentRef = useRef(new HallWakeIntentTracker());
+  // t1365u: «this hall was playing» survives a reload of the page (hall-auto-resume.ts). Hall
+  // device only; scope = space:location, like the offline buffer owner.
+  const hallScopeRef = useRef<string | null>(null);
+  const playingMarkerRef = useRef<HallPlayingMarkerWriter | null>(null);
+  const notePlayingMarker = useCallback(() => {
+    const writer = playingMarkerRef.current;
+    const ctl = ctlRef.current;
+    if (!writer || !ctl) return;
+    writer.observe(hallScopeRef.current, ctl.status, wakeIntentRef.current.deliberatelyPaused);
+  }, []);
   const syncWakeLock = useCallback(() => {
     wakeLockRef.current?.setWanted(wakeIntentRef.current.wanted(ctlRef.current, remotePausedRef.current));
   }, []);
@@ -496,6 +532,9 @@ export function BusinessCabinetPlayerProvider({
   const trySafeBuildReload = useCallback(() => {
     const pending = pendingBuildRef.current;
     if (!pending || remotePausedRef.current || remoteCommandBusyRef.current) return;
+    // t1365u: the hall was playing and nobody paused it on purpose – whatever the controller says
+    // now, a reload could only silence it. Wait for a deliberate pause.
+    if (playingMarkerRef.current && hallMeantToPlay(readHallPlayingMarker(hallLocalStorage()), hallScopeRef.current)) return;
     const ctl = ctlRef.current;
     const musicPaused = hallMusicSilent(
       hallIntentOf(ctl),
@@ -598,6 +637,17 @@ export function BusinessCabinetPlayerProvider({
   }, [canBeat]);
 
   const bufferOwner = canBeat && open && model ? `${model.spaceId}:${model.locationId ?? ""}` : null;
+  useLayoutEffect(() => {
+    hallScopeRef.current = bufferOwner;
+    if (!canBeat) {
+      playingMarkerRef.current = null;
+      return;
+    }
+    playingMarkerRef.current ??= new HallPlayingMarkerWriter(hallLocalStorage());
+    // Another hall on this browser: its «was playing» never starts music here.
+    const marker = readHallPlayingMarker(hallLocalStorage());
+    if (bufferOwner && marker && marker.scope !== bufferOwner) clearHallPlayingMarker(hallLocalStorage());
+  }, [canBeat, bufferOwner]);
   useEffect(() => {
     if (!bufferOwner) return;
     let cancelled = false;
@@ -616,6 +666,9 @@ export function BusinessCabinetPlayerProvider({
         store,
         sign: (audioItemId) => signWorkspaceTrack(modelRef.current?.spaceId ?? "cafe", audioItemId),
         fetchBlob: fetchTrackBlob,
+        // t1365u: the hall iPhone starts tracks from the stream; one next copy in memory is enough
+        // for a reconnect (the rest stays on disk).
+        warmTracks: isAppleTouchDevice(navigator) ? 1 : undefined,
         createUrl: (blob) => URL.createObjectURL(blob),
         revokeUrl: (url) => URL.revokeObjectURL(url),
         window: (audioItemId) => {
@@ -674,6 +727,10 @@ export function BusinessCabinetPlayerProvider({
         // network at the boundary.
         backgroundAdvance: () => lockedAppleScreen(document, navigator),
         loopAdvance: () => loopMode && audio.loop === true,
+        // t1365u: hall iPhone – a fresh pre-signed stream wins over the device copy at a normal
+        // start (no whole-track blob loaded into the page at every boundary); the copy stays the
+        // source for reconnects, starts without a ready link and offline.
+        streamFirst: () => streamFirstRef.current,
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
         previousIndex: (currentIndex, length) => cafeQueuePreviousIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
@@ -707,6 +764,7 @@ export function BusinessCabinetPlayerProvider({
           // Any fresh start (also one not wrapped below) ends a deliberate pause.
           wakeIntentRef.current.observe(current.status);
           syncWakeLock();
+          notePlayingMarker();
           if (current.status === "paused" || current.status === "idle") {
             trySafeBuildReload();
           }
@@ -728,6 +786,7 @@ export function BusinessCabinetPlayerProvider({
       }));
       ctl.onProgress(audio.currentTime, audio.duration);
       if (audio.paused) return;
+      notePlayingMarker();
       remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true);
     };
     const sendReport = () => reportRef.current();
@@ -787,7 +846,7 @@ export function BusinessCabinetPlayerProvider({
       fader.dispose();
       if (fadeRef.current === fader) fadeRef.current = null;
     };
-  }, [catalogKey, open, remember, syncWakeLock]);
+  }, [catalogKey, open, remember, syncWakeLock, notePlayingMarker]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -978,23 +1037,20 @@ export function BusinessCabinetPlayerProvider({
           status: () => ctlRef.current?.status ?? "idle",
           toggle: (signal) => commandTransport(signal, () => toggleRef.current()),
           next: (signal) => commandTransport(signal, () => nextRef.current(signal)),
-          applied: async (type) => {
-            // Soft pause resolves before the fade has actually silenced the element.
-            if (type === "pause" && fadeRef.current?.fadingOut) await fadeRef.current.fadeOut();
-            // Resume / next while a track is still loading (sign, reconnect): wait for it here
-            // instead of failing and waiting out the 30 s lease.
-            if (type !== "pause") await waitWhileLoading(() => ctlRef.current?.status ?? "idle", POINT_RESUME_SETTLE_MS);
-            const status = ctlRef.current?.status;
-            const audio = audioRef.current;
-            const done = !!audio && (type === "pause"
-              ? (status === "paused" || status === "idle") && audio.paused
-              : status === "playing" && !audio.paused);
-            if (type === "pause" && done) {
+          applied: pointCommandApplied({
+            status: () => ctlRef.current?.status,
+            audio: () => audioRef.current,
+            fade: () => fadeRef.current,
+            ownerPaused: () => {
               remotePausedRef.current = true;
+              // t1365u (review of b2853392): also when the hall was already silent (paused /
+              // idle / iOS autoplay refusal) and the pause itself was a no-op – the owner chose
+              // silence, so a reloaded page must not start the music by itself.
+              wakeIntentRef.current.markPaused();
+              playingMarkerRef.current?.clear();
               syncWakeLock();
-            }
-            return done;
-          },
+            },
+          }),
           ack: async (command) => {
             const ack = await fetch("/api/business/point", {
               method: "POST",
@@ -1460,6 +1516,79 @@ export function BusinessCabinetPlayerProvider({
     };
   }, [canBeat, rebuildFromProfile]);
 
+  // t1365u (Sergey t1366u–t1368u): the page of a hall that was playing was opened again (the
+  // browser reloaded it, e.g. Safari after its web process died): start the music by itself, no
+  // message, no hint. Once per page; only a hall device, only the same hall, only a recent marker,
+  // never over a deliberate pause (the marker is gone then) or an owner pause.
+  const autoResumeTriedRef = useRef(false);
+  useEffect(() => {
+    if (!canBeat || !open || !catalogKey || autoResumeTriedRef.current) return;
+    const scope = hallScopeRef.current;
+    const storage = hallLocalStorage();
+    const marker = readHallPlayingMarker(storage);
+    if (!shouldAutoResumeHall({ marker, scope, now: Date.now(), maxAgeMs: HALL_AUTO_RESUME_MAX_AGE_MS })) {
+      autoResumeTriedRef.current = true;
+      // Too old (phone put away, tab closed for the night): a later load must not start either.
+      if (marker && marker.scope === scope) clearHallPlayingMarker(storage);
+      return;
+    }
+    let stop = false;
+    const startedAt = Date.now();
+    let timer: number | null = null;
+    const attempt = () => {
+      timer = null;
+      if (stop || autoResumeTriedRef.current) return;
+      const ctl = ctlRef.current;
+      const ready = !!ctl && !!modelRef.current?.tracks.length && accessRef.current?.allowsPlayback() === true;
+      if (!ready) {
+        if (Date.now() - startedAt < HALL_AUTO_RESUME_READY_MS) timer = window.setTimeout(attempt, HALL_AUTO_RESUME_POLL_MS);
+        else autoResumeTriedRef.current = true;
+        return;
+      }
+      autoResumeTriedRef.current = true;
+      if (remotePausedRef.current || wakeIntentRef.current.deliberatelyPaused) return;
+      // Something already started (a tap, an owner command): nothing to do.
+      if (ctl.status !== "idle" && !(ctl.status === "paused" && ctl.needsGesture)) return;
+      // Same path as the round Play button: saved track, saved position, wake lock, reports.
+      // A refusal (iOS without a tap) leaves the track loaded; the foreground / first-touch
+      // retries below pick it up.
+      void toggleRef.current();
+    };
+    attempt();
+    return () => {
+      stop = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [canBeat, open, catalogKey]);
+
+  // t1365u: a start the browser refused (needsGesture) while this hall means to play resumes on
+  // the very first touch anywhere on the hall screen – not a button to look for, nothing shown.
+  // Controls keep their own handlers (one tap is never «resume + pause»).
+  useEffect(() => {
+    if (!canBeat || typeof document === "undefined") return;
+    let lastTry = 0;
+    const onTouch = (event: Event) => {
+      const ctl = ctlRef.current;
+      if (!ctl || ctl.status !== "paused" || !ctl.needsGesture) return;
+      // touchend and the click that follows it are one tap.
+      const now = Date.now();
+      if (now - lastTry < 1_500) return;
+      if (remotePausedRef.current || wakeIntentRef.current.deliberatelyPaused) return;
+      const target = event.target as { closest?: (selector: string) => unknown } | null;
+      if (target && typeof target.closest === "function" && target.closest(HALL_TOUCH_RESUME_SKIP_SELECTOR)) return;
+      lastTry = now;
+      void toggleRef.current();
+    };
+    document.addEventListener("touchend", onTouch, true);
+    document.addEventListener("click", onTouch, true);
+    document.addEventListener("keydown", onTouch, true);
+    return () => {
+      document.removeEventListener("touchend", onTouch, true);
+      document.removeEventListener("click", onTouch, true);
+      document.removeEventListener("keydown", onTouch, true);
+    };
+  }, [canBeat]);
+
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;
     const audio = audioRef.current;
@@ -1467,6 +1596,7 @@ export function BusinessCabinetPlayerProvider({
     setBarDismissed(true);
     // Closing the bar is a deliberate stop: the hall screen may go dark, even after an owner pause.
     wakeIntentRef.current.markPaused({ stop: true });
+    playingMarkerRef.current?.clear();
     syncWakeLock();
     if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
       await ctl.toggle();
