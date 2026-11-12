@@ -1,5 +1,7 @@
 "use client";
 
+import AlbumRadioControl from "@/components/audio/AlbumRadioControl";
+
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import {
@@ -182,6 +184,9 @@ export default function GlobalMiniPlayer() {
       }}
       aria-label="Мини-плеер"
     >
+      <div className="absolute inset-x-0 bottom-full bg-[#4b2f86] text-white">
+        <AlbumRadioControl />
+      </div>
       <div className="relative mx-auto flex h-full w-full max-w-[430px] flex-col px-3 py-2">
         <button
           type="button"

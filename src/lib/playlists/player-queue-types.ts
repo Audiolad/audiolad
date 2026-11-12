@@ -17,13 +17,25 @@ export type PlaylistQueueEntry =
       kind: "audio_item";
       practiceId: string;
       audioItemId: string;
+      /** Radio never falls back to a storefront preview. */
+      fullOnly?: boolean;
       authorSlug: string | null;
       productSlug: string;
       title: string;
       listenHref: string;
     };
 
+export type AlbumRadioSource = {
+  kind: "album_radio";
+  runId: string;
+  authorSlug: string;
+  productSlug: string;
+  practiceId: string;
+  returnHref: string;
+};
+
 export type PlaylistQueueSource =
+  | AlbumRadioSource
   | {
       kind: "owner_playlist";
       playlistId: string;

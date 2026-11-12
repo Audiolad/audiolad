@@ -42,6 +42,7 @@ import {
 } from "@/lib/listen/repeat-analytics";
 
 type ListenAnalyticsTrackerProps = {
+  playbackAttribution?: Record<string, string | number | boolean>;
   practiceId: string;
   trackId: string | null;
   path: string;
@@ -57,6 +58,7 @@ function emitPlayStarted(input: {
   trackId: string;
   path: string;
   listeningKey: string;
+  playbackAttribution?: Record<string, string | number | boolean>;
   /** Wall time for continuous-session expiry between distinct listening contexts. */
   continuousAt?: number;
 }): void {
@@ -78,6 +80,7 @@ function emitPlayStarted(input: {
     audio_item_id: input.trackId,
     properties: {
       listening_key: input.listeningKey,
+      ...input.playbackAttribution,
     },
   });
 }
@@ -91,6 +94,7 @@ function emitPlayStarted(input: {
  * preserving original path and distinct listening contexts; survives programCompleted.
  */
 export default function ListenAnalyticsTracker({
+  playbackAttribution,
   practiceId,
   trackId,
   path,
@@ -175,6 +179,7 @@ export default function ListenAnalyticsTracker({
         practiceId,
         trackId,
         path,
+        playbackAttribution,
         now,
       });
       return;
@@ -246,8 +251,9 @@ export default function ListenAnalyticsTracker({
       path,
       listeningKey,
       continuousAt: now,
+      playbackAttribution,
     });
-  }, [isPlaying, path, practiceId, sessionId, trackId]);
+  }, [isPlaying, path, playbackAttribution, practiceId, sessionId, trackId]);
 
   useEffect(() => {
     if (!trackId || duration <= 0) {
@@ -275,6 +281,7 @@ export default function ListenAnalyticsTracker({
           practiceId,
           trackId,
           path,
+          playbackAttribution,
           now,
         });
       }
@@ -323,6 +330,7 @@ export default function ListenAnalyticsTracker({
         audio_item_id: trackId,
         properties: {
           listening_key: listeningKey,
+          ...playbackAttribution,
         },
       });
     }
@@ -355,6 +363,7 @@ export default function ListenAnalyticsTracker({
           audio_item_id: trackId,
           properties: {
             listening_key: listeningKey,
+            ...playbackAttribution,
           },
         });
       }
@@ -366,6 +375,7 @@ export default function ListenAnalyticsTracker({
     path,
     practiceId,
     programCompleted,
+    playbackAttribution,
     sessionId,
     trackId,
   ]);
@@ -426,5 +436,6 @@ function flushPendingEntry(input: {
     path: entry.path,
     listeningKey,
     continuousAt: entry.confirmedAt,
+    playbackAttribution: entry.playbackAttribution,
   });
 }

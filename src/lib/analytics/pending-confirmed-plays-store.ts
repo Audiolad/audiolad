@@ -21,6 +21,7 @@ export type PendingConfirmedPlay = {
    */
   listeningContextId: number;
   confirmedAt: number;
+  playbackAttribution?: Record<string, string | number | boolean>;
 };
 
 export function pendingConfirmedPlayKey(
@@ -37,6 +38,7 @@ export type PendingConfirmedPlaysStore = {
     trackId: string;
     path: string;
     listeningContextId: number;
+    playbackAttribution?: Record<string, string | number | boolean>;
     now: number;
   }): PendingConfirmedPlay;
   list(): PendingConfirmedPlay[];
@@ -67,6 +69,7 @@ export function createPendingConfirmedPlaysStore(): PendingConfirmedPlaysStore {
         path: input.path,
         listeningContextId: input.listeningContextId,
         confirmedAt: input.now,
+        ...(input.playbackAttribution ? { playbackAttribution: input.playbackAttribution } : {}),
       };
       entries.set(key, entry);
       return entry;

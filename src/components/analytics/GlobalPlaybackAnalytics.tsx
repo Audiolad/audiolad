@@ -67,8 +67,16 @@ export default function GlobalPlaybackAnalytics({
     return null;
   }
 
+  // Same-album exact-track handoff can render once before the engine adopts
+  // the new track. Never attach the next radio context to the previous audio.
+  if (isCatalogGlobalPlayerSession(session) && session.playbackAttribution?.playback_mode === "album_radio" &&
+      !session.tracks.some((track) => track.id === engine.currentTrack?.id)) {
+    return null;
+  }
+
   return (
     <ListenAnalyticsTracker
+      playbackAttribution={isCatalogGlobalPlayerSession(session) ? session.playbackAttribution : undefined}
       practiceId={target.practiceId}
       trackId={engine.currentTrack?.id ?? null}
       path={target.path}
