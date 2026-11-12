@@ -12,7 +12,7 @@ import {
 } from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
-import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
+import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID, isAuthorCabinetBusinessAdmissionEnabled } from "@/lib/author-dashboard/business-access";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import {
@@ -241,9 +241,10 @@ export default function AuthorDashboardNav({
   const pathname = usePathname();
   const unreadComments = useAuthorUnreadCommentCount();
   const [businessNoticeOpen, setBusinessNoticeOpen] = useState(false);
-  const businessLocked = accessStatus !== undefined && !authorCanOpenBusiness(accessStatus);
+  const admissionEnabled = isAuthorCabinetBusinessAdmissionEnabled();
+  const businessLocked = admissionEnabled && accessStatus !== undefined && !authorCanOpenBusiness(accessStatus);
   // On /author-dashboard/business the page itself renders the notice (same id), so it is always shown.
-  const onBusinessPage = pathname.startsWith("/author-dashboard/business");
+  const onBusinessPage = admissionEnabled && pathname.startsWith("/author-dashboard/business");
   const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
@@ -342,13 +343,17 @@ export default function AuthorDashboardNav({
       icon: StatusIcon,
       active: pathname.startsWith("/author-dashboard/status"),
     },
-    {
-      href: `/author-dashboard/business${authorQuery}`,
-      label: "АудиоЛад Бизнес",
-      icon: StatusIcon,
-      active: pathname.startsWith("/author-dashboard/business"),
-      locked: businessLocked,
-    },
+    ...(admissionEnabled
+      ? [
+          {
+            href: `/author-dashboard/business${authorQuery}`,
+            label: "АудиоЛад Бизнес",
+            icon: StatusIcon,
+            active: pathname.startsWith("/author-dashboard/business"),
+            locked: businessLocked,
+          },
+        ]
+      : []),
     {
       href: `/author-dashboard/legal${authorQuery}`,
       label: "Документы",
