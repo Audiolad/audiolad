@@ -205,3 +205,18 @@ export async function purgeHallBufferStorage(): Promise<void> {
     }
   } catch { /* blocked */ }
 }
+
+/**
+ * t1390u follow-up: number of entries in the hall cache (copies + size sidecars), null when Cache
+ * Storage is missing or blocked. Diagnostics only (journal snapshot / last breath): tells whether a
+ * multi-GB origin storage use on a hall device is this buffer or something else. Never throws.
+ */
+export async function countHallBufferEntries(): Promise<number | null> {
+  try {
+    if (typeof caches === "undefined") return null;
+    if (!(await caches.has(HALL_BUFFER_CACHE_NAME))) return 0;
+    return (await (await caches.open(HALL_BUFFER_CACHE_NAME)).keys()).length;
+  } catch {
+    return null;
+  }
+}

@@ -25,7 +25,8 @@ import {
   type HallJournalData,
   type HallJournalKind,
 } from "@/lib/business-app/hall-device-journal";
-import { createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, writeHallBufferOwner } from "@/lib/business-app/hall-offline-buffer-store";
+import { HallLastBreathWriter, hallPrevPageReport, readHallLastBreath } from "@/lib/business-app/hall-last-breath";
+import { countHallBufferEntries, createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, writeHallBufferOwner } from "@/lib/business-app/hall-offline-buffer-store";
 import { HallReportQueue } from "@/lib/business-app/hall-report-queue";
 import {
   hallBuildMismatch,
@@ -552,8 +553,14 @@ export function BusinessCabinetPlayerProvider({
   /** The start the browser refused came from the automatic resume after a page reload. */
   const autoResumeRefusedRef = useRef(false);
   const autoResumeRunningRef = useRef(false);
+  /** t1390u follow-up: last track change on this page (epoch ms) and the «last breath» writer. */
+  const lastTrackAtRef = useRef<number | null>(null);
+  const lastBreathRef = useRef<HallLastBreathWriter | null>(null);
   const journal = useCallback((kind: HallJournalKind, data?: HallJournalData) => {
     journalRef.current?.log(kind, data);
+    // Every journal event (track change, pause, refusal…) also refreshes the last breath at once:
+    // a page killed right after it still leaves this state for the next page.
+    lastBreathRef.current?.tick(true);
   }, []);
   /** Deliberate pause / start in flight – what the controller itself does not know. */
   const wakeIntentRef = useRef(new HallWakeIntentTracker());
@@ -687,26 +694,69 @@ export function BusinessCabinetPlayerProvider({
       markerAgeS: markerAge,
       apple: isAppleTouchDevice(navigator),
     });
+    // t1390u follow-up: how the previous hall page of this device ended («bye» false = killed),
+    // from its last breath; then this page starts writing its own.
+    let local: Storage | null = null;
+    try { local = window.localStorage; } catch { local = null; }
+    const prev = hallPrevPageReport(readHallLastBreath(local), { pageId, now: Date.now() });
+    if (prev) j.log("prev_page", prev, { context: false });
+    let usageMb: number | null = null;
+    let cacheN: number | null = null;
+    const breath = new HallLastBreathWriter(local, pageId, () => {
+      const ctl = ctlRef.current;
+      const audio = audioRef.current;
+      const buf = bufferRef.current?.stats();
+      const trackAt = lastTrackAtRef.current;
+      return {
+        st: ctl?.status ?? null,
+        pos: audio && Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : null,
+        up: Math.round((Date.now() - performance.timeOrigin) / 1000),
+        n: tracksSinceLoadRef.current,
+        trackAgeS: trackAt === null ? null : Math.round((Date.now() - trackAt) / 1000),
+        bufN: buf?.tracks ?? null,
+        bufMb: buf ? Math.round(buf.bytes / 104857.6) / 10 : null,
+        dl: buf?.downloading ?? null,
+        vis: document.visibilityState === "visible" ? "v" : "h",
+        build: appVersion ? appVersion.slice(0, 8) : null,
+        usageMb,
+        cacheN,
+      };
+    });
+    lastBreathRef.current = breath;
+    breath.tick(true);
+    const breathTimer = window.setInterval(() => breath.tick(), 5_000);
     const onVisibility = () => j.log("visibility");
     const onHide = (event: PageTransitionEvent) => {
       // A normal unload says goodbye; a page killed by the browser never does (crashSuspect).
-      if (!event.persisted) clearHallPageAlive(session);
+      if (!event.persisted) {
+        clearHallPageAlive(session);
+        breath.goodbye();
+      }
       j.log("page_hide", { persisted: event.persisted });
       void j.flush();
     };
     const onShow = (event: PageTransitionEvent) => {
-      if (event.persisted) markHallPageAlive(session, pageId);
+      if (event.persisted) {
+        markHallPageAlive(session, pageId);
+        breath.alive();
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onHide);
     window.addEventListener("pageshow", onShow);
     const snapshot = window.setInterval(() => {
+      // t1390u follow-up: entries in the hall cache next to the origin storage use – tells whether
+      // the multi-GB use seen on the hall iPhone is this buffer or something else.
+      const countCache = countHallBufferEntries();
       const estimate = navigator.storage?.estimate?.bind(navigator.storage);
-      if (!estimate) return void j.log("snapshot");
-      void estimate().then(
-        (e) => j.log("snapshot", { usageMb: typeof e.usage === "number" ? Math.round(e.usage / 1048576) : null }),
-        () => j.log("snapshot"),
-      );
+      const usage = estimate
+        ? estimate().then((e) => (typeof e.usage === "number" ? Math.round(e.usage / 1048576) : null), () => null)
+        : Promise.resolve<number | null>(null);
+      void Promise.all([usage, countCache.catch(() => null)]).then(([u, c]) => {
+        usageMb = u;
+        cacheN = c;
+        j.log("snapshot", { usageMb: u, cacheN: c });
+      });
     }, HALL_JOURNAL_SNAPSHOT_MS);
     let lastHeld: boolean | null = null;
     const wakeWatch = window.setInterval(() => {
@@ -722,6 +772,10 @@ export function BusinessCabinetPlayerProvider({
       window.removeEventListener("pageshow", onShow);
       window.clearInterval(snapshot);
       window.clearInterval(wakeWatch);
+      window.clearInterval(breathTimer);
+      // The player left this page on purpose (not a killed page): say so for the next page.
+      breath.goodbye();
+      if (lastBreathRef.current === breath) lastBreathRef.current = null;
       void j.flush();
       j.dispose();
       if (journalRef.current === j) journalRef.current = null;
@@ -872,6 +926,7 @@ export function BusinessCabinetPlayerProvider({
           if (audioItemId) bufferRef.current?.pin(audioItemId);
           if (audioItemId) {
             tracksSinceLoadRef.current++;
+            lastTrackAtRef.current = Date.now();
             journal("track", { local });
           }
         },

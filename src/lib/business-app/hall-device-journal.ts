@@ -29,6 +29,8 @@ export const HALL_JOURNAL_KINDS = [
   "autoplay_blocked",
   "auto_resume",
   "wake_lock",
+  // t1390u follow-up: how the previous hall page of this device ended (hall-last-breath.ts).
+  "prev_page",
 ] as const;
 export type HallJournalKind = (typeof HALL_JOURNAL_KINDS)[number];
 
@@ -53,11 +55,12 @@ export const HALL_JOURNAL_STRING_MAX = 64;
 export const HALL_PAGE_ALIVE_KEY = "audiolad.hall.page-alive";
 
 /** Never lost to the hourly cap while HALL_JOURNAL_RESERVE_PER_HOUR lasts. */
-const RESERVED_KINDS = new Set<HallJournalKind>(["page_load", "autoplay_blocked", "watchdog_stuck"]);
+const RESERVED_KINDS = new Set<HallJournalKind>(["page_load", "prev_page", "autoplay_blocked", "watchdog_stuck"]);
 
 /** Rare and important: never throttled by kind, flushed within seconds. */
 const URGENT_KINDS = new Set<HallJournalKind>([
   "page_load",
+  "prev_page",
   "page_hide",
   "unexpected_pause",
   "self_resume_ok",
@@ -137,8 +140,12 @@ export class HallDeviceJournal {
     return this.queue.length;
   }
 
-  /** Records one event (throttled). Returns false when it was not kept. Never throws. */
-  log(kind: HallJournalKind, data?: HallJournalData): boolean {
+  /**
+   * Records one event (throttled). Returns false when it was not kept. Never throws.
+   * `opts.context: false` – the data only, without the live page context (an event about another
+   * page, e.g. «prev_page», must not mix in this page's state or crowd out its own keys).
+   */
+  log(kind: HallJournalKind, data?: HallJournalData, opts?: { context?: boolean }): boolean {
     try {
       if (this.disposed) return false;
       const now = this.now();
@@ -167,7 +174,7 @@ export class HallDeviceJournal {
       this.lastByKind.set(kind, now);
       let ctx: HallJournalData = {};
       try {
-        ctx = this.d.context?.() ?? {};
+        ctx = opts?.context === false ? {} : this.d.context?.() ?? {};
       } catch {
         ctx = {};
       }
