@@ -74,6 +74,20 @@ export function expertQuote(expert: CoffeeExpert, index: number): ExpertQuote {
 }
 
 /** Pure checks for the registry. Throws on the first broken record. */
+/** Global cap on quotes per expert (Sergey, 2026-11-11). */
+export const COFFEE_EXPERT_QUOTE_CAP = 8;
+
+/**
+ * One-off exception (Sergey, 2026-11-12 14:05 MSK, t1395u: «Разрешаю один раз 9-ю цитату русскому эксперту для ХАССП и приборов»).
+ * Exactly one Russian expert may hold a ninth quote, and that quote may appear only in the listed article.
+ * Everyone else keeps the cap of 8. Do not extend this to other experts or articles without a new decision.
+ */
+export const NINTH_QUOTE_EXCEPTION = {
+  expertId: "ilya-lazerson",
+  quoteIndex: 8,
+  articles: ["hassp-dlya-kofeyni"],
+} as const;
+
 export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = COFFEE_EXPERTS): void {
   const ids = new Set<string>();
   for (const expert of experts) {
@@ -92,8 +106,12 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     }
     // Sergey, 2026-11-01: sets reuse the existing pool, each time with a new real quote, so an expert can hold more than three.
     // Sergey, 2026-11-11: cap raised from 6 to 8 so coffee SEO rotation can add new verified quotes.
-    if (expert.quotes.length < 1 || expert.quotes.length > 8) {
-      throw new Error(`${expert.id}: need 1 to 8 quotes`);
+    const quoteCap = expert.id === NINTH_QUOTE_EXCEPTION.expertId ? 9 : COFFEE_EXPERT_QUOTE_CAP;
+    if (expert.quotes.length < 1 || expert.quotes.length > quoteCap) {
+      throw new Error(`${expert.id}: need 1 to ${quoteCap} quotes`);
+    }
+    if (expert.id === NINTH_QUOTE_EXCEPTION.expertId && expert.origin !== "ru") {
+      throw new Error(`${expert.id}: the one-off ninth quote is for a Russian expert only`);
     }
     if (!expert.photo) {
       throw new Error(`${expert.id}: a real portrait is required, no initials placeholders`);
