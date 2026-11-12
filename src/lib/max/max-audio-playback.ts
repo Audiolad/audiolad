@@ -357,3 +357,79 @@ export function shouldApplyMaxSeekRestore(input: {
     input.listenerTrackId === input.liveTrackId
   );
 }
+
+/**
+ * Some embedded Chromium hosts (desktop MAX) lock each media element until it
+ * gets a play() call inside a user gesture. The first press has no signed URL
+ * yet, so the real play() runs after the fetch, outside the gesture, and is
+ * rejected. Calling play() synchronously in the click unlocks the element; the
+ * later play() with the signed URL is then allowed. Without a source the
+ * browser fetches nothing, and the pending promise is aborted by the next
+ * load(), which is expected and ignored.
+ */
+export function unlockMaxAudioElementInGesture(audio: {
+  getAttribute: (name: string) => string | null;
+  currentSrc: string;
+  play: () => Promise<void> | void;
+}): boolean {
+  if (hasMaxAudioElementSource(audio)) {
+    return false;
+  }
+  try {
+    const pending = audio.play();
+    if (pending && typeof (pending as Promise<void>).catch === "function") {
+      (pending as Promise<void>).catch(() => {});
+    }
+  } catch {
+    // Older engines throw synchronously; the real play() reports problems.
+  }
+  return true;
+}
+
+/** Media "play" events from the gesture unlock (no source yet) are not real playback. */
+export function shouldReflectMaxPlayEvent(hasSource: boolean): boolean {
+  return hasSource;
+}
+
+export type MaxPlayRejectionDiagnostic = {
+  errorName: string;
+  client: string;
+  stage: string;
+};
+
+/** Coarse client class only: no full UA, no versions beyond the engine family. */
+export function coarseMaxClient(userAgent: string | null | undefined): string {
+  const ua = userAgent ?? "";
+  const os = /iPhone|iPad|iPod/.test(ua)
+    ? "ios"
+    : /Android/.test(ua)
+      ? "android"
+      : /Macintosh|Mac OS X/.test(ua)
+        ? "mac"
+        : /Windows/.test(ua)
+          ? "windows"
+          : /Linux/.test(ua)
+            ? "linux"
+            : "other";
+  const engine = /Chrome\/|CriOS\//.test(ua)
+    ? "chrome"
+    : /Firefox\/|FxiOS\//.test(ua)
+      ? "firefox"
+      : /Safari\//.test(ua)
+        ? "safari"
+        : "other";
+  return `${os}-${engine}`;
+}
+
+export function describeMaxPlayRejection(
+  error: unknown,
+  userAgent: string | null | undefined,
+  stage: string,
+): MaxPlayRejectionDiagnostic {
+  const rawName =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name: unknown }).name)
+      : "unknown";
+  const errorName = /^[A-Za-z]{1,40}$/.test(rawName) ? rawName : "unknown";
+  return { errorName, client: coarseMaxClient(userAgent), stage };
+}
