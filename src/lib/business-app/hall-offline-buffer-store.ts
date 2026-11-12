@@ -9,6 +9,8 @@ import { HALL_BUFFER_CACHE_NAME, HALL_BUFFER_IDB_STORAGE, HALL_BUFFER_OWNER_KEY,
 
 const cacheKey = (id: string) => `/__hall-buffer/${encodeURIComponent(id)}`;
 const PROBE_KEY = "__probe__";
+/** t1390u: size of a streamed copy whose response had no Content-Length (tiny sidecar entry). */
+const sizeKey = (id: string) => `${cacheKey(id)}?size`;
 const IDB_TABLE = "tracks";
 
 function cacheStore(): BufferStore {
@@ -22,14 +24,70 @@ function cacheStore(): BufferStore {
     },
     async put(id, blob, downloadedAt) {
       await (await open()).put(cacheKey(id), new Response(blob, {
-        headers: { "content-type": blob.type || "audio/mpeg", "x-hall-downloaded-at": String(downloadedAt) },
+        headers: {
+          "content-type": blob.type || "audio/mpeg",
+          "x-hall-downloaded-at": String(downloadedAt),
+          "x-hall-size": String(blob.size),
+        },
       }));
     },
+    // t1390u: the response body streams into the cache – the page never holds the whole track.
+    async putResponse(id, response, downloadedAt) {
+      if (!response.body) throw new Error("no_body");
+      const declared = Number(response.headers.get("content-length"));
+      const headers: Record<string, string> = {
+        "content-type": response.headers.get("content-type") || "audio/mpeg",
+        "x-hall-downloaded-at": String(downloadedAt),
+      };
+      if (Number.isFinite(declared) && declared > 0) headers["x-hall-size"] = String(declared);
+      const cache = await open();
+      if (Number.isFinite(declared) && declared > 0) {
+        await cache.put(cacheKey(id), new Response(response.body, { headers }));
+        return declared;
+      }
+      // No length from the server (review 2): count the bytes as they pass – chunk by chunk, never
+      // the whole track – and keep the size in a tiny sidecar entry for meta().
+      let size = 0;
+      const counter = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, ctl) {
+          size += chunk.byteLength;
+          ctl.enqueue(chunk);
+        },
+      });
+      await cache.put(cacheKey(id), new Response(response.body.pipeThrough(counter), { headers }));
+      await cache.put(sizeKey(id), new Response(String(size), { headers: { "content-type": "text/plain" } }));
+      return size;
+    },
+    async meta(id, readBody = true) {
+      const cache = await open();
+      const res = await cache.match(cacheKey(id));
+      if (!res) return null;
+      const downloadedAt = Number(res.headers.get("x-hall-downloaded-at")) || 0;
+      let size = Number(res.headers.get("x-hall-size") || res.headers.get("content-length"));
+      if (!(Number.isFinite(size) && size > 0)) {
+        const side = await cache.match(sizeKey(id));
+        size = side ? Number(await side.text()) : 0;
+      }
+      if (Number.isFinite(size) && size > 0) {
+        res.body?.cancel().catch(() => { /* nothing to release */ }); // never wait on it
+        return { size, downloadedAt };
+      }
+      // Copies stored before t1390u carry no size. iPhone (readBody false): never read a whole
+      // track into the page – the copy is dropped and downloaded again. Others: read once.
+      if (!readBody) {
+        res.body?.cancel().catch(() => { /* nothing to release */ }); // never wait on it
+        return null;
+      }
+      return { size: (await res.blob()).size, downloadedAt };
+    },
     async delete(id) {
-      await (await open()).delete(cacheKey(id));
+      const cache = await open();
+      await cache.delete(cacheKey(id));
+      await cache.delete(sizeKey(id));
     },
     async keys() {
       return (await (await open()).keys())
+        .filter((r) => new URL(r.url).search === "")
         .map((r) => decodeURIComponent(new URL(r.url).pathname.split("/").pop() ?? ""))
         .filter((id) => id && id !== PROBE_KEY);
     },

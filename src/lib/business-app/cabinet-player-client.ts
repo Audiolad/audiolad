@@ -103,6 +103,28 @@ export async function postPointUsage(
   }
 }
 
+/**
+ * t1390u: hall device journal batch (hall-device-journal.ts) → business_player_device_events.
+ * true: stored (or deliberately dropped by the server); false: try again later.
+ */
+export async function postPointEvents(
+  events: readonly { k: string; at: number; d: Record<string, unknown> }[],
+  appVersion: string | null,
+  f: Fetch = fetch,
+): Promise<boolean> {
+  try {
+    const body: Record<string, unknown> = { action: "report", kind: "events", events };
+    if (appVersion) body.appVersion = appVersion;
+    const res = await f("/api/business/point", { ...JSON_POST, body: JSON.stringify(body), keepalive: true });
+    if (res.status >= 500) return false;
+    const json = (await res.json().catch(() => null)) as { ok?: unknown } | null;
+    // A refusal (400 / no session) will not get better with retries: drop the batch.
+    return json !== null;
+  } catch {
+    return false;
+  }
+}
+
 export async function postCabinetReport(payload: CabinetReportPayload, f: Fetch = fetch): Promise<PointReportResult> {
   try {
     const res = await f("/api/business/player/report", {

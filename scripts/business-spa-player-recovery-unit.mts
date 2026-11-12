@@ -423,7 +423,9 @@ function world(opts: {
   const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
   const provider = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
   assert.match(provider, /addEventListener\("waiting", onWaiting\)/);
-  assert.match(provider, /addEventListener\("stalled", onWaiting\)/);
+  // t1390u: "stalled" is journaled first, then the same controller hook.
+  assert.match(provider, /addEventListener\("stalled", onStalled\)/);
+  assert.match(provider, /const onStalled = \(\) => \{\s*journal\("el_stalled"\);\s*ctl\.onWaiting\(\);/);
   assert.match(provider, /window\.addEventListener\("online", onOnline\)/);
   assert.match(provider, /ctl\.onProgress\(audio\.currentTime, audio\.duration\)/);
   assert.match(provider, /signal: abort\.signal/);
