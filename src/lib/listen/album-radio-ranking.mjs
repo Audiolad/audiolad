@@ -92,8 +92,10 @@ export function passportProfile(features) {
   profile.bpm = finiteIn(features.bpm ?? null, 30, 240);
   profile.energy = finiteIn(features.energy ?? null, 0, 100);
   profile.vocal = features.vocal === 'instrumental' || features.vocal === 'vocal' ? features.vocal : null;
-  const sound = profile.genres.length + profile.styles.length + profile.moods.length + (profile.energy === null ? 0 : 1);
-  if (!sound) return null;
+  // Any passport field counts; admission is decided later on the merged profile.
+  const known = RADIO_LABEL_GROUPS.some((group) => profile[group].length) || profile.character !== null ||
+    profile.bpm !== null || profile.energy !== null || profile.vocal !== null;
+  if (!known) return null;
   profile.basis = 'passport';
   return profile;
 }
@@ -104,6 +106,7 @@ export function withTextFallback(passport, fallback) {
   if (!passport) return { ...fallback, basis: 'text' };
   const result = { ...passport };
   for (const group of RADIO_LABEL_GROUPS) if (!result[group].length) result[group] = fallback[group];
+  if (result.character === null) result.character = fallback.character;
   if (result.bpm === null) result.bpm = fallback.bpm;
   if (result.vocal === null) result.vocal = fallback.vocal;
   return result;

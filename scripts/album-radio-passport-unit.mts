@@ -52,13 +52,15 @@ assert.equal(radioFeaturesFromPassport(null), null);
 // Batched query with a fake client: one versions request per 50 tracks, cached sealed versions skip run reads.
 const calls: string[] = [];
 const versions = Array.from({ length: 60 }, (_, i) => version(`q${i}`, `track-${i}`));
+versions.push(version("nobind", "track-nobind", { analyzer_run_id: null }));
+let failRuns = new Set<string>();
 const client: RadioPassportClient = {
   from: (table) => ({
     select: (columns) => ({
       in: (column, values) => {
         calls.push(table);
         const rows = table === "music_passport_versions" ? versions.filter((v) => values.includes(v.audio_item_id))
-          : table === "music_analyzer_runs" ? values.map((id) => ({ id, styles: [{ label: "Spa Music", research_only: true }], afv_schema: "audiolad-features:1", afv_energy: { value: 33 } }))
+          : table === "music_analyzer_runs" ? values.filter((id) => !failRuns.has(id)).map((id) => ({ id, styles: [{ label: "Spa Music", research_only: true }], afv_schema: "audiolad-features:1", afv_energy: { value: 33 } }))
             : [];
         assert.ok(table !== "music_analyzer_runs" || !columns.includes("segments"));
         const result = Promise.resolve({ data: rows, error: null });
@@ -68,14 +70,32 @@ const client: RadioPassportClient = {
   }),
 };
 const ids = versions.map((v) => v.audio_item_id);
-const first = await queryRadioPassportFeatures(client, [...ids, "no-passport"]);
-assert.equal(first.size, 60);
-assert.equal(first.get("track-1")!.energy, 33);
-assert.ok(!first.has("no-passport"));
+// Missing source run: that passport is NOT used (no unverified labels) and the batch is incomplete.
+failRuns = new Set(["run-q1"]);
+const degraded = await queryRadioPassportFeatures(client, [...ids, "no-passport"]);
+assert.equal(degraded.complete, false);
+assert.ok(!degraded.features.has("track-1"));
+assert.ok(!degraded.features.has("track-nobind"));
+assert.ok(!degraded.features.has("no-passport"));
+assert.ok(!degraded.features.get("track-2")!.styles.some((s) => s.label === "spa music"));
 assert.equal(calls.filter((c) => c === "music_passport_versions").length, 2);
+// Recovery: the next read retries only the missing run and is complete.
+failRuns = new Set();
 calls.length = 0;
-await queryRadioPassportFeatures(client, ids);
+const recovered = await queryRadioPassportFeatures(client, ids);
+assert.equal(recovered.complete, true);
+assert.equal(recovered.features.size, 60);
+assert.equal(recovered.features.get("track-1")!.energy, 33);
+assert.ok(!recovered.features.get("track-1")!.styles.some((s) => s.label === "spa music"));
+assert.equal(calls.filter((c) => c === "music_analyzer_runs").length, 1);
+calls.length = 0;
+const warm = await queryRadioPassportFeatures(client, ids);
+assert.equal(warm.complete, true);
 assert.deepEqual([...new Set(calls)], ["music_passport_versions"]);
+
+// Sparse passport: a published BPM alone is still a passport field.
+const bpmOnly = version("sparse", "t-sparse", { structured_fields: { bpm: { published: 72 } } });
+assert.equal(radioFeaturesFromPassport(bpmOnly, [], radioNormalizedFromRun({ id: "r" }))!.bpm, 72);
 
 // Boundaries: no Business code, no analyzer execution, read-only.
 const src = readFileSync("src/lib/listen/album-radio-passport.ts", "utf8");

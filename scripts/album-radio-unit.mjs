@@ -31,6 +31,16 @@ test('passport vocabulary is used as is (no lossy keyword mapping)', () => {
   assert.equal(p.basis, 'passport');
   assert.equal(passport({}), null);
 });
+test('sparse passport keeps every field it has; text fills only missing ones', () => {
+  const sparse = passport({ instruments: ['piano'], bpm: 72, vocal: 'instrumental', character: 'warm' });
+  assert.equal(sparse.basis, 'passport');
+  const merged = withTextFallback(sparse, profile('jazz guitar 120 bpm vocal'));
+  assert.deepEqual(merged.instruments.map((i) => i.label), ['piano']);
+  assert.equal(merged.bpm, 72); assert.equal(merged.vocal, 'instrumental'); assert.equal(merged.character, 'warm');
+  assert.deepEqual(merged.genres.map((g) => g.label), ['jazz']);
+  // Admission is decided on the merged profile, so passport guards still apply.
+  assert.equal(radioSimilarity(merged, withTextFallback(passport({ vocal: 'vocal' }), profile('jazz'))), null);
+});
 test('passport fields win; author text fills only missing fields', () => {
   const merged = withTextFallback(passport({ moods: ['warm'], energy: 30 }), profile('джаз лаунж 80 bpm без вокала'));
   assert.deepEqual(merged.moods.map((m) => m.label), ['warm']);

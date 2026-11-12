@@ -17,30 +17,50 @@ type Profile = RadioProfile;
 const productText = (p: CatalogProduct) => [p.format, p.subtitle, p.description].filter(Boolean).join(" ");
 
 const PASSPORT_CACHE_MS = 5 * 60 * 1000;
+/** Passport enrichment is bounded; on timeout the radio ranks on author text this time. */
+const PASSPORT_LOAD_TIMEOUT_MS = 4000;
 let passportCache: { at: number; key: string; value: Map<string, RadioPassportFeatures> } | null = null;
+let passportInFlight: { key: string; value: Promise<{ features: Map<string, RadioPassportFeatures>; complete: boolean }> } | null = null;
 
-/** Passport sound features of catalogue tracks. Empty map on any source error: the radio
- * then ranks on author text, exactly as before the passport existed. */
+/** Passport sound features of catalogue tracks. Empty map on any source error or timeout:
+ * the radio then ranks on author text, exactly as before the passport existed. Only a
+ * complete read is cached; concurrent requests share one in-flight read. */
 async function loadPassportFeatures(trackIds: string[]): Promise<Map<string, RadioPassportFeatures>> {
   const key = [...new Set(trackIds)].sort().join(",");
   if (passportCache && passportCache.key === key && Date.now() - passportCache.at < PASSPORT_CACHE_MS) return passportCache.value;
+  let flight = passportInFlight && passportInFlight.key === key ? passportInFlight : null;
+  if (!flight) {
+    const value = Promise.resolve().then(() => queryRadioPassportFeatures(createServiceRoleClient() as unknown as RadioPassportClient, trackIds));
+    const entry = { key, value };
+    flight = passportInFlight = entry;
+    void value.then((result) => {
+      if (result.complete) passportCache = { at: Date.now(), key, value: result.features };
+    }, () => undefined).finally(() => { if (passportInFlight === entry) passportInFlight = null; });
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const value = await queryRadioPassportFeatures(createServiceRoleClient() as unknown as RadioPassportClient, trackIds);
-    passportCache = { at: Date.now(), key, value };
-    return value;
+    const result = await Promise.race([
+      flight.value,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("album_radio_passport_timeout")), PASSPORT_LOAD_TIMEOUT_MS); }),
+    ]);
+    return result.features;
   } catch (error) {
     console.error("[album-radio] passports unavailable, text basis", error instanceof Error ? error.message : "unknown");
     return new Map();
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
 /** Published tracks of the catalogue albums (ids + author text), batched by album. */
 async function loadCatalogTracks(supabase: SupabaseClient, practiceIds: string[]) {
   const rows = (await Promise.all(chunkIds(practiceIds, 25).map(async (chunk) => {
-    const { data, error } = await supabase.from("audio_items").select("id, practice_id, description")
-      .in("practice_id", chunk).eq("status", "published");
-    if (error || !Array.isArray(data)) return [];
-    return data as Array<{ id: string; practice_id: string; description: string | null }>;
+    try {
+      const { data, error } = await supabase.from("audio_items").select("id, practice_id, description")
+        .in("practice_id", chunk).eq("status", "published");
+      if (error || !Array.isArray(data)) return [];
+      return data as Array<{ id: string; practice_id: string; description: string | null }>;
+    } catch { return []; }
   }))).flat();
   const byPractice = new Map<string, Array<{ id: string; description: string | null }>>();
   for (const row of rows) byPractice.set(row.practice_id, [...(byPractice.get(row.practice_id) ?? []), row]);

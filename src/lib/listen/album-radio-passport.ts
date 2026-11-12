@@ -169,7 +169,8 @@ export function radioFeaturesFromPassport(
   if (energy === null && analyzerEnergy !== null && analyzerEnergy >= 0 && analyzerEnergy <= 100) energy = analyzerEnergy;
   const role = analysis?.features.vocal_role?.value;
   const vocal = role === "instrumental" ? "instrumental" : role === "vocal" || role === "mixed" ? "vocal" : null;
-  if (!labelled && energy === null) return null;
+  // Any reliable field is kept; text fills only the fields that are missing.
+  if (!labelled && !labels.character.length && energy === null && bpm === null && vocal === null) return null;
   return {
     genres: labels.genres, styles: labels.styles, moods: labels.moods,
     instruments: labels.instruments, character: labels.character[0]?.label ?? null,
@@ -191,6 +192,17 @@ export type RadioPassportClient = {
   };
 };
 
+/** Bounded parallelism: at most `limit` PostgREST requests of one phase at a time. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
+  }));
+  return out;
+}
+export const RADIO_QUERY_CONCURRENCY = 6;
+
 const VERSION_COLUMNS = "id, audio_item_id, status, sealed_at, ceased_at, structured_fields, analyzer_run_id";
 const ATTRIBUTE_COLUMNS = "id, passport_id, attribute_key, origin, value_numeric, value_text, confidence, source_ref";
 /** Sealed snapshots are immutable: their features are cached for the process lifetime. */
@@ -198,24 +210,25 @@ const featuresByVersion = new Map<string, RadioPassportFeatures | null>();
 const VERSION_CACHE_LIMIT = 6000;
 
 /** Batched read: ⌈tracks/50⌉ version requests, then attributes and run excerpts only for
- * versions not yet cached. Any failure throws; the caller falls back to author text. */
+ * versions not yet cached. Version/attribute failures throw (caller: author text). A passport
+ * whose source run cannot be read is left out and `complete` is false (caller must not cache). */
 export async function queryRadioPassportFeatures(
   client: RadioPassportClient,
   trackIds: readonly string[],
-): Promise<Map<string, RadioPassportFeatures>> {
+): Promise<{ features: Map<string, RadioPassportFeatures>; complete: boolean }> {
   const ids = [...new Set(trackIds)];
-  const versions = (await Promise.all(chunkIds(ids).map(async (chunk) => {
+  const versions = (await mapLimit(chunkIds(ids), RADIO_QUERY_CONCURRENCY, async (chunk) => {
     const { data, error } = await client.from("music_passport_versions").select(VERSION_COLUMNS)
       .in("audio_item_id", chunk).eq("status", "active").is("ceased_at", null).not("sealed_at", "is", null);
     if (error || !Array.isArray(data)) throw new Error("album_radio_passport_versions_unavailable");
     return data as RadioPassportVersionRow[];
-  }))).flat();
+  })).flat();
   const fresh = versions.filter((v) => !featuresByVersion.has(v.id));
-  const attributes = (await Promise.all(chunkIds(fresh.map((v) => v.id), 25).map(async (chunk) => {
+  const attributes = (await mapLimit(chunkIds(fresh.map((v) => v.id), 25), RADIO_QUERY_CONCURRENCY, async (chunk) => {
     const { data, error } = await client.from("music_passport_attributes").select(ATTRIBUTE_COLUMNS).in("passport_id", chunk);
     if (error || !Array.isArray(data)) throw new Error("album_radio_passport_attributes_unavailable");
     return data as RadioPassportAttributeRow[];
-  }))).flat();
+  })).flat();
   const runIdFor = (v: RadioPassportVersionRow) => {
     if (v.analyzer_run_id) return v.analyzer_run_id;
     const refs = new Set(attributes.filter((a) => a.passport_id === v.id).flatMap((a) => {
@@ -226,28 +239,34 @@ export async function queryRadioPassportFeatures(
   };
   const runIds = [...new Set(fresh.flatMap((v) => { const id = runIdFor(v); return id ? [id] : []; }))];
   const runs = new Map<string, RadioRunRow>();
-  // An unavailable run must not re-enable research-only labels: the reader then uses its
-  // conservative fallback list, and energy stays unknown.
-  await Promise.all(chunkIds(runIds, 20).map(async (chunk) => {
+  // A run read failure is transient: those passports are left out this time (see below).
+  await mapLimit(chunkIds(runIds, 20), RADIO_QUERY_CONCURRENCY, async (chunk) => {
     try {
       const { data, error } = await client.from("music_analyzer_runs").select(RADIO_RUN_COLUMNS).in("id", chunk);
       if (!error && Array.isArray(data)) for (const row of data as RadioRunRow[]) runs.set(row.id, row);
     } catch { /* conservative fallback */ }
-  }));
+  });
+  const attributesBy = new Map<string, RadioPassportAttributeRow[]>();
+  for (const row of attributes) attributesBy.set(row.passport_id, [...(attributesBy.get(row.passport_id) ?? []), row]);
+  let complete = true;
   for (const version of fresh) {
     const runId = runIdFor(version);
     const run = runId ? runs.get(runId) : undefined;
-    const features = radioFeaturesFromPassport(version, attributes.filter((a) => a.passport_id === version.id), radioNormalizedFromRun(run));
-    // Do not pin a result computed without its analyzer source; retry next time.
-    if (runId && !run) continue;
+    // Fail closed: withholding is decided by the source run, so a passport is used only
+    // together with its readable run. No bound run (immutable) → never used (text fallback).
+    // A bound run that could not be read → left out now and the batch is incomplete, so the
+    // caller does not cache it and the next request retries.
+    if (runId && !run) { complete = false; continue; }
     if (featuresByVersion.size >= VERSION_CACHE_LIMIT) featuresByVersion.clear();
-    featuresByVersion.set(version.id, features);
+    featuresByVersion.set(version.id, run
+      ? radioFeaturesFromPassport(version, attributesBy.get(version.id) ?? [], radioNormalizedFromRun(run))
+      : null);
   }
-  const result = new Map<string, RadioPassportFeatures>();
+  const features = new Map<string, RadioPassportFeatures>();
   for (const version of versions) {
-    if (result.has(version.audio_item_id)) continue;
-    const cached = featuresByVersion.has(version.id) ? featuresByVersion.get(version.id) : radioFeaturesFromPassport(version, attributes, undefined);
-    if (cached) result.set(version.audio_item_id, cached);
+    if (features.has(version.audio_item_id)) continue;
+    const cached = featuresByVersion.get(version.id);
+    if (cached) features.set(version.audio_item_id, cached);
   }
-  return result;
+  return { features, complete };
 }
