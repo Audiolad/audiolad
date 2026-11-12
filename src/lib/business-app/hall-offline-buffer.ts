@@ -360,6 +360,10 @@ export class HallOfflineBuffer {
     if (this.disposed) return;
     const max = this.maxTracks;
     const next = [...new Set(ids)].filter((id) => id !== selectedId).slice(0, max);
+    // t1390u: the controller starts another track (it pins it only after the source is set) –
+    // the start delay begins now, before the refill that follows this plan change.
+    const delay = Math.max(0, this.d.startDelayMs ?? 0);
+    if (delay > 0 && selectedId && selectedId !== this.pinned && selectedId !== this.selected) this.hold(delay);
     this.selected = selectedId;
     this.plan = next;
     for (const [id, ctl] of this.downloading) {
@@ -491,11 +495,16 @@ export class HallOfflineBuffer {
     if (!this.d.isOnline() || this.now() < this.retryAt) return;
     // t1390u: a track has just started – the boundary belongs to the stream (the hold timer refills).
     if (this.now() < this.holdUntil) return;
+    // t1390u: an iPhone never downloads a whole mp3 into the page. Without a streaming store
+    // (Cache Storage unavailable → IndexedDB) it plays the stream only, with no copies.
+    if (this.d.streamToStore && !(this.d.fetchResponse && this.d.store.putResponse)) return;
     const limit = Math.max(1, this.d.concurrency ?? HALL_BUFFER_CONCURRENCY);
     if (this.downloading.size >= limit) return;
     const id = this.plan.find((x) => !this.downloading.has(x) && !this.has(x));
     if (!id) return;
     const budget = await this.budget();
+    // The track may have changed while the budget was read (provider: plan → refill → pin).
+    if (this.now() < this.holdUntil) return;
     if (this.disposed || this.downloading.has(id) || this.has(id) || !this.plan.includes(id)) return;
     if (this.downloading.size >= limit) return; // another refill started meanwhile
     if (this.bytes() + this.avgSize > budget) return; // N shrinks to what the device can hold
@@ -550,7 +559,10 @@ export class HallOfflineBuffer {
         downloadedAt,
         url: id === this.pinned ? old?.url ?? null : null,
       });
+      // Streamed (Android): a copy that should be warm is read back from disk now.
+      const warmLater = !warmNow && !blob && this.warmIds().includes(id);
       blob = null;
+      if (warmLater) void this.warm();
       this.updateAvg();
       this.retryAt = 0;
       this.d.onChange?.();

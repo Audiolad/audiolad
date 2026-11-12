@@ -910,7 +910,9 @@ export class SpaOnlinePlayer {
 
   /**
    * t1390u: the next link is due once `presignDelaySec` of the track has played (or the end is
-   * near). A locked screen signs at once – the handoff there must never wait for the network.
+   * near), on a locked screen too: the boundary signs only the current track (verify). The early
+   * handoff / loop wrap still find the link – it is signed 30 s in or PRESIGN_LEAD_SEC before the
+   * end, and a loop wrap forces it.
    */
   private presignDue(cur: SpaManifestItem): boolean {
     let delay = 0;
@@ -920,7 +922,6 @@ export class SpaOnlinePlayer {
       delay = 0;
     }
     if (!Number.isFinite(delay) || delay <= 0) return true;
-    if (this.inBackground() || this.loopMode()) return true;
     const pos = Number.isFinite(this.lastPosition) ? this.lastPosition : 0;
     if (pos >= delay) return true;
     const length = cur.durationSeconds;

@@ -152,7 +152,8 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   assert.equal(w.signs.length, 3, "still one request at the boundary");
 }
 
-// A3. A short track or the end near: the link is not delayed past the end; a locked screen signs at once.
+// A3. A short track or the end near: the link is not delayed past the end. A locked screen waits
+// the same 30 s (review of 0a93ded9: no exception – one request at the boundary there too).
 {
   const short = world({ presignDelay: 30 });
   short.p.items = [item(1, 50), item(2, 50)];
@@ -165,7 +166,11 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   const locked = world({ presignDelay: 30, background: true });
   await locked.p.toggle();
   await flush();
-  assert.deepEqual(locked.signs, ["track-1", "track-2"], "locked iPhone: the handoff never waits");
+  assert.deepEqual(locked.signs, ["track-1"], "locked iPhone: no next link at the boundary either");
+  locked.audio.currentTime = 31;
+  locked.p.onProgress(31, 180);
+  await flush();
+  assert.deepEqual(locked.signs, ["track-1", "track-2"], "locked iPhone: next link after 30 s, long before the handoff");
 }
 
 // B1. The element paused by itself while playing → play() on the same element, no message.
@@ -439,6 +444,10 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   assert.equal(sent[0][2].d.st, "playing", "context merged");
   for (let i = 0; i < HALL_JOURNAL_MAX_PER_HOUR + 20; i++) j.log("recover", { i });
   assert.ok(j.dropped >= 20, "hourly cap");
+  const droppedBefore = j.dropped;
+  assert.equal(j.log("autoplay_blocked", { hidden: true }), true, "the silence explanation still gets in (reserve)");
+  assert.equal(j.log("el_waiting"), false, "ordinary events stay capped");
+  assert.equal(j.dropped, droppedBefore + 1);
   await c.advance(60_000);
   assert.ok(sent.every((b) => b.length <= HALL_JOURNAL_BATCH), "batches stay small");
   // Failed sends keep the events.
@@ -478,7 +487,9 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
 {
   const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
   const player = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
-  assert.match(player, /presignDelaySec: \(\) => \(streamFirstRef\.current \? HALL_IOS_PRESIGN_DELAY_SEC : 0\)/);
+  assert.match(player, /presignDelaySec: \(\) => \(canBeatRef\.current \? HALL_IOS_PRESIGN_DELAY_SEC : 0\)/, "hall Android too");
+  assert.match(player, /startDelayMs: HALL_BUFFER_IOS_START_DELAY_MS,\n\s+\.\.\.\(isAppleTouchDevice/, "start delay on every hall device");
+  assert.match(player, /lazyCopies: true \}\n\s+: \{\}\)/, "Android keeps its Blob buffer (streaming was worse in Chromium)");
   assert.match(player, /window\.setInterval\(\(\) => ctl\.watchdog\(\), HALL_WATCHDOG_TICK_MS\)/);
   assert.match(player, /ctl\.onElementPause\(\);/);
   assert.match(player, /"autoplay_blocked_after_reload" : "autoplay_blocked"/);
@@ -495,6 +506,162 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   assert.doesNotMatch(sql, /^\s*(DROP|DELETE|UPDATE|TRUNCATE|INSERT)\b/im, "additive only: no data statements");
   assert.doesNotMatch(sql, /ALTER TABLE public\.(?!business_player_device_events)/i, "no other table touched");
   assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
+}
+
+// A5 (review of 0a93ded9, blocker 1). The provider's real order on a natural track change:
+// loading → plan change + refill → source set → pin. The refill must not sign at the boundary,
+// also when the track changes while the refill waits for the storage estimate.
+{
+  const c = clock();
+  const rows = new Map<string, { size: number; downloadedAt: number }>();
+  const store: BufferStore = {
+    kind: "cache",
+    async get() { return null; },
+    async put() { throw new Error("blob path must not be used"); },
+    async putResponse(id, response, downloadedAt) {
+      const size = Number(response.headers.get("content-length"));
+      rows.set(id, { size, downloadedAt });
+      return size;
+    },
+    async meta(id) { return rows.get(id) ?? null; },
+    async delete(id) { rows.delete(id); },
+    async keys() { return [...rows.keys()]; },
+    async clear() { rows.clear(); },
+  };
+  const signs: string[] = [];
+  let releaseEstimate: (() => void) | null = null;
+  let slowEstimate = false;
+  const buffer = new HallOfflineBuffer({
+    store,
+    sign: async (id) => { signs.push(id); return { ok: true, data: { url: `https://s/${id}` } }; },
+    async fetchBlob() { throw new Error("no blob"); },
+    async fetchResponse() {
+      return new Response("x", { headers: { "content-length": String(8 * MB), "content-type": "audio/mpeg" } });
+    },
+    estimate: () => slowEstimate
+      ? new Promise((r) => { releaseEstimate = () => r({ quota: 10_000 * MB, usage: 0 }); })
+      : Promise.resolve({ quota: 10_000 * MB, usage: 0 }),
+    streamToStore: true,
+    lazyCopies: true,
+    startDelayMs: HALL_BUFFER_IOS_START_DELAY_MS,
+    maxTracks: HALL_BUFFER_IOS_TRACKS,
+    createUrl: () => "blob:x",
+    revokeUrl: () => {},
+    window: () => ({ until: null }),
+    isOnline: () => true,
+    now: c.now,
+    setTimer: c.setTimer,
+    clearTimer: c.clearTimer,
+  });
+  buffer.setPlan(["t2", "t3", "t4"], "t1");
+  buffer.pin("t1");
+  await buffer.refill(true);
+  await c.advance(HALL_BUFFER_IOS_START_DELAY_MS);
+  await flush();
+  assert.deepEqual(signs, ["t2", "t3", "t4"], "filled 45 s into t1");
+  signs.length = 0;
+  // Natural change to t2: plan first (refill right after), the pin comes later.
+  buffer.setPlan(["t3", "t4", "t5"], "t2");
+  await buffer.refill(true);
+  await flush();
+  assert.deepEqual(signs, [], "plan change before the pin: no request at the boundary");
+  buffer.pin("t2");
+  await c.advance(HALL_BUFFER_IOS_START_DELAY_MS - 1_000);
+  assert.deepEqual(signs, [], "nothing during the first 44 s");
+  await c.advance(1_000);
+  await flush();
+  assert.deepEqual(signs, ["t5"], "t5 after 45 s");
+  // Race: a refill waits for the estimate while the next track starts.
+  signs.length = 0;
+  slowEstimate = true;
+  buffer.setPlan(["t4", "t5", "t6"], "t3");
+  // Hold is on (new selected track); simulate the refill already past its first check.
+  await c.advance(HALL_BUFFER_IOS_START_DELAY_MS);
+  const pending = buffer.refill(true);
+  await flush();
+  buffer.setPlan(["t5", "t6", "t7"], "t4");
+  buffer.pin("t4");
+  (releaseEstimate as (() => void) | null)?.();
+  await pending;
+  await flush();
+  assert.deepEqual(signs, [], "the track changed during the estimate: no request at the boundary");
+  buffer.dispose();
+}
+
+// A6 (review of 0a93ded9, blocker 3). iPhone without Cache Storage (IndexedDB fallback): no buffer
+// at all – a whole mp3 is never downloaded into the page.
+{
+  let blobFetches = 0;
+  const signs: string[] = [];
+  const idb: BufferStore = {
+    kind: "idb",
+    async get() { return null; },
+    async put() {},
+    async delete() {},
+    async keys() { return []; },
+    async clear() {},
+  };
+  const buffer = new HallOfflineBuffer({
+    store: idb,
+    sign: async (id) => { signs.push(id); return { ok: true, data: { url: `https://s/${id}` } }; },
+    async fetchBlob() { blobFetches++; return new Blob(["x"]); },
+    async fetchResponse() { return new Response("x"); },
+    streamToStore: true,
+    lazyCopies: true,
+    maxTracks: HALL_BUFFER_IOS_TRACKS,
+    createUrl: () => "blob:x",
+    revokeUrl: () => {},
+    window: () => ({ until: null }),
+    isOnline: () => true,
+  });
+  buffer.setPlan(["a", "b", "c"], null);
+  await buffer.refill(true);
+  await flush();
+  assert.equal(blobFetches, 0, "no Blob download on the iPhone");
+  assert.deepEqual(signs, [], "no buffer requests without a streaming store");
+  assert.deepEqual(buffer.stats(), { tracks: 0, bytes: 0, inMemory: 0 });
+  buffer.dispose();
+}
+
+// A7. Streamed download without lazy copies (not used by the player on Android – kept working for
+// the buffer contract): the warm next track is read back from the store.
+{
+  const rows = new Map<string, { size: number; downloadedAt: number }>();
+  let blobFetches = 0;
+  const store: BufferStore = {
+    kind: "cache",
+    async get(id) {
+      const r = rows.get(id);
+      return r ? { blob: new Blob([new Uint8Array(16)], { type: "audio/mpeg" }), downloadedAt: r.downloadedAt } : null;
+    },
+    async put() { throw new Error("blob path must not be used"); },
+    async putResponse(id, response, downloadedAt) {
+      rows.set(id, { size: 8 * MB, downloadedAt });
+      await response.body?.cancel();
+      return 8 * MB;
+    },
+    async meta(id) { return rows.get(id) ?? null; },
+    async delete(id) { rows.delete(id); },
+    async keys() { return [...rows.keys()]; },
+    async clear() { rows.clear(); },
+  };
+  const buffer = new HallOfflineBuffer({
+    store,
+    sign: async (id) => ({ ok: true, data: { url: `https://s/${id}` } }),
+    async fetchBlob() { blobFetches++; return new Blob(["x"]); },
+    async fetchResponse() { return new Response("x"); },
+    streamToStore: true,
+    createUrl: () => "blob:warm",
+    revokeUrl: () => {},
+    window: () => ({ until: null }),
+    isOnline: () => true,
+  });
+  buffer.setPlan(["n1", "n2", "n3"], null);
+  for (let i = 0; i < 4; i++) { await buffer.refill(true); await flush(); }
+  assert.equal(blobFetches, 0, "Android: no Blob download");
+  assert.equal(rows.size, 3);
+  assert.ok(buffer.localSource("n1", 180), "the next track's copy is ready (warm) for an offline switch");
+  buffer.dispose();
 }
 
 console.log("business-hall-ios-memory-recovery-unit: OK");

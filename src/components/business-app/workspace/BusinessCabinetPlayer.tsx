@@ -236,7 +236,14 @@ async function fetchTrackResponse(url: string, signal: AbortSignal): Promise<Res
   };
   signal.addEventListener("abort", stop, { once: true });
   // Straight to the storage URL: the service worker never handles audio (public/sw.js).
-  return fetch(url, { signal: timeout.signal, credentials: "omit", cache: "no-store" });
+  try {
+    return await fetch(url, { signal: timeout.signal, credentials: "omit", cache: "no-store" });
+  } catch (error) {
+    // No body to stream: release the timer and the listener now (otherwise they end with it).
+    window.clearTimeout(timer);
+    signal.removeEventListener("abort", stop);
+    throw error;
+  }
 }
 
 async function fetchTrackBlob(url: string, signal: AbortSignal): Promise<Blob> {
@@ -799,15 +806,16 @@ export function BusinessCabinetPlayerProvider({
         fetchBlob: fetchTrackBlob,
         // t1365u: the hall iPhone starts tracks from the stream. t1390u: on iPhone / iPad only
         // HALL_BUFFER_IOS_TRACKS next tracks, streamed straight to disk, no copy in page memory
-        // until a reconnect asks for it, and no download during the first seconds of a track.
+        // until a reconnect asks for it (no Cache Storage → no buffer at all).
+        // Android / desktop keep the Blob download: measured in Chromium, streaming the body into
+        // Cache Storage goes through the renderer and almost doubled its memory (≈ 850 vs 460 MB
+        // peak, scripts/business-hall-buffer-memory-webkit-browser.mts), while a Blob lives in the
+        // browser process. Everywhere: no buffer download during the first
+        // HALL_BUFFER_IOS_START_DELAY_MS of a track (the track change keeps one request).
+        fetchResponse: fetchTrackResponse,
+        startDelayMs: HALL_BUFFER_IOS_START_DELAY_MS,
         ...(isAppleTouchDevice(navigator)
-          ? {
-            maxTracks: HALL_BUFFER_IOS_TRACKS,
-            fetchResponse: fetchTrackResponse,
-            streamToStore: true,
-            lazyCopies: true,
-            startDelayMs: HALL_BUFFER_IOS_START_DELAY_MS,
-          }
+          ? { maxTracks: HALL_BUFFER_IOS_TRACKS, streamToStore: true, lazyCopies: true }
           : {}),
         createUrl: (blob) => URL.createObjectURL(blob),
         revokeUrl: (url) => URL.revokeObjectURL(url),
@@ -869,7 +877,9 @@ export function BusinessCabinetPlayerProvider({
         },
         // t1390u: hall iPhone – the next link after HALL_IOS_PRESIGN_DELAY_SEC of play, so only the
         // access re-check goes out at the boundary; a reconnect loads the lazy device copy.
-        presignDelaySec: () => (streamFirstRef.current ? HALL_IOS_PRESIGN_DELAY_SEC : 0),
+        // t1390u: hall devices (iPhone and Android) sign the next track 30 s in, so a track change
+        // sends one request (the access re-check), not three at once.
+        presignDelaySec: () => (canBeatRef.current ? HALL_IOS_PRESIGN_DELAY_SEC : 0),
         prepareLocal: (audioItemId) => bufferRef.current?.prepare(audioItemId),
         // t1390u: self-resume after a pause nobody asked for + the 10 s watchdog (hall devices).
         element: canBeatRef.current

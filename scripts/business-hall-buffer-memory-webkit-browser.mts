@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { build } from "esbuild";
-import { devices, webkit } from "playwright";
+import { chromium, devices, webkit } from "playwright";
 
 const TRACK = Buffer.alloc(8 * 1024 * 1024, 7);
 
@@ -39,7 +39,8 @@ const bundle = await build({
           revokeUrl: (u) => URL.revokeObjectURL(u),
           window: () => ({ until: null }),
           isOnline: () => true,
-          ...(ios ? { maxTracks: 3, streamToStore: true, lazyCopies: true } : { warmTracks: 1 }),
+          ...(ios ? { maxTracks: 3, streamToStore: true, lazyCopies: true }
+            : mode === "android" ? { streamToStore: true } : mode === "android-before" ? {} : { warmTracks: 1 }),
         });
         const states = [];
         for (let i = 0; i < 30; i++) {
@@ -86,13 +87,14 @@ function rssMb(re: RegExp): number {
   }
 }
 
-async function measure(mode: "before" | "after") {
-  const browser = await webkit.launch();
-  const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+async function measure(mode: "before" | "after" | "android-before" | "android") {
+  const android = mode.startsWith("android");
+  const browser = android ? await chromium.launch() : await webkit.launch();
+  const ctx = await browser.newContext({ ...(android ? devices["Pixel 7"] : devices["iPhone 15"]) });
   const page = await ctx.newPage();
   await page.goto(base + "/");
-  const WEB = /(WPE|WebKit)WebProcess/;
-  const NET = /(WPE|WebKit)NetworkProce/;
+  const WEB = android ? /--type=renderer/ : /(WPE|WebKit)WebProcess/;
+  const NET = android ? /--utility-sub-type=network/ : /(WPE|WebKit)NetworkProce/;
   const idle = rssMb(WEB);
   let peak = idle;
   let netPeak = rssMb(NET);
@@ -108,8 +110,11 @@ async function measure(mode: "before" | "after") {
 
 const before = await measure("before");
 const after = await measure("after");
+// t1390u (Samsung hall stop): Android Chrome – 10 tracks + 2 warm copies, Blob download vs stream.
+const androidBefore = await measure("android-before");
+const androidAfter = await measure("android");
 server.close();
-for (const r of [before, after]) {
+for (const r of [before, after, androidBefore, androidAfter]) {
   const last = r.result.states?.[r.result.states.length - 1];
   console.log(`${r.mode}: web process RSS idle ${r.idle} MB, peak ${r.peak} MB, end ${r.end} MB; network process peak ${r.netPeak} MB; ` +
     `stored ${r.result.stored} tracks, last stats ${JSON.stringify(last)}, blob downloads ${r.result.fetchedBlobs}`);
@@ -121,4 +126,7 @@ assert.equal(after.result.fetchedBlobs, 0, "iPhone path never downloads a Blob")
 assert.ok(after.result.stored <= 4, "3 tracks (+ the sounding one) on the iPhone");
 assert.ok(after.result.states.every((s) => s.inMemory === 0), "no copy in page memory");
 assert.ok(after.result.states[after.result.states.length - 1].tracks >= 3, "the buffer still fills (streamed put works in WebKit)");
+// Finding (12.11.2026): in Chromium the streamed put raises the renderer peak (≈ 850 vs 460 MB),
+// so the player keeps the Blob download on Android. Printed above for the record, not asserted.
+assert.equal(androidBefore.result.error, undefined);
 console.log("business-hall-buffer-memory-webkit-browser: OK");

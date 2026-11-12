@@ -40,12 +40,20 @@ export const HALL_JOURNAL_BATCH = 12;
 export const HALL_JOURNAL_QUEUE_MAX = 60;
 export const HALL_JOURNAL_MAX_PER_HOUR = 150;
 export const HALL_JOURNAL_KIND_GAP_MS = 10_000;
+/**
+ * Extra hourly room kept for the events that explain a silence (page load, autoplay refusal,
+ * watchdog), so a burst of self-resume / recover events cannot crowd them out.
+ */
+export const HALL_JOURNAL_RESERVE_PER_HOUR = 30;
 export const HALL_JOURNAL_FLUSH_MS = 60_000;
 export const HALL_JOURNAL_URGENT_FLUSH_MS = 2_000;
 export const HALL_JOURNAL_DATA_KEYS = 16;
 export const HALL_JOURNAL_STRING_MAX = 64;
 /** sessionStorage: this tab's hall page is alive (removed on a normal unload). */
 export const HALL_PAGE_ALIVE_KEY = "audiolad.hall.page-alive";
+
+/** Never lost to the hourly cap while HALL_JOURNAL_RESERVE_PER_HOUR lasts. */
+const RESERVED_KINDS = new Set<HallJournalKind>(["page_load", "autoplay_blocked", "watchdog_stuck"]);
 
 /** Rare and important: never throttled by kind, flushed within seconds. */
 const URGENT_KINDS = new Set<HallJournalKind>([
@@ -112,6 +120,7 @@ export class HallDeviceJournal {
   private suppressed = new Map<HallJournalKind, number>();
   private hourStart = 0;
   private hourCount = 0;
+  private reserveCount = 0;
   private timer: unknown = null;
   private timerAt = Infinity;
   private sending = false;
@@ -144,12 +153,17 @@ export class HallDeviceJournal {
       if (now - this.hourStart >= 3_600_000) {
         this.hourStart = now;
         this.hourCount = 0;
+        this.reserveCount = 0;
       }
       if (this.hourCount >= HALL_JOURNAL_MAX_PER_HOUR) {
-        this.dropped++;
-        return false;
+        if (!RESERVED_KINDS.has(kind) || this.reserveCount >= HALL_JOURNAL_RESERVE_PER_HOUR) {
+          this.dropped++;
+          return false;
+        }
+        this.reserveCount++;
+      } else {
+        this.hourCount++;
       }
-      this.hourCount++;
       this.lastByKind.set(kind, now);
       let ctx: HallJournalData = {};
       try {

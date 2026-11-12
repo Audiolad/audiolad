@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { build } from "esbuild";
-import { devices, webkit } from "playwright";
+import { chromium, devices, webkit } from "playwright";
 
 const RATE = 8_000;
 function wav(seconds: number, hz: number): Buffer {
@@ -87,9 +87,12 @@ const server = http.createServer((req, res) => {
 });
 await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-const browser = await webkit.launch();
+// Run twice: WebKit as an iPhone and Chromium as an Android phone (the Samsung hall, t1390u).
+for (const [name, engine, device] of [["webkit/iPhone", webkit, "iPhone 15"], ["chromium/Android", chromium, "Pixel 7"]] as const) {
+console.log(`== ${name}`);
+const browser = await engine.launch({ args: engine === chromium ? ["--autoplay-policy=no-user-gesture-required"] : [] });
 try {
-  const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+  const ctx = await browser.newContext({ ...devices[device] });
   const page = await ctx.newPage();
   await page.goto(base + "/");
   await page.click("button");
@@ -128,6 +131,7 @@ try {
   await ctx.close();
 } finally {
   await browser.close();
-  server.close();
 }
+}
+server.close();
 console.log("business-hall-self-resume-webkit-browser: OK");
