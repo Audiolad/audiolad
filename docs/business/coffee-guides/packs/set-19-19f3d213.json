@@ -53,8 +53,8 @@
       ],
       "experts": [
         {
-          "id": "fyodor-ovchinnikov",
-          "quoteIndex": 0
+          "id": "dmitry-shurshakov",
+          "quoteIndex": 1
         },
         {
           "id": "patria-jafferies",
@@ -202,13 +202,13 @@
       ],
       "experts": [
         {
-          "id": "ivan-berezutsky",
+          "id": "stalik-khankishiev",
           "quoteIndex": 0
         },
         {
           "id": "mary-berry",
-          "quoteIndex": 1,
-          "translation": "Нужна правильная текстура, правильный вкус, выпечка должна хорошо выглядеть и манить, мякиш должен быть правильным – всё должно быть как надо."
+          "quoteIndex": 3,
+          "translation": "Но в целом мы думаем одинаково – мы хотим добиться самой лучшей выпечки."
         }
       ]
     },
@@ -276,7 +276,7 @@
       ],
       "experts": [
         {
-          "id": "marina-naumova",
+          "id": "ekaterina-alekhina",
           "quoteIndex": 0
         },
         {
@@ -342,9 +342,9 @@
           "quoteIndex": 6
         },
         {
-          "id": "nigella-lawson",
-          "quoteIndex": 0,
-          "translation": "Думаю, самое главное – напомнить себе, что люди приходят хорошо провести время, а не судить, и вам нужно просто сделать так, чтобы они почувствовали, что им рады."
+          "id": "sunalini-menon",
+          "quoteIndex": 7,
+          "translation": "Сегодня в Индии и в других странах, которые производят и потребляют кофе и где главным напитком был чай, кофе стал образом жизни."
         }
       ]
     }
