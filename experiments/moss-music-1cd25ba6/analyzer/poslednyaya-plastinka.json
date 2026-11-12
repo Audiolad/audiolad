@@ -1,0 +1,40 @@
+{
+  "schema": "audiolad-analyzer-snapshot",
+  "source": "Сокращение экспорта прогона a66eabf9-772c-4ce3-8926-9a2015c587e1. Сам экспорт в репозиторий не коммитится. Числа вокала, инструментов и настроения сверены с docs/E20D8EB7_FINDINGS.md.",
+  "sha256": "793773feae95b724bce3c38d8f2c49a580c7e879a684d2349a6316acdb7759fa",
+  "title": "Последняя пластинка",
+  "project": "Чили на виниле",
+  "duration_s": 171.962,
+  "vocal_raw": "mixed",
+  "vocal_screen": "abstain",
+  "vocal_screen_note": "После порогов 0.35 и 0.08 экран показывает «не определено». Исходный vocal.type=mixed не переписывался. Максимум четырёх сходств 0.079067.",
+  "vocal_decision": "top two of instrumental/vocal/mixed differ by 0.0012, within tie_margin 0.0200; type set to mixed",
+  "vocal_scores": {
+    "instrumental": 0.058268,
+    "vocal": 0.077916,
+    "mixed": 0.079067,
+    "spoken_word": 0.021839
+  },
+  "mixed_segment_consistency": 0.964906,
+  "speech_leads": false,
+  "genres": ["New Age", "Funk/Soul", "Jazz"],
+  "styles": ["Smooth Jazz", "Chillout", "Lounge Jazz"],
+  "styles_note": "Dark Jazz в этом экспорте есть ниже top 3 (cosine 0.288) и в верхней тройке стилей не стоит.",
+  "instruments": [
+    "brushes",
+    "organ",
+    "flute",
+    "synth pad",
+    "strings",
+    "woodwinds",
+    "synthesizer",
+    "hand percussion",
+    "singing bowls",
+    "electric piano"
+  ],
+  "moods": ["warm", "relaxing", "melancholic", "meditative", "calm"],
+  "tempo": "BPM не определён",
+  "energy": "42/100, audiolad-dsp:2, confidence=null, предварительная оценка",
+  "sound_character": "intimate, низкая оценка",
+  "ground_truth_note": "Слуховая метка владельца: инструментал. Это не слепая панель."
+}
