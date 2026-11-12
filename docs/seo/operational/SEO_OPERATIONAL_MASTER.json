@@ -3984,6 +3984,43 @@
         "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
         "operationalAddedAt": "2026-10-23"
       }
+    },
+    {
+      "articleId": "ART_new_20260813_kak-sozdat-svoyu-meditatsiyu",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как создать свою медитацию: от идеи до готовой аудиозаписи",
+      "slug": "kak-sozdat-svoyu-meditatsiyu",
+      "productionUrl": "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "plannedUrl": "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "primaryQuery": "как сделать медитацию самому",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PUBLISHED",
+      "articleType": "creator",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Creator meditation article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": null,
+        "title": null,
+        "slug": null,
+        "productionUrl": null,
+        "availabilityStatus": "NOT_APPLICABLE_CREATOR_ARTICLE",
+        "note": "Creator article uses Studio and School paths; no catalog practice is attached."
+      },
+      "practiceRelevance": "NOT_APPLICABLE",
+      "publishedAt": "2026-08-13T00:00:00.000Z",
+      "updatedAt": "2026-08-13T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Creator article in the registry since 13.08.2026 (commit a444c61c) but missing from the operational master; added on reconciliation 12.11.2026, production URL answered HTTP 200 that day. Frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-11-12"
+      }
     }
   ],
   "nextQueue": [],

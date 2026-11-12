@@ -1241,7 +1241,7 @@
       "practiceKey": "meditatsiya-angel-hranitel",
       "practiceAuthorPath": "sergey-and-zoya",
       "practiceRelevance": "ACCEPTABLE",
-      "validationStatus": "NOT_VALIDATED",
+      "validationStatus": "PLANNED",
       "evidence": "Article prepared for the articles section. Production URL stays null until a smoke check.",
       "operationalAddedAt": "2026-10-23"
     },
@@ -1260,7 +1260,7 @@
       "practiceKey": "meditatsiya-angel-hranitel",
       "practiceAuthorPath": "sergey-and-zoya",
       "practiceRelevance": "ACCEPTABLE",
-      "validationStatus": "NOT_VALIDATED",
+      "validationStatus": "PLANNED",
       "evidence": "Article prepared for the articles section. Production URL stays null until a smoke check.",
       "operationalAddedAt": "2026-10-23"
     },
@@ -1279,7 +1279,7 @@
       "practiceKey": "meditatsiya-angel-hranitel",
       "practiceAuthorPath": "sergey-and-zoya",
       "practiceRelevance": "ACCEPTABLE",
-      "validationStatus": "NOT_VALIDATED",
+      "validationStatus": "PLANNED",
       "evidence": "Article prepared for the articles section. Production URL stays null until a smoke check.",
       "operationalAddedAt": "2026-10-23"
     },
@@ -1298,7 +1298,7 @@
       "practiceKey": "meditatsiya-angel-hranitel",
       "practiceAuthorPath": "sergey-and-zoya",
       "practiceRelevance": "ACCEPTABLE",
-      "validationStatus": "NOT_VALIDATED",
+      "validationStatus": "PLANNED",
       "evidence": "Article prepared for the articles section. Production URL stays null until a smoke check.",
       "operationalAddedAt": "2026-10-23"
     },
@@ -1317,9 +1317,21 @@
       "practiceKey": "meditatsiya-angel-hranitel",
       "practiceAuthorPath": "sergey-and-zoya",
       "practiceRelevance": "ACCEPTABLE",
-      "validationStatus": "NOT_VALIDATED",
+      "validationStatus": "PLANNED",
       "evidence": "Article prepared for the articles section. Production URL stays null until a smoke check.",
       "operationalAddedAt": "2026-10-23"
+    },
+    {
+      "articleId": "ART_new_20260813_kak-sozdat-svoyu-meditatsiyu",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-sozdat-svoyu-meditatsiyu",
+      "productionUrl": "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "plannedUrl": "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "status": "PUBLISHED",
+      "practiceKey": null,
+      "practiceRelevance": "NOT_APPLICABLE",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "evidence": "Creator article in the registry since 13.08.2026 (commit a444c61c) but missing from the operational master; added on reconciliation 12.11.2026, production URL answered HTTP 200 that day. Frequency remains UNVERIFIED because no committed verified value is available."
     }
   ]
 }
