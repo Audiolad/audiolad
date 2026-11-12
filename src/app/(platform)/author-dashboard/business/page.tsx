@@ -14,7 +14,7 @@ import RightsholderVerificationForm, {
   type OwnProduct,
   type ProgramDocument,
 } from "@/components/author-dashboard/business/RightsholderVerificationForm";
-import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
+import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID, isAuthorCabinetBusinessAdmissionEnabled } from "@/lib/author-dashboard/business-access";
 import {
   listAuthorWorkspacesForUser,
   requireAuthenticatedUser,
@@ -49,6 +49,10 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   const requestedSlug = params.author?.trim() ?? "";
   const workspace = workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
   const { role, accessStatus } = await requireAuthorMembership(workspace.id);
+  // Temporary pause (t1386u): no form, no Business data, deep links go back to the cabinet.
+  if (!isAuthorCabinetBusinessAdmissionEnabled()) {
+    redirect(`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`);
+  }
   // No commercial status: same notice as the muted nav tab, and no Business data is loaded.
   if (!authorCanOpenBusiness(accessStatus)) {
     return (
