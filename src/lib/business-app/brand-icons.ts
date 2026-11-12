@@ -25,24 +25,31 @@ export const BUSINESS_BRAND_MARK_SRC = BUSINESS_BRAND_MARK_PATH;
 type HostBrandMetadata = Pick<Metadata, "manifest" | "icons">;
 
 /**
- * audiolad.ru (and every non-business host) — unchanged classic icons.
- * The first entry reproduces byte-for-byte the link Next used to inject from the
- * former file-convention `src/app/favicon.ico` (removed so it no longer leaks
- * onto business.audiolad.ru); `/favicon.ico` itself is served from `public/`.
+ * audiolad.ru (and every non-business host, except coffee when its host flag is on)
+ * uses the classic violet lotus mark. Bump CLASSIC_BRAND_ICON_VERSION when the
+ * icon files change so browsers and iOS do not keep the previous dark-blue mark.
+ * `/favicon.ico` itself is served from `public/`.
  */
-export const CLASSIC_FILE_FAVICON_HREF = "/favicon.ico?favicon.2vob68tjqpejf.ico";
+export const CLASSIC_BRAND_ICON_VERSION = "violet1";
+
+export function classicBrandAssetUrl(file: string): string {
+  const path = file.startsWith("/") ? file : `/${file}`;
+  return `${path}?v=${CLASSIC_BRAND_ICON_VERSION}`;
+}
+
+export const CLASSIC_FILE_FAVICON_HREF = classicBrandAssetUrl("/favicon.ico");
 
 export const CLASSIC_BRAND_METADATA: HostBrandMetadata = {
-  manifest: "/manifest.webmanifest",
+  manifest: classicBrandAssetUrl("/manifest.webmanifest"),
   icons: {
     icon: [
       { url: CLASSIC_FILE_FAVICON_HREF, sizes: "256x256", type: "image/x-icon" },
-      { url: "/favicon.ico" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: classicBrandAssetUrl("/favicon.ico") },
+      { url: classicBrandAssetUrl("/favicon-32x32.png"), sizes: "32x32", type: "image/png" },
+      { url: classicBrandAssetUrl("/favicon-16x16.png"), sizes: "16x16", type: "image/png" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: classicBrandAssetUrl("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" },
     ],
   },
 };
