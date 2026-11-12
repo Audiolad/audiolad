@@ -1,6 +1,7 @@
 /**
  * Owner lifecycle buttons on /admin/ai-company (company-core #41, docs/lifecycle-api.md):
- * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить», «Вернуть на доработку» (company-core #42).
+ * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить», «Вернуть на доработку» (company-core #42),
+ * «Вернуть» из архива (company-core #57).
  * Buttons come only from Core allowed_actions; required_decision is shown; the proxy sends one validated command.
  */
 import assert from "node:assert/strict";
@@ -214,6 +215,24 @@ const ret = validateLifecycleCommand({ ...base, action: "return", reason: "Мо�
 assert.ok(ret.ok);
 assert.deepEqual(ret.ok && lifecycleCoreBody(ret.command), { idempotency_key: "abcdefgh-1", expected_status: "human_gate", reason: "Мобильный дизайн плейлиста не сделан" });
 assert.equal(lifecycleCommandPath(TASK, "return"), `/v1/tasks/${TASK}/return`);
+// «Вернуть» из архива (company-core #57): only from Core's list for a cancelled task, reason required, default target.
+assert.deepEqual(lifecycleView({ id: "x", status: "cancelled", allowedActions: ["restore"], requiredDecision: null }), {
+  expectedStatus: "cancelled",
+  actions: ["restore"],
+  requiredDecision: null,
+});
+assert.equal(lifecycleCommandPath(TASK, "restore"), `/v1/tasks/${TASK}/restore`);
+const archived = { ...base, expectedStatus: "cancelled" };
+assert.equal(validateLifecycleCommand({ ...archived, action: "restore" }).ok, false, "restore needs a reason");
+const restoreCmd = validateLifecycleCommand({ ...archived, action: "restore", reason: "Сняли по ошибке, вернуть в работу" });
+assert.ok(restoreCmd.ok);
+assert.deepEqual(restoreCmd.ok && lifecycleCoreBody(restoreCmd.command), { idempotency_key: "abcdefgh-1", expected_status: "cancelled", reason: "Сняли по ошибке, вернуть в работу" });
+const restored = interpretLifecycleResponse(200, { task_id: TASK, action: "restore", status: "planned", to_status: "planned", idempotent: false }, { taskId: TASK, action: "restore" });
+assert.ok(restored.ok);
+assert.match(restored.ok ? restored.message : "", /возвращена из архива/);
+const notCancelled = interpretLifecycleResponse(409, { error: "not_cancelled", task_id: TASK, action: "restore" }, { taskId: TASK, action: "restore" });
+assert.equal(notCancelled.ok, false);
+assert.match(!notCancelled.ok ? notCancelled.message : "", /не в архиве/);
 const cancelCmd = validateLifecycleCommand({ ...base, action: "cancel", reason: "поглощена другими PR", after: "defer", evidence: [] });
 assert.ok(cancelCmd.ok);
 assert.deepEqual(cancelCmd.ok && lifecycleCoreBody(cancelCmd.command), { idempotency_key: "abcdefgh-1", expected_status: "human_gate", reason: "поглощена другими PR" });

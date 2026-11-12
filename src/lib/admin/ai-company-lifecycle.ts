@@ -18,6 +18,7 @@ export const LIFECYCLE_LABELS: Record<LifecycleAction, string> = {
   cancel: "Снять задачу",
   complete: "Завершить с доказательствами",
   stop: "Остановить",
+  restore: "Вернуть",
 };
 
 export const EVIDENCE_TYPES = ["code_delivery", "document", "core_record", "external_confirmation"] as const;
@@ -83,9 +84,9 @@ export function lifecycleCommandPath(taskId: string, action: LifecycleAction): s
   return `/v1/tasks/${encodeURIComponent(taskId)}/${action}`;
 }
 
-/** Actions whose reason is required: «Снять», «Остановить», «Вернуть на доработку» (что не так). */
+/** Actions whose reason is required: «Снять», «Остановить», «Вернуть на доработку» (что не так), «Вернуть» из архива. */
 export function reasonRequired(action: LifecycleAction): boolean {
-  return action === "cancel" || action === "stop" || action === "return";
+  return action === "cancel" || action === "stop" || action === "return" || action === "restore";
 }
 
 /** A reason Core will accept: at least 8 characters and not just «stop/снять». Shared by the dialog and the proxy. */
@@ -198,6 +199,8 @@ const ERROR_TEXT: Record<string, string> = {
   pr_url_mismatch: "PR не совпадает с PR задачи в Core.",
   core_record_not_found: "Запись Core с таким UUID не найдена.",
   core_record_other_task: "Эта запись Core относится к другой задаче.",
+  not_cancelled: "Задача уже не в архиве. Обновите страницу.",
+  restore_target_invalid: "Неизвестно, куда вернуть задачу. Обновите страницу.",
   internal_error: "Company Core не выполнил действие.",
 };
 
@@ -207,6 +210,7 @@ const DONE_TEXT: Record<LifecycleAction, string> = {
   cancel: "Задача снята и перенесена в архив. История и PR сохранены.",
   complete: "Задача завершена с доказательствами и перенесена в архив.",
   stop: "Остановка запрошена. Ждём подтверждения исполнителя.",
+  restore: "Задача возвращена из архива. Исполнителю ничего не отправлено – запустить её снова можно кнопкой «В работу».",
 };
 
 export function interpretLifecycleResponse(
