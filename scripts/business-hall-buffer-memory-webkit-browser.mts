@@ -68,6 +68,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/bundle.js") { res.setHeader("content-type", "text/javascript"); return res.end(js); }
   if (url.pathname.startsWith("/track/")) {
     res.setHeader("content-type", "audio/mpeg");
+    // Odd tracks come chunked, without Content-Length (the size is counted while streaming).
+    if (/[13579]\.mp3$/.test(url.pathname)) { res.write(TRACK); return res.end(); }
     res.setHeader("content-length", String(TRACK.length));
     return res.end(TRACK);
   }
@@ -126,6 +128,8 @@ assert.equal(after.result.fetchedBlobs, 0, "iPhone path never downloads a Blob")
 assert.ok(after.result.stored <= 4, "3 tracks (+ the sounding one) on the iPhone");
 assert.ok(after.result.states.every((s) => s.inMemory === 0), "no copy in page memory");
 assert.ok(after.result.states[after.result.states.length - 1].tracks >= 3, "the buffer still fills (streamed put works in WebKit)");
+assert.equal(after.result.states[after.result.states.length - 1].bytes, after.result.states[after.result.states.length - 1].tracks * TRACK.length,
+  "sizes right also without Content-Length");
 // Finding (12.11.2026): in Chromium the streamed put raises the renderer peak (≈ 850 vs 460 MB),
 // so the player keeps the Blob download on Android. Printed above for the record, not asserted.
 assert.equal(androidBefore.result.error, undefined);

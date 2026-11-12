@@ -71,7 +71,7 @@ export type BufferStore = {
    */
   putResponse?(id: string, response: Response, downloadedAt: number): Promise<number>;
   /** t1390u: size and download time without reading the body (rehydrate after a reload). */
-  meta?(id: string): Promise<{ size: number; downloadedAt: number } | null>;
+  meta?(id: string, readBody?: boolean): Promise<{ size: number; downloadedAt: number } | null>;
   delete(id: string): Promise<void>;
   keys(): Promise<string[]>;
   clear(): Promise<void>;
@@ -407,7 +407,8 @@ export class HallOfflineBuffer {
       // copy into the page (10 tracks were ~80 MB of page memory right after a crash reload).
       let got: { size: number; downloadedAt: number } | null = null;
       try {
-        if (store.meta) got = await store.meta(id);
+        // iPhone (lazy copies): an old copy without a size is dropped, never read into the page.
+        if (store.meta) got = await store.meta(id, !this.d.lazyCopies);
         else {
           const row = await store.get(id);
           got = row ? { size: row.blob.size, downloadedAt: row.downloadedAt } : null;

@@ -9,6 +9,8 @@ import { HALL_BUFFER_CACHE_NAME, HALL_BUFFER_IDB_STORAGE, HALL_BUFFER_OWNER_KEY,
 
 const cacheKey = (id: string) => `/__hall-buffer/${encodeURIComponent(id)}`;
 const PROBE_KEY = "__probe__";
+/** t1390u: size of a streamed copy whose response had no Content-Length (tiny sidecar entry). */
+const sizeKey = (id: string) => `${cacheKey(id)}?size`;
 const IDB_TABLE = "tracks";
 
 function cacheStore(): BufferStore {
@@ -39,29 +41,53 @@ function cacheStore(): BufferStore {
       };
       if (Number.isFinite(declared) && declared > 0) headers["x-hall-size"] = String(declared);
       const cache = await open();
-      await cache.put(cacheKey(id), new Response(response.body, { headers }));
-      if (Number.isFinite(declared) && declared > 0) return declared;
-      // No length from the server: measure once from the stored copy (disk-backed in the cache).
-      const stored = await cache.match(cacheKey(id));
-      return stored ? (await stored.blob()).size : 0;
+      if (Number.isFinite(declared) && declared > 0) {
+        await cache.put(cacheKey(id), new Response(response.body, { headers }));
+        return declared;
+      }
+      // No length from the server (review 2): count the bytes as they pass – chunk by chunk, never
+      // the whole track – and keep the size in a tiny sidecar entry for meta().
+      let size = 0;
+      const counter = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, ctl) {
+          size += chunk.byteLength;
+          ctl.enqueue(chunk);
+        },
+      });
+      await cache.put(cacheKey(id), new Response(response.body.pipeThrough(counter), { headers }));
+      await cache.put(sizeKey(id), new Response(String(size), { headers: { "content-type": "text/plain" } }));
+      return size;
     },
-    async meta(id) {
-      const res = await (await open()).match(cacheKey(id));
+    async meta(id, readBody = true) {
+      const cache = await open();
+      const res = await cache.match(cacheKey(id));
       if (!res) return null;
       const downloadedAt = Number(res.headers.get("x-hall-downloaded-at")) || 0;
-      const size = Number(res.headers.get("x-hall-size") || res.headers.get("content-length"));
+      let size = Number(res.headers.get("x-hall-size") || res.headers.get("content-length"));
+      if (!(Number.isFinite(size) && size > 0)) {
+        const side = await cache.match(sizeKey(id));
+        size = side ? Number(await side.text()) : 0;
+      }
       if (Number.isFinite(size) && size > 0) {
-        try { await res.body?.cancel(); } catch { /* nothing to release */ }
+        res.body?.cancel().catch(() => { /* nothing to release */ }); // never wait on it
         return { size, downloadedAt };
       }
-      // Copies stored before t1390u carry no size header: read it once (old path).
+      // Copies stored before t1390u carry no size. iPhone (readBody false): never read a whole
+      // track into the page – the copy is dropped and downloaded again. Others: read once.
+      if (!readBody) {
+        res.body?.cancel().catch(() => { /* nothing to release */ }); // never wait on it
+        return null;
+      }
       return { size: (await res.blob()).size, downloadedAt };
     },
     async delete(id) {
-      await (await open()).delete(cacheKey(id));
+      const cache = await open();
+      await cache.delete(cacheKey(id));
+      await cache.delete(sizeKey(id));
     },
     async keys() {
       return (await (await open()).keys())
+        .filter((r) => new URL(r.url).search === "")
         .map((r) => decodeURIComponent(new URL(r.url).pathname.split("/").pop() ?? ""))
         .filter((id) => id && id !== PROBE_KEY);
     },

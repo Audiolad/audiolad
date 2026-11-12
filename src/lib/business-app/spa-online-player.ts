@@ -217,6 +217,8 @@ export class SpaOnlinePlayer {
   /** Keep the interrupted selection/intent until access is explicitly verified again. */
   private deniedPlayback: { audioItemId: string | null; resume: boolean } | null = null;
   /** Autoplay refused: the UI shows «Включить музыку»; a tap calls toggle() in the gesture. */
+  /** t1390u: access re-checks in flight (a delayed next link waits for them). */
+  private verifying = 0;
   needsGesture = false;
   private retryTimer: unknown = null;
   private retryAttempt = 0;
@@ -922,6 +924,8 @@ export class SpaOnlinePlayer {
       delay = 0;
     }
     if (!Number.isFinite(delay) || delay <= 0) return true;
+    // Never next to the boundary's access re-check (review 2: tracks under 75 s signed at 0:00).
+    if (this.verifying > 0) return false;
     const pos = Number.isFinite(this.lastPosition) ? this.lastPosition : 0;
     if (pos >= delay) return true;
     const length = cur.durationSeconds;
@@ -950,10 +954,18 @@ export class SpaOnlinePlayer {
     } catch {
       return;
     }
+    // t1390u: while this re-check runs no other link is signed (one request at a time at the
+    // boundary); a next link already due (short track) goes out right after it.
+    this.verifying++;
+    const settled = () => {
+      this.verifying = Math.max(0, this.verifying - 1);
+      if (op === this.op && !this.disposed) this.prefetchNext();
+    };
     void pending.then((r) => {
+      settled();
       if (op !== this.op || this.disposed || r.ok) return;
       if (r.reason === "no_access") this.denied();
-    }, () => { /* network: keep playing, the next boundary checks again */ });
+    }, () => { settled(); /* network: keep playing, the next boundary checks again */ });
   }
 
   private stopAudio() {

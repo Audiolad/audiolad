@@ -73,9 +73,10 @@ function clock() {
   return { now: () => t, setTimer, clearTimer, advance, timers };
 }
 
-function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void> | void; element?: boolean; background?: boolean } = {}) {
+function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void> | void; element?: boolean; background?: boolean; holdSign?: (id: string, n: number) => boolean } = {}) {
   const c = clock();
   const signs: string[] = [];
+  const held: (() => void)[] = [];
   const events: { kind: string; data?: Record<string, unknown> }[] = [];
   let plays = 0;
   const audio = {
@@ -103,7 +104,9 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
       clearTimer: c.clearTimer,
       sign: async (id): Promise<OnlineSignResult> => {
         signs.push(id);
-        return { ok: true, data: { url: `https://s/${id}?n=${signs.length}` } };
+        const n = signs.length;
+        if (opts.holdSign?.(id, n)) await new Promise<void>((r) => held.push(r));
+        return { ok: true, data: { url: `https://s/${id}?n=${n}` } };
       },
       onChange() {},
       backgroundAdvance: () => opts.background === true,
@@ -113,7 +116,7 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
     },
     [item(1), item(2), item(3)],
   );
-  return { p, audio, signs, events, c, plays: () => plays };
+  return { p, audio, signs, events, c, held, plays: () => plays };
 }
 
 // A1. Without a delay (Android, as before): the next link is signed right at the start.
@@ -171,6 +174,34 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   locked.p.onProgress(31, 180);
   await flush();
   assert.deepEqual(locked.signs, ["track-1", "track-2"], "locked iPhone: next link after 30 s, long before the handoff");
+}
+
+// A3b (review 2). A short track (60 s, under delay + lead): at its boundary only the access
+// re-check goes out; its next link waits for that answer – never two requests at once.
+for (const background of [false, true]) {
+  const w = world({ presignDelay: 30, background, holdSign: (id, n) => id === "track-2" && n === 3 });
+  w.p.items = [item(1, 60), item(2, 60), item(3, 60)];
+  await w.p.toggle();
+  await flush();
+  w.audio.currentTime = 31;
+  w.p.onProgress(31, 60);
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2"]);
+  w.audio.ended = true;
+  await w.p.onEnded();
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2"], "boundary: the re-check only");
+  w.audio.ended = false;
+  w.audio.currentTime = 1;
+  w.p.onProgress(1, 60);
+  w.audio.currentTime = 2;
+  w.p.onProgress(2, 60);
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2"], "short track: next link waits for the re-check");
+  assert.equal(w.held.length, 1);
+  w.held[0]();
+  await flush();
+  assert.deepEqual(w.signs, ["track-1", "track-2", "track-2", "track-3"], "then the next link, one at a time");
 }
 
 // B1. The element paused by itself while playing → play() on the same element, no message.
@@ -662,6 +693,55 @@ function world(opts: { presignDelay?: number; play?: (n: number) => Promise<void
   assert.equal(rows.size, 3);
   assert.ok(buffer.localSource("n1", 180), "the next track's copy is ready (warm) for an offline switch");
   buffer.dispose();
+}
+
+// A8 (review 2). Cache Storage store, response WITHOUT Content-Length: the size is counted while
+// the body streams (no Blob), kept in a sidecar, and meta() never reads the track. An old copy
+// without size is dropped on the iPhone (readBody false), read once elsewhere.
+{
+  const { createHallBufferStore } = await import("../src/lib/business-app/hall-offline-buffer-store");
+  const entries = new Map<string, Response>();
+  const fakeCache = {
+    async put(key: string, res: Response) {
+      const buf = new Uint8Array(await res.arrayBuffer());
+      entries.set(key, new Response(buf, { headers: res.headers }));
+    },
+    async match(key: string) { return entries.get(key)?.clone() ?? undefined; },
+    async delete(key: string) { return entries.delete(key); },
+    async keys() { return [...entries.keys()].map((k) => new Request("https://h" + k)); },
+  };
+  const g = globalThis as unknown as Record<string, unknown>;
+  const saved = { window: g.window, caches: g.caches };
+  g.window = { isSecureContext: true };
+  g.caches = { open: async () => fakeCache, delete: async () => { entries.clear(); return true; } };
+  let blobReads = 0;
+  const origBlob = Response.prototype.blob;
+  Response.prototype.blob = function (this: Response) { blobReads++; return origBlob.call(this); };
+  try {
+    const store = await createHallBufferStore();
+    assert.equal(store?.kind, "cache");
+    blobReads = 0;
+    const body = new ReadableStream<Uint8Array>({
+      start(ctl) { for (let i = 0; i < 8; i++) ctl.enqueue(new Uint8Array(1024)); ctl.close(); },
+    });
+    const size = await store!.putResponse!("t1", new Response(body, { headers: { "content-type": "audio/mpeg" } }), 5);
+    assert.equal(size, 8 * 1024, "counted while streaming");
+    assert.deepEqual(await store!.meta!("t1", false), { size: 8 * 1024, downloadedAt: 5 }, "size from the sidecar");
+    assert.deepEqual(await store!.meta!("t1", false), { size: 8 * 1024, downloadedAt: 5 });
+    assert.equal(blobReads, 0, "the track is never read into a Blob");
+    assert.deepEqual(await store!.keys(), ["t1"], "the sidecar is not a track");
+    // A copy from before t1390u: no size anywhere.
+    entries.set("/__hall-buffer/old", new Response(new Uint8Array(4096), { headers: { "x-hall-downloaded-at": "7" } }));
+    assert.equal(await store!.meta!("old", false), null, "iPhone: an old copy without size is dropped, not read");
+    assert.equal(blobReads, 0);
+    assert.deepEqual(await store!.meta!("old"), { size: 4096, downloadedAt: 7 }, "Android: read once as before");
+    await store!.delete("t1");
+    assert.equal(entries.has("/__hall-buffer/t1?size"), false, "sidecar deleted with the copy");
+  } finally {
+    Response.prototype.blob = origBlob;
+    g.window = saved.window;
+    g.caches = saved.caches;
+  }
 }
 
 console.log("business-hall-ios-memory-recovery-unit: OK");
