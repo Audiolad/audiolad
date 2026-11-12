@@ -1,0 +1,97 @@
+name: AI Company Task
+description: Task packet for Audiolad AI Company agents
+title: "[AI] "
+labels: []
+body:
+  - type: textarea
+    id: strategic_goal
+    attributes:
+      label: Strategic Goal
+      description: What active company goal does this advance?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Why does this task exist now?
+    validations:
+      required: true
+  - type: textarea
+    id: ideal_outcome
+    attributes:
+      label: Ideal Outcome Scene
+      description: Describe in plain human language what success looks like in the real user's life.
+    validations:
+      required: true
+  - type: textarea
+    id: contribution
+    attributes:
+      label: Contribution
+      description: How does this task move the Strategic Goal?
+    validations:
+      required: true
+  - type: textarea
+    id: market_reference
+    attributes:
+      label: Market / Reference Check
+      description: Existing strong solutions, Buy/Integrate/Benchmark & Build/Build recommendation.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_output
+    attributes:
+      label: Expected Output
+      description: Exact useful result that must be produced.
+    validations:
+      required: true
+  - type: input
+    id: producer
+    attributes:
+      label: Producer
+      placeholder: Engineering / Research / Product / UX / QA / Analytics / Marketing & Sales / Orchestrator
+    validations:
+      required: true
+  - type: input
+    id: consumer
+    attributes:
+      label: Result Consumer
+      description: Who uses this result next?
+    validations:
+      required: true
+  - type: textarea
+    id: consumer_need
+    attributes:
+      label: Consumer Need
+      description: What must the consumer be able to do because of this result?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Observable criteria for acceptance.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Prior tasks, decisions or data required.
+  - type: dropdown
+    id: human_gate
+    attributes:
+      label: Human Gate
+      options:
+        - None
+        - Sergey
+        - Oriy
+    validations:
+      required: true
+  - type: textarea
+    id: next_action
+    attributes:
+      label: Next Action
+      description: What should happen after Consumer Acceptance?
+    validations:
+      required: true
