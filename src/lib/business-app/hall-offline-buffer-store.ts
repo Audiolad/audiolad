@@ -22,8 +22,40 @@ function cacheStore(): BufferStore {
     },
     async put(id, blob, downloadedAt) {
       await (await open()).put(cacheKey(id), new Response(blob, {
-        headers: { "content-type": blob.type || "audio/mpeg", "x-hall-downloaded-at": String(downloadedAt) },
+        headers: {
+          "content-type": blob.type || "audio/mpeg",
+          "x-hall-downloaded-at": String(downloadedAt),
+          "x-hall-size": String(blob.size),
+        },
       }));
+    },
+    // t1390u: the response body streams into the cache – the page never holds the whole track.
+    async putResponse(id, response, downloadedAt) {
+      if (!response.body) throw new Error("no_body");
+      const declared = Number(response.headers.get("content-length"));
+      const headers: Record<string, string> = {
+        "content-type": response.headers.get("content-type") || "audio/mpeg",
+        "x-hall-downloaded-at": String(downloadedAt),
+      };
+      if (Number.isFinite(declared) && declared > 0) headers["x-hall-size"] = String(declared);
+      const cache = await open();
+      await cache.put(cacheKey(id), new Response(response.body, { headers }));
+      if (Number.isFinite(declared) && declared > 0) return declared;
+      // No length from the server: measure once from the stored copy (disk-backed in the cache).
+      const stored = await cache.match(cacheKey(id));
+      return stored ? (await stored.blob()).size : 0;
+    },
+    async meta(id) {
+      const res = await (await open()).match(cacheKey(id));
+      if (!res) return null;
+      const downloadedAt = Number(res.headers.get("x-hall-downloaded-at")) || 0;
+      const size = Number(res.headers.get("x-hall-size") || res.headers.get("content-length"));
+      if (Number.isFinite(size) && size > 0) {
+        try { await res.body?.cancel(); } catch { /* nothing to release */ }
+        return { size, downloadedAt };
+      }
+      // Copies stored before t1390u carry no size header: read it once (old path).
+      return { size: (await res.blob()).size, downloadedAt };
     },
     async delete(id) {
       await (await open()).delete(cacheKey(id));

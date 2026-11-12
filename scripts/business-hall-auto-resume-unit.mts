@@ -440,7 +440,10 @@ async function bufferWarm(warmTracks?: number) {
   assert.match(src, /hallMeantToPlay\(readHallPlayingMarker\(hallLocalStorage\(\)\), hallScopeRef\.current\)\) return;/, "build reload guard");
   assert.match(src, /shouldAutoResumeHall\(/, "auto-resume after a reload");
   assert.match(src, /streamFirst: \(\) => streamFirstRef\.current/, "stream first on the hall iPhone");
-  assert.match(src, /warmTracks: isAppleTouchDevice\(navigator\) \? 1 : undefined/);
+  // t1390u: the hall iPhone keeps no copy in memory ahead of time (lazy copies), 3 tracks, streamed.
+  assert.match(src, /lazyCopies: true/);
+  assert.match(src, /maxTracks: HALL_BUFFER_IOS_TRACKS/);
+  assert.match(src, /streamToStore: true/);
   assert.match(src, /playingMarkerRef\.current\?\.clear\(\);/, "closing the bar clears the marker");
   // The player's command handler is the tested pointCommandApplied, and its owner pause clears the marker.
   assert.match(src, /applied: pointCommandApplied\(\{/, "player uses the tested command check");

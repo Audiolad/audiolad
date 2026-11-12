@@ -47,6 +47,17 @@ export const HALL_BUFFER_IDB_STORAGE = "audiolad-hall-buffer";
 export const HALL_BUFFER_WARM = 2;
 /** localStorage: whose buffer this is (`space:location`). A different hall wipes it. */
 export const HALL_BUFFER_OWNER_KEY = "audiolad.hall-buffer.owner";
+/**
+ * t1390u (Sergey 12.11.2026, hall iPhone): Safari re-opened the hall page by itself after 50–70
+ * track changes (11.11 and 12.11 at 09:42 MSK), most likely because the page ran out of memory –
+ * every boundary pushed a whole ~8 MB mp3 through the page (fetch → Blob → Cache Storage) next to
+ * the stream. On iPhone / iPad the buffer now keeps only this many next tracks, streams each
+ * download straight into Cache Storage (the body never becomes a Blob in the page), keeps no copy
+ * in memory until a reconnect asks for one, and waits HALL_BUFFER_IOS_START_DELAY_MS after a track
+ * starts before it downloads anything (one request at a time, never at the boundary).
+ */
+export const HALL_BUFFER_IOS_TRACKS = 3;
+export const HALL_BUFFER_IOS_START_DELAY_MS = 45_000;
 
 export type BufferStoreKind = "cache" | "idb";
 
@@ -54,6 +65,13 @@ export type BufferStore = {
   kind: BufferStoreKind;
   get(id: string): Promise<{ blob: Blob; downloadedAt: number } | null>;
   put(id: string, blob: Blob, downloadedAt: number): Promise<void>;
+  /**
+   * t1390u: store a network response without reading its body into the page (Cache Storage
+   * streams it to disk). Resolves with the stored size in bytes. Missing: Blob path only.
+   */
+  putResponse?(id: string, response: Response, downloadedAt: number): Promise<number>;
+  /** t1390u: size and download time without reading the body (rehydrate after a reload). */
+  meta?(id: string): Promise<{ size: number; downloadedAt: number } | null>;
   delete(id: string): Promise<void>;
   keys(): Promise<string[]>;
   clear(): Promise<void>;
@@ -66,6 +84,20 @@ export type HallBufferDeps = {
   store: BufferStore | null;
   sign(audioItemId: string): Promise<OnlineSignResult>;
   fetchBlob(url: string, signal: AbortSignal): Promise<Blob>;
+  /**
+   * t1390u: raw response for `putResponse` (streamed download). Used only with `streamToStore`
+   * and a store that has `putResponse`; any failure there falls back to nothing (retry later).
+   */
+  fetchResponse?(url: string, signal: AbortSignal): Promise<Response>;
+  /** t1390u: download straight into the store (hall iPhone). Default false (Blob path). */
+  streamToStore?: boolean;
+  /**
+   * t1390u: lazy copies (hall iPhone) – nothing is loaded into memory ahead of time; only a copy
+   * asked for by `prepare(id)` (a reconnect) or already sounding is. Default false.
+   */
+  lazyCopies?: boolean;
+  /** t1390u: after a new track starts (`pin`), no download begins for this long. Default 0. */
+  startDelayMs?: number;
   createUrl(blob: Blob): string;
   revokeUrl(url: string): void;
   /**
@@ -147,6 +179,11 @@ export class HallOfflineBuffer {
   /** Bumped by purge(): downloads started before it never land. */
   private generation = 0;
   private wantsRefill = false;
+  /** t1390u: tracks a reconnect asked for (lazy copies). */
+  private demanded: string[] = [];
+  /** t1390u: no download starts before this moment (a track has just started). */
+  private holdUntil = 0;
+  private holdTimer: unknown = null;
 
   constructor(private readonly d: HallBufferDeps) {}
 
@@ -234,6 +271,12 @@ export class HallOfflineBuffer {
 
   /** Tracks whose copies are kept in memory: sounding, selected and the next HALL_BUFFER_WARM. */
   private warmIds(): string[] {
+    if (this.d.lazyCopies) {
+      // Hall iPhone: only what a reconnect asked for, and the copy the element already plays.
+      const ids = this.demanded.filter((id) => this.entries.has(id));
+      if (this.pinned && this.entries.get(this.pinned)?.url && !ids.includes(this.pinned)) ids.unshift(this.pinned);
+      return ids;
+    }
     const warm = Math.max(0, Math.floor(this.d.warmTracks ?? HALL_BUFFER_WARM));
     const ids = this.plan.slice(0, warm);
     for (const id of [this.selected, this.pinned]) if (id && !ids.includes(id)) ids.unshift(id);
@@ -279,11 +322,32 @@ export class HallOfflineBuffer {
     }
   }
 
+  /**
+   * t1390u: a reconnect of this track is coming – load its copy into memory (lazy copies only;
+   * otherwise the copy is warm already). The controller's retry picks it up.
+   */
+  prepare(id: string): void {
+    if (this.disposed || !this.d.lazyCopies || !this.entries.has(id)) return;
+    if (!this.demanded.includes(id)) this.demanded = [id];
+    void this.warm();
+  }
+
+  /** t1390u telemetry: copies on the device, their bytes and how many sit in page memory. */
+  stats(): { tracks: number; bytes: number; inMemory: number } {
+    let inMemory = 0;
+    for (const e of this.entries.values()) if (e.blob) inMemory++;
+    return { tracks: this.entries.size, bytes: this.bytes(), inMemory };
+  }
+
   /** The element now plays this track (null: nothing). The previous pinned copy may go. */
   pin(id: string | null): void {
     if (this.pinned === id) return;
     const old = this.pinned;
     this.pinned = id;
+    // A reconnect that asked for a copy is over once another track sounds.
+    if (id && !this.demanded.includes(id)) this.demanded = [];
+    const delay = Math.max(0, this.d.startDelayMs ?? 0);
+    if (id && delay > 0) this.hold(delay);
     if (old && !this.plan.includes(old) && !this.kept(old)) this.evict(old);
     void this.warm();
   }
@@ -311,6 +375,16 @@ export class HallOfflineBuffer {
     this.d.onChange?.();
   }
 
+  /** t1390u: no download starts for `ms`; a refill wanted meanwhile runs when the hold ends. */
+  private hold(ms: number): void {
+    this.holdUntil = this.now() + ms;
+    if (this.holdTimer !== null) this.cancel(this.holdTimer);
+    this.holdTimer = this.timer(() => {
+      this.holdTimer = null;
+      if (!this.disposed && this.wantsRefill) void this.refill();
+    }, ms);
+  }
+
   /** Reload: take over the copies already on the device (expired / foreign ones are deleted). */
   async rehydrate(): Promise<void> {
     const store = this.d.store;
@@ -325,9 +399,15 @@ export class HallOfflineBuffer {
     for (const id of keys) {
       if (this.disposed || gen !== this.generation) return;
       if (this.entries.has(id)) continue;
-      let got: { blob: Blob; downloadedAt: number } | null = null;
+      // t1390u: size and age from the headers where the store can – a reload never reads every
+      // copy into the page (10 tracks were ~80 MB of page memory right after a crash reload).
+      let got: { size: number; downloadedAt: number } | null = null;
       try {
-        got = await store.get(id);
+        if (store.meta) got = await store.meta(id);
+        else {
+          const row = await store.get(id);
+          got = row ? { size: row.blob.size, downloadedAt: row.downloadedAt } : null;
+        }
       } catch {
         got = null;
       }
@@ -339,7 +419,7 @@ export class HallOfflineBuffer {
         continue;
       }
       // On disk only; warm() loads the ones about to play.
-      this.entries.set(id, { blob: null, size: got.blob.size, downloadedAt: got.downloadedAt, url: null });
+      this.entries.set(id, { blob: null, size: got.size, downloadedAt: got.downloadedAt, url: null });
     }
     this.updateAvg();
     await this.warm();
@@ -409,6 +489,8 @@ export class HallOfflineBuffer {
     if (!active) return;
     this.sweep();
     if (!this.d.isOnline() || this.now() < this.retryAt) return;
+    // t1390u: a track has just started – the boundary belongs to the stream (the hold timer refills).
+    if (this.now() < this.holdUntil) return;
     const limit = Math.max(1, this.d.concurrency ?? HALL_BUFFER_CONCURRENCY);
     if (this.downloading.size >= limit) return;
     const id = this.plan.find((x) => !this.downloading.has(x) && !this.has(x));
@@ -430,26 +512,45 @@ export class HallOfflineBuffer {
         }
         throw new Error(signed.reason);
       }
-      const fetched = await this.d.fetchBlob(signed.data.url, abort.signal);
-      if (this.disposed || gen !== this.generation || abort.signal.aborted) return;
-      if (!this.d.window(id) || !this.plan.includes(id)) return;
-      const blob = fetched.type ? fetched : new Blob([fetched], { type: "audio/mpeg" });
-      const downloadedAt = this.now();
-      await this.d.store.put(id, blob, downloadedAt);
+      const store = this.d.store;
+      let blob: Blob | null = null;
+      let size = 0;
+      let downloadedAt = 0;
+      if (this.d.streamToStore && this.d.fetchResponse && store.putResponse) {
+        // t1390u: the body goes from the network straight to Cache Storage, never into the page.
+        const response = await this.d.fetchResponse(signed.data.url, abort.signal);
+        if (this.disposed || gen !== this.generation || abort.signal.aborted) return;
+        if (!response.ok) throw new Error(`http_${response.status}`);
+        if (!this.d.window(id) || !this.plan.includes(id)) {
+          try { await response.body?.cancel(); } catch { /* nothing to release */ }
+          return;
+        }
+        downloadedAt = this.now();
+        size = await store.putResponse(id, response, downloadedAt);
+      } else {
+        const fetched = await this.d.fetchBlob(signed.data.url, abort.signal);
+        if (this.disposed || gen !== this.generation || abort.signal.aborted) return;
+        if (!this.d.window(id) || !this.plan.includes(id)) return;
+        blob = fetched.type ? fetched : new Blob([fetched], { type: "audio/mpeg" });
+        downloadedAt = this.now();
+        await store.put(id, blob, downloadedAt);
+        size = blob.size;
+      }
       if (this.disposed || gen !== this.generation) {
-        void this.d.store.delete(id).catch(() => {});
+        void store.delete(id).catch(() => {});
         return;
       }
       const old = this.entries.get(id);
       if (old?.url && id !== this.pinned) this.d.revokeUrl(old.url);
       // Kept in memory only when it plays soon; otherwise on disk until warm() needs it.
-      const warmNow = this.warmIds().includes(id);
+      const warmNow = !!blob && this.warmIds().includes(id);
       this.entries.set(id, {
         blob: warmNow ? blob : null,
-        size: blob.size,
+        size,
         downloadedAt,
         url: id === this.pinned ? old?.url ?? null : null,
       });
+      blob = null;
       this.updateAvg();
       this.retryAt = 0;
       this.d.onChange?.();
@@ -488,6 +589,8 @@ export class HallOfflineBuffer {
     this.disposed = true;
     if (this.sweepTimer !== null) this.cancel(this.sweepTimer);
     this.sweepTimer = null;
+    if (this.holdTimer !== null) this.cancel(this.holdTimer);
+    this.holdTimer = null;
     for (const ctl of this.downloading.values()) ctl.abort();
     this.downloading.clear();
     for (const e of this.entries.values()) if (e.url) this.d.revokeUrl(e.url);

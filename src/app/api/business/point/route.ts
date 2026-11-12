@@ -25,6 +25,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeHallAppVersion } from "@/lib/business-app/hall-build-reload";
 import { readServerHallBuildId } from "@/lib/business-app/hall-server-build.server";
+import { HALL_JOURNAL_BATCH, parseHallJournalEvent } from "@/lib/business-app/hall-device-journal";
 
 /** Log the collapsed client IP once per server process, not on every attempt. */
 let warnedCollapsedIp = false;
@@ -105,6 +106,67 @@ async function writePlayerAppVersion(token: string, appVersion: string): Promise
       .eq("player_id", playerId);
   } catch {
     /* best effort */
+  }
+}
+
+/**
+ * t1390u: per-process cap on journal rows per device token (the client already throttles; this
+ * only stops a broken or hostile page from filling the table).
+ */
+const JOURNAL_WINDOW_MS = 10 * 60_000;
+const JOURNAL_MAX_PER_WINDOW = 200;
+const journalWindows = new Map<string, { start: number; count: number }>();
+
+function journalAllowance(tokenHash: string, wanted: number, now: number): number {
+  const w = journalWindows.get(tokenHash);
+  if (!w || now - w.start >= JOURNAL_WINDOW_MS) {
+    if (journalWindows.size > 5_000) journalWindows.clear();
+    journalWindows.set(tokenHash, { start: now, count: Math.min(wanted, JOURNAL_MAX_PER_WINDOW) });
+    return Math.min(wanted, JOURNAL_MAX_PER_WINDOW);
+  }
+  const left = Math.max(0, JOURNAL_MAX_PER_WINDOW - w.count);
+  const take = Math.min(wanted, left);
+  w.count += take;
+  return take;
+}
+
+/**
+ * t1390u: hall device journal batch → business_player_device_events (service role, resolved by
+ * the device token like the app version write). Best effort: never fails the device.
+ */
+async function writeHallJournal(token: string, rawEvents: unknown, appVersion: string | null): Promise<number> {
+  if (!Array.isArray(rawEvents) || rawEvents.length === 0) return 0;
+  const now = Date.now();
+  const events = rawEvents.slice(0, HALL_JOURNAL_BATCH)
+    .map((e) => parseHallJournalEvent(e, now))
+    .filter((e): e is NonNullable<typeof e> => e !== null);
+  if (events.length === 0) return 0;
+  const hash = pointTokenHashHex(token);
+  const allowed = journalAllowance(hash, events.length, now);
+  if (allowed <= 0) return 0;
+  try {
+    const admin = createServiceRoleClient();
+    const { data: session, error: sessionError } = await admin
+      .from("business_point_sessions")
+      .select("player_id, organization_id, location_id")
+      .eq("token_hash", `\\x${hash}`)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (sessionError || !session) return 0;
+    const row = session as { player_id: string; organization_id: string; location_id: string | null };
+    const rows = events.slice(0, allowed).map((e) => ({
+      player_id: row.player_id,
+      organization_id: row.organization_id,
+      location_id: row.location_id,
+      kind: e.k,
+      client_at: new Date(e.at).toISOString(),
+      app_version: appVersion,
+      data: e.d,
+    }));
+    const { error } = await admin.from("business_player_device_events").insert(rows);
+    return error ? 0 : rows.length;
+  } catch {
+    return 0;
   }
 }
 
@@ -426,6 +488,10 @@ export async function POST(request: Request) {
         p_sample_seq: usage.seq, p_audio_item_id: usage.audioItemId, p_position_ms: usage.positionMs,
       });
       return json(usageError ? { ok: false, reason: "usage_report_failed" } : { ok: true, data: null });
+    }
+    if (body.kind === "events") {
+      const stored = await writeHallJournal(token, body.events, normalizeHallAppVersion(body.appVersion));
+      return json({ ok: true, data: { stored } });
     }
     const kind = body.kind === "playback" ? "playback" : body.kind === "heartbeat" ? "heartbeat" : null;
     if (!kind) return json({ ok: false, reason: "invalid_request" }, 400);

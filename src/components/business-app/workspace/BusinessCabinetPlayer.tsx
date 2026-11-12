@@ -15,8 +15,16 @@ import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
 
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
-import { postPointReport, postPointUsage } from "@/lib/business-app/cabinet-player-client";
-import { HallOfflineBuffer, hallBufferPlan } from "@/lib/business-app/hall-offline-buffer";
+import { postPointEvents, postPointReport, postPointUsage } from "@/lib/business-app/cabinet-player-client";
+import { HALL_BUFFER_IOS_START_DELAY_MS, HALL_BUFFER_IOS_TRACKS, HallOfflineBuffer, hallBufferPlan } from "@/lib/business-app/hall-offline-buffer";
+import {
+  HallDeviceJournal,
+  clearHallPageAlive,
+  hallNavigationType,
+  markHallPageAlive,
+  type HallJournalData,
+  type HallJournalKind,
+} from "@/lib/business-app/hall-device-journal";
 import { createHallBufferStore, purgeHallBufferStorage, readHallBufferOwner, writeHallBufferOwner } from "@/lib/business-app/hall-offline-buffer-store";
 import { HallReportQueue } from "@/lib/business-app/hall-report-queue";
 import {
@@ -207,6 +215,29 @@ async function signWorkspaceTrack(spaceId: string, audioItemId: string): Promise
 
 /** One buffer download may take this long before it is abandoned (slow line: retried later). */
 const BUFFER_FETCH_TIMEOUT_MS = 180_000;
+/** t1390u: hall iPhone – the next link is signed after this much of a track (not at the boundary). */
+const HALL_IOS_PRESIGN_DELAY_SEC = 30;
+/** t1390u: «position does not move» check of the hall player. */
+const HALL_WATCHDOG_TICK_MS = 2_000;
+/** t1390u: periodic journal snapshot (uptime, tracks since load, buffer, storage). */
+const HALL_JOURNAL_SNAPSHOT_MS = 5 * 60_000;
+
+/**
+ * t1390u: the buffer download as a raw response – its body streams into Cache Storage
+ * (hall-offline-buffer-store.ts putResponse) and never becomes a Blob in the page. The timeout
+ * also covers the body: it aborts a download still running after BUFFER_FETCH_TIMEOUT_MS.
+ */
+async function fetchTrackResponse(url: string, signal: AbortSignal): Promise<Response> {
+  const timeout = new AbortController();
+  const timer = window.setTimeout(() => timeout.abort(), BUFFER_FETCH_TIMEOUT_MS);
+  const stop = () => {
+    window.clearTimeout(timer);
+    timeout.abort();
+  };
+  signal.addEventListener("abort", stop, { once: true });
+  // Straight to the storage URL: the service worker never handles audio (public/sw.js).
+  return fetch(url, { signal: timeout.signal, credentials: "omit", cache: "no-store" });
+}
 
 async function fetchTrackBlob(url: string, signal: AbortSignal): Promise<Blob> {
   const timeout = new AbortController();
@@ -425,6 +456,10 @@ export function BusinessCabinetPlayerProvider({
   }, []);
 
   const canBeat = pointReports;
+  const canBeatRef = useRef(canBeat);
+  useLayoutEffect(() => {
+    canBeatRef.current = canBeat;
+  }, [canBeat]);
   /** t1365u: hall iPhone / iPad – start from a fresh pre-signed stream, not a blob: copy. */
   const streamFirstRef = useRef(false);
   useLayoutEffect(() => {
@@ -438,7 +473,12 @@ export function BusinessCabinetPlayerProvider({
     // During a skip fade-out the element still sounds the previous track: report that one.
     const audible = ctl.audibleItemId;
     const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(audible), ctl.recovering);
-    const report = evidenceRef.current.report(state, audible, Date.now());
+    const evidence = evidenceRef.current.report(state, audible, Date.now());
+    // t1390u: an autoplay refusal gets its own code (after a page reload: the browser restarted
+    // the hall page and refused the automatic start). Diagnostics only – nothing is shown.
+    const report = ctl.needsGesture && evidence.state !== "playing"
+      ? { ...evidence, errorCode: autoResumeRefusedRef.current ? "autoplay_blocked_after_reload" : "autoplay_blocked" }
+      : evidence;
     // Owner mirror (t1283u): position and the upcoming queue of what the hall really plays.
     const tracks = modelRef.current?.tracks ?? [];
     const fading = ctl.fadingOutPrevious;
@@ -499,6 +539,15 @@ export function BusinessCabinetPlayerProvider({
   // Android battery saving cannot freeze the page between two tracks. Screen-only: it never
   // touches the audio element, the build reload above, the iPhone handoff or the fades.
   const wakeLockRef = useRef<HallWakeLock | null>(null);
+  // t1390u: hall device journal (hall-device-journal.ts) – small, throttled, never shown.
+  const journalRef = useRef<HallDeviceJournal | null>(null);
+  const tracksSinceLoadRef = useRef(0);
+  /** The start the browser refused came from the automatic resume after a page reload. */
+  const autoResumeRefusedRef = useRef(false);
+  const autoResumeRunningRef = useRef(false);
+  const journal = useCallback((kind: HallJournalKind, data?: HallJournalData) => {
+    journalRef.current?.log(kind, data);
+  }, []);
   /** Deliberate pause / start in flight – what the controller itself does not know. */
   const wakeIntentRef = useRef(new HallWakeIntentTracker());
   // t1365u: «this hall was playing» survives a reload of the page (hall-auto-resume.ts). Hall
@@ -590,6 +639,88 @@ export function BusinessCabinetPlayerProvider({
     };
   }, [canBeat, trySafeBuildReload]);
 
+  // t1390u: hall device journal – page load (navigation type, «was playing», crash suspicion),
+  // visibility, a snapshot every 5 min; element / controller events are logged where they happen.
+  useEffect(() => {
+    if (!canBeat || typeof window === "undefined") return;
+    let appVersion: string | null = null;
+    void resolveHallClientBuildId().then((v) => { appVersion = v ?? null; }, () => {});
+    const j = new HallDeviceJournal({
+      send: (events) => postPointEvents(events, appVersion),
+      context: () => {
+        const ctl = ctlRef.current;
+        const audio = audioRef.current;
+        const buf = bufferRef.current?.stats();
+        const heap = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize;
+        return {
+          st: ctl?.status ?? null,
+          pos: audio && Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : null,
+          up: Math.round((Date.now() - performance.timeOrigin) / 1000),
+          n: tracksSinceLoadRef.current,
+          vis: document.visibilityState === "visible" ? "v" : "h",
+          wl: wakeLockRef.current?.held ?? null,
+          bufN: buf?.tracks ?? null,
+          bufMb: buf ? Math.round(buf.bytes / 104857.6) / 10 : null,
+          bufMem: buf?.inMemory ?? null,
+          heapMb: typeof heap === "number" ? Math.round(heap / 1048576) : null,
+        };
+      },
+    });
+    journalRef.current = j;
+    let session: Storage | null = null;
+    try { session = window.sessionStorage; } catch { session = null; }
+    const pageId = `${Math.round(performance.timeOrigin)}-${Math.random().toString(36).slice(2, 8)}`;
+    const { previousAlive } = markHallPageAlive(session, pageId);
+    const marker = readHallPlayingMarker(hallLocalStorage());
+    const markerAge = marker ? Math.round((Date.now() - marker.at) / 1000) : null;
+    j.log("page_load", {
+      nav: hallNavigationType(performance),
+      crashSuspect: previousAlive,
+      wasPlaying: markerAge !== null && markerAge <= HALL_AUTO_RESUME_MAX_AGE_MS / 1000,
+      markerAgeS: markerAge,
+      apple: isAppleTouchDevice(navigator),
+    });
+    const onVisibility = () => j.log("visibility");
+    const onHide = (event: PageTransitionEvent) => {
+      // A normal unload says goodbye; a page killed by the browser never does (crashSuspect).
+      if (!event.persisted) clearHallPageAlive(session);
+      j.log("page_hide", { persisted: event.persisted });
+      void j.flush();
+    };
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) markHallPageAlive(session, pageId);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("pageshow", onShow);
+    const snapshot = window.setInterval(() => {
+      const estimate = navigator.storage?.estimate?.bind(navigator.storage);
+      if (!estimate) return void j.log("snapshot");
+      void estimate().then(
+        (e) => j.log("snapshot", { usageMb: typeof e.usage === "number" ? Math.round(e.usage / 1048576) : null }),
+        () => j.log("snapshot"),
+      );
+    }, HALL_JOURNAL_SNAPSHOT_MS);
+    let lastHeld: boolean | null = null;
+    const wakeWatch = window.setInterval(() => {
+      const held = wakeLockRef.current?.held ?? null;
+      if (held !== lastHeld) {
+        lastHeld = held;
+        j.log("wake_lock", { held });
+      }
+    }, 15_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("pageshow", onShow);
+      window.clearInterval(snapshot);
+      window.clearInterval(wakeWatch);
+      void j.flush();
+      j.dispose();
+      if (journalRef.current === j) journalRef.current = null;
+    };
+  }, [canBeat]);
+
   const catalogKey = model && open ? workspaceControllerKey(model) : "";
 
   /** t1331u: the next HALL_BUFFER_TRACKS of the live queue, downloaded while the hall plays. */
@@ -666,9 +797,18 @@ export function BusinessCabinetPlayerProvider({
         store,
         sign: (audioItemId) => signWorkspaceTrack(modelRef.current?.spaceId ?? "cafe", audioItemId),
         fetchBlob: fetchTrackBlob,
-        // t1365u: the hall iPhone starts tracks from the stream; one next copy in memory is enough
-        // for a reconnect (the rest stays on disk).
-        warmTracks: isAppleTouchDevice(navigator) ? 1 : undefined,
+        // t1365u: the hall iPhone starts tracks from the stream. t1390u: on iPhone / iPad only
+        // HALL_BUFFER_IOS_TRACKS next tracks, streamed straight to disk, no copy in page memory
+        // until a reconnect asks for it, and no download during the first seconds of a track.
+        ...(isAppleTouchDevice(navigator)
+          ? {
+            maxTracks: HALL_BUFFER_IOS_TRACKS,
+            fetchResponse: fetchTrackResponse,
+            streamToStore: true,
+            lazyCopies: true,
+            startDelayMs: HALL_BUFFER_IOS_START_DELAY_MS,
+          }
+          : {}),
         createUrl: (blob) => URL.createObjectURL(blob),
         revokeUrl: (url) => URL.revokeObjectURL(url),
         window: (audioItemId) => {
@@ -720,8 +860,27 @@ export function BusinessCabinetPlayerProvider({
         sign: (audioItemId) => signWorkspaceTrack(modelRef.current?.spaceId ?? "cafe", audioItemId),
         // t1331u: hall device copy of the track (offline buffer), preferred over the network.
         localSource: (audioItemId, durationSec) => bufferRef.current?.localSource(audioItemId, durationSec) ?? null,
-        onSource: (audioItemId) => {
+        onSource: (audioItemId, local) => {
           if (audioItemId) bufferRef.current?.pin(audioItemId);
+          if (audioItemId) {
+            tracksSinceLoadRef.current++;
+            journal("track", { local });
+          }
+        },
+        // t1390u: hall iPhone – the next link after HALL_IOS_PRESIGN_DELAY_SEC of play, so only the
+        // access re-check goes out at the boundary; a reconnect loads the lazy device copy.
+        presignDelaySec: () => (streamFirstRef.current ? HALL_IOS_PRESIGN_DELAY_SEC : 0),
+        prepareLocal: (audioItemId) => bufferRef.current?.prepare(audioItemId),
+        // t1390u: self-resume after a pause nobody asked for + the 10 s watchdog (hall devices).
+        element: canBeatRef.current
+          ? () => ({ paused: audio.paused, ended: audio.ended, currentTime: audio.currentTime })
+          : undefined,
+        onEvent: (kind, data) => {
+          if (kind === "autoplay_blocked") autoResumeRefusedRef.current = autoResumeRunningRef.current;
+          if (kind === "autoplay_blocked" || kind === "unexpected_pause" || kind === "self_resume_ok"
+            || kind === "self_resume_failed" || kind === "self_resume_ended" || kind === "watchdog_stuck" || kind === "recover") {
+            journal(kind, kind === "autoplay_blocked" ? { ...data, afterReload: autoResumeRunningRef.current } : data);
+          }
         },
         // Locked iPhone (t1303u): hand the next track over before the end, never wait for the
         // network at the boundary.
@@ -797,10 +956,26 @@ export function BusinessCabinetPlayerProvider({
     };
     const onEnded = () => void ctl.onEnded();
     const onSeeking = () => ctl.onSeeking(audio.currentTime, audio.duration);
-    const onError = () => void ctl.onError();
+    const onError = () => {
+      journal("el_error", { code: audio.error?.code ?? null });
+      void ctl.onError();
+    };
+    // t1390u: a pause nobody asked for (status still "playing") is played again by the controller.
+    const onPause = () => {
+      sendReport();
+      journal("el_pause", { ended: audio.ended });
+      ctl.onElementPause();
+    };
     // Network recovery (P0-3): a stall that does not move on, or the connection coming
     // back, is handled by the controller (backoff retries, resume at the position).
-    const onWaiting = () => ctl.onWaiting();
+    const onWaiting = () => {
+      journal("el_waiting");
+      ctl.onWaiting();
+    };
+    const onStalled = () => {
+      journal("el_stalled");
+      ctl.onWaiting();
+    };
     const onOnline = () => void ctl.onOnline();
     const onVisible = () => {
       if (document.visibilityState === "visible") {
@@ -813,29 +988,32 @@ export function BusinessCabinetPlayerProvider({
     // hall music at a mid-fade (or zero) volume. A user pause in its fade-out completes now.
     const onBackground = () => fader.prepareForBackground();
     audio.addEventListener("waiting", onWaiting);
-    audio.addEventListener("stalled", onWaiting);
+    audio.addEventListener("stalled", onStalled);
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pagehide", onBackground);
     document.addEventListener("freeze", onBackground);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("playing", onPlaying);
-    audio.addEventListener("pause", sendReport);
+    audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("seeking", onSeeking);
     audio.addEventListener("error", onError);
     const reportTimer = window.setInterval(sendReport, 15_000);
+    // t1390u: «position does not move for 10 s while playing» – hall devices only.
+    const watchdogTimer = canBeatRef.current ? window.setInterval(() => ctl.watchdog(), HALL_WATCHDOG_TICK_MS) : null;
     return () => {
       window.clearInterval(reportTimer);
+      if (watchdogTimer !== null) window.clearInterval(watchdogTimer);
       audio.removeEventListener("waiting", onWaiting);
-      audio.removeEventListener("stalled", onWaiting);
+      audio.removeEventListener("stalled", onStalled);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onBackground);
       document.removeEventListener("freeze", onBackground);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("playing", onPlaying);
-      audio.removeEventListener("pause", sendReport);
+      audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("seeking", onSeeking);
       audio.removeEventListener("error", onError);
@@ -846,7 +1024,7 @@ export function BusinessCabinetPlayerProvider({
       fader.dispose();
       if (fadeRef.current === fader) fadeRef.current = null;
     };
-  }, [catalogKey, open, remember, syncWakeLock, notePlayingMarker]);
+  }, [catalogKey, open, remember, syncWakeLock, notePlayingMarker, journal]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1552,14 +1730,18 @@ export function BusinessCabinetPlayerProvider({
       // Same path as the round Play button: saved track, saved position, wake lock, reports.
       // A refusal (iOS without a tap) leaves the track loaded; the foreground / first-touch
       // retries below pick it up.
-      void toggleRef.current();
+      journal("auto_resume", { markerAgeS: marker ? Math.round((Date.now() - marker.at) / 1000) : null });
+      autoResumeRunningRef.current = true;
+      void toggleRef.current().finally(() => {
+        autoResumeRunningRef.current = false;
+      });
     };
     attempt();
     return () => {
       stop = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [canBeat, open, catalogKey]);
+  }, [canBeat, open, catalogKey, journal]);
 
   // t1365u: a start the browser refused (needsGesture) while this hall means to play resumes on
   // the very first touch anywhere on the hall screen – not a button to look for, nothing shown.

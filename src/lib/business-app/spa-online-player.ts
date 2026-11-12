@@ -96,6 +96,25 @@ export type OnlineDeps = {
    * Omitted: false (copy first, as before).
    */
   streamFirst?: () => boolean;
+  /**
+   * t1390u (hall iPhone, 12.11.2026): seconds of the current track to play before the next one is
+   * pre-signed (0 / omitted: at once, as before). At a boundary only the access re-check of the
+   * started track goes out; the next link follows later, never in parallel with it. A locked
+   * screen (`backgroundAdvance`) and a loop wrap waiting for a link still sign at once.
+   */
+  presignDelaySec?: () => number;
+  /**
+   * t1390u: lazy device copies (hall iPhone) – ask the buffer to load the copy of this track into
+   * memory now, because a reconnect is about to need it. Omitted: copies are already warm.
+   */
+  prepareLocal?: (audioItemId: string) => void;
+  /**
+   * t1390u: the real element (not the fader): paused / ended. Enables the self-resume after a
+   * pause nobody asked for and the 10 s «position does not move» watchdog. Omitted: both off.
+   */
+  element?: () => { paused: boolean; ended: boolean; currentTime: number };
+  /** t1390u: device journal hook (hall-device-journal.ts). Best effort, never throws into the player. */
+  onEvent?: (kind: string, data?: Record<string, string | number | boolean | null>) => void;
 };
 
 export const RECOVERY_BASE_MS = 1_000;
@@ -146,6 +165,17 @@ export const LOOP_MANUAL_SEEK_GUARD_MS = 1_500;
 export const RECONNECTING_MESSAGE = "Связь восстанавливается…";
 /** A stream that stalls while a device copy of the same track exists: switch to the copy this soon. */
 export const LOCAL_STALL_MS = 3_000;
+/**
+ * t1390u: the element paused by itself while the hall plays (iOS audio interruption, a route
+ * change, a browser hiccup): play() on the same element again after this, doubling up to
+ * SELF_RESUME_MAX_MS. Never a message, never a button.
+ */
+export const SELF_RESUME_BASE_MS = 750;
+export const SELF_RESUME_MAX_MS = 30_000;
+/** t1390u watchdog: status "playing" but the position has not moved for this long. */
+export const WATCHDOG_STUCK_MS = 10_000;
+/** Healthy play this long after a self-resume resets its backoff. */
+const SELF_RESUME_HEALTHY_SEC = 5;
 
 /** Browser autoplay policy refusal: only a user gesture helps, retries would loop. */
 export function isAutoplayRefusal(error: unknown): boolean {
@@ -215,6 +245,14 @@ export class SpaOnlinePlayer {
   private refusedHidden = false;
   /** The loaded source is a device copy (hall offline buffer), not the network stream. */
   private sourceLocal = false;
+  /** t1390u: self-resume after a pause nobody asked for (same element, backoff). */
+  private resumeTimer: unknown = null;
+  private resumeAttempt = 0;
+  private resumeFrom = -1;
+  /** t1390u watchdog: last position seen and since when it has not moved. */
+  private wdPos = Number.NaN;
+  private wdSince = 0;
+  private wdStrikes = 0;
 
   constructor(
     private readonly d: OnlineDeps,
@@ -261,6 +299,129 @@ export class SpaOnlinePlayer {
   private clearRetry() {
     if (this.retryTimer !== null) this.cancel(this.retryTimer);
     this.retryTimer = null;
+    this.clearSelfResume();
+  }
+
+  private clearSelfResume() {
+    if (this.resumeTimer !== null) this.cancel(this.resumeTimer);
+    this.resumeTimer = null;
+  }
+
+  private emit(kind: string, data?: Record<string, string | number | boolean | null>) {
+    try {
+      this.d.onEvent?.(kind, data);
+    } catch {
+      /* telemetry never breaks playback */
+    }
+  }
+
+  private elementState(): { paused: boolean; ended: boolean; currentTime: number } | null {
+    try {
+      return this.d.element?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * t1390u: the element paused while the hall plays and nobody asked for it (a tap, the owner,
+   * the lock screen and the rights stop all change the status first). Play the same element
+   * again with backoff; never a message, never «press to continue».
+   */
+  onElementPause(): void {
+    if (this.disposed || this.status !== "playing" || this.switching || this.leaving) return;
+    const el = this.elementState();
+    if (!el || !el.paused || el.ended || !this.d.audio.src) return;
+    this.emit("unexpected_pause", { pos: Math.round(el.currentTime) });
+    this.scheduleSelfResume("pause");
+  }
+
+  /** A self-resume is waiting (status stays "playing": the hall still means to play). */
+  get selfResuming(): boolean {
+    return this.resumeTimer !== null;
+  }
+
+  private scheduleSelfResume(reason: string): void {
+    if (this.disposed || this.resumeTimer !== null) return;
+    const n = this.resumeAttempt++;
+    const delay = Math.min(SELF_RESUME_BASE_MS * 2 ** Math.min(n, 8), SELF_RESUME_MAX_MS);
+    const op = this.op;
+    this.resumeTimer = this.timer(() => {
+      this.resumeTimer = null;
+      void this.selfResumeNow(op, reason, n + 1);
+    }, delay);
+  }
+
+  private async selfResumeNow(op: number, reason: string, attempt: number): Promise<void> {
+    if (op !== this.op || this.disposed || this.status !== "playing") return;
+    const el = this.elementState();
+    if (el && !el.paused && !el.ended) return;
+    if (el?.ended) {
+      this.emit("self_resume_ended", { reason, attempt });
+      return this.onEnded();
+    }
+    this.resumeFrom = Number.isFinite(this.lastPosition) ? this.lastPosition : 0;
+    try {
+      await this.d.audio.play();
+      if (op !== this.op || this.disposed) return;
+      this.emit("self_resume_ok", { reason, attempt });
+    } catch (error) {
+      if (op !== this.op || this.disposed || this.status !== "playing") return;
+      const blocked = isAutoplayRefusal(error);
+      this.emit("self_resume_failed", { reason, attempt, blocked });
+      // A broken source (not a refusal) after a few tries: reconnect at the same position.
+      if (!blocked && attempt >= 3) {
+        this.resumeAttempt = 0;
+        return this.recover();
+      }
+      this.scheduleSelfResume(reason);
+    }
+  }
+
+  /**
+   * t1390u watchdog, called every few seconds by the page: status "playing" but the position has
+   * not moved for WATCHDOG_STUCK_MS. A paused element is played again (self-resume); an ended one
+   * moves on; one that claims to play but does not move is reconnected at its position.
+   */
+  watchdog(): void {
+    const el = this.elementState();
+    if (!el || this.disposed || this.status !== "playing" || this.switching || this.leaving
+      || this.retryTimer !== null || this.stallTimer !== null || this.resumeTimer !== null) {
+      this.wdPos = Number.NaN;
+      return;
+    }
+    const pos = el.currentTime;
+    const now = this.now();
+    if (!Number.isFinite(pos)) return;
+    if (!Number.isFinite(this.wdPos) || Math.abs(pos - this.wdPos) > 0.05) {
+      this.wdPos = pos;
+      this.wdSince = now;
+      this.wdStrikes = 0;
+      return;
+    }
+    if (now - this.wdSince < WATCHDOG_STUCK_MS) return;
+    this.wdSince = now;
+    this.emit("watchdog_stuck", { pos: Math.round(pos), paused: el.paused, ended: el.ended, strike: this.wdStrikes + 1 });
+    if (el.ended) {
+      this.wdStrikes = 0;
+      void this.onEnded();
+      return;
+    }
+    if (el.paused) {
+      this.scheduleSelfResume("stuck");
+      return;
+    }
+    this.wdStrikes++;
+    if (this.wdStrikes >= 2) {
+      this.wdStrikes = 0;
+      this.recover();
+      return;
+    }
+    try {
+      void this.d.audio.play().catch(() => {});
+    } catch {
+      /* the next check reconnects */
+    }
   }
 
   private clearStall() {
@@ -379,7 +540,9 @@ export class SpaOnlinePlayer {
     this.armDeadline(id, op);
     this.set("playing");
     // Sign the next track now, while the page is awake: on a locked screen "ended" must be
-    // able to switch the source without waiting for the network.
+    // able to switch the source without waiting for the network. t1390u: on the hall iPhone a
+    // visible page signs it a little later (presignDelaySec), never together with the re-check.
+    this.wdPos = Number.NaN;
     this.prefetchNext();
   }
 
@@ -404,6 +567,9 @@ export class SpaOnlinePlayer {
         since: this.now(),
       };
     }
+    // t1390u: lazy copies (hall iPhone) – load this track's copy now; the retry below finds it.
+    try { this.d.prepareLocal?.(item.audioItemId); } catch { /* best effort */ }
+    this.emit("recover", { attempt: this.retryAttempt + 1, local: this.sourceLocal });
     // The stream failed but this device holds a copy of the same track: continue from the copy at
     // the same position at once (no backoff). A failing copy itself waits like any other source.
     const copy = !this.sourceLocal && this.local(item) !== null;
@@ -484,6 +650,9 @@ export class SpaOnlinePlayer {
     if (Number.isFinite(positionSec)) this.lastPosition = positionSec;
     if (this.errorRetries > 0 && positionSec - this.healthyFrom >= RECOVERY_HEALTHY_SEC) this.errorRetries = 0;
     if (this.stallTimer !== null && positionSec > this.stallAt + 0.25) this.clearStall();
+    if (this.resumeAttempt > 0 && this.resumeTimer === null && positionSec - this.resumeFrom >= SELF_RESUME_HEALTHY_SEC) {
+      this.resumeAttempt = 0;
+    }
     if (this.loopWrap(positionSec, durationSec)) return;
     if (this.loopMode() && Number.isFinite(positionSec)) this.loopFrom = positionSec;
     this.prefetchNext();
@@ -548,7 +717,7 @@ export class SpaOnlinePlayer {
     // next one now and switch the moment it arrives (prefetchNext).
     this.wrapPendingOp = this.op;
     this.presignRetryAt = 0;
-    this.prefetchNext();
+    this.prefetchNext(true);
     return true;
   }
 
@@ -594,7 +763,7 @@ export class SpaOnlinePlayer {
     }
     if (this.readyFor(id)) return this.settleWrapPending();
     this.presignRetryAt = 0;
-    this.prefetchNext();
+    this.prefetchNext(true);
   }
 
   /**
@@ -701,10 +870,11 @@ export class SpaOnlinePlayer {
    * Pre-sign the next track (once per next track, refreshed when the URL ages). A failed sign
    * is retried after PRESIGN_RETRY_MS; the boundary still signs on its own when none is ready.
    */
-  private prefetchNext(): void {
+  private prefetchNext(force = false): void {
     if (this.disposed || this.status !== "playing") return;
     const cur = this.current;
     if (!cur) return;
+    if (!force && !this.presignDue(cur)) return;
     const target = this.nextTarget();
     const next = target >= 0 ? this.items[target] : null;
     if (!next || next.audioItemId === cur.audioItemId) return;
@@ -736,6 +906,25 @@ export class SpaOnlinePlayer {
       this.presigned = { audioItemId: id, url: r.data.url, at: this.now() };
       this.settleWrapPending();
     }, failed);
+  }
+
+  /**
+   * t1390u: the next link is due once `presignDelaySec` of the track has played (or the end is
+   * near). A locked screen signs at once – the handoff there must never wait for the network.
+   */
+  private presignDue(cur: SpaManifestItem): boolean {
+    let delay = 0;
+    try {
+      delay = Number(this.d.presignDelaySec?.() ?? 0);
+    } catch {
+      delay = 0;
+    }
+    if (!Number.isFinite(delay) || delay <= 0) return true;
+    if (this.inBackground() || this.loopMode()) return true;
+    const pos = Number.isFinite(this.lastPosition) ? this.lastPosition : 0;
+    if (pos >= delay) return true;
+    const length = cur.durationSeconds;
+    return typeof length === "number" && Number.isFinite(length) && length > 0 && length - pos <= delay + PRESIGN_LEAD_SEC;
   }
 
   private takePresigned(id: string): { url: string; at: number } | null {
@@ -944,6 +1133,7 @@ export class SpaOnlinePlayer {
     this.retryAttempt = 0;
     this.needsGesture = true;
     this.refusedHidden = this.inBackground();
+    this.emit("autoplay_blocked", { hidden: this.refusedHidden });
     this.set("paused");
   }
 
