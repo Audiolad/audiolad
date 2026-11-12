@@ -182,7 +182,7 @@ export const MATCHA_DLYA_KOFEYNI: VerticalGuideArticle = {
   },
   expertOne: {
     expertId: "ekaterina-alekhina",
-    quoteIndex: 4,
+    quoteIndex: 5,
     heading: "Что даёт бережное отношение к продукту",
     lead: [
       [
