@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test:album-radio:browser": "node scripts/album-radio-browser-smoke.mjs",
-    "test:album-radio": "node --test scripts/album-radio-unit.mjs && node --import tsx scripts/album-radio-access-unit.mts",
+    "test:album-radio": "node --test scripts/album-radio-unit.mjs && node --import tsx scripts/album-radio-access-unit.mts && node --import tsx scripts/album-radio-passport-unit.mts",
     "test:business-partner-codes": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-partner-codes-unit.tsx && python3 scripts/business-partner-codes-isolated.py",
     "test:business-pilot": "node --import tsx scripts/business-pilot-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-pilot-ui-unit.tsx && python3 scripts/business-pilot-isolated.py",
     "test:business-player-retention": "node --import tsx scripts/business-player-retention-unit.mts && python3 scripts/business-player-retention-isolated.py",
