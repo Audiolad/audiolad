@@ -21,6 +21,7 @@ import {
   type RightsholderExample,
 } from "@/lib/business-rightsholder/examples";
 import { verificationFormError, type VerificationFormError } from "@/lib/business-rightsholder/verification-errors";
+import { isAuthorCabinetBusinessAdmissionEnabled } from "@/lib/author-dashboard/business-access";
 import { createClient } from "@/lib/supabase/client";
 import {
   PROVIDERS,
@@ -167,6 +168,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    // Temporary pause (t1386u): never call draft/submit RPCs while author admission is off.
+    if (!isAuthorCabinetBusinessAdmissionEnabled()) return;
     if (!validate() || (!unified && (!terms || !rights))) return;
     // Do not upload files for a product whose workspace has not accepted 2.0: the server would refuse.
     if (productNeedsAgreement) return;
