@@ -28,6 +28,7 @@ import {
   isAuthorCabinetBusinessAdmissionEnabled,
 } from "../src/lib/author-dashboard/business-access";
 import { resolveAuthorStatusView } from "../src/lib/author-dashboard/author-status";
+import { isAudioSprintVkusZhizniPromoVisible } from "../src/lib/seo-queries/audio-sprint";
 
 const ROOT = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -167,7 +168,12 @@ async function main() {
     const text = nav.container.textContent ?? "";
     assert.ok(!text.includes("Осень звучит"), `no sprint tab on ${pathname}`);
     assert.ok(!text.includes("до 18 октября"), `no sprint deadline badge on ${pathname}`);
-    assert.equal(linksTo(nav.container, "/author-dashboard/audio-sprints").length, 0);
+    assert.equal(linksTo(nav.container, "/author-dashboard/audio-sprints/osen-zvuchit-2026").length, 0);
+    // «Вкус жизни» (14–29.11.2026) has its own highlighted tab while its window is open.
+    assert.equal(
+      linksTo(nav.container, "/author-dashboard/audio-sprints/vkus-zhizni-2026").length,
+      isAudioSprintVkusZhizniPromoVisible() ? 1 : 0,
+    );
     assert.equal(linksTo(nav.container, "/author-dashboard/seo-opportunities").length, 1);
     assert.equal(linksTo(nav.container, "/author-dashboard/stats").length, 1);
     await nav.cleanup();
@@ -192,7 +198,13 @@ async function main() {
     );
     assert.ok(dashboardHtml.includes("Продукты текущего проекта"), "dashboard rendered");
     assert.ok(!dashboardHtml.includes("Осень звучит"), "no sprint banner or tab on the dashboard");
-    assert.ok(!dashboardHtml.includes("призовой фонд"), "no prize-fund promo on the dashboard");
+    assert.ok(
+      dashboardHtml.includes("Вкус жизни · АудиоСпринт") === isAudioSprintVkusZhizniPromoVisible(),
+      "«Вкус жизни» banner only while its sprint runs",
+    );
+    if (!isAudioSprintVkusZhizniPromoVisible()) {
+      assert.ok(!dashboardHtml.includes("призовой фонд"), "no prize-fund promo on the dashboard");
+    }
     assert.ok(!dashboardHtml.includes('href="/osen-zvuchit"'), "no link to the sprint landing");
   }
 

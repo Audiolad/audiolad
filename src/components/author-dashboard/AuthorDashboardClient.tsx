@@ -37,7 +37,11 @@ import {
 } from "@/lib/author-products/moderation";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
-import { isAudioSprintOsenZvuchitPromoVisible } from "@/lib/seo-queries/audio-sprint";
+import {
+  AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT,
+  isAudioSprintOsenZvuchitPromoVisible,
+  isAudioSprintVkusZhizniPromoVisible,
+} from "@/lib/seo-queries/audio-sprint";
 import {
   formatPriceLabel,
   formatUpdatedAt,
@@ -91,6 +95,30 @@ function AutumnLeafIcon() {
     >
       <path d="M19.5 4.5C14.6 4.7 9.9 6.4 7 10c-2.2 2.7-2.5 6-.7 7.8 1.8 1.8 5.1 1.5 7.8-.7 3.6-2.9 5.3-7.6 5.4-12.6Z" />
       <path d="M5.5 19c2.7-3.7 5.9-6.8 9.8-9.2" />
+    </svg>
+  );
+}
+
+function SprintFlowerIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="9" r="2.2" />
+      <path d="M12 6.8c-.9-2.2.1-3.8 0-3.8s.9 1.6 0 3.8Z" />
+      <path d="M12 6.8C10.6 4.6 8 4.4 8 6.2s2.4 2.6 4 2.8" />
+      <path d="M12 6.8c1.4-2.2 4-2.4 4-.6s-2.4 2.6-4 2.8" />
+      <path d="M10 10.6c-2 .9-3.4 2.6-2.1 3.6 1.2.9 3.1-.8 4.1-3" />
+      <path d="M14 10.6c2 .9 3.4 2.6 2.1 3.6-1.2.9-3.1-.8-4.1-3" />
+      <path d="M12 11.2V21" />
+      <path d="M12 17c-1.6-1.6-3.6-1.8-4.6-1.2 1 1.6 2.8 2 4.6 1.2Z" />
     </svg>
   );
 }
@@ -292,6 +320,7 @@ export default function AuthorDashboardClient({
 
 
   const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible();
+  const vkusPromoVisible = isAudioSprintVkusZhizniPromoVisible();
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
   );
@@ -318,6 +347,36 @@ export default function AuthorDashboardClient({
                 </p>
                 <p className="mt-1 text-sm leading-5 text-[#80552e]">
                   3–18 октября · 100 поисковых запросов · призовой фонд 6 000 ₽
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-[#dfb45d] bg-white/75 px-4 py-2 text-sm font-semibold text-[#8f571d] transition group-hover:bg-white sm:self-auto">
+              Подробнее
+              <span aria-hidden="true">→</span>
+            </span>
+          </div>
+        </Link>
+      ) : null}
+
+      {/* AudioSprint «Вкус жизни» promo while the sprint runs (14–29.11.2026). */}
+      {vkusPromoVisible ? (
+        <Link
+          href="/vkus-zhizni"
+          data-testid="audio-sprint-vkus-zhizni-banner"
+          className="group mt-4 block overflow-hidden rounded-[24px] border border-[#efc873] bg-gradient-to-r from-[#fff4d7] via-[#ffe9bd] to-[#f7d28a] px-5 py-4 text-[#4a2f17] shadow-[0_10px_26px_rgba(181,120,42,0.14)] transition hover:border-[#dfa94a] hover:shadow-[0_12px_30px_rgba(181,120,42,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97828]"
+          aria-label="Подробнее об АудиоСпринте «Вкус жизни»"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/75 text-[#b66f22] shadow-sm">
+                <SprintFlowerIcon />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[17px] font-semibold text-[#6f3f16]">
+                  Вкус жизни · АудиоСпринт
+                </p>
+                <p className="mt-1 text-sm leading-5 text-[#80552e]">
+                  14–29 ноября · {AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT} поисковых запросов · призовой фонд 6 000 ₽
                 </p>
               </div>
             </div>

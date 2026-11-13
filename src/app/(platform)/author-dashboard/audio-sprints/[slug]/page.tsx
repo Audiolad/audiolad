@@ -61,6 +61,7 @@ export default async function AuthorAudioSprintPage({
         />
       </div>
       <AuthorAudioSprintClient
+        sprintSlug={listing.sprint.slug}
         authorId={workspace.id}
         authorName={workspace.name}
         authorSlug={workspace.slug}
