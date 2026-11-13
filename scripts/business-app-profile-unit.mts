@@ -125,7 +125,7 @@ assert.match(page, /canEditOrganization=\{membership\?\.role === "owner"\}/);
 // t1352u: «Выйти» in the bottom-right corner of the same profile card, away from «История оплат».
 assert.match(page, /data-testid="biz-profile-sign-out"/);
 assert.match(page, /className="flex justify-end pt-3"/);
-assert.match(page, /<SignOutForm action=\{signOut\}>/);
+assert.match(page, /<SignOutForm action=\{signOut\} anonymousWarning=\{user\?\.is_anonymous === true\}/);
 assert.match(page, />\s*Выйти\s*</);
 assert.ok(page.indexOf("<BusinessProfileSubscription") < page.indexOf("biz-profile-sign-out"), "logout stays under the subscription block");
 assert.ok(page.indexOf("biz-profile-sign-out") < page.indexOf("biz-profile-help-section"), "logout stays in the profile card, not the help card");

@@ -1,3 +1,5 @@
+import { getHostBrandName } from "@/lib/business-app/brand-icons";
+import { BUSINESS_HOSTNAME, COFFEE_HOSTNAME } from "@/lib/business-app/host";
 import { AUTHOR_PROJECT_CAPACITY_ORDER_KIND } from "@/lib/author-projects/capacity-catalog";
 import { BUSINESS_CABINET_RETURN_PATH } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
@@ -100,12 +102,13 @@ export function businessCheckoutResultCard(
   authenticated: boolean,
   site?: string,
 ): BusinessCheckoutResultCard {
+  const brand = getHostBrandName(site === "coffee" ? COFFEE_HOSTNAME : BUSINESS_HOSTNAME);
   const back = businessCabinetReturn(view === "paid_unauthenticated" ? false : authenticated, site);
 
   if (view === "paid_authenticated") {
     return {
       title: "Оплата прошла. Доступ открыт.",
-      description: "30 дней кабинета АудиоЛад Бизнес. Автосписания нет.",
+      description: `30 дней кабинета ${brand}. Автосписания нет.`,
       actionHref: buildBusinessSubscriptionPaidHref(site),
       actionLabel: "Вернуться в кабинет",
       secondaryHref: null,
@@ -116,7 +119,7 @@ export function businessCheckoutResultCard(
   if (view === "paid_unauthenticated") {
     return {
       title: "Оплата получена",
-      description: "30 дней кабинета АудиоЛад Бизнес открыты на вашем аккаунте. Войдите, чтобы открыть кабинет. Автосписания нет.",
+      description: `30 дней кабинета ${brand} открыты на вашем аккаунте. Войдите по почте, указанной при оплате. Автосписания нет.`,
       actionHref: back.href,
       actionLabel: back.label,
       secondaryHref: null,

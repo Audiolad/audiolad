@@ -11,17 +11,22 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
 
-  if (!code) {
+  const tokenHash = url.searchParams.get("token_hash");
+  const emailLink = Boolean(tokenHash) && url.searchParams.get("type") === "email";
+
+  if (!code && !emailLink) {
     return NextResponse.redirect(
       buildPublicRedirectUrl("/auth/sign-in?error=auth_callback", request),
     );
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = emailLink
+    ? await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: "email" })
+    : await supabase.auth.exchangeCodeForSession(code!);
 
   if (error) {
-    console.error("auth_callback_exchange_error", error.message);
+    console.error("auth_callback_exchange_error");
     return NextResponse.redirect(
       buildPublicRedirectUrl("/auth/reset-password?error=expired", request),
     );

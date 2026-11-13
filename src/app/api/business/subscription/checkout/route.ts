@@ -1,5 +1,9 @@
+import { cookies } from "next/headers";
+import { AUTHOR_SUPPORT_COOKIE_NAME } from "@/lib/author-support/policy";
+import { linkBusinessLoginEmail } from "@/lib/business-app/login-access";
+import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { BUSINESS_OFFER_HREF, businessOfferPaymentGate } from "@/lib/business/offer";
@@ -87,6 +91,25 @@ export async function POST(request: Request) {
   }
   if (offerGate === "offer_acceptance_required") {
     return NextResponse.json({ error: "offer_acceptance_required", href: BUSINESS_OFFER_HREF }, { status: 409 });
+  }
+
+  if (user.is_anonymous) {
+    // Linking the receipt email changes the login, so never in support mode (t1442u).
+    if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME)) {
+      return NextResponse.json({ error: "support_mode_consent_forbidden" }, { status: 403 });
+    }
+    const { data: owner, error: ownerError } = await supabase.from("business_organization_members")
+      .select("organization_id").eq("user_id", user.id).eq("role", "owner").limit(1);
+    if (ownerError) return NextResponse.json({ error: "internal_error" }, { status: 503 });
+    if (!owner?.length) return NextResponse.json({ error: "not_organization_owner" }, { status: 403 });
+  }
+  const linked = await linkBusinessLoginEmail(supabase, user, customerEmail);
+  if (!linked.ok) {
+    return NextResponse.json({ error: linked.code }, { status: linked.code === "receipt_email_taken" ? 409 : 503 });
+  }
+  if (linked.linked) {
+    const hostname = hostnameFromHeaders(request.headers);
+    after(() => sendBusinessLoginEmail(customerEmail, hostname, user.id));
   }
 
   // The server computes the amount; the order is refused unless it matches the confirmed price.

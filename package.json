@@ -300,7 +300,7 @@
     "test:business-spa-admin": "npx tsx scripts/business-spa-admin-unit.mjs",
     "test:business-app-eligibility": "npx tsx scripts/business-app-eligibility-unit.mjs",
     "test:business-player-live-claim": "node scripts/business-player-live-claim-concurrency-unit.mjs",
-    "test:business-app-profile": "npx tsx scripts/business-app-profile-unit.mts && npx tsx scripts/business-payment-history-unit.tsx",
+    "test:business-app-profile": "npm run test:business-guest-login && npx tsx scripts/business-app-profile-unit.mts && npx tsx scripts/business-payment-history-unit.tsx",
     "test:business-hall-build-reload": "npx tsx scripts/business-hall-build-reload-unit.mts && npx tsx scripts/business-hall-no-reload-while-playing-unit.mts && npx tsx scripts/business-hall-wake-lock-unit.mts && npx tsx scripts/business-hall-auto-resume-unit.mts",
     "test:business-venue-status-dot": "npx tsx scripts/business-venue-status-dot-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/business-venue-status-dots-loader-unit.mts && npm run test:business-hall-build-reload",
     "test:business-app-owner-home-signals": "npx tsx scripts/business-owner-home-live-refresh-unit.mts && npx tsx scripts/business-live-refresh-unit.mts && npx tsx scripts/business-app-owner-home-signals-unit.mjs && npx tsx scripts/business-spa-live-state-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/business-app-owner-home-render-unit.tsx && npm run test:business-player-live-claim && npm run test:business-venue-status-dot",
@@ -509,6 +509,7 @@
     "test:mobile-author-cabinet-top-chrome": "npx tsx scripts/mobile-author-cabinet-top-chrome-unit.mts",
     "test:next-step-product-picker": "npx tsx scripts/next-step-product-picker-unit.mts",
     "test:business-privacy-document": "node --import tsx scripts/business-privacy-document-unit.tsx",
+    "test:business-guest-login": "node scripts/business-guest-login-contract-unit.mjs && node scripts/business-auth-coffee-copy-unit.mjs && npx tsx scripts/business-guest-login-unit.mts",
     "test:business-auth-coffee-copy": "node scripts/business-auth-coffee-copy-unit.mjs"
   },
   "dependencies": {

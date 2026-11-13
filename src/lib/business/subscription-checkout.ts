@@ -11,6 +11,8 @@ export type BusinessPayErrorCode =
   | "support_mode_consent_forbidden"
   | "payments_not_configured"
   | "invalid_request"
+  | "receipt_email_taken"
+  | "login_email_failed"
   | "receipt_email_required"
   | "venue_topup_not_available"
   | "pending_order_mismatch"

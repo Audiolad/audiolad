@@ -1,6 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { linkBusinessLoginEmail, businessPasswordError } from "@/lib/business-app/login-access";
+import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
+import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { AUTHOR_SUPPORT_COOKIE_NAME } from "@/lib/author-support/policy";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
@@ -109,9 +113,8 @@ export async function saveBusinessTimezone(input: { timezone: string }) {
 }
 
 /**
- * «Почта для чеков» (t1343u): an owner account without its own email keeps the receipt
- * address in auth user_metadata.receipt_email. The checkout uses it when nothing else is
- * typed and remembers a newly typed one. An account with its own email gets receipts there.
+ * Receipt email also becomes the login of the session’s anonymous owner.
+ * Permanent accounts keep their current receipt behaviour.
  */
 export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) {
   const receiptEmail = normalizeBusinessReceiptEmail(input?.receiptEmail);
@@ -120,12 +123,39 @@ export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) 
     return { ok: false, error: "Почту для чеков меняет владелец в личном кабинете." } as const;
   }
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Войдите в аккаунт ещё раз." } as const;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { ok: false, error: "Войдите в аккаунт ещё раз." } as const;
+  const domain = await loadBusinessOwnerHomeContext();
+  if (domain.status !== "authenticated" || !domain.canPay) return { ok: false, error: "Сохранить почту может владелец аккаунта." } as const;
   if (user.email?.trim()) {
     return { ok: false, error: "Чеки приходят на почту аккаунта." } as const;
+  }
+  const linked = await linkBusinessLoginEmail(supabase, user, receiptEmail);
+  if (!linked.ok) return linked;
+  if (linked.linked) {
+    const hostname = hostnameFromHeaders(await headers());
+    after(() => sendBusinessLoginEmail(receiptEmail, hostname, user.id));
+    return { ok: true, receiptEmail } as const;
   }
   const { error } = await supabase.auth.updateUser({ data: { [BUSINESS_RECEIPT_EMAIL_META_KEY]: receiptEmail } });
   if (error) return { ok: false, error: "Не удалось сохранить почту. Попробуйте ещё раз." } as const;
   return { ok: true, receiptEmail } as const;
+}
+
+/** Own-session password update. A metadata flag is UI state only, never an authorization claim. */
+export async function saveBusinessLoginPassword(input: { password: string; repeat: string }) {
+  const invalid = businessPasswordError(input?.password, input?.repeat);
+  if (invalid) return { ok: false, error: invalid } as const;
+  if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
+    return { ok: false, error: "Изменить пароль можно в личном кабинете владельца." } as const;
+  }
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { ok: false, error: "Войдите в аккаунт ещё раз." } as const;
+  const domain = await loadBusinessOwnerHomeContext();
+  if (domain.status !== "authenticated" || !domain.canPay) return { ok: false, error: "Изменить пароль может владелец аккаунта." } as const;
+  if (!user.email || user.is_anonymous) return { ok: false, error: "Сначала добавьте почту." } as const;
+  const { error } = await supabase.auth.updateUser({ password: input.password, data: { business_password_saved: true } });
+  if (error) return { ok: false, error: "Не удалось сохранить пароль. Попробуйте ещё раз." } as const;
+  return { ok: true } as const;
 }

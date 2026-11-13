@@ -1,5 +1,6 @@
 "use client";
 
+import AnonymousSessionNotice from "@/components/auth/AnonymousSessionNotice";
 import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
@@ -276,6 +277,8 @@ function SignUpForm() {
                 : "Сохраняйте практики, создавайте плейлисты и слушайте материалы на разных устройствах."}
           </p>
         </header>
+
+        <AnonymousSessionNotice coffee={coffee} />
 
         <form
           ref={formRef}
