@@ -28,7 +28,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
           </span>
           <span>
             Атлас звучания
-            <span className="atlas-header__brand-sub">АудиоЛад Бизнес</span>
+            <span className="atlas-header__brand-sub">АудиоЛад Кофейни</span>
           </span>
         </Link>
         <div className="atlas-header__actions">
@@ -43,7 +43,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
             Скачать PDF-атлас
           </CoffeeAtlasGoalLink>
           <Link href={BUSINESS_LANDING_PATH} className="atlas-header__back">
-            АудиоЛад Бизнес
+            АудиоЛад Кофейни
           </Link>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function CoffeeAtlasCtaButton({ className = "atlas-btn atlas-btn--primary
   );
 }
 
-/** AudioLad Business offer — printed at the bottom of every atlas page. */
+/** Offer printed at the bottom of every atlas page. */
 export function CoffeeAtlasOffer({ headingId }: { headingId: string }) {
   return (
     <section className="atlas-offer" aria-labelledby={headingId} data-atlas-offer="true">
@@ -123,7 +123,7 @@ export function CoffeeAtlasFooter() {
       <div className="atlas-wrap">
         <p className="atlas-footer__disclaimer">{COFFEE_ATLAS_DISCLAIMER}</p>
         <p className="atlas-footer__links">
-          <Link href={BUSINESS_LANDING_PATH}>АудиоЛад Бизнес</Link>
+          <Link href={BUSINESS_LANDING_PATH}>АудиоЛад Кофейни</Link>
           {" · "}
           <Link href="/">АудиоЛад</Link>
           {" · "}
