@@ -10,13 +10,13 @@ import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-set
 import { BUSINESS_VENUE_FALLBACK_PATH, businessCabinetCan } from "@/lib/business-app/cabinet-mode";
 import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
 import { loadPointDevicePermission } from "@/lib/business-app/point-session.server";
-import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildNamedBusinessPageMetadata } from "@/lib/business-app/seo";
+import { headers } from "next/headers";
 
-export const metadata: Metadata = {
-  ...buildBusinessAppPageMetadata(),
-  title: "Настройка – АудиоЛад Бизнес",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildNamedBusinessPageMetadata(getHostnameFromHeaders(await headers()), "Настройка");
+}
 
 /** Sound choices. A saved venue row replaces the copy on this device. */
 export default async function BusinessAppSettingsPage({

@@ -1,6 +1,7 @@
 import type { Metadata, MetadataRoute } from "next";
 
-import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "./host";
+import { COFFEE_BRAND_NAME, getHostBrandName } from "./brand-icons";
+import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled, isCoffeeHostname } from "./host";
 
 export const BUSINESS_APP_SEO_TITLE = "Аудиолад Бизнес";
 
@@ -9,9 +10,10 @@ export const BUSINESS_APP_SEO_DESCRIPTION =
 
 /** Private B2B app — never index. */
 export function buildBusinessAppMetadata(hostname?: string): Metadata {
+  const coffee = Boolean(hostname && isCoffeeHostname(hostname));
   return {
-    title: BUSINESS_APP_SEO_TITLE,
-    description: BUSINESS_APP_SEO_DESCRIPTION,
+    title: coffee ? COFFEE_BRAND_NAME : BUSINESS_APP_SEO_TITLE,
+    description: coffee ? "Кабинет владельца кофейни АудиоЛад Кофейня" : BUSINESS_APP_SEO_DESCRIPTION,
     alternates: {
       canonical: `${coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? COFFEE_ORIGIN : BUSINESS_ORIGIN}/`,
     },
@@ -26,13 +28,22 @@ export function buildBusinessAppMetadata(hostname?: string): Metadata {
   };
 }
 
+/** Private cabinet page title: host-aware brand, no page-level alternates (canonical lives in the layout). */
+export function buildNamedBusinessPageMetadata(hostname: string, pageTitle: string): Metadata {
+  return {
+    ...buildBusinessAppPageMetadata(hostname),
+    title: `${pageTitle} – ${getHostBrandName(hostname)}`,
+    robots: { index: false, follow: false },
+  };
+}
+
 /**
  * Page-level metadata without `alternates`: the page inherits the host-aware canonical of
  * business-app/layout.tsx (coffee → coffee, otherwise business). A page-level `alternates`
  * would replace it with the business origin on coffee.
  */
-export function buildBusinessAppPageMetadata(): Metadata {
-  const { alternates: _hostAwareInLayout, ...rest } = buildBusinessAppMetadata();
+export function buildBusinessAppPageMetadata(hostname?: string): Metadata {
+  const { alternates: _hostAwareInLayout, ...rest } = buildBusinessAppMetadata(hostname);
   void _hostAwareInLayout;
   return rest;
 }
@@ -78,6 +89,7 @@ export function buildCoffeePublicPageMetadata(hostname: string, path: string, ti
     description,
     alternates: { canonical: url },
     robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
-    openGraph: { type: "website", url, siteName: "АудиоЛад Кофе", locale: "ru_RU", title, description },
+    openGraph: { type: "website", url, siteName: COFFEE_BRAND_NAME, locale: "ru_RU", title, description },
+    twitter: { card: "summary", title, description },
   };
 }

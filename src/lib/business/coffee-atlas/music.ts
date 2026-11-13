@@ -71,9 +71,9 @@ export const COFFEE_ATLAS_MUSIC: Readonly<
   "single-o-surry-hills": [
     { authorSlug: "djazmanov", productSlug: "legkiy-fank", audioItemId: "7ea01dd5-9e5d-458f-9641-901c587949d3" },
   ],
-  // «Рояль у окна» – «Фортепианный джаз»
+  // «Утро в маленьком кафе» – «Джазовая музыка для кафе»
   "la-colombe": [
-    { authorSlug: "djazmanov", productSlug: "fortepiannyy-dzhaz", audioItemId: "8a1642df-677f-4e11-8db5-af1f5230fc9f" },
+    { authorSlug: "djazmanov", productSlug: "dzhazovaya-muzyka-dlya-kafe", audioItemId: "4b0d2a74-0ad7-489c-ba64-4e0b61a1a9f3" },
   ],
 };
 

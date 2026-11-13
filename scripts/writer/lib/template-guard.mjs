@@ -1,4 +1,4 @@
-// Which template a pack belongs to. The sz («Сергей и Зоя») and coffee (АудиоЛад Кофейни) templates
+// Which template a pack belongs to. The sz («Сергей и Зоя») and coffee (АудиоЛад Кофейня) templates
 // live in separate folders (lib/sites/sz, lib/sites/coffee) and must never receive each other's packs.
 export const COFFEE_TEMPLATE_ID = "audiolad-coffee-guide-v1";
 

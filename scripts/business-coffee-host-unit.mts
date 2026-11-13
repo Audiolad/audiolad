@@ -7,7 +7,7 @@ import { businessAuthHref, businessReturnPath, businessReturnTarget, isBusinessT
 import { buildBusinessSubscriptionPaidHref, buildBusinessSubscriptionSignInHref } from "../src/lib/payments/checkout-result-cta";
 import { getSafeNextPath } from "../src/lib/auth/routes";
 import { readFileSync } from "node:fs";
-import { getHostBrandMetadata } from "../src/lib/business-app/brand-icons";
+import { getHostBrandMetadata, getHostBrandName } from "../src/lib/business-app/brand-icons";
 import { migrateCoffeeGuestCookie } from "../src/lib/business-app/coffee-host-proxy";
 import { COFFEE_HANDOFF_COOKIE, SHARED_GUEST_COFFEE_COOKIE, coffeeReturnPath, selectGuestToken, sharedGuestOptions } from "../src/lib/business-app/guest-coffee/shared-identity";
 import { coffeeStorage, migrateCoffeeSettings, normalizeSharedCoffeeValue, sharedCoffeeStorageKey } from "../src/lib/business-app/shared-coffee-storage";
@@ -135,7 +135,12 @@ try {
   const reportRoute = readFileSync(new URL("../src/app/api/business/player/report/route.ts", import.meta.url), "utf8");
   assert.ok(reportRoute.indexOf("isCabinetReportSource(body)") < reportRoute.indexOf("isCoffeeHostRequest(request.headers)") &&
     reportRoute.indexOf("isCoffeeHostRequest(request.headers)") < reportRoute.indexOf("handleSpaReport("), "coffee: cabinet report only, SPA branch refused");
-  assert.deepEqual(getHostBrandMetadata(COFFEE_HOSTNAME), getHostBrandMetadata("business.audiolad.ru"));
+  assert.equal(getHostBrandName(COFFEE_HOSTNAME), "АудиоЛад Кофейня");
+  assert.equal(getHostBrandName("business.audiolad.ru"), "АудиоЛад Бизнес");
+  assert.deepEqual(getHostBrandMetadata(COFFEE_HOSTNAME).icons, getHostBrandMetadata("business.audiolad.ru").icons);
+  assert.notEqual(getHostBrandMetadata(COFFEE_HOSTNAME).manifest, getHostBrandMetadata("business.audiolad.ru").manifest);
+  assert.match(String(getHostBrandMetadata(COFFEE_HOSTNAME).manifest), /manifest-coffee\.webmanifest/);
+
   assert.equal(buildBusinessAppMetadata(COFFEE_HOSTNAME).alternates?.canonical, "https://coffee.audiolad.ru/");
   assert.deepEqual(buildBusinessAppMetadata(COFFEE_HOSTNAME).robots, buildBusinessAppMetadata().robots);
   // MINOR: pages inherit the host-aware layout canonical (no page-level alternates).
@@ -143,7 +148,7 @@ try {
   assert.deepEqual(buildBusinessAppPageMetadata().robots, buildBusinessAppMetadata().robots);
   for (const page of ["music", "profile", "settings"]) {
     const src = readFileSync(new URL(`../src/app/business-app/${page}/page.tsx`, import.meta.url), "utf8");
-    assert.ok(src.includes("buildBusinessAppPageMetadata()") && !/alternates|buildBusinessAppMetadata\(/.test(src), `${page}: inherits canonical`);
+    assert.ok(src.includes("buildNamedBusinessPageMetadata(") && !/alternates|buildBusinessAppMetadata\(/.test(src), `${page}: inherits canonical`);
   }
   assert.deepEqual(sharedGuestOptions(COFFEE_HOSTNAME), { domain: ".audiolad.ru", secure: true, httpOnly: true, sameSite: "lax", path: "/", maxAge: 31536000 });
   for (const host of ["localhost", "preview.test", "audiolad.ru.evil.test", "evilaudiolad.ru"]) {

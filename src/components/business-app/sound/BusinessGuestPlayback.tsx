@@ -272,7 +272,7 @@ export function BusinessGuestPlaybackProvider({ children, initialLimit = "ok" }:
           openTestId="biz-player-open"
           closeTestId="biz-player-close"
           controlsPrefix="biz-player"
-          ariaLabel="Плеер АудиоЛад Бизнес"
+          ariaLabel="Плеер АудиоЛад Кофейня"
         />
       ) : null}
       {/* Outside every page: a route change never removes (and so never pauses) the element. */}

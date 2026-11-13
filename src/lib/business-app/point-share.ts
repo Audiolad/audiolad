@@ -1,7 +1,12 @@
+import { getHostBrandName } from "@/lib/business-app/brand-icons";
 import { BUSINESS_SITE_PATH, isBusinessHostname } from "@/lib/business-app/host";
 import { normalizePointCode } from "@/lib/business-app/point-session";
 
 export const POINT_SHARE_TITLE = "Устройство в зале – АудиоЛад Бизнес";
+
+export function pointShareTitle(hostname: string): string {
+  return `Устройство в зале – ${getHostBrandName(hostname)}`;
+}
 
 /**
  * Link to the device connection page. The code goes into the fragment (#1234):
@@ -25,8 +30,9 @@ export function pointTelegramShareUrl(link: string, text: string): string {
   return `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
 }
 
-export function pointMailtoUrl(link: string, text: string): string {
-  return `mailto:?subject=${encodeURIComponent(POINT_SHARE_TITLE)}&body=${encodeURIComponent(`${text}\n\n${link}`)}`;
+export function pointMailtoUrl(link: string, text: string, hostname?: string): string {
+  const title = hostname ? pointShareTitle(hostname) : POINT_SHARE_TITLE;
+  return `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`${text}\n\n${link}`)}`;
 }
 
 /** Seconds left before the code expires, never negative. */

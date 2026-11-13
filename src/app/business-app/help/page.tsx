@@ -17,5 +17,5 @@ export default async function BusinessAppHelpPage() {
 }
 
 export async function generateMetadata() {
-  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/help", "Помощь – АудиоЛад Кофе", "Помощь с настройкой звучания кофейни и работой кабинета.");
+  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/help", "Помощь – АудиоЛад Кофейня", "Помощь с настройкой звучания кофейни и работой кабинета.");
 }

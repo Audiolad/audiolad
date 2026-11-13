@@ -11,7 +11,7 @@ export const COFFEE = {
   repo: "Audiolad/audiolad",
   verticalId: "coffee",
   verticalPath: "/b/coffee",
-  byline: "АудиоЛад Кофейни",
+  byline: "АудиоЛад Кофейня",
   referenceSlug: "kofe-v-zernah-dlya-kofeyni",
   referenceUrl: "https://audiolad.ru/b/coffee/kofe-v-zernah-dlya-kofeyni",
   articlesDir: "src/lib/business/vertical-guides/articles",

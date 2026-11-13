@@ -6,10 +6,10 @@ import PointQrCode from "@/components/business-app/PointQrCode";
 import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
 import { formatPointCode } from "@/lib/business-app/point-session";
 import {
-  POINT_SHARE_TITLE,
   pointCodeDeadline,
   pointDeviceLink,
   pointShareText,
+  pointShareTitle,
 } from "@/lib/business-app/point-share";
 
 type LinkState = { linked: boolean; playerCode: string | null };
@@ -164,7 +164,7 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     }
     // Native phone share sheet includes installed apps such as MAX and Telegram.
     try {
-      await navigator.share({ title: POINT_SHARE_TITLE, text, url });
+      await navigator.share({ title: pointShareTitle(window.location.hostname), text, url });
     } catch (err) {
       if ((err as { name?: string } | null)?.name !== "AbortError") {
         setError("Ссылка готова. Нажмите «Поделиться ссылкой» ещё раз или скопируйте её.");

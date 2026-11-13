@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
     robots: { index: false, follow: false },
-    ...buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), `/documents/${id}`, doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ", doc?.summary ?? "Документы АудиоЛад Кофе"),
+    ...buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), `/documents/${id}`, doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ", doc?.summary ?? "Документы АудиоЛад Кофейня"),
   };
 }
 

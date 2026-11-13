@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import BusinessGuestStartCta from "@/components/business-app/BusinessGuestStartCta";
 import { useBusinessHostname } from "@/components/business-app/BusinessDomainProvider";
+import { getHostBrandName } from "@/lib/business-app/brand-icons";
 import { BusinessStruckPrice } from "@/components/business-app/BusinessPartnerPrice";
 import { setPartnerQuote } from "@/components/business-app/partner-quote-store";
 import { BUSINESS_GIFT_CTA, BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
@@ -87,7 +88,7 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
     <section className="business-app-card mx-auto max-w-[640px] space-y-4" data-testid="biz-partner-landing">
       <p className="text-sm font-semibold uppercase tracking-wide text-[var(--biz-text-muted)]">Персональное предложение</p>
       <h1 className="text-[1.6rem] font-bold leading-tight text-[var(--biz-text)]">
-        АудиоЛад Бизнес со скидкой {partnerDiscountPercent(offer.unitPriceRub, offer.standardUnitPriceRub)}%
+        {getHostBrandName(hostname)} со скидкой {partnerDiscountPercent(offer.unitPriceRub, offer.standardUnitPriceRub)}%
       </h1>
       <p className="text-xl">
         <BusinessStruckPrice standardRub={offer.standardUnitPriceRub} priceRub={offer.unitPriceRub} testId="biz-partner-landing-price" />{" "}

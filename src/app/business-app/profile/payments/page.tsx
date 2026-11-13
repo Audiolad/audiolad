@@ -6,16 +6,16 @@ import { requireBusinessCabinetPermission } from "@/lib/business-app/cabinet-mod
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { BUSINESS_PAYMENT_HISTORY_LINK_LABEL, type BusinessPaymentHistoryView } from "@/lib/business-app/payment-history";
 import { loadBusinessPaymentHistory } from "@/lib/business-app/payment-history.server";
-import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildNamedBusinessPageMetadata } from "@/lib/business-app/seo";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...buildBusinessAppPageMetadata(),
-  title: "История оплат – АудиоЛад Бизнес",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildNamedBusinessPageMetadata(getHostnameFromHeaders(await headers()), "История оплат");
+}
 
 /** Owner «История оплат» (Sergey t1342u). Read-only; only the owner's own organization. */
 export default async function BusinessPaymentHistoryPage() {

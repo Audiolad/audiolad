@@ -31,9 +31,9 @@ export const COFFEE_ATLAS_PDF_DOWNLOAD_NAME = "Атлас-10-кофеен-мир
 export const COFFEE_ATLAS_CTA_LABEL = "Подобрать звучание моей кофейни";
 export const COFFEE_ATLAS_CTA_HREF = coffeeStorefrontUrl();
 
-/** AudioLad Business offer printed at the bottom of every atlas page. */
+/** Offer printed at the bottom of every atlas page. */
 export const COFFEE_ATLAS_OFFER = {
-  title: "АудиоЛад Бизнес для вашей кофейни",
+  title: "АудиоЛад Кофейня для вашей кофейни",
   price: formatBusinessMonthlyPrice(),
   period: BUSINESS_PLAN_PERIOD_LABEL,
   trial: BUSINESS_GIFT_TITLE,

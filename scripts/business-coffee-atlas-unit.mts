@@ -99,7 +99,7 @@ const EXPECTED_TRACKS: Record<string, [string, string, string]> = {
   "cafe-san-alberto": ["kofeynik", "latinoamerikanskiy-dzhaz", "a496b83c-4d67-45e6-b669-2b9f12e7c4f3"],
   "truth-coffee-roasting": ["jazz-relax", "nuar-dzhaz", "3a9040fb-515d-4796-a892-c919e6f0a933"],
   "single-o-surry-hills": ["djazmanov", "legkiy-fank", "7ea01dd5-9e5d-458f-9641-901c587949d3"],
-  "la-colombe": ["djazmanov", "fortepiannyy-dzhaz", "8a1642df-677f-4e11-8db5-af1f5230fc9f"],
+  "la-colombe": ["djazmanov", "dzhazovaya-muzyka-dlya-kafe", "4b0d2a74-0ad7-489c-ba64-4e0b61a1a9f3"],
 };
 for (const slug of slugs) {
   const [authorSlug, productSlug, audioItemId] = EXPECTED_TRACKS[slug];
@@ -274,8 +274,8 @@ assert.deepEqual(playableBuilt["caffe-florian"], [], "published but unplayable a
 assert.deepEqual(playableBuilt["starbucks-reserve-shanghai"], [], "play-check failure hides the example");
 assert.deepEqual(playableBuilt["truth-coffee-roasting"], [], "track missing from the session is hidden – never another track");
 assert.equal(playableBuilt["la-colombe"]?.length, 1, "playable example stays");
-assert.equal(playableBuilt["la-colombe"]?.[0]?.trackTitle, "Трек fortepiannyy-dzhaz", "track title of the exact track");
-assert.equal(playableBuilt["la-colombe"]?.[0]?.albumTitle, "Альбом fortepiannyy-dzhaz", "album title below");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.trackTitle, "Трек dzhazovaya-muzyka-dlya-kafe", "track title of the exact track");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.albumTitle, "Альбом dzhazovaya-muzyka-dlya-kafe", "album title below");
 assert.equal(new Set(checked).size, checked.length, "each album is checked once");
 assert.deepEqual(
   await buildCoffeeAtlasMusic({
@@ -307,6 +307,7 @@ assert.equal(COFFEE_ATLAS_CTA_HREF, process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST
 }
 
 // --- offer on every page ---
+assert.equal(COFFEE_ATLAS_OFFER.title, "АудиоЛад Кофейня для вашей кофейни");
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
 assert.equal(COFFEE_ATLAS_OFFER.trial, "7 дней в подарок");
 assert.equal(COFFEE_ATLAS_OFFER.afterTrial, "Далее 799 ₽ за 30 дней");
@@ -345,7 +346,7 @@ assert.match(
 );
 assert.ok(
   headerSource.indexOf("Скачать PDF-атлас") < headerSource.indexOf("atlas-header__back"),
-  "header pill sits next to the «АудиоЛад Бизнес» link",
+  "header pill sits next to the «АудиоЛад Кофейня» link",
 );
 assert.doesNotMatch(chrome, /CoffeeAtlasPdfActions/, "no shared PDF button group left");
 const PDF_BUTTON = /COFFEE_ATLAS_PDF_PATH|\.pdf\b|business_atlas_coffee_pdf_|Открыть PDF|Скачать PDF|PDF-атласе|Подарок:/;
@@ -358,6 +359,28 @@ for (const [name, source] of [
   assert.doesNotMatch(source, PDF_BUTTON, `${name}: no PDF buttons in the page body`);
 }
 assert.match(overview, /Начать путешествие/, "overview hero keeps «Начать путешествие»");
+
+// --- industry offer name on the atlas (t1433u) ---
+assert.equal(
+  (headerSource.match(/АудиоЛад Кофейня/g) ?? []).length,
+  2,
+  "header brand lockup and desktop back-link use «АудиоЛад Кофейня»",
+);
+assert.match(restOfChrome, /<Link href=\{BUSINESS_LANDING_PATH\}>АудиоЛад Кофейня<\/Link>/, "footer link label");
+assert.doesNotMatch(chrome, /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/constants.ts"), /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/metadata.ts"), /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
+assert.match(
+  read("src/lib/business/coffee-atlas/metadata.ts"),
+  /– АудиоЛад Кофейня/,
+  "overview title/OG use the coffee industry name",
+);
+assert.match(read("src/lib/business/coffee-atlas/constants.ts"), /Атлас – вдохновляющий обзор для владельцев кофеен\. АудиоЛад не связан/);
+assert.doesNotMatch(chrome, /АудиоЛад Кофейни/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/constants.ts"), /АудиоЛад Кофейни/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/metadata.ts"), /АудиоЛад Кофейни/);
+
+
 assert.match(shopView, /href="#listen"[\s\S]{0,80}Послушать атмосферу/, "shop hero keeps «Послушать атмосферу»");
 assert.match(shopView, /id="listen"/, "listen anchor exists");
 assert.match(shopView, /Из PDF-атласа/, "PDF page images block stays");
