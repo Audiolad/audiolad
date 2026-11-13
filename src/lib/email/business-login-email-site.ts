@@ -28,4 +28,3 @@ export function businessLoginEmailSite(requestHeaders: { get(name: string): stri
     next: coffee ? "/cabinet" : BUSINESS_CABINET_RETURN_PATH,
   };
 }
-
