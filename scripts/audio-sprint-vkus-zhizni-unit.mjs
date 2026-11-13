@@ -26,7 +26,9 @@ for (const text of [
   "У каждого момента жизни есть своё звучание",
   "Именно этому посвящён наш новый АудиоСпринт – «Вкус жизни».",
   "16 дней",
-  "2 направления",
+  "на создание и публикацию",
+  "на старте спринта",
+  "const SPRINT_START_QUERY_COUNT = 120;",
   "6 000 ₽",
   "3 000 ₽",
   "2 000 ₽",
@@ -52,6 +54,11 @@ for (const text of [
 assert.equal((page.match(/ноября 2026 года"/g) ?? []).length, 1);
 assert.doesNotMatch(page, /будет объявлена позже/);
 assert.equal((page.match(/Каждый продукт – отдельный шанс/g) ?? []).length, 1);
+
+// Hero stats follow the /osen-zvuchit format; the query count is one constant.
+assert.equal((page.match(/SPRINT_START_QUERY_COUNT/g) ?? []).length, 2);
+assert.doesNotMatch(page, /2 направления/);
+assert.match(page, /<GiftIcon tone=\{index\}/);
 
 // Decorations: inline SVG only, hidden from assistive tech.
 const decor = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/decor.tsx"), "utf8");
