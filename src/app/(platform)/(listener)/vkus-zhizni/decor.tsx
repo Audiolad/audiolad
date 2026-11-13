@@ -237,3 +237,31 @@ export function CalendarIcon({ className }: DecorProps) {
     </IconFrame>
   );
 }
+
+const GIFT_TONES = [
+  { box: VIOLET, lid: "#8b5fd6", ribbon: HONEY, shine: "#ffffff" },
+  { box: "#9a7be0", lid: "#b49af0", ribbon: ROSE, shine: "#ffffff" },
+  { box: "#c6b0f2", lid: LAVENDER, ribbon: VIOLET, shine: "#ffffff" },
+] as const;
+
+/** Gift box with a bow for the prize cards. `tone` 0–2 follows the place. */
+export function GiftIcon({ className, tone = 0 }: DecorProps & { tone?: number }) {
+  const c = GIFT_TONES[Math.min(Math.max(tone, 0), GIFT_TONES.length - 1)];
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 64 64" className={className}>
+      <ellipse cx="32" cy="58" rx="20" ry="3" fill="#e9dcfb" />
+      {/* bow */}
+      <path d="M32 18 C 24 6, 12 8, 16 16 C 18 20, 26 20, 32 18 Z" fill={c.ribbon} />
+      <path d="M32 18 C 40 6, 52 8, 48 16 C 46 20, 38 20, 32 18 Z" fill={c.ribbon} />
+      <path d="M32 18 C 28 22, 26 26, 24 28 M32 18 C 36 22, 38 26, 40 28" stroke={c.ribbon} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      {/* box */}
+      <rect x="12" y="30" width="40" height="26" rx="4" fill={c.box} />
+      <rect x="9" y="20" width="46" height="12" rx="4" fill={c.lid} />
+      {/* ribbon */}
+      <rect x="29" y="20" width="6" height="36" fill={c.ribbon} />
+      <rect x="12" y="32" width="40" height="2.5" fill="#000000" opacity="0.08" />
+      <circle cx="32" cy="19" r="3.6" fill={c.ribbon} />
+      <path d="M16 36 v 14" stroke={c.shine} strokeWidth="2" strokeLinecap="round" opacity="0.35" />
+    </svg>
+  );
+}

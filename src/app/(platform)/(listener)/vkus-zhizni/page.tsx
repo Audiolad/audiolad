@@ -12,6 +12,7 @@ import {
   CalendarIcon,
   CornerBouquet,
   CupIcon,
+  GiftIcon,
   HeroDecor,
   LotusIcon,
   MoonIcon,
@@ -119,6 +120,15 @@ const directions = ["Музыка", "Медитации"];
 
 const RAFFLE_DATE = "30 ноября 2026 года";
 
+/** Number of search queries at sprint start (owner's figure, t1422u). Edit here only. */
+const SPRINT_START_QUERY_COUNT = 120;
+
+const heroStats = [
+  ["16 дней", "на создание и публикацию"],
+  [`${SPRINT_START_QUERY_COUNT} запросов`, "на старте спринта"],
+  ["6 000 ₽", "призовой фонд"],
+];
+
 const chances = [
   ["1 продукт", "1 шанс"],
   ["3 продукта", "3 шанса"],
@@ -197,19 +207,13 @@ export default function VkusZhizniPage() {
         </div>
 
         <div className="relative clear-both mt-7 grid max-w-3xl gap-2 @sm:grid-cols-3 @xl:gap-3">
-          {[
-            ["16 дней", ""],
-            ["2 направления", ""],
-            ["6 000 ₽", "призовой фонд"],
-          ].map(([value, label]) => (
+          {heroStats.map(([value, label]) => (
             <div
-              key={value}
-              className="rounded-[20px] border border-white/80 bg-white/80 px-3 py-3 shadow-sm @xl:px-4 @xl:py-4"
+              key={label}
+              className="h-full rounded-[20px] border border-white/80 bg-white/80 px-3 py-3 shadow-sm @xl:px-4 @xl:py-4"
             >
               <p className="text-base font-semibold text-[#25135c] @xl:text-xl">{value}</p>
-              {label ? (
-                <p className="mt-1 text-sm leading-5 text-[#7d70a2]">{label}</p>
-              ) : null}
+              <p className="mt-1 text-sm leading-5 text-[#7d70a2]">{label}</p>
             </div>
           ))}
         </div>
@@ -391,11 +395,12 @@ export default function VkusZhizniPage() {
           </p>
 
           <div className="relative mt-6 grid gap-3 @md:grid-cols-3">
-            {prizes.map(([place, amount]) => (
+            {prizes.map(([place, amount], index) => (
               <div
                 key={place}
                 className="rounded-[22px] border border-white bg-white/85 px-5 py-6 text-center shadow-sm"
               >
+                <GiftIcon tone={index} className="mx-auto mb-3 h-14 w-14" />
                 <p className="text-sm font-semibold text-[#7d70a2]">{place}</p>
                 <p className="mt-1 text-3xl font-semibold text-[#7042c5]">{amount}</p>
               </div>
