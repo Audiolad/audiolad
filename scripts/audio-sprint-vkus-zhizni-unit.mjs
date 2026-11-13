@@ -95,6 +95,7 @@ assert.match(migration, /ON CONFLICT \(normalized_query\) DO UPDATE SET/);
 assert.match(migration, /ON CONFLICT \(sprint_id, query_id\) DO UPDATE SET/);
 assert.match(migration, /v_total <> 266 OR v_music <> 140 OR v_voice <> 126/);
 assert.doesNotMatch(migration, /osen-zvuchit|DELETE |DROP |TRUNCATE /i);
+assert.match(migration, /WHERE NOT EXISTS \(\n  SELECT 1\n  FROM public\.seo_sprint_queries AS other_sq/, "rows shared with another sprint stay unchanged");
 assert.equal((migration.match(/^  \('/gm) ?? []).length, 266);
 
 // CTA leads to the real booking flow in the cabinet.

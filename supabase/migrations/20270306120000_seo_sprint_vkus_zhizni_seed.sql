@@ -297,7 +297,16 @@ ON CONFLICT (normalized_query) DO UPDATE SET
   intent = COALESCE(public.seo_queries.intent, EXCLUDED.intent),
   recommended_format = COALESCE(public.seo_queries.recommended_format, EXCLUDED.recommended_format),
   audio_fit = COALESCE(public.seo_queries.audio_fit, EXCLUDED.audio_fit),
-  analysis_status = 'analyzed';
+  analysis_status = 'analyzed'
+-- Rows that already belong to another sprint (6 shared with «Осень звучит») stay
+-- exactly as they are: no metadata, status or text changes.
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.seo_sprint_queries AS other_sq
+  JOIN public.seo_sprints AS other_s ON other_s.id = other_sq.sprint_id
+  WHERE other_sq.query_id = public.seo_queries.id
+    AND other_s.slug <> 'vkus-zhizni-2026'
+);
 
 WITH sprint AS (
   SELECT id FROM public.seo_sprints WHERE slug = 'vkus-zhizni-2026'
@@ -604,6 +613,12 @@ WHERE sq.query_id = q.id
   AND left(q.query_text, 1) <> upper(left(q.query_text, 1))
   AND NOT EXISTS (
     SELECT 1 FROM public.practices AS p WHERE p.primary_seo_query_id = q.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.seo_sprint_queries AS other_sq
+    JOIN public.seo_sprints AS other_s ON other_s.id = other_sq.sprint_id
+    WHERE other_sq.query_id = q.id AND other_s.slug <> 'vkus-zhizni-2026'
   );
 
 DO $$
