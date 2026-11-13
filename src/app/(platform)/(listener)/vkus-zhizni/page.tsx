@@ -17,7 +17,6 @@ import {
   MoonIcon,
   NoteIcon,
   ParkIcon,
-  SideBranch,
   SprigDivider,
   SunIcon,
 } from "./decor";
@@ -157,9 +156,6 @@ function CtaButton() {
 export default function VkusZhizniPage() {
   return (
     <article className="relative overflow-hidden pb-16 pt-4">
-      <SideBranch className="pointer-events-none absolute right-4 top-[900px] hidden h-[360px] w-[120px] opacity-50 xl:block" />
-      <SideBranch className="pointer-events-none absolute right-24 top-[2300px] hidden h-[300px] w-[100px] -scale-x-100 opacity-40 xl:block" />
-      <SideBranch className="pointer-events-none absolute right-6 top-[3700px] hidden h-[340px] w-[110px] opacity-45 xl:block" />
       <nav aria-label="Хлебные крошки" className="text-sm text-[#7d70a2]">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -177,9 +173,10 @@ export default function VkusZhizniPage() {
         </ol>
       </nav>
 
-      <header className="relative mt-6 overflow-hidden rounded-[32px] border border-[#eadff8] bg-gradient-to-br from-[#fdf6ff] via-[#fffaff] to-[#eef7f1] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
-        <HeroDecor className="pointer-events-none absolute -right-10 -top-6 h-36 w-44 opacity-40 sm:h-48 sm:w-60 sm:opacity-60 lg:right-6 lg:top-1/2 lg:h-[300px] lg:w-[370px] lg:-translate-y-1/2 lg:opacity-100" />
-        <div className="relative max-w-4xl lg:max-w-[58%]">
+      <header className="@container relative mt-6 overflow-hidden rounded-[32px] border border-[#eadff8] bg-gradient-to-br from-[#fdf6ff] via-[#fffaff] to-[#eef7f1] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
+        <HeroDecor className="pointer-events-none absolute right-6 top-8 hidden h-[280px] w-[340px] @3xl:block" />
+        <div className="relative flow-root max-w-4xl @3xl:max-w-[56%]">
+          <HeroDecor className="pointer-events-none float-right -mr-3 -mt-1 ml-2 h-28 w-36 @md:h-36 @md:w-44 @3xl:hidden" />
           <p className="inline-flex rounded-full border border-[#e2c8ff] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[#7042c5]">
             14–29 ноября 2026 года
           </p>
@@ -197,35 +194,35 @@ export default function VkusZhizniPage() {
             Выберите поисковый запрос Яндекса, создайте музыкальный альбом или
             медитацию, опубликуйте на АудиоЛаде.
           </p>
+        </div>
 
-          <div className="mt-7 grid max-w-3xl gap-3 sm:grid-cols-3 lg:max-w-none">
-            {[
-              ["16 дней", ""],
-              ["2 направления", ""],
-              ["6 000 ₽", "призовой фонд"],
-            ].map(([value, label]) => (
-              <div
-                key={value}
-                className="rounded-[20px] border border-white/80 bg-white/80 px-4 py-4 shadow-sm"
-              >
-                <p className="text-xl font-semibold text-[#25135c]">{value}</p>
-                {label ? (
-                  <p className="mt-1 text-sm leading-5 text-[#7d70a2]">{label}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
+        <div className="relative clear-both mt-7 grid max-w-3xl gap-2 @sm:grid-cols-3 @xl:gap-3">
+          {[
+            ["16 дней", ""],
+            ["2 направления", ""],
+            ["6 000 ₽", "призовой фонд"],
+          ].map(([value, label]) => (
+            <div
+              key={value}
+              className="rounded-[20px] border border-white/80 bg-white/80 px-3 py-3 shadow-sm @xl:px-4 @xl:py-4"
+            >
+              <p className="text-base font-semibold text-[#25135c] @xl:text-xl">{value}</p>
+              {label ? (
+                <p className="mt-1 text-sm leading-5 text-[#7d70a2]">{label}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
 
-          <div className="mt-7">
-            <CtaButton />
-          </div>
+        <div className="relative mt-7">
+          <CtaButton />
         </div>
       </header>
 
-      <div className="max-w-4xl">
+      <div className="@container max-w-4xl">
         <SprigDivider className="mx-auto mt-10 h-8 w-44" />
         <Section id="moments" title="У каждого момента жизни есть своё звучание">
-          <ul className="grid gap-4 sm:grid-cols-2">
+          <ul className="grid gap-4 @xl:grid-cols-2">
             {moments.slice(0, 4).map((text, index) => {
               const Icon = momentIcons[index];
               return (
@@ -256,7 +253,7 @@ export default function VkusZhizniPage() {
               публикуйте его на платформе.
             </p>
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 @xl:grid-cols-2">
             <div className={cardClassName}>
               <div className="flex items-center gap-3">
                 <NoteIcon className="h-10 w-10 shrink-0" />
@@ -284,7 +281,7 @@ export default function VkusZhizniPage() {
         </Section>
 
         <Section id="why" title="Зачем участвовать">
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid gap-3 @xl:grid-cols-2">
             {benefits.map((item) => (
               <li key={item} className={`${cardClassName} flex gap-3 text-[15px] leading-7 text-[#4a3d73] sm:text-base`}>
                 <span aria-hidden="true" className="mt-2.5 h-2 w-2 shrink-0 rounded-full bg-[#8cc4a4]" />
@@ -315,7 +312,7 @@ export default function VkusZhizniPage() {
           <div className={proseClassName}>
             <p>Выберите направление: «Музыка» или «Медитации».</p>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2" data-sprint-queries="pending">
+          <div className="mt-5 grid gap-4 @xl:grid-cols-2" data-sprint-queries="pending">
             {directions.map((name) => (
               <div
                 key={name}
@@ -348,7 +345,7 @@ export default function VkusZhizniPage() {
               опубликованный по правилам спринта продукт даёт один отдельный шанс
               в розыгрыше.
             </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 @md:grid-cols-3">
               {chances.map(([products, chance]) => (
                 <div key={products} className={cardClassName}>
                   <p className="text-base font-medium text-[#7d70a2]">{products}</p>
@@ -393,7 +390,7 @@ export default function VkusZhizniPage() {
             продуктов, которые выполнили условия участия.
           </p>
 
-          <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="relative mt-6 grid gap-3 @md:grid-cols-3">
             {prizes.map(([place, amount]) => (
               <div
                 key={place}
@@ -423,7 +420,7 @@ export default function VkusZhizniPage() {
           </div>
         </section>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-2">
+        <div className="mt-14 grid gap-4 @xl:grid-cols-2">
           <section id="who" className={`${cardClassName} scroll-mt-24`} aria-labelledby="who-heading">
             <BookIcon className="h-11 w-11" />
             <h2 id="who-heading" className="mt-3 text-xl font-semibold text-[#25135c]">

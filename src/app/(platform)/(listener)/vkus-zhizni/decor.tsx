@@ -237,21 +237,3 @@ export function CalendarIcon({ className }: DecorProps) {
     </IconFrame>
   );
 }
-
-/** Tall faded branch for the wide-screen margin. */
-export function SideBranch({ className }: DecorProps) {
-  return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 120 360" className={className}>
-      <path d="M60 356 C 54 280, 70 200, 58 120 C 52 80, 60 40, 72 6" stroke={LEAF_DARK} strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <Leaf x={58} y={300} angle={-150} size={0.9} />
-      <Leaf x={62} y={260} angle={-30} size={0.85} fill="#a7d3b8" />
-      <Leaf x={60} y={210} angle={-160} size={0.8} fill="#a7d3b8" />
-      <Leaf x={62} y={170} angle={-25} size={0.8} />
-      <Leaf x={56} y={120} angle={-150} size={0.7} />
-      <Leaf x={60} y={80} angle={-35} size={0.65} fill="#a7d3b8" />
-      <Flower cx={72} cy={10} r={10} petal={ROSE} />
-      <Flower cx={36} cy={140} r={7} petal={LAVENDER} />
-      <Flower cx={92} cy={236} r={7} petal={PEACH} />
-    </svg>
-  );
-}
