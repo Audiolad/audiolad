@@ -16,6 +16,8 @@ type Props = {
   primaryQueryText: string;
   primaryQueryId: string;
   analyzedOpportunities: AuthorSeoPromptRelatedCandidate[];
+  /** AudioSprint booking: the product title equals the booked query exactly. */
+  exactTitle?: boolean;
 };
 
 /**
@@ -28,6 +30,7 @@ export default function AuthorSeoPromptBuilder({
   primaryQueryText,
   primaryQueryId,
   analyzedOpportunities,
+  exactTitle = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [productType, setProductType] = useState("");
@@ -84,6 +87,7 @@ export default function AuthorSeoPromptBuilder({
       productType,
       relatedQueries: selectedRelatedQueries,
       productSource,
+      exactTitle,
     });
     setPrompt(next);
   }
@@ -129,6 +133,11 @@ export default function AuthorSeoPromptBuilder({
             <p className="mt-1 rounded-xl border border-[#d7c4f5] bg-white px-3 py-2 text-sm text-[#4c3d78]">
               {primaryQueryText}
             </p>
+            {exactTitle ? (
+              <p className="mt-1 text-xs leading-5 text-[#5f5484]" data-testid="author-seo-prompt-exact-title">
+                Название продукта спринта точно совпадает с этим запросом – промпт это учитывает.
+              </p>
+            ) : null}
           </div>
 
           <label className="block text-sm font-medium text-[#25135c]">
@@ -202,7 +211,7 @@ export default function AuthorSeoPromptBuilder({
               </p>
               {secondarySuggestions.length === 0 ? (
                 <p className="mt-3 text-sm text-[#796ba0]">
-                  Подходящих дополнительных запросов сейчас нет — можно сформировать промпт только с
+                  Подходящих дополнительных запросов сейчас нет – можно сформировать промпт только с
                   основным запросом.
                 </p>
               ) : (
@@ -284,7 +293,7 @@ export default function AuthorSeoPromptBuilder({
               <li>
                 <span className="font-semibold text-[#25135c]">1. Добавьте материал продукта</span>
                 <span className="block">
-                  Вставьте текст, сценарий, программу, тезисы или описание музыки — один источник
+                  Вставьте текст, сценарий, программу, тезисы или описание музыки – один источник
                   фактов о продукте.
                 </span>
               </li>

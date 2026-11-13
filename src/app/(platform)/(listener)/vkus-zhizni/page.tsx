@@ -101,10 +101,25 @@ const benefits = [
   "Творческий опыт и возможность участвовать в розыгрыше призового фонда.",
 ];
 
+/** Same packaging list as step 4 on /osen-zvuchit (t1440u). */
+const packagingItems = [
+  "подназвание;",
+  "описание;",
+  "SEO-заголовок;",
+  "SEO-описание;",
+  "3 пункта «Как слушать» или «Как проходить»;",
+  "3 вопроса и ответа;",
+  "обложку;",
+  "аудио.",
+];
+
+const PACKAGING_STEP = "packaging";
+
 const steps = [
   "Выберите поисковый запрос в кабинете автора АудиоЛада, в разделе «Музыка» или «Медитации».",
   "Забронируйте выбранную тему. Можно держать до пяти броней одновременно. Каждая бронь действует семь дней, после чего неиспользованный запрос вновь становится доступным.",
   "Создайте тематический аудиопродукт. Для музыки – альбом; рекомендуем не менее десяти композиций, минимально пять. Для медитаций – одну полноценную, завершённую медитацию.",
+  PACKAGING_STEP,
   "Опубликуйте продукт на АудиоЛаде в сроки спринта, 14–29 ноября 2026 года, соблюдая требования к правам и оформлению.",
   "Участвуйте в подведении итогов и розыгрыше призового фонда.",
 ];
@@ -157,6 +172,29 @@ function Section({
       </h2>
       <div className="mt-5">{children}</div>
     </section>
+  );
+}
+
+/** Step «Оформите продукт»: wording of step 4 on /osen-zvuchit (t1440u). */
+function PackagingStep() {
+  return (
+    <div className="min-w-0 space-y-3 pt-1.5 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
+      <h3 className="text-lg font-semibold text-[#25135c]">Оформите продукт</h3>
+      <p>
+        Название продукта должно <strong className="text-[#25135c]">точно совпадать с выбранным
+        поисковым запросом</strong>.
+      </p>
+      <p>Для участия в спринте заполните основные элементы оформления:</p>
+      <ul className="list-disc space-y-1 pl-5">
+        {packagingItems.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      <p>
+        В кабинете автора есть готовый промпт, который поможет
+        подготовить оформление продукта с помощью ИИ.
+      </p>
+    </div>
   );
 }
 
@@ -306,9 +344,13 @@ export default function VkusZhizniPage() {
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f1e9fb] text-sm font-bold text-[#7042c5]">
                     {index + 1}
                   </span>
-                  <p className="pt-1.5 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
-                    {text}
-                  </p>
+                  {text === PACKAGING_STEP ? (
+                    <PackagingStep />
+                  ) : (
+                    <p className="pt-1.5 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
+                      {text}
+                    </p>
+                  )}
                 </div>
               </li>
             ))}

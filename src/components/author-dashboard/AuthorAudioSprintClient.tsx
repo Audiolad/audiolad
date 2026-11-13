@@ -365,6 +365,7 @@ export default function AuthorAudioSprintClient({
                     primaryQueryText={item.queryText}
                     primaryQueryId={item.id}
                     analyzedOpportunities={related}
+                    exactTitle
                   />
                 ) : null}
               </article>

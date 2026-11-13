@@ -9,6 +9,7 @@ import {
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
   AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE,
+  AUTHOR_SEO_PROMPT_EXACT_TITLE_SECTION,
   SEO_PROMPT_EMPTY_RELATED,
   SEO_PROMPT_SECONDARY_CANDIDATE_LIMIT,
   SEO_PROMPT_SECONDARY_SELECT_LIMIT,
@@ -384,3 +385,48 @@ assert.match(builderUi, /1\. Добавьте материал продукта/
 assert.doesNotMatch(builderUi, /productContent|PRODUCT_CONTENT/);
 
 console.log("author-seo-prompt-builder-unit: ok");
+
+// t1440u: AudioSprint booking («Вкус жизни», «Осень звучит»): sprint-agnostic prompt, title = booked query.
+{
+  assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /\u2014/, "prompt body uses en dash only");
+  assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("– Для тире используй только среднее тире «–» (U+2013)."));
+  assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /осен|октябр|ноябр|спринт/i, "prompt is sprint-agnostic");
+  assert.doesNotMatch(builderUi, />[^<{]*\u2014[^<{]*</, "builder copy uses en dash only");
+  assert.match(builderUi, /exactTitle = false/);
+  assert.match(builderUi, /productSource,\s+exactTitle,\s+\}\);/);
+  assert.match(builderUi, /Название продукта спринта точно совпадает с этим запросом/);
+
+  const cases = [
+    { seoQuery: "джаз для кофейни", productType: "Музыка", productSource: "Альбом из 10 инструментальных композиций, лёгкий джаз." },
+    { seoQuery: "медитация благодарности", productType: "Медитация", productSource: "Сценарий: дыхание, благодарность, завершение." },
+  ];
+  for (const input of cases) {
+    const sprint = buildAuthorSeoProductPrompt({ ...input, relatedQueries: [], exactTitle: true });
+    const general = buildAuthorSeoProductPrompt({ ...input, relatedQueries: [] });
+    assert.doesNotMatch(sprint, /\{\{[A-Z_]+\}\}/, "all placeholders filled");
+    assert.ok(sprint.includes(`ОСНОВНОЙ SEO-ЗАПРОС:\n${input.seoQuery}`));
+    assert.ok(sprint.includes(`ТИП ПРОДУКТА:\n${input.productType}`));
+    assert.ok(
+      sprint.includes(`приведи основной SEO-запрос дословно, без изменений и дополнений:\n\n${input.seoQuery}\n`),
+      "sprint title instruction names the booked query",
+    );
+    assert.ok(sprint.includes("1. НАЗВАНИЕ ПРОДУКТА\n\nНазвание продукта уже определено"));
+    assert.doesNotMatch(sprint, /Если точное вхождение звучит нормально/);
+    assert.ok(sprint.includes("2. ПОДНАЗВАНИЕ"));
+    assert.ok(sprint.includes("6. КАК СЛУШАТЬ / КАК ПРОХОДИТЬ"));
+    assert.ok(sprint.includes("Если продукт – музыка, раздел называется «Как слушать»."));
+    assert.ok(sprint.includes("7. ВОПРОСЫ И ОТВЕТЫ"));
+    assert.ok(sprint.includes("ФОРМАТ ОТВЕТА"));
+    assert.equal((sprint.match(/1\. НАЗВАНИЕ ПРОДУКТА/g) || []).length, 1);
+    // Outside the title section the sprint prompt equals the general one.
+    const tail = (text) => text.slice(text.indexOf("2. ПОДНАЗВАНИЕ"));
+    const head = (text) => text.slice(0, text.indexOf("1. НАЗВАНИЕ ПРОДУКТА"));
+    assert.equal(tail(sprint), tail(general));
+    assert.equal(head(sprint), head(general));
+    assert.ok(general.includes("Если точное вхождение звучит нормально, используй его как название."));
+    assert.doesNotMatch(sprint, /\u2014/);
+    assert.doesNotMatch(general, /\u2014/);
+  }
+  assert.ok(AUTHOR_SEO_PROMPT_EXACT_TITLE_SECTION.startsWith("1. НАЗВАНИЕ ПРОДУКТА\n\n"));
+  console.log("author-seo-prompt-builder-unit: t1440u sprint exact title ok");
+}

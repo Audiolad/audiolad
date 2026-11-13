@@ -141,4 +141,32 @@ assert.match(listLib, /\.in\("slug", \[\.\.\.AUDIO_SPRINT_ENABLED_SLUGS\]\)/);
 const sprintPage = readFileSync(path.join(root, "src/app/(platform)/author-dashboard/audio-sprints/[slug]/page.tsx"), "utf8");
 assert.match(sprintPage, /sprintSlug=\{listing\.sprint\.slug\}/);
 
+// t1440u: step «Оформите продукт» with the /osen-zvuchit wording, placed after «Создайте…».
+const osenPage = readFileSync(path.join(root, "src/app/(platform)/(listener)/osen-zvuchit/page.tsx"), "utf8");
+const packagingBlock = (src) => src.split("const packagingItems = [")[1].split("];")[0];
+assert.equal(packagingBlock(page), packagingBlock(osenPage), "packaging list matches /osen-zvuchit");
+for (const text of [
+  ">Оформите продукт<",
+  "Название продукта должно <strong className=\"text-[#25135c]\">точно совпадать с выбранным",
+  "поисковым запросом</strong>.",
+  "<p>Для участия в спринте заполните основные элементы оформления:</p>",
+  "В кабинете автора есть готовый промпт, который поможет",
+  "подготовить оформление продукта с помощью ИИ.",
+]) {
+  assert.ok(page.includes(text), `packaging step: ${text}`);
+  assert.ok(osenPage.includes(text.replace(">Оформите продукт<", 'title="Оформите продукт"')), `osen wording: ${text}`);
+}
+const stepsBlock = page.split("const steps = [")[1].split("];")[0];
+const stepOrder = stepsBlock.split("\n").map((line) => line.trim()).filter(Boolean);
+assert.equal(stepOrder.length, 6, "six steps");
+assert.match(stepOrder[2], /^"Создайте тематический аудиопродукт/);
+assert.equal(stepOrder[3], "PACKAGING_STEP,");
+assert.match(stepOrder[4], /^"Опубликуйте продукт на АудиоЛаде/);
+assert.match(page, /\{text === PACKAGING_STEP \? \(\s*<PackagingStep \/>/);
+
+// t1440u: the cabinet prompt for a sprint booking keeps the title equal to the booked query.
+const sprintClient = readFileSync(path.join(root, "src/components/author-dashboard/AuthorAudioSprintClient.tsx"), "utf8");
+assert.match(sprintClient, /<AuthorSeoPromptBuilder\s+primaryQueryText=\{item\.queryText\}\s+primaryQueryId=\{item\.id\}\s+analyzedOpportunities=\{related\}\s+exactTitle\s*\/>/);
+assert.doesNotMatch(sprintClient, /osen-zvuchit-2026|AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG &&[^\n]*AuthorSeoPromptBuilder/);
+
 console.log("audio-sprint-vkus-zhizni-unit: ok");
