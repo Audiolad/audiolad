@@ -509,7 +509,7 @@
     "test:mobile-author-cabinet-top-chrome": "npx tsx scripts/mobile-author-cabinet-top-chrome-unit.mts",
     "test:next-step-product-picker": "npx tsx scripts/next-step-product-picker-unit.mts",
     "test:business-privacy-document": "node --import tsx scripts/business-privacy-document-unit.tsx",
-    "test:business-guest-login": "node scripts/business-guest-login-contract-unit.mjs && node scripts/business-auth-coffee-copy-unit.mjs && npx tsx scripts/business-guest-login-unit.mts",
+    "test:business-guest-login": "node scripts/business-guest-login-contract-unit.mjs && node scripts/business-auth-coffee-copy-unit.mjs && npx tsx scripts/business-guest-login-unit.mts && npx tsx scripts/business-login-email-site-unit.mts",
     "test:business-auth-coffee-copy": "node scripts/business-auth-coffee-copy-unit.mjs"
   },
   "dependencies": {

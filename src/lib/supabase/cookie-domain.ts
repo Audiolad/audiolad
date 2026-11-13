@@ -109,6 +109,37 @@ export function hostnameFromHeaders(headers: {
   return normalize(headers.get("x-forwarded-host")?.split(",")[0]);
 }
 
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/** `localhost`, `127.0.0.1`, `[::1]` – with or without a port. */
+export function isLoopbackHostHeader(hostHeader: string | null | undefined): boolean {
+  const raw = hostHeader?.trim().toLowerCase() ?? "";
+  if (!raw) return false;
+  const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(raw);
+  if (bracketed) return LOOPBACK_HOSTNAMES.has(bracketed[1] ?? "");
+  if (raw === "::1") return true;
+  return LOOPBACK_HOSTNAMES.has(raw.split(":")[0] ?? "");
+}
+
+/**
+ * Public site the visitor is on – for brand, links and email copy (t1442u).
+ *
+ * Same as `hostnameFromHeaders`, except for the internal request Next.js makes for
+ * `NextResponse.rewrite()` (coffee `/profile` → `/business-app/profile`, incl. server
+ * actions posted to that page): it arrives with `Host: localhost:<PORT>` and keeps the
+ * nginx-set `X-Forwarded-Host`. Only then the forwarded host is used. Cookie scope keeps
+ * `hostnameFromHeaders` unchanged.
+ */
+export function publicHostnameFromHeaders(headers: {
+  get(name: string): string | null;
+}): string {
+  if (isLoopbackHostHeader(headers.get("host"))) {
+    const forwarded = normalize(headers.get("x-forwarded-host")?.split(",")[0]);
+    if (forwarded) return forwarded;
+  }
+  return hostnameFromHeaders(headers);
+}
+
 /**
  * `Set-Cookie` line that expires the legacy host-only variant (no Domain).
  * When Secure (production/https) it is `SameSite=None; Secure`, so the browser

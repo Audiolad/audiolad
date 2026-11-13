@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { AUTHOR_SUPPORT_COOKIE_NAME } from "@/lib/author-support/policy";
 import { linkBusinessLoginEmail } from "@/lib/business-app/login-access";
 import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
+import { businessLoginEmailSite } from "@/lib/email/business-login-email-site";
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { after, NextResponse } from "next/server";
 
@@ -108,8 +109,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: linked.code }, { status: linked.code === "receipt_email_taken" ? 409 : 503 });
   }
   if (linked.linked) {
-    const hostname = hostnameFromHeaders(request.headers);
-    after(() => sendBusinessLoginEmail(customerEmail, hostname, user.id));
+    const site = businessLoginEmailSite(request.headers);
+    after(() => sendBusinessLoginEmail(customerEmail, site, user.id));
   }
 
   // The server computes the amount; the order is refused unless it matches the confirmed price.
