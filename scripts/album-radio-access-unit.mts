@@ -13,11 +13,15 @@ const denied = await resolvePlaylistQueueEntrySession(entry, { fromStart: true,
   fetchListen: async () => ({ ok: false, reason: "unavailable" }), fetchCatalog });
 assert.equal(denied.ok, false);
 assert.equal(previewCalls, 0);
-for (const patch of [{ albumRadioEligible: false }, { playbackMode: "preview" as const }, { isAuthorPreview: true }]) {
+for (const patch of [{ albumRadioEligible: false }, { playbackMode: "preview" as const }, { isAuthorPreview: true, albumRadioEligible: false }, { isAuthorPreview: true, albumRadioEligible: undefined }]) {
   const result = await resolvePlaylistQueueEntrySession(entry, { fromStart: true,
     fetchListen: async () => ({ ok: true, session: { ...session, ...patch } }), fetchCatalog });
   assert.equal(result.ok, false);
 }
+// t1437u: author member of a published, listed release (author_preview access) still gets the full radio track.
+const own = await resolvePlaylistQueueEntrySession(entry, { fromStart: true,
+  fetchListen: async () => ({ ok: true, session: { ...session, isAuthorPreview: true } }), fetchCatalog });
+assert.ok(own.ok);
 const full = await resolvePlaylistQueueEntrySession(entry, { fromStart: true,
   fetchListen: async () => ({ ok: true, session }), fetchCatalog });
 assert.ok(full.ok);
