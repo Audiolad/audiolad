@@ -8,6 +8,12 @@ import {
 } from "@/lib/seo/public-page-metadata";
 
 import {
+  AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT,
+  AUDIO_SPRINT_VKUS_ZHIZNI_SLUG,
+} from "@/lib/seo-queries/audio-sprint";
+
+import VkusZhizniQueryList from "./QueryList";
+import {
   BookIcon,
   CalendarIcon,
   CornerBouquet,
@@ -26,13 +32,13 @@ import {
  * АудиоСпринт «Вкус жизни», 14–29 ноября 2026 (Company Core eb792a06).
  *
  * Separate page. The October sprint landing (/osen-zvuchit), its sprint and its data are not touched.
- * The query list comes from Core task 976eabbc and is shown only after the owner
- * approves it. Until then the list block shows «Список готовится» and no booking
- * is imitated.
+ * The approved query list (Core 976eabbc, t1427u) is shown from static page data; booking
+ * happens in the author cabinet on the sprint vkus-zhizni-2026 (same mechanism as the
+ * October sprint: up to 5 active reservations, 7 days each).
  */
 
 const PAGE_PATH = "/vkus-zhizni";
-const QUERIES_ANCHOR = "#queries";
+const SPRINT_HREF = `/author-dashboard/audio-sprints/${AUDIO_SPRINT_VKUS_ZHIZNI_SLUG}`;
 const PAGE_TITLE = "Вкус жизни – АудиоСпринт для авторов АудиоЛада";
 const PAGE_DESCRIPTION =
   "«Вкус жизни» – АудиоСпринт для авторов АудиоЛада 14–29 ноября 2026 года: музыка и медитации по поисковым запросам Яндекса, призовой фонд 6 000 ₽.";
@@ -116,12 +122,11 @@ const prizes = [
   ["3 место", "1 000 ₽"],
 ];
 
-const directions = ["Музыка", "Медитации"];
 
 const RAFFLE_DATE = "30 ноября 2026 года";
 
-/** Number of search queries at sprint start (owner's figure, t1422u). Edit here only. */
-const SPRINT_START_QUERY_COUNT = 120;
+/** Number of search queries at sprint start (approved list, t1427u). Edit in audio-sprint.ts. */
+const SPRINT_START_QUERY_COUNT = AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT;
 
 const heroStats = [
   ["16 дней", "на создание и публикацию"],
@@ -157,7 +162,7 @@ function Section({
 
 function CtaButton() {
   return (
-    <Link href={QUERIES_ANCHOR} className={primaryCtaClassName}>
+    <Link href={SPRINT_HREF} className={primaryCtaClassName}>
       Выбрать поисковый запрос
     </Link>
   );
@@ -316,18 +321,8 @@ export default function VkusZhizniPage() {
           <div className={proseClassName}>
             <p>Выберите направление: «Музыка» или «Медитации».</p>
           </div>
-          <div className="mt-5 grid gap-4 @xl:grid-cols-2" data-sprint-queries="pending">
-            {directions.map((name) => (
-              <div
-                key={name}
-                className="rounded-[24px] border border-[#d7c4f5] bg-[#faf6ff] px-5 py-5 sm:px-6"
-              >
-                <h3 className="text-lg font-semibold text-[#25135c]">{name}</h3>
-                <p className="mt-2 text-[15px] font-medium leading-7 text-[#7042c5] sm:text-base">
-                  Список готовится
-                </p>
-              </div>
-            ))}
+          <div className="mt-5">
+            <VkusZhizniQueryList bookingHref={SPRINT_HREF} />
           </div>
         </Section>
 

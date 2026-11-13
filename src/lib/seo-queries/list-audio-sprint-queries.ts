@@ -6,7 +6,7 @@ import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
-  AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
+  AUDIO_SPRINT_ENABLED_SLUGS,
   audioSprintEnabledPools,
   audioSprintProductMatchesGroup,
   isAudioSprintAuthorGroup,
@@ -132,7 +132,7 @@ async function findEnabledSprintQueryText(
     .from("seo_sprints")
     .select("id")
     .in("id", sprintIds)
-    .eq("slug", AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG);
+    .in("slug", [...AUDIO_SPRINT_ENABLED_SLUGS]);
 
   if (sprintError) return { ok: false };
   const enabledSprintIds = new Set((sprints ?? []).map((row) => readString(row.id)));

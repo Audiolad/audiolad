@@ -18,6 +18,9 @@ import type { AuthorAccessStatus } from "@/lib/authors/access";
 import {
   audioSprintHref,
   isAudioSprintOsenZvuchitPromoVisible,
+  isAudioSprintVkusZhizniPromoVisible,
+  AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL,
+  AUDIO_SPRINT_VKUS_ZHIZNI_SLUG,
 } from "@/lib/seo-queries/audio-sprint";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
@@ -251,6 +254,7 @@ export default function AuthorDashboardNav({
     : "";
   const discoveryEnabled = isAuthorSeoDiscoveryEnabled(authorId);
   const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible();
+  const vkusPromoVisible = isAudioSprintVkusZhizniPromoVisible();
 
   const items: {
     href: string;
@@ -300,7 +304,20 @@ export default function AuthorDashboardNav({
             href: audioSprintHref(authorSlug),
             label: AUTUMN_NAV_LABEL,
             icon: AudioSprintIcon,
-            active: pathname.startsWith("/author-dashboard/audio-sprints"),
+            active: pathname.startsWith("/author-dashboard/audio-sprints/osen-zvuchit"),
+          },
+        ]
+      : []),
+    // «Вкус жизни» (14–29.11.2026): highlighted tab while the sprint runs.
+    ...(vkusPromoVisible
+      ? [
+          {
+            href: audioSprintHref(authorSlug, AUDIO_SPRINT_VKUS_ZHIZNI_SLUG),
+            label: AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL,
+            icon: AudioSprintIcon,
+            active: pathname.startsWith(
+              `/author-dashboard/audio-sprints/${AUDIO_SPRINT_VKUS_ZHIZNI_SLUG}`,
+            ),
           },
         ]
       : []),
@@ -376,7 +393,8 @@ export default function AuthorDashboardNav({
       <nav className="flex flex-wrap gap-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const autumn = item.label === AUTUMN_NAV_LABEL;
+          const vkus = item.label === AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL;
+          const autumn = item.label === AUTUMN_NAV_LABEL || vkus;
 
           if (item.locked) {
             // No commercial status: visible but muted; never navigates to Business.
@@ -415,7 +433,7 @@ export default function AuthorDashboardNav({
               ) : null}
               {autumn ? (
                 <span className="hidden h-4 shrink-0 items-center rounded-full bg-[#25135c] px-1.5 text-[10px] font-semibold leading-none text-[#FFF8EA] sm:inline-flex">
-                  до 18 октября
+                  {vkus ? "до 29 ноября" : "до 18 октября"}
                 </span>
               ) : null}
             </Link>

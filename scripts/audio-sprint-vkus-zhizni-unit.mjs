@@ -28,7 +28,7 @@ for (const text of [
   "16 дней",
   "на создание и публикацию",
   "на старте спринта",
-  "const SPRINT_START_QUERY_COUNT = 120;",
+  "const SPRINT_START_QUERY_COUNT = AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT;",
   "6 000 ₽",
   "3 000 ₽",
   "2 000 ₽",
@@ -66,16 +66,51 @@ assert.doesNotMatch(decor, /https?:\/\/(?!www\.w3\.org)/);
 assert.doesNotMatch(decor, /<img|<image|url\(/);
 assert.equal((decor.match(/<svg/g) ?? []).length, (decor.match(/aria-hidden="true"/g) ?? []).length);
 
-// Topic list is not published before the owner approves it (Core 976eabbc).
-assert.match(page, /Список готовится/);
-assert.match(page, /data-sprint-queries="pending"/);
-assert.doesNotMatch(page, /Забронировать/);
-assert.doesNotMatch(page, /audio-sprints\//, "no link into the old sprint data");
+// Approved list (t1427u): static page data, 265 = 139 music + 126 meditations (t1429u: one removed), CTA to the cabinet sprint.
+const queriesSrc = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/queries.ts"), "utf8");
+const listSrc = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/QueryList.tsx"), "utf8");
+const block = (name) => queriesSrc.split(`export const ${name}`)[1].split("];")[0];
+const musicItems = block("VKUS_ZHIZNI_MUSIC_QUERIES").match(/^  ".*",$/gm) ?? [];
+const voiceItems = block("VKUS_ZHIZNI_MEDITATION_QUERIES").match(/^  ".*",$/gm) ?? [];
+assert.equal(musicItems.length, 139);
+assert.equal(voiceItems.length, 126);
+assert.equal(new Set([...musicItems, ...voiceItems].map((s) => s.toLowerCase())).size, 265);
+assert.doesNotMatch(queriesSrc, /\u2014/);
+const sprintLib = readFileSync(path.join(root, "src/lib/seo-queries/audio-sprint.ts"), "utf8");
+assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 265;/);
+assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_SLUG = "vkus-zhizni-2026";/);
+assert.doesNotMatch(page, /Список готовится/);
+assert.match(page, /<VkusZhizniQueryList bookingHref=\{SPRINT_HREF\} \/>/);
+assert.match(page, /const SPRINT_HREF = `\/author-dashboard\/audio-sprints\/\$\{AUDIO_SPRINT_VKUS_ZHIZNI_SLUG\}`;/);
+assert.doesNotMatch(page, /osen-zvuchit-2026/, "no link into the October sprint data");
+assert.match(listSrc, /Показать все/);
+assert.match(listSrc, /Поиск по запросам/);
+assert.doesNotMatch(listSrc, /frequency|частотн/i, "the landing list shows no frequency");
+assert.doesNotMatch(listSrc, /\u2014/);
 
-// CTA points to the on-page query block.
+// Seed migration: own sprint, 266 initial queries, idempotent, October sprint untouched.
+const migration = readFileSync(path.join(root, "supabase/migrations/20270306120000_seo_sprint_vkus_zhizni_seed.sql"), "utf8");
+assert.match(migration, /VALUES \('vkus-zhizni-2026', 'Вкус жизни'\)\nON CONFLICT \(slug\) DO UPDATE/);
+assert.match(migration, /ON CONFLICT \(normalized_query\) DO UPDATE SET/);
+assert.match(migration, /ON CONFLICT \(sprint_id, query_id\) DO UPDATE SET/);
+assert.match(migration, /v_total <> 266 OR v_music <> 140 OR v_voice <> 126/);
+assert.doesNotMatch(migration, /osen-zvuchit|DELETE |DROP |TRUNCATE /i);
+assert.match(migration, /WHERE NOT EXISTS \(\n  SELECT 1\n  FROM public\.seo_sprint_queries AS other_sq/, "rows shared with another sprint stay unchanged");
+assert.equal((migration.match(/^  \('/gm) ?? []).length, 266);
+
+// t1429u: one query removed from the landing and the database.
+assert.ok(![...musicItems, ...voiceItems].some((s) => /бриля/i.test(s)), "removed query is not on the landing");
+const removal = readFileSync(path.join(root, "supabase/migrations/20270307120000_seo_sprint_vkus_zhizni_remove_bril.sql"), "utf8");
+assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)/);
+assert.match(removal, /seo_query_reservations WHERE query_id = v_query_id/);
+assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)\n[\s\S]*?FOR UPDATE;/, "query row is locked before the booking check");
+assert.match(removal, /v_total <> 265 OR v_music <> 139 OR v_voice <> 126/);
+assert.doesNotMatch(removal, /osen-zvuchit|DROP |TRUNCATE /i);
+assert.equal((removal.match(/DELETE FROM/g) ?? []).length, 2);
+
+// CTA leads to the real booking flow in the cabinet.
 assert.equal((page.match(/Выбрать поисковый запрос/g) ?? []).length, 1);
-assert.match(page, /const QUERIES_ANCHOR = "#queries";/);
-assert.match(page, /<Section id="queries"/);
+assert.match(page, /<Link href=\{SPRINT_HREF\} className=\{primaryCtaClassName\}>/);
 
 // The October sprint landing is unchanged by this task.
 try {
@@ -88,5 +123,20 @@ try {
 } catch (error) {
   if (error instanceof assert.AssertionError) throw error;
 }
+
+// Cabinet: highlighted tab, dashboard banner, title lock on both sprints.
+const navSrc = readFileSync(path.join(root, "src/components/author-dashboard/AuthorDashboardNav.tsx"), "utf8");
+assert.match(navSrc, /href: audioSprintHref\(authorSlug, AUDIO_SPRINT_VKUS_ZHIZNI_SLUG\)/);
+assert.match(navSrc, /label: AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL/);
+assert.match(navSrc, /const autumn = item\.label === AUTUMN_NAV_LABEL \|\| vkus;/);
+assert.match(navSrc, /до 29 ноября/);
+assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL = "Аудиоспринт «Вкус жизни»";/);
+assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT = "2026-11-30T00:00:00\+03:00";/);
+const dashSrc = readFileSync(path.join(root, "src/components/author-dashboard/AuthorDashboardClient.tsx"), "utf8");
+assert.match(dashSrc, /\{vkusPromoVisible \? \(\s*<Link\s+href="\/vkus-zhizni"[\s\S]*?Вкус жизни · АудиоСпринт[\s\S]*?<\/Link>\s*\) : null\}/);
+const listLib = readFileSync(path.join(root, "src/lib/seo-queries/list-audio-sprint-queries.ts"), "utf8");
+assert.match(listLib, /\.in\("slug", \[\.\.\.AUDIO_SPRINT_ENABLED_SLUGS\]\)/);
+const sprintPage = readFileSync(path.join(root, "src/app/(platform)/author-dashboard/audio-sprints/[slug]/page.tsx"), "utf8");
+assert.match(sprintPage, /sprintSlug=\{listing\.sprint\.slug\}/);
 
 console.log("audio-sprint-vkus-zhizni-unit: ok");

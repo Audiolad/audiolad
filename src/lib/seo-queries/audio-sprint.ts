@@ -57,6 +57,50 @@ export function isAudioSprintOsenZvuchitPromoVisible(
   return isAudioSprintOsenZvuchitPromoActive(now ?? Date.now());
 }
 
+/**
+ * AudioSprint «Вкус жизни» (Company Core eb792a06): 14–29 November 2026 inclusive
+ * (Moscow time). Own sprint row and query set; reservations, title lock and the
+ * moderation gate use the same mechanism as «Осень звучит».
+ */
+export const AUDIO_SPRINT_VKUS_ZHIZNI_SLUG = "vkus-zhizni-2026";
+export const AUDIO_SPRINT_VKUS_ZHIZNI_TITLE = "Вкус жизни";
+export const AUDIO_SPRINT_VKUS_ZHIZNI_DESCRIPTION =
+  "Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в каталог. Музыка создаётся в разделе «Музыка», медитации – через «Продукт» → «Аудиопрактика».";
+export const AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT = "2026-11-30T00:00:00+03:00";
+export const AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL = "Аудиоспринт «Вкус жизни»";
+/** Queries at sprint start (approved list 13.11.2026, t1427u; minus one, t1429u). */
+export const AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 265;
+
+const AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT_MS = Date.parse(
+  AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT,
+);
+
+/** Build-time switch for the «Вкус жизни» cabinet tab and dashboard banner. */
+export const AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENABLED: boolean = true;
+
+/** true while the «Вкус жизни» window is open (pure, time injectable). */
+export function isAudioSprintVkusZhizniPromoActive(
+  now: Date | number = Date.now(),
+): boolean {
+  const at = typeof now === "number" ? now : now.getTime();
+  if (!Number.isFinite(at)) return false;
+  return at < AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT_MS;
+}
+
+/** Whether the author UI shows the «Вкус жизни» promo (tab + banner). */
+export function isAudioSprintVkusZhizniPromoVisible(
+  now?: Date | number,
+): boolean {
+  if (!AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENABLED) return false;
+  return isAudioSprintVkusZhizniPromoActive(now ?? Date.now());
+}
+
+/** Sprints whose queries carry the title lock and the moderation gate. */
+export const AUDIO_SPRINT_ENABLED_SLUGS = [
+  AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
+  AUDIO_SPRINT_VKUS_ZHIZNI_SLUG,
+] as const;
+
 /** First release shows the initial pool only. Reserve stays hidden. */
 export const reservePoolEnabled = false;
 
@@ -68,6 +112,23 @@ export const AUDIO_SPRINT_GROUP_LABEL: Record<AudioSprintAuthorGroup, string> = 
   music: "Музыка",
   voice: "Медитации и практики",
 };
+
+/** Group label per sprint: «Вкус жизни» has exactly «Музыка» and «Медитации». */
+export function audioSprintGroupLabel(
+  sprintSlug: string | null | undefined,
+  group: AudioSprintAuthorGroup,
+): string {
+  if (sprintSlug === AUDIO_SPRINT_VKUS_ZHIZNI_SLUG && group === "voice") {
+    return "Медитации";
+  }
+  return AUDIO_SPRINT_GROUP_LABEL[group];
+}
+
+export function audioSprintDescription(sprintSlug: string | null | undefined): string {
+  return sprintSlug === AUDIO_SPRINT_VKUS_ZHIZNI_SLUG
+    ? AUDIO_SPRINT_VKUS_ZHIZNI_DESCRIPTION
+    : AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION;
+}
 
 export type AudioSprintPool = "initial" | "reserve";
 
@@ -252,12 +313,15 @@ export function buildAudioSprintProductCreateHref(input: {
   });
 }
 
-export function audioSprintHref(authorSlug?: string | null): string {
+export function audioSprintHref(
+  authorSlug?: string | null,
+  sprintSlug: string = AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
+): string {
   const params = new URLSearchParams();
   const slug = authorSlug?.trim() ?? "";
   if (slug) params.set("author", slug);
   const query = params.toString();
-  const path = `/author-dashboard/audio-sprints/${AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG}`;
+  const path = `/author-dashboard/audio-sprints/${encodeURIComponent(sprintSlug)}`;
   return query ? `${path}?${query}` : path;
 }
 

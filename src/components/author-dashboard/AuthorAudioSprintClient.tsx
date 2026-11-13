@@ -8,8 +8,9 @@ import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromp
 import { transferSeoReservationToWorkspace } from "@/lib/seo-queries/seo-reservation-product-context";
 import {
   AUDIO_SPRINT_AUTHOR_GROUPS,
-  AUDIO_SPRINT_GROUP_LABEL,
-  AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION,
+  AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
+  audioSprintDescription,
+  audioSprintGroupLabel,
   audioSprintHref,
   audioSprintPublicationClass,
   audioSprintReserveConflictLifecycle,
@@ -27,6 +28,8 @@ import {
 } from "@/lib/seo-queries/types";
 
 type Props = {
+  /** Sprint slug from the route; defaults to «Осень звучит» for older callers. */
+  sprintSlug?: string;
   authorId: string;
   authorName: string;
   authorSlug: string;
@@ -46,6 +49,7 @@ function formatUntil(value: string | null) {
 }
 
 export default function AuthorAudioSprintClient({
+  sprintSlug = AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
   authorId,
   authorName,
   authorSlug,
@@ -194,10 +198,17 @@ export default function AuthorAudioSprintClient({
   }
 
   return (
-    <div className="space-y-5" data-testid="audio-sprint-osen-zvuchit">
+    <div
+      className="space-y-5"
+      data-testid={
+        sprintSlug === AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG
+          ? "audio-sprint-osen-zvuchit"
+          : `audio-sprint-${sprintSlug}`
+      }
+    >
       <section className="rounded-[24px] border border-[#d7c4f5] bg-[#faf6ff] p-5">
         <p className="text-sm leading-6 text-[#4c3d78]">
-          {AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION}
+          {audioSprintDescription(sprintSlug)}
         </p>
         <p className="mt-3 text-sm font-semibold text-[#25135c]">
           Мои запросы: {activeCount} из {SEO_ACTIVE_RESERVATION_LIMIT}
@@ -219,7 +230,7 @@ export default function AuthorAudioSprintClient({
                     : "border border-[#e4d7f4] bg-white text-[#7042c5]"
                 }`}
               >
-                {AUDIO_SPRINT_GROUP_LABEL[value]} ({count})
+                {audioSprintGroupLabel(sprintSlug, value)} ({count})
               </button>
             );
           })}
@@ -325,7 +336,7 @@ export default function AuthorAudioSprintClient({
                         </button>
                       ) : null}
                       <Link
-                        href={audioSprintHref(item.reservationWorkspaceSlug)}
+                        href={audioSprintHref(item.reservationWorkspaceSlug, sprintSlug)}
                         className="text-sm font-semibold text-[#7042c5]"
                       >
                         Открыть это пространство
