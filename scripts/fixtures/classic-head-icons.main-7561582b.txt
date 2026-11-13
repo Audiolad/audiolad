@@ -1,10 +1,10 @@
 <meta name="application-name" content="АудиоЛад"/>
-<link rel="manifest" href="/manifest.webmanifest?v=violet1"/>
+<link rel="manifest" href="/manifest.webmanifest?v=violet2"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="АудиоЛад"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<link rel="icon" href="/favicon.ico?v=violet1" sizes="256x256" type="image/x-icon"/>
-<link rel="icon" href="/favicon.ico?v=violet1"/>
-<link rel="icon" href="/favicon-32x32.png?v=violet1" sizes="32x32" type="image/png"/>
-<link rel="icon" href="/favicon-16x16.png?v=violet1" sizes="16x16" type="image/png"/>
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=violet1" sizes="180x180" type="image/png"/>
+<link rel="icon" href="/favicon.ico?v=violet2" sizes="256x256" type="image/x-icon"/>
+<link rel="icon" href="/favicon.ico?v=violet2"/>
+<link rel="icon" href="/favicon-32x32.png?v=violet2" sizes="32x32" type="image/png"/>
+<link rel="icon" href="/favicon-16x16.png?v=violet2" sizes="16x16" type="image/png"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=violet2" sizes="180x180" type="image/png"/>

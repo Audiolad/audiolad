@@ -79,7 +79,7 @@ for (const f of ["favicon.ico", "icon.svg", "icon.png", "icon.ico", "apple-icon.
 }
 assert.ok(existsSync(pub("/favicon.ico")));
 assert.equal(classic.icons.icon[0].url, classicBrandAssetUrl("/favicon.ico"));
-assert.equal(CLASSIC_BRAND_ICON_VERSION, "violet1");
+assert.equal(CLASSIC_BRAND_ICON_VERSION, "violet2");
 for (const u of classicUrls) {
   assert.ok(u.includes(`?v=${CLASSIC_BRAND_ICON_VERSION}`), `classic cache-bust ${u}`);
   assert.ok(existsSync(pub(u)), `missing ${u}`);
@@ -89,6 +89,9 @@ for (const i of cm.icons) {
   assert.ok(existsSync(pub(i.src)), i.src);
 }
 assert.ok(cm.icons.some((i) => i.src.startsWith("/icon-maskable-512.png") && i.purpose === "maskable"));
+assert.ok(cm.icons.some((i) => i.src.startsWith("/icon-any-192.png") && i.purpose === "any" && i.sizes === "192x192"));
+assert.ok(cm.icons.some((i) => i.src.startsWith("/icon-any-512.png") && i.purpose === "any" && i.sizes === "512x512"));
+assert.ok(cm.icons.every((i) => i.purpose === "maskable" || i.src.startsWith("/icon-any-")), "classic purpose=any icons must be the rounded icon-any-* files");
 
 // Leather lotus (photograph, not the old espresso-on-cream flat mark): real PNG sizes,
 // opaque (RGB or palette, no alpha), leather-brown corners, a sharp mark in the centre,
@@ -249,5 +252,43 @@ assert.match(shell, /business-app-topbar/);
 assert.match(shell, /BusinessBrandLockup/);
 assert.match(css, /\.business-app-brand__mark \{[^}]*border-radius:\s*50%/);
 assert.match(css, /\.business-app-topbar \{\s*display:\s*none;/);
+
+
+// t1424u: rounded favicons / purpose=any icons have transparent corners;
+// maskable and the square Open Graph icon-512 stay full-bleed opaque.
+function decodeRgba(png, path) {
+  assert.equal(png.depth, 8, path);
+  assert.equal(png.interlace, 0, path);
+  assert.equal(png.colorType, 6, `${path} must be RGBA`);
+  const rows = unfilter(png.data, png.w, png.h, 4);
+  return (x, y) => [...rows[y].subarray(x * 4, x * 4 + 4)];
+}
+function assertRoundedTransparent(path, size) {
+  const png = readPng(pub(path));
+  assert.equal(`${png.w}x${png.h}`, `${size}x${size}`, path);
+  const px = decodeRgba(png, path);
+  for (const [x, y] of [[0, 0], [size - 1, 0], [0, size - 1], [size - 1, size - 1]]) {
+    assert.equal(px(x, y)[3], 0, `${path} corner ${x},${y} must be transparent, got ${px(x, y)}`);
+  }
+  const mid = px(Math.floor(size / 2), Math.floor(size / 2));
+  assert.equal(mid[3], 255, `${path} centre must be opaque, got ${mid}`);
+}
+for (const [path, size] of [
+  ["/favicon-16x16.png", 16],
+  ["/favicon-32x32.png", 32],
+  ["/favicon-48x48.png", 48],
+  ["/favicon-64x64.png", 64],
+  ["/icon-any-192.png", 192],
+  ["/icon-any-512.png", 512],
+]) {
+  assertRoundedTransparent(path, size);
+}
+for (const path of ["/icon-512.png", "/icon-192.png", "/icon-maskable-512.png", "/apple-touch-icon.png"]) {
+  const png = readPng(pub(path));
+  const px = decodeRgb(png, path);
+  const N = png.w;
+  const corner = px(0, 0);
+  assert.ok(corner[0] > 80 && corner[2] > 160, `${path} must stay full-bleed violet, corner ${corner}`);
+}
 
 console.log("business-brand-icons-unit: ok");

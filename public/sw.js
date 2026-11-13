@@ -13,7 +13,7 @@
  * - manifest, icons, favicons
  */
 
-const CACHE_VERSION = "audiolad-pwa-v5";
+const CACHE_VERSION = "audiolad-pwa-v6";
 const STATIC_CACHE = `${CACHE_VERSION}-public`;
 
 const NEVER_CACHE_PREFIXES = [
@@ -35,6 +35,8 @@ const CACHEABLE_PUBLIC_PATHS = new Set([
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
+  "/icon-any-192.png",
+  "/icon-any-512.png",
   "/icon-maskable-512.png",
   "/icon-1024.png",
   "/apple-touch-icon.png",
