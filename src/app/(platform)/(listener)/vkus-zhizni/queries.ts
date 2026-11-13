@@ -2,7 +2,8 @@
  * AudioSprint «Вкус жизни»: approved query list (Sergey, 13.11.2026, t1427u).
  * Generated from «Итоговый_список_Вкус_жизни_2026-11-13.xlsx», sheet «Итоговый список».
  * Text is kept exactly as in the sheet. The same set is seeded into the database by
- * supabase/migrations/20270306120000_seo_sprint_vkus_zhizni_seed.sql.
+ * supabase/migrations/20270306120000_seo_sprint_vkus_zhizni_seed.sql; «ансамбль современного джаза
+ * игоря бриля» removed (t1429u) here and by 20270307120000_seo_sprint_vkus_zhizni_remove_bril.sql.
  */
 
 export const VKUS_ZHIZNI_MUSIC_QUERIES: readonly string[] = [
@@ -42,7 +43,6 @@ export const VKUS_ZHIZNI_MUSIC_QUERIES: readonly string[] = [
   "аргентинское танго в современной обработке",
   "трайбл лаунж джаз",
   "итальянская мафия музыка темный нуар джаз",
-  "ансамбль современного джаза игоря бриля",
   "джаз блюз на французском",
   "музыка аргентинского танго медленная",
   "французский джаз вокализ и песни",
