@@ -1,23 +1,16 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getHostBrandName } from "@/lib/business-app/brand-icons";
-import { BUSINESS_HOSTNAME, BUSINESS_ORIGIN, COFFEE_ORIGIN, isCoffeeHostname } from "@/lib/business-app/host";
-import { BUSINESS_CABINET_RETURN_PATH } from "@/lib/access-grants/paths";
+import type { BusinessLoginEmailSite } from "@/lib/email/business-login-email-site";
 import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import { formatMimeFromAddress } from "@/lib/email/mime";
 
 /** Best effort, only immediately after the session's anonymous account was linked. No token persistence. */
-export async function sendBusinessLoginEmail(email: string, hostname: string, userId: string): Promise<void> {
+export async function sendBusinessLoginEmail(email: string, site: BusinessLoginEmailSite, userId: string): Promise<void> {
   try {
     const smtp = getSmtpConfigFromEnv();
     if (!smtp) return;
-    const coffee = isCoffeeHostname(hostname);
-    const brand = getHostBrandName(coffee ? hostname : BUSINESS_HOSTNAME);
-    const origin = coffee ? COFFEE_ORIGIN : BUSINESS_ORIGIN;
-    const next = coffee ? "/cabinet" : BUSINESS_CABINET_RETURN_PATH;
-    // Business auth lives on the apex, coffee auth on coffee itself.
-    const authOrigin = coffee ? origin : "https://audiolad.ru";
+    const { brand, authOrigin, next } = site;
     const callback = new URL("/auth/callback", authOrigin);
     callback.searchParams.set("next", next);
     const { data, error } = await createServiceRoleClient().auth.admin.generateLink({

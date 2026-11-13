@@ -2,7 +2,7 @@
 
 import { linkBusinessLoginEmail, businessPasswordError } from "@/lib/business-app/login-access";
 import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
-import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
+import { businessLoginEmailSite } from "@/lib/email/business-login-email-site";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -133,8 +133,8 @@ export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) 
   const linked = await linkBusinessLoginEmail(supabase, user, receiptEmail);
   if (!linked.ok) return linked;
   if (linked.linked) {
-    const hostname = hostnameFromHeaders(await headers());
-    after(() => sendBusinessLoginEmail(receiptEmail, hostname, user.id));
+    const site = businessLoginEmailSite(await headers());
+    after(() => sendBusinessLoginEmail(receiptEmail, site, user.id));
     return { ok: true, receiptEmail } as const;
   }
   const { error } = await supabase.auth.updateUser({ data: { [BUSINESS_RECEIPT_EMAIL_META_KEY]: receiptEmail } });
