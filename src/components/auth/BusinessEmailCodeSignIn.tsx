@@ -36,26 +36,26 @@ export default function BusinessEmailCodeSignIn({ next, coffee }: { next: string
     } catch { setError("Не удалось войти. Попробуйте ещё раз."); }
     finally { setBusy(false); }
   }
-  return <section className="mt-6 space-y-3">
+  return <section className="mt-6 space-y-3 rounded-[20px] border border-[var(--biz-border,#ddcfef)] p-4" data-testid="auth-email-code">
     <p className="text-sm">Начинали без регистрации? Если при оплате вы указали почту, войдите по коду из письма на эту почту.</p>
-    <button type="button" className="underline" onClick={() => setOpen(!open)} aria-expanded={open}>Войти по коду из письма</button>
-    {open ? <form onSubmit={submit} className="space-y-3">
-      <label className="block">Почта
-        <input className="business-app-input block w-full" type="email" required autoComplete="email" value={email} disabled={busy || step === "code"} onChange={(e) => setEmail(e.target.value)} />
+    <button type="button" className="text-sm font-semibold underline" onClick={() => setOpen(!open)} aria-expanded={open}>Войти по коду из письма</button>
+    {open ? <form onSubmit={submit} className="space-y-4">
+      <label className="block"><span className="text-sm font-medium">Почта</span>
+        <input className="mt-3 w-full rounded-[20px] border border-[var(--biz-border,#ddcfef)] bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)]" type="email" required autoComplete="email" value={email} disabled={busy || step === "code"} onChange={(e) => setEmail(e.target.value)} />
       </label>
       {step === "code" ? <>
-        <label className="block">Код из письма
-          <input className="business-app-input block w-full" value={token} onChange={(e) => setToken(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required disabled={busy} />
+        <label className="block"><span className="text-sm font-medium">Код из письма</span>
+          <input className="mt-3 w-full rounded-[20px] border border-[var(--biz-border,#ddcfef)] bg-[var(--biz-surface,white)] px-4 py-4 outline-none placeholder:text-[var(--biz-text-muted,#a99db9)] focus:border-[var(--biz-accent,#7042c5)]" value={token} onChange={(e) => setToken(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required disabled={busy} />
         </label>
-        <button className="underline" type="button" disabled={busy} onClick={() => { setStep("email"); setToken(""); setMessage(""); setError(""); }}>Изменить почту</button>{" "}
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm"><button className="underline" type="button" disabled={busy} onClick={() => { setStep("email"); setToken(""); setMessage(""); setError(""); }}>Изменить почту</button>{" "}
         <button className="underline" type="button" disabled={busy} onClick={() => {
           if (Date.now() < resendAt) { setMessage("Повторный код можно запросить через минуту."); return; }
           void send();
-        }}>Отправить код ещё раз</button>
+        }}>Отправить код ещё раз</button></p>
       </> : null}
-      <p role="status">{message}</p>
+      <p role="status" className="text-sm">{message}</p>
       {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" className="primary-cta primary-cta--form" disabled={busy}>{busy ? "Подождите…" : step === "email" ? "Получить код" : "Войти"}</button>
+      <button type="submit" className="primary-cta primary-cta--form w-full" disabled={busy}>{busy ? "Подождите…" : step === "email" ? "Получить код" : "Войти"}</button>
     </form> : null}
   </section>;
 }
