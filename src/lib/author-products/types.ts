@@ -117,6 +117,8 @@ export type PracticeRow = {
   deleted_by: string | null;
   deletion_reason: string | null;
   currency: string;
+  first_published_at?: string | null;
+  first_publication_date_unknown?: boolean;
   published_at: string | null;
   scheduled_publish_at: string | null;
   listening_notice_enabled: boolean;
@@ -156,8 +158,11 @@ export type AuthorProductListItem = {
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string;
+  first_published_at?: string | null;
+  first_publication_date_unknown?: boolean;
   published_at: string | null;
   scheduled_publish_at: string | null;
+  created_at?: string | null;
   audio_count: number;
 };
 

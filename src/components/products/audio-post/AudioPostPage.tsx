@@ -1,3 +1,4 @@
+import ProductPublicationDate from "@/components/products/ProductPublicationDate";
 import LegalFooter from "@/components/LegalFooter";
 import AuthorLink from "@/components/authors/AuthorLink";
 import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
@@ -193,6 +194,8 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
                 <p className="mt-2 text-sm text-[#7d70a2]">{durationLabel}</p>
               ) : null}
 
+              <ProductPublicationDate publishedAt={viewModel.firstPublishedAt} />
+
               <AudioPostPlayer {...playerProps} variant="embedded" />
 
               {viewModel.ratingsUiEnabled ? (
@@ -265,6 +268,8 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               ) : null}
             </div>
           </div>
+
+          <ProductPublicationDate publishedAt={viewModel.firstPublishedAt} />
 
           <div className="mt-6">
             <AudioPostPlayer {...playerProps} variant="panel" />

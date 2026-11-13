@@ -4,6 +4,77 @@
 
 ---
 
+## Сессия – 13 ноября 2026 (603aa2d6, даты создания и первого выхода продуктов)
+
+Изучены AGENTS.md, схема и миграции unified audio product / lifecycle /
+moderation / scheduled publication / transactional outbox, общие загрузчики,
+RPC и маршруты публикации, кабинет автора и отдельный музыкальный список,
+публичная страница и шаблоны practice/music/course/audio_post. Рабочее дерево
+при старте чистое, ветка `ai-company/task-603aa2d6`.
+Локальная документация Next.js в `node_modules/next/dist/docs/` недоступна:
+`node_modules` отсутствует. API Next.js в задаче не менялись.
+
+Подготовлены additive migration, осторожный backfill, защита неизменяемых дат,
+единый русский формат Europe/Moscow и вывод дат в кабинете и публичных шаблонах.
+Неизвестные исторические публикации не получают дату переиздания. Изменения
+рабочей БД, production, зависимостей, прав доступа и юридических текстов не делались.
+Коммит и push не выполнялись. Issues 639–641 не затрагивались.
+
+Изменённые/добавленные файлы:
+
+- `supabase/migrations/20270308120000_product_first_publication_dates.sql`
+- `src/lib/products/publication-dates.ts`
+- `src/lib/products/lookup.ts`
+- `src/lib/author-products/products.ts`
+- `src/lib/author-products/types.ts`
+- `src/lib/author-studio-music/management.ts`
+- `src/app/api/author/studio-music/route.ts`
+- `src/app/(platform)/(listener)/practice/[...segments]/page.tsx`
+- `src/components/author-dashboard/AuthorDashboardClient.tsx`
+- `src/components/author-dashboard/AuthorMusicClient.tsx`
+- `src/components/products/ProductPublicationDate.tsx`
+- `src/components/products/practice-page/PracticePageContent.tsx`
+- `src/components/products/practice-page/types.ts`
+- `src/components/products/audio-post/AudioPostPage.tsx`
+- `scripts/product-publication-dates-isolated.py`
+- `scripts/product-publication-dates-unit.mts`
+- `package.json`
+- `docs/DATABASE.md`
+- `docs/SESSION_LOG.md`
+
+Проверки:
+
+- PASS: `python3 scripts/product-publication-dates-isolated.py` – реальная миграция
+  и существующие schedule guard / claim в новом временном PostgreSQL:
+  история и outbox, NULL creation, черновики, все типы, первая публикация,
+  попытки подмены дат, правки, скрытие/восстановление до и после расписания,
+  переиздание неизвестной истории, позднее одобрение, идемпотентность claim
+  и единственное событие индексации.
+- PASS: `node scripts/scheduled-publication-sql-unit.mjs`.
+- PASS: `node scripts/duplicate-migration-versions-unit.mjs`.
+- PASS: просмотр diff и `git diff --check`.
+- `npm run lint`, `npm run typecheck`, `npm run build`,
+  `npm run test:product-publication-dates` – не запустились: `npm: command not found`,
+  нет `node_modules` (доступен только системный Node.js 18).
+- `node scripts/practice-republish-lifecycle-unit.mjs` – не запустился напрямую:
+  Node.js без tsx не поддерживает импорт `.ts`.
+- `node scripts/author-published-product-seo-link-sql-unit.mjs` – штатный skip:
+  нет локального DATABASE_URL / Docker; рабочая БД для проверки не использовалась.
+- Проверка в браузере не выполнена: нет зависимостей и запущенного приложения.
+
+После применения патча на box: в изолированный SQL-тест добавлен поиск
+локального PostgreSQL (`PG_BIN` / новейший `/usr/lib/postgresql`), скрипт
+включён в `test:database-migrations`, unit-тест – в `test:database-migrations:ci`,
+добавлен workflow `product-publication-dates-isolated.yml`.
+
+Точка продолжения: lint/typecheck/build в CI; браузерные сценарии кабинета и
+публичных страниц (включая мобильный аудиопост) после выкладки. До внедрения
+приложения применить миграцию штатным процессом после ревью и отдельного
+согласия на миграцию. Исторические NULL без надёжных свидетельств намеренно
+остаются неизвестными.
+
+---
+
 ## Сессия — 3 октября 2026 (VK Mini App moderation pass, issue #737)
 
 **Сделано:**

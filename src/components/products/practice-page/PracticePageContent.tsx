@@ -1,3 +1,4 @@
+import ProductPublicationDate from "@/components/products/ProductPublicationDate";
 import LegalFooter from "@/components/LegalFooter";
 import AuthorAppreciationPrototype from "@/components/author-appreciation/AuthorAppreciationPrototype";
 import CourseLearnerContent from "@/components/products/course-learner/CourseLearnerContent";
@@ -55,6 +56,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
         <section className="mt-6 min-w-0" data-practice-section="hero">
           <PracticeProductHero viewModel={viewModel} />
+          <ProductPublicationDate publishedAt={viewModel.firstPublishedAt} />
         </section>
 
         {viewModel.ratingsUiEnabled ? (

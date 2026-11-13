@@ -1,3 +1,5 @@
+import { productFirstPublicationAt } from "@/lib/products/publication-dates";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   MUSIC_USAGE_PERMISSION,
   isMusicProductKind,
@@ -70,6 +72,8 @@ export function studioMusicConfigurationChanged(input: {
 
 export type AuthorStudioMusicListItem = {
   practiceId: string;
+  createdAt?: string | null;
+  firstPublishedAt?: string | null;
   title: string;
   slug: string;
   coverUrl: string | null;
@@ -193,6 +197,11 @@ export function mapPracticeToStudioMusicListItem(input: {
     music_usage_permission: string | null;
     studio_music_pricing_mode: string | null;
     studio_music_price_minor: number | null;
+    created_at?: string | null;
+    first_published_at?: string | null;
+    first_publication_date_unknown?: boolean;
+    scheduled_publish_at?: string | null;
+    published_at?: string | null;
     deleted_at?: string | null;
   };
   trackCount: number;
@@ -222,6 +231,12 @@ export function mapPracticeToStudioMusicListItem(input: {
 
   return {
     practiceId: p.id,
+    createdAt: p.created_at ?? null,
+    firstPublishedAt: isPracticePubliclyAvailable({
+      status: p.status,
+      scheduledPublishAt: p.scheduled_publish_at,
+      publishedAt: p.published_at,
+    }) ? productFirstPublicationAt(p) : null,
     title: p.title,
     slug: p.slug,
     coverUrl: p.cover_url,
