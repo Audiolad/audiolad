@@ -45,6 +45,7 @@ export default function ListenPageClient({
   coverImage,
   coverUpdatedAt,
   isAuthorPreview,
+  albumRadioEligible,
   promoConversionMode = false,
   isAuthenticated = false,
   guestProgressMode = false,
@@ -162,6 +163,7 @@ export default function ListenPageClient({
       coverImage,
       coverUpdatedAt,
       isAuthorPreview,
+      albumRadioEligible,
       requestAutoplay: autoplay,
       guestProgressMode,
       guestProgressMeta,
@@ -170,6 +172,7 @@ export default function ListenPageClient({
     });
   }, [
     activeCatalogPracticeId,
+    albumRadioEligible,
     activeQueue,
     activeRequestAutoplay,
     authorName,

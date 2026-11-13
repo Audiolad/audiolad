@@ -124,7 +124,9 @@ export async function selectAlbumRadio(input: {
     if (Date.now() > deadline) break;
     const result = await loadListenSessionPayload(supabase, product.authorSlug!, product.slug, userId, { forceStartAtBeginning: true });
     if (!result.ok || !isCatalogGlobalPlayerSession(result.session) || !isAlbumRadioAccessAllowed(result.session) || result.session.albumRadioEligible !== true || result.session.playbackMode === "preview") continue;
-    const tracks = result.session.tracks.filter((track) => !track.id.startsWith("legacy-") && !input.exclude.includes(track.id)).slice(0, 12);
+    // An author member's session also lists drafts: radio takes only published audio_items (t1437u).
+    const published = new Set((catalogTracks.get(product.id) ?? []).map((t) => t.id));
+    const tracks = result.session.tracks.filter((track) => (!result.session.isAuthorPreview || published.has(track.id)) && !track.id.startsWith("legacy-") && !input.exclude.includes(track.id)).slice(0, 12);
     const enriched = tracks.map((track) => ({ track, profile: trackProfile(track.id, product, track.description) }));
     for (const { track, profile } of enriched) {
       if (candidates.length >= 72) break;
