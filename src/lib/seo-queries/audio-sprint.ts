@@ -68,8 +68,8 @@ export const AUDIO_SPRINT_VKUS_ZHIZNI_DESCRIPTION =
   "Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в каталог. Музыка создаётся в разделе «Музыка», медитации – через «Продукт» → «Аудиопрактика».";
 export const AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT = "2026-11-30T00:00:00+03:00";
 export const AUDIO_SPRINT_VKUS_ZHIZNI_NAV_LABEL = "Аудиоспринт «Вкус жизни»";
-/** Queries at sprint start (approved list 13.11.2026, t1427u). */
-export const AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 266;
+/** Queries at sprint start (approved list 13.11.2026, t1427u; minus one, t1429u). */
+export const AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 265;
 
 const AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT_MS = Date.parse(
   AUDIO_SPRINT_VKUS_ZHIZNI_PROMO_ENDS_AT,

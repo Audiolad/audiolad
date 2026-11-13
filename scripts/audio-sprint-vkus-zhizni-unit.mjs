@@ -66,18 +66,18 @@ assert.doesNotMatch(decor, /https?:\/\/(?!www\.w3\.org)/);
 assert.doesNotMatch(decor, /<img|<image|url\(/);
 assert.equal((decor.match(/<svg/g) ?? []).length, (decor.match(/aria-hidden="true"/g) ?? []).length);
 
-// Approved list (t1427u): static page data, 266 = 140 music + 126 meditations, CTA to the cabinet sprint.
+// Approved list (t1427u): static page data, 265 = 139 music + 126 meditations (t1429u: one removed), CTA to the cabinet sprint.
 const queriesSrc = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/queries.ts"), "utf8");
 const listSrc = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/QueryList.tsx"), "utf8");
 const block = (name) => queriesSrc.split(`export const ${name}`)[1].split("];")[0];
 const musicItems = block("VKUS_ZHIZNI_MUSIC_QUERIES").match(/^  ".*",$/gm) ?? [];
 const voiceItems = block("VKUS_ZHIZNI_MEDITATION_QUERIES").match(/^  ".*",$/gm) ?? [];
-assert.equal(musicItems.length, 140);
+assert.equal(musicItems.length, 139);
 assert.equal(voiceItems.length, 126);
-assert.equal(new Set([...musicItems, ...voiceItems].map((s) => s.toLowerCase())).size, 266);
+assert.equal(new Set([...musicItems, ...voiceItems].map((s) => s.toLowerCase())).size, 265);
 assert.doesNotMatch(queriesSrc, /\u2014/);
 const sprintLib = readFileSync(path.join(root, "src/lib/seo-queries/audio-sprint.ts"), "utf8");
-assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 266;/);
+assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_QUERY_COUNT = 265;/);
 assert.match(sprintLib, /AUDIO_SPRINT_VKUS_ZHIZNI_SLUG = "vkus-zhizni-2026";/);
 assert.doesNotMatch(page, /Список готовится/);
 assert.match(page, /<VkusZhizniQueryList bookingHref=\{SPRINT_HREF\} \/>/);
@@ -97,6 +97,16 @@ assert.match(migration, /v_total <> 266 OR v_music <> 140 OR v_voice <> 126/);
 assert.doesNotMatch(migration, /osen-zvuchit|DELETE |DROP |TRUNCATE /i);
 assert.match(migration, /WHERE NOT EXISTS \(\n  SELECT 1\n  FROM public\.seo_sprint_queries AS other_sq/, "rows shared with another sprint stay unchanged");
 assert.equal((migration.match(/^  \('/gm) ?? []).length, 266);
+
+// t1429u: one query removed from the landing and the database.
+assert.ok(![...musicItems, ...voiceItems].some((s) => /бриля/i.test(s)), "removed query is not on the landing");
+const removal = readFileSync(path.join(root, "supabase/migrations/20270307120000_seo_sprint_vkus_zhizni_remove_bril.sql"), "utf8");
+assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)/);
+assert.match(removal, /seo_query_reservations WHERE query_id = v_query_id/);
+assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)\n[\s\S]*?FOR UPDATE;/, "query row is locked before the booking check");
+assert.match(removal, /v_total <> 265 OR v_music <> 139 OR v_voice <> 126/);
+assert.doesNotMatch(removal, /osen-zvuchit|DROP |TRUNCATE /i);
+assert.equal((removal.match(/DELETE FROM/g) ?? []).length, 2);
 
 // CTA leads to the real booking flow in the cabinet.
 assert.equal((page.match(/Выбрать поисковый запрос/g) ?? []).length, 1);
