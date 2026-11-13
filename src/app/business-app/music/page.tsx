@@ -6,17 +6,17 @@ import BusinessWorkspace from "@/components/business-app/workspace/BusinessWorks
 import { loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
 import { businessMusicRoute } from "@/lib/business-app/point-device";
 import { loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
-import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildNamedBusinessPageMetadata } from "@/lib/business-app/seo";
 import { loadWorkspacePage } from "@/lib/business-workspace/load.server";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...buildBusinessAppPageMetadata(),
-  title: "Музыка – АудиоЛад Бизнес",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildNamedBusinessPageMetadata(getHostnameFromHeaders(await headers()), "Музыка");
+}
 
 /**
  * The one music place in the cabinet: the venue player and the upcoming queue.

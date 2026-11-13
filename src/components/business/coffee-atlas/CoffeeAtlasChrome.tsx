@@ -28,7 +28,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
           </span>
           <span>
             Атлас звучания
-            <span className="atlas-header__brand-sub">АудиоЛад Кофейни</span>
+            <span className="atlas-header__brand-sub">АудиоЛад Кофейня</span>
           </span>
         </Link>
         <div className="atlas-header__actions">
@@ -43,7 +43,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
             Скачать PDF-атлас
           </CoffeeAtlasGoalLink>
           <Link href={BUSINESS_LANDING_PATH} className="atlas-header__back">
-            АудиоЛад Кофейни
+            АудиоЛад Кофейня
           </Link>
         </div>
       </div>
@@ -123,7 +123,7 @@ export function CoffeeAtlasFooter() {
       <div className="atlas-wrap">
         <p className="atlas-footer__disclaimer">{COFFEE_ATLAS_DISCLAIMER}</p>
         <p className="atlas-footer__links">
-          <Link href={BUSINESS_LANDING_PATH}>АудиоЛад Кофейни</Link>
+          <Link href={BUSINESS_LANDING_PATH}>АудиоЛад Кофейня</Link>
           {" · "}
           <Link href="/">АудиоЛад</Link>
           {" · "}

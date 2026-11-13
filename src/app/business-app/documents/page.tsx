@@ -301,5 +301,5 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
 }
 
 export async function generateMetadata() {
-  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/documents", "Документы – АудиоЛад Кофе", "Действующие документы и условия использования музыки в кофейне.");
+  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/documents", "Документы – АудиоЛад Кофейня", "Действующие документы и условия использования музыки в кофейне.");
 }

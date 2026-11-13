@@ -307,7 +307,7 @@ assert.equal(COFFEE_ATLAS_CTA_HREF, process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST
 }
 
 // --- offer on every page ---
-assert.equal(COFFEE_ATLAS_OFFER.title, "АудиоЛад Кофейни для вашей кофейни");
+assert.equal(COFFEE_ATLAS_OFFER.title, "АудиоЛад Кофейня для вашей кофейни");
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
 assert.equal(COFFEE_ATLAS_OFFER.trial, "7 дней в подарок");
 assert.equal(COFFEE_ATLAS_OFFER.afterTrial, "Далее 799 ₽ за 30 дней");
@@ -346,7 +346,7 @@ assert.match(
 );
 assert.ok(
   headerSource.indexOf("Скачать PDF-атлас") < headerSource.indexOf("atlas-header__back"),
-  "header pill sits next to the «АудиоЛад Кофейни» link",
+  "header pill sits next to the «АудиоЛад Кофейня» link",
 );
 assert.doesNotMatch(chrome, /CoffeeAtlasPdfActions/, "no shared PDF button group left");
 const PDF_BUTTON = /COFFEE_ATLAS_PDF_PATH|\.pdf\b|business_atlas_coffee_pdf_|Открыть PDF|Скачать PDF|PDF-атласе|Подарок:/;
@@ -362,20 +362,24 @@ assert.match(overview, /Начать путешествие/, "overview hero kee
 
 // --- industry offer name on the atlas (t1433u) ---
 assert.equal(
-  (headerSource.match(/АудиоЛад Кофейни/g) ?? []).length,
+  (headerSource.match(/АудиоЛад Кофейня/g) ?? []).length,
   2,
-  "header brand lockup and desktop back-link use «АудиоЛад Кофейни»",
+  "header brand lockup and desktop back-link use «АудиоЛад Кофейня»",
 );
-assert.match(restOfChrome, /<Link href=\{BUSINESS_LANDING_PATH\}>АудиоЛад Кофейни<\/Link>/, "footer link label");
+assert.match(restOfChrome, /<Link href=\{BUSINESS_LANDING_PATH\}>АудиоЛад Кофейня<\/Link>/, "footer link label");
 assert.doesNotMatch(chrome, /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
 assert.doesNotMatch(read("src/lib/business/coffee-atlas/constants.ts"), /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
 assert.doesNotMatch(read("src/lib/business/coffee-atlas/metadata.ts"), /АудиоЛад Бизнес|АУДИОЛАД БИЗНЕС|AudioLad Business/);
 assert.match(
   read("src/lib/business/coffee-atlas/metadata.ts"),
-  /– АудиоЛад Кофейни/,
+  /– АудиоЛад Кофейня/,
   "overview title/OG use the coffee industry name",
 );
 assert.match(read("src/lib/business/coffee-atlas/constants.ts"), /Атлас – вдохновляющий обзор для владельцев кофеен\. АудиоЛад не связан/);
+assert.doesNotMatch(chrome, /АудиоЛад Кофейни/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/constants.ts"), /АудиоЛад Кофейни/);
+assert.doesNotMatch(read("src/lib/business/coffee-atlas/metadata.ts"), /АудиоЛад Кофейни/);
+
 
 assert.match(shopView, /href="#listen"[\s\S]{0,80}Послушать атмосферу/, "shop hero keeps «Послушать атмосферу»");
 assert.match(shopView, /id="listen"/, "listen anchor exists");

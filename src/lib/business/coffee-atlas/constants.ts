@@ -33,7 +33,7 @@ export const COFFEE_ATLAS_CTA_HREF = coffeeStorefrontUrl();
 
 /** Offer printed at the bottom of every atlas page. */
 export const COFFEE_ATLAS_OFFER = {
-  title: "АудиоЛад Кофейни для вашей кофейни",
+  title: "АудиоЛад Кофейня для вашей кофейни",
   price: formatBusinessMonthlyPrice(),
   period: BUSINESS_PLAN_PERIOD_LABEL,
   trial: BUSINESS_GIFT_TITLE,

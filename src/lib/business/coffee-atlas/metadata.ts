@@ -12,7 +12,7 @@ import type { CoffeeAtlasShop } from "./shops";
 
 const SITE_NAME = "Аудиолад";
 
-export const COFFEE_ATLAS_META_TITLE = `${COFFEE_ATLAS_TITLE}: 10 кофеен, куда возвращаются – АудиоЛад Кофейни`;
+export const COFFEE_ATLAS_META_TITLE = `${COFFEE_ATLAS_TITLE}: 10 кофеен, куда возвращаются – АудиоЛад Кофейня`;
 
 export const COFFEE_ATLAS_META_DESCRIPTION =
   "Путешествие по 10 знаменитым кофейням мира: история, атмосфера, идеи для своей кофейни и то, как каждая из них могла бы звучать. Полный PDF-атлас в подарок.";

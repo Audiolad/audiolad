@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { useBusinessHostname, useBusinessDomain, useGuestStartEnabled } from "@/components/business-app/BusinessDomainProvider";
+import { getHostBrandName } from "@/lib/business-app/brand-icons";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
@@ -481,7 +482,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           openTestId="biz-player-open"
           closeTestId="biz-player-close"
           controlsPrefix="biz-player"
-          ariaLabel="Плеер АудиоЛад Бизнес"
+          ariaLabel={`Плеер ${getHostBrandName(hostname)}`}
         />
       ) : (
         <p className="business-app-muted text-sm" data-testid="biz-player" data-status={status}>

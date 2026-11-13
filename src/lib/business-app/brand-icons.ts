@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { isBusinessHostname } from "./host";
+import { isBusinessHostname, isCoffeeHostname } from "./host";
 
 /** Public prefix for business.audiolad.ru brand assets (leather lotus mark; see docs/business/brand-icons). */
 export const BUSINESS_BRAND_ASSET_PREFIX = "/business/brand/";
@@ -12,6 +12,12 @@ export const BUSINESS_BRAND_ASSET_PREFIX = "/business/brand/";
 export const BUSINESS_BRAND_ICON_VERSION = "leather1";
 
 export const BUSINESS_BRAND_NAME = "АудиоЛад Бизнес";
+
+export const COFFEE_BRAND_NAME = "АудиоЛад Кофейня";
+
+export function getHostBrandName(hostname: string): string {
+  return isCoffeeHostname(hostname) ? COFFEE_BRAND_NAME : BUSINESS_BRAND_NAME;
+}
 
 export function businessBrandAssetUrl(file: string): string {
   return `${BUSINESS_BRAND_ASSET_PREFIX}${file}?v=${BUSINESS_BRAND_ICON_VERSION}`;
@@ -71,10 +77,15 @@ export const BUSINESS_BRAND_METADATA: HostBrandMetadata = {
   },
 };
 
+/** coffee.audiolad.ru — same leather mark, own manifest name «АудиоЛад Кофейня». */
+export const COFFEE_BRAND_METADATA: HostBrandMetadata = {
+  manifest: businessBrandAssetUrl("manifest-coffee.webmanifest"),
+  icons: BUSINESS_BRAND_METADATA.icons,
+};
+
 export function getHostBrandMetadata(hostname: string): HostBrandMetadata {
-  return isBusinessHostname(hostname)
-    ? BUSINESS_BRAND_METADATA
-    : CLASSIC_BRAND_METADATA;
+  if (isCoffeeHostname(hostname)) return COFFEE_BRAND_METADATA;
+  return isBusinessHostname(hostname) ? BUSINESS_BRAND_METADATA : CLASSIC_BRAND_METADATA;
 }
 
 export function isBusinessBrandAssetPath(pathname: string): boolean {

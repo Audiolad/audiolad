@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import BusinessOwnerUnlockForm from "@/components/business-app/BusinessOwnerUnlockForm";
 import { BUSINESS_OWNER_UNLOCK_SECONDS, safeBusinessNextPath } from "@/lib/business-app/cabinet-mode";
 import { loadBusinessCabinetEmail, loadBusinessCabinetMode } from "@/lib/business-app/cabinet-mode.server";
-import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { buildNamedBusinessPageMetadata } from "@/lib/business-app/seo";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...buildBusinessAppPageMetadata(),
-  title: "Кабинет владельца – АудиоЛад Кофе",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildNamedBusinessPageMetadata(getHostnameFromHeaders(await headers()), "Кабинет владельца");
+}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

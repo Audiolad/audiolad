@@ -19,10 +19,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const hostname = getHostnameFromHeaders(await headers());
   return {
     ...buildBusinessAppMetadata(hostname),
-    title: "Звучание кофейни – АудиоЛад Бизнес",
-    description: "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Бизнес без регистрации.",
+    title: "Звучание кофейни – АудиоЛад Кофейня",
+    description: "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Кофейня без регистрации.",
     alternates: { canonical: BUSINESS_GUEST_COFFEE_URL },
-    ...buildCoffeePublicPageMetadata(hostname, "/", "Звучание кофейни – АудиоЛад Бизнес", "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Бизнес без регистрации."),
+    ...buildCoffeePublicPageMetadata(hostname, "/", "Звучание кофейни – АудиоЛад Кофейня", "Настройте звучание кофейни и послушайте подборки в кабинете АудиоЛад Кофейня без регистрации."),
   };
 }
 

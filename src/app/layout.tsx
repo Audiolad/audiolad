@@ -7,7 +7,7 @@ import BaseProviders from "@/components/providers/BaseProviders";
 import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
-import { getHostBrandMetadata } from "@/lib/business-app/brand-icons";
+import { getHostBrandMetadata, getHostBrandName } from "@/lib/business-app/brand-icons";
 import { isBusinessHostname } from "@/lib/business-app/host";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 import { getAppOriginUrl } from "@/lib/seo/app-origin";
@@ -45,13 +45,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const hostname = getHostnameFromHeaders(await headers());
   const brand = getHostBrandMetadata(hostname);
   if (isBusinessHostname(hostname)) {
+    const name = getHostBrandName(hostname);
     return {
       ...baseMetadata,
       ...brand,
-      applicationName: "АудиоЛад Бизнес",
+      applicationName: name,
       appleWebApp: {
         capable: true,
-        title: "АудиоЛад Бизнес",
+        title: name,
         statusBarStyle: "default",
       },
     };

@@ -38,6 +38,10 @@ export function isCoffeeHostRequest(headers: { get(name: string): string | null 
   return coffeeHostEnabled() && hostnameFromHeaders(headers) === COFFEE_HOSTNAME;
 }
 
+export function isCoffeeHostname(hostname: string): boolean {
+  return coffeeHostEnabled() && hostname === COFFEE_HOSTNAME;
+}
+
 export function isBusinessHostname(hostname: string): boolean {
   return hostname === BUSINESS_HOSTNAME || (coffeeHostEnabled() && hostname === COFFEE_HOSTNAME);
 }

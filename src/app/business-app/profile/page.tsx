@@ -9,7 +9,7 @@ import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import SignOutForm from "@/components/auth/SignOutForm";
 import ProfileHelpContact from "@/components/business-app/ProfileHelpContact";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
-import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { buildNamedBusinessPageMetadata } from "@/lib/business-app/seo";
 import BusinessProfileForm from "@/components/business-app/profile/BusinessProfileForm";
 import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
 import BusinessTimezoneForm from "@/components/business-app/profile/BusinessTimezoneForm";
@@ -22,11 +22,9 @@ import { requireBusinessCabinetPermission } from "@/lib/business-app/cabinet-mod
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...buildBusinessAppPageMetadata(),
-  title: "Профиль – АудиоЛад Бизнес",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildNamedBusinessPageMetadata(getHostnameFromHeaders(await headers()), "Профиль");
+}
 
 export default async function BusinessProfilePage() {
   // Not on the hall device without a fresh owner password, not in the preview (cabinet-mode.ts).
