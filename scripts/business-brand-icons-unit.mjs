@@ -244,7 +244,10 @@ const shell = readFileSync(join(root, "src/components/business-app/BusinessAppSh
 const css = readFileSync(join(root, "src/components/business-app/business-app.css"), "utf8");
 assert.equal(BUSINESS_BRAND_NAME, "АудиоЛад Бизнес");
 assert.match(lockup, /BUSINESS_BRAND_MARK_SRC/);
-assert.match(lockup, /BUSINESS_BRAND_NAME/);
+assert.match(lockup, /getHostBrandName/);
+assert.doesNotMatch(lockup, /BUSINESS_BRAND_NAME/);
+assert.match(lockup, /АудиоЛад Кофейня/);
+assert.match(lockup, /АудиоЛад Бизнес/);
 assert.match(lockup, /business-app-brand__mark/);
 assert.match(sidebar, /BusinessBrandLockup/);
 assert.doesNotMatch(sidebar, /Аудиолад<\/p>|АБ/);
