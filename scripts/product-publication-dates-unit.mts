@@ -20,11 +20,23 @@ assert.equal(productFirstPublicationAt({ ...scheduled, scheduled_publish_at: "20
 assert.equal(productFirstPublicationAt({ ...scheduled, first_publication_date_unknown: true }, now), null);
 assert.equal(productFirstPublicationAt({ ...scheduled, first_publication_date_unknown: undefined }, now), null);
 assert.equal(productFirstPublicationAt({ ...scheduled, first_published_at: "2026-11-01T00:00:00Z" }, now), "2026-11-01T00:00:00Z");
-// Wiring checks: the shared practice/music/course hero and both post layouts
-// must receive the same factual date, independent of SEO article templates.
+// Wiring checks: public date sits below FAQ / SEO sections and above the legal
+// footer, not under the hero. Both audio-post layouts share one trailing slot.
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-assert.match(read("src/components/products/practice-page/PracticePageContent.tsx"), /ProductPublicationDate publishedAt=\{viewModel.firstPublishedAt\}/);
-assert.equal((read("src/components/products/audio-post/AudioPostPage.tsx").match(/ProductPublicationDate publishedAt=/g) ?? []).length, 2);
+const practicePage = read("src/components/products/practice-page/PracticePageContent.tsx");
+const practiceDateAt = practicePage.indexOf("ProductPublicationDate publishedAt={viewModel.firstPublishedAt}");
+assert.ok(practiceDateAt > 0);
+assert.ok(practiceDateAt > practicePage.indexOf("PracticeSeoContentSections"));
+assert.ok(practiceDateAt < practicePage.indexOf("<LegalFooter"));
+assert.ok(practicePage.indexOf("data-practice-section=\"hero\"") < practiceDateAt);
+assert.doesNotMatch(practicePage, /PracticeProductHero[\s\S]{0,200}ProductPublicationDate/);
+const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
+assert.equal((audioPost.match(/ProductPublicationDate publishedAt=/g) ?? []).length, 1);
+const audioDateAt = audioPost.indexOf("ProductPublicationDate publishedAt={viewModel.firstPublishedAt}");
+assert.ok(audioDateAt > audioPost.indexOf("PracticeSeoContentSections"));
+assert.ok(audioDateAt < audioPost.lastIndexOf("<LegalFooter"));
+assert.doesNotMatch(audioPost, /AudioPostPlayer[\s\S]{0,250}ProductPublicationDate/);
+assert.doesNotMatch(audioPost, /featured-card__content[\s\S]{0,800}ProductPublicationDate/);
 assert.match(read("src/components/author-dashboard/AuthorDashboardClient.tsx"), /Создан \{createdDate\}/);
 assert.match(read("src/components/author-dashboard/AuthorDashboardClient.tsx"), /productIsPublic && firstPublicationDate/);
 assert.equal((read("src/components/author-dashboard/AuthorMusicClient.tsx").match(/<MusicProductDates item=/g) ?? []).length, 2);
