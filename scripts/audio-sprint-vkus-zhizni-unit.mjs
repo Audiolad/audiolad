@@ -58,6 +58,8 @@ assert.equal((page.match(/Каждый продукт – отдельный ш�
 // Hero stats follow the /osen-zvuchit format; the query count is one constant.
 assert.equal((page.match(/SPRINT_START_QUERY_COUNT/g) ?? []).length, 2);
 assert.doesNotMatch(page, /2 направления/);
+assert.match(page, /Музыка для расслабления, джаз для кофеен, музыка для отдыха и\s+приятных моментов жизни\./, "music card text (t1430u)");
+assert.doesNotMatch(page, /танго|при наличии всех|правами на музыку/, "no tango / music rights caveat (t1430u)");
 assert.match(page, /<GiftIcon tone=\{index\}/);
 
 // Decorations: inline SVG only, hidden from assistive tech.

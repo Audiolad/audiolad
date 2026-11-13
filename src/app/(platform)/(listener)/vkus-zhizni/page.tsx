@@ -269,10 +269,8 @@ export default function VkusZhizniPage() {
                 <h3 className="text-lg font-semibold text-[#25135c]">Музыка</h3>
               </div>
               <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
-                Джаз для кофеен, французские мелодии, аргентинское танго,
-                инструментальная музыка для отдыха и другие направления. Можно
-                использовать ранее созданную собственную музыку при наличии всех
-                необходимых прав.
+                Музыка для расслабления, джаз для кофеен, музыка для отдыха и
+                приятных моментов жизни.
               </p>
             </div>
             <div className={cardClassName}>
@@ -428,8 +426,7 @@ export default function VkusZhizniPage() {
             </h2>
             <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
               Действующие авторы АудиоЛада. Участие предполагает создание и
-              публикацию авторского аудиопродукта с необходимыми правами на музыку
-              и материалы.
+              публикацию авторского аудиопродукта.
             </p>
           </section>
           <section id="when" className={`${cardClassName} scroll-mt-24`} aria-labelledby="when-heading">
