@@ -37,7 +37,7 @@ type SignUpAuthClient = {
     signUp: (args: {
       email: string;
       password: string;
-      options?: { data?: Record<string, string>; emailRedirectTo?: string };
+      options?: { data?: Record<string, string | boolean>; emailRedirectTo?: string };
     }) => Promise<{
       data: {
         user: { id?: string | null; email?: string | null } | null;
@@ -203,6 +203,7 @@ export async function signUpAction(
     options: {
       ...(coffee ? { emailRedirectTo: `${COFFEE_ORIGIN}/auth/callback?${new URLSearchParams({ next: destination })}` } : {}),
       data: {
+        business_password_saved: true,
         first_name: firstName,
         last_name: lastName,
         full_name: `${firstName} ${lastName}`.trim(),

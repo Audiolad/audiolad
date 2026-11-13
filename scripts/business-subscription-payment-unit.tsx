@@ -129,10 +129,12 @@ assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-te
 }
 const accepted = card({ ...ownerDomain, offerAccepted: true }, grace);
 assert.doesNotMatch(accepted, /biz-home-receipt-email/, "account with email: no receipt field");
-const guestStart = card({ ...ownerDomain, offerAccepted: true, needsReceiptEmail: true }, grace);
+const guestStart = card({ ...ownerDomain, offerAccepted: true, needsReceiptEmail: true, isAnonymousOwner: true }, grace);
 assert.match(guestStart, /data-testid="biz-home-receipt-email-input"/);
 assert.match(guestStart, /type="email"/);
 assert.match(guestStart, /Почта для чека/);
+assert.match(guestStart, /Эта почта станет почтой для входа в кабинет/);
+assert.doesNotMatch(accepted, /Эта почта станет почтой для входа в кабинет/);
 assert.match(guestStart, /В аккаунте нет почты\. Укажите, куда прислать чек об оплате\./);
 assert.ok(guestStart.indexOf("biz-home-receipt-email") < guestStart.indexOf("biz-home-pay-button"), "email before pay");
 assert.doesNotMatch(guestStart, /—/);
@@ -188,7 +190,7 @@ assert.doesNotMatch(checkoutSource, /console\.error\([^)]*rememberEmail/, "no em
   assert.match(actions, /export async function saveBusinessReceiptEmail/);
   assert.match(actions, /updateUser\(\{ data: \{ \[BUSINESS_RECEIPT_EMAIL_META_KEY\]: receiptEmail \} \}\)/);
   const page = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
-  assert.match(page, /domain\.needsReceiptEmail \? \(\s*<BusinessReceiptEmailForm receiptEmail=\{domain\.savedReceiptEmail \?\? null\} \/>/);
+  assert.match(page, /domain\.needsReceiptEmail \? \(\s*<BusinessReceiptEmailForm receiptEmail=\{domain\.savedReceiptEmail \?\? null\} anonymous=\{user\?\.is_anonymous === true\} \/>/);
   assert.match(page, /Сюда же приходят чеки об оплате\./);
 }
 assert.match(checkoutSource, /error: "receipt_email_required" \}, \{ status: 400 \}/);
@@ -305,6 +307,7 @@ try {
             : "https://coffee.audiolad.ru/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet%3Fsite%3Dcoffee";
           assert.deepEqual(actual, {
             ...legacy,
+            description: legacy.description.replaceAll("АудиоЛад Бизнес", "АудиоЛад Кофейня"),
             actionHref: view === "processing" ? null : target,
             secondaryHref: view === "processing" ? target : null,
           });

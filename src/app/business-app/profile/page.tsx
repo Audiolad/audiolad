@@ -1,3 +1,5 @@
+import BusinessLoginAccess from "@/components/business-app/profile/BusinessLoginAccess";
+import { businessPasswordState } from "@/lib/business-app/login-access";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -70,6 +72,9 @@ export default async function BusinessProfilePage() {
             <BusinessOwnerSurnamePrompt />
           </div>
         )}
+        {user && domain.status === "authenticated" && domain.canPay ? (
+          <BusinessLoginAccess email={email} anonymous={user.is_anonymous === true} savedEmail={domain.savedReceiptEmail ?? null} passwordState={businessPasswordState(user)} />
+        ) : null}
         <section className="business-app-card space-y-3">
           <BusinessProfileForm ownerName={ownerName} ownerSurname={ownerSurname} organizationName={domain.organizationId ? (domain.organizationName ?? "") : null} canEditOrganization={membership?.role === "owner"} />
           <dl className="space-y-2 text-sm">
@@ -110,8 +115,9 @@ export default async function BusinessProfilePage() {
             <BusinessTimezoneForm timezone={domain.location.timezone || "Europe/Moscow"}
               currentLabel={businessTimezoneLabel(domain.location.timezone || "Europe/Moscow")} />
           ) : null}
-          {domain.status === "authenticated" && domain.needsReceiptEmail ? (
-            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
+          {/* t1442u: an anonymous owner saves this address in «Вход в кабинет» above. */}
+          {domain.status === "authenticated" && domain.needsReceiptEmail && user?.is_anonymous !== true ? (
+            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} anonymous={user?.is_anonymous === true} />
           ) : null}
           {domain.location ? null : (
             <p>
@@ -124,7 +130,7 @@ export default async function BusinessProfilePage() {
             showPaymentHistory={membership?.role === "owner"} />
           {/* t1352u: «Выйти» in the bottom-right corner of this card, away from «История оплат». */}
           <div className="flex justify-end pt-3" data-testid="biz-profile-sign-out">
-            <SignOutForm action={signOut}>
+            <SignOutForm action={signOut} anonymousWarning={user?.is_anonymous === true} saveAccessHref="/profile#biz-profile-login">
               <button type="submit" className="business-app-btn business-app-btn-secondary business-app-focus-ring">
                 Выйти
               </button>

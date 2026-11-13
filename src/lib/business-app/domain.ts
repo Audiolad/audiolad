@@ -56,6 +56,7 @@ export type BusinessOwnerHomeContext =
       offerNewEditionPending?: boolean;
       /** Owner account without email (guest start): payment asks for an email for the receipt. */
       needsReceiptEmail?: boolean;
+      isAnonymousOwner?: boolean;
       /** The receipt email remembered from the last payment (t1343u); prefilled, still editable. */
       savedReceiptEmail?: string | null;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
@@ -132,6 +133,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       canPay,
       offerAccepted,
       offerNewEditionPending,
+      isAnonymousOwner: user.is_anonymous === true,
       needsReceiptEmail,
       savedReceiptEmail,
       signals: null,
@@ -191,6 +193,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       canPay,
       offerAccepted,
       offerNewEditionPending,
+      isAnonymousOwner: user.is_anonymous === true,
       needsReceiptEmail,
       savedReceiptEmail,
       signals,
@@ -229,6 +232,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     canPay,
     offerAccepted,
     offerNewEditionPending,
+    isAnonymousOwner: user.is_anonymous === true,
     needsReceiptEmail,
     savedReceiptEmail,
     location: {

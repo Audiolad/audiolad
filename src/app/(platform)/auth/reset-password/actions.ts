@@ -95,6 +95,7 @@ export async function resetPasswordAction(input: {
 
   const { error } = await supabase.auth.updateUser({
     password: input.password,
+    data: { business_password_saved: true },
   });
 
   if (error) {

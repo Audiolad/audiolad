@@ -1,5 +1,7 @@
 "use client";
 
+import AnonymousSessionNotice from "@/components/auth/AnonymousSessionNotice";
+import BusinessEmailCodeSignIn from "@/components/auth/BusinessEmailCodeSignIn";
 import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { BUSINESS_REGISTERED_NOTE, COFFEE_SIGN_IN_INTRO } from "@/lib/access-grants/copy";
@@ -135,6 +137,10 @@ function SignInForm() {
             {PASSWORD_RESET_SUCCESS_MESSAGE}
           </div>
         )}
+
+        <AnonymousSessionNotice coffee={coffee} />
+
+        {coffee || isBusinessTrialNext(searchParams.get("next")) || searchParams.get("next")?.startsWith("/auth/business-cabinet") ? <BusinessEmailCodeSignIn coffee={coffee} next={searchParams.get("next")} /> : null}
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <label className="block">

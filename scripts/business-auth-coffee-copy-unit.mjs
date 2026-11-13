@@ -22,7 +22,8 @@ assert.ok(signUp.includes('? "Хочу получать новости Ауди�
 assert.ok(signUp.includes(': "Хочу получать новости АудиоЛада, рекомендации практик'), "sign-up listener marketing kept");
 assert.doesNotMatch(signUp, /\u2014/, "sign-up no em dash");
 assert.doesNotMatch(signUp, /Фамилия\s-\sнеобязательно/, "sign-up no hyphen-minus in optional surname");
-assert.match(signUp, /Фамилия – необязательно/, "sign-up en dash in optional surname");
+assert.match(signUp, /<span className="text-sm font-medium">Фамилия<\/span>/, "sign-up required surname label");
+assert.doesNotMatch(signUp, /Фамилия – необязательно/, "surname is required in the current form");
 
 assert.match(signIn, /coffee \? "АудиоЛад Кофейня" : "АудиоЛад"/, "sign-in brand");
 assert.match(signIn, /coffee \? COFFEE_SIGN_IN_INTRO/, "sign-in coffee intro");
@@ -41,4 +42,9 @@ assert.ok(!proxy.includes("COFFEE_ALLOWED_LEGAL_PATHS"), "privacy no longer pass
 const host = readFileSync(join(root, "src/lib/business-app/host.ts"), "utf8");
 assert.ok(host.includes('"/privacy": `${BUSINESS_SITE_PATH}/documents/privacy`'), "privacy is a public Business document rewrite");
 
+const emailCode = readFileSync(join(root, "src/components/auth/BusinessEmailCodeSignIn.tsx"), "utf8");
+assert.match(signIn, /<BusinessEmailCodeSignIn coffee=\{coffee\}/, "coffee offers code sign-in");
+assert.match(emailCode, /Начинали без регистрации\?/, "guest hint");
+assert.match(emailCode, /Войти по коду из письма/, "code flow entry");
+assert.doesNotMatch(emailCode, /АудиоЛад Бизнес|\u2014/);
 console.log("business-auth-coffee-copy-unit: ok");

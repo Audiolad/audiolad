@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { RECEIPT_EMAIL_TAKEN_MESSAGE } from "@/lib/business-app/login-access";
+import { BusinessEmailTakenActions } from "@/components/business-app/profile/BusinessEmailTakenActions";
 import { useId, useState } from "react";
 
 import { BusinessOfferDocumentLink } from "@/components/business-app/BusinessOfferDocumentLink";
@@ -70,9 +72,13 @@ export function useBusinessHomePay() {
   const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
-  const [askReceiptEmail, setAskReceiptEmail] = useState(
-    domain.status === "authenticated" && Boolean(domain.needsReceiptEmail),
-  );
+  const needsReceiptEmail = domain.status === "authenticated" && Boolean(domain.needsReceiptEmail);
+  const [askReceiptEmail, setAskReceiptEmail] = useState(needsReceiptEmail);
+  const [receiptRequirementSource, setReceiptRequirementSource] = useState(needsReceiptEmail);
+  if (receiptRequirementSource !== needsReceiptEmail) {
+    setReceiptRequirementSource(needsReceiptEmail);
+    setAskReceiptEmail(needsReceiptEmail);
+  }
   // t1343u: the email remembered from the last payment is prefilled and stays editable.
   const savedReceiptEmail = domain.status === "authenticated" ? (domain.savedReceiptEmail ?? "") : "";
   const [receiptEmail, setReceiptEmailState] = useState(savedReceiptEmail);
@@ -84,7 +90,7 @@ export function useBusinessHomePay() {
   }
   const setReceiptEmail = (value: string) => {
     setReceiptEmailState(value);
-    if (error?.code === "receipt_email_required") setError(null);
+    if (error?.code === "receipt_email_required" || error?.code === "receipt_email_taken") setError(null);
   };
 
   const accept = async () => {
@@ -344,13 +350,13 @@ export function BusinessOfferAcceptedStepNote() {
 }
 
 /**
- * Guest-start accounts have no email; the receipt still needs one. The address is remembered
- * after the payment link is created (user_metadata.receipt_email, t1343u) and shown in the profile.
+ * Anonymous owners link this address to their existing account before checkout.
  */
 export function BusinessReceiptEmailField({ control, busy }: { control: NonNullable<ReceiptEmailControl>; busy: boolean }) {
   const id = useId();
   const domain = useBusinessDomain();
   const saved = domain.status === "authenticated" ? (domain.savedReceiptEmail ?? "") : "";
+  const anonymous = domain.status === "authenticated" && domain.isAnonymousOwner === true;
   const remembered = Boolean(saved) && normalizeBusinessReceiptEmail(control.value) === saved;
   return (
     <div className="space-y-1" data-testid="biz-home-receipt-email">
@@ -370,6 +376,7 @@ export function BusinessReceiptEmailField({ control, busy }: { control: NonNulla
         aria-describedby={`${id}-hint`}
         data-testid="biz-home-receipt-email-input"
       />
+      {anonymous ? <p className="text-sm">Эта почта станет почтой для входа в кабинет.</p> : null}
       <p id={`${id}-hint`} className="text-sm leading-6 text-[var(--biz-text-muted)]">
         {remembered
           ? "Чек придёт на эту почту. Изменить её можно здесь или в профиле."
@@ -490,6 +497,23 @@ export function BusinessEarlyPayCarryoverNote({
 }
 
 export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; acceptAnchorId: string }) {
+  if (error.code === "receipt_email_taken") {
+    return <div role="alert" data-testid="biz-home-pay-error">
+      <p>{RECEIPT_EMAIL_TAKEN_MESSAGE}</p>
+      <BusinessEmailTakenActions onChange={(button) => {
+        // Find this payment block's field, even when several blocks are on the page.
+        let container: HTMLElement | null = button.parentElement;
+        while (container) {
+          const field = container.querySelector<HTMLInputElement>('[data-testid="biz-home-receipt-email-input"]');
+          if (field) { field.focus(); return; }
+          container = container.parentElement;
+        }
+      }} />
+    </div>;
+  }
+  if (error.code === "login_email_failed") {
+    return <p role="alert" data-testid="biz-home-pay-error">Не удалось сохранить почту для входа. Попробуйте оплатить ещё раз или <Link href="/profile#biz-profile-login" className="underline">сохраните почту в профиле</Link>.</p>;
+  }
   if (error.code === "offer_acceptance_required") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">

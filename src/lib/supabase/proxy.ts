@@ -225,7 +225,7 @@ async function updateSessionInner(
     );
   }
 
-  if (authenticatedUser && isAuthEntryRoute(pathname)) {
+  if (authenticatedUser && !authenticatedUser.is_anonymous && isAuthEntryRoute(pathname)) {
     const destination = getSafeNextPath(
       request.nextUrl.searchParams.get("next"),
       isCoffeeHostRequest(request.headers) ? "/cabinet" : undefined,

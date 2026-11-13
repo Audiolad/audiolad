@@ -488,8 +488,8 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
           requestHeaders: async () => new Headers({ host }),
           createClient: async () => ({
             auth: {
-              signUp: async (args: { options?: { data?: Record<string, string>; emailRedirectTo?: string } }) => {
-                box.trial = args.options?.data?.business_trial;
+              signUp: async (args: { options?: { data?: Record<string, string | boolean>; emailRedirectTo?: string } }) => {
+                box.trial = args.options?.data?.business_trial as string | undefined;
                 box.emailRedirectTo = args.options?.emailRedirectTo;
                 return {
                   data: { user: authError ? null : { id: USER_A }, session: null },
