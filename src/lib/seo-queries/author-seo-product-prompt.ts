@@ -153,7 +153,7 @@ SEO-запросы определяют поисковую тему и форм�
 
 SEO-запросы вплетай в описание естественно вокруг реального содержания продукта.
 
-Не копируй большой исходный текст дословно — сделай компактное описание около 950 символов.
+Не копируй большой исходный текст дословно – сделай компактное описание около 950 символов.
 
 Напиши цельный, естественный и полезный текст.
 
@@ -686,11 +686,39 @@ export function getAuthorSeoProductSourceGuidance(
   };
 }
 
+const TITLE_SECTION_START = "1. НАЗВАНИЕ ПРОДУКТА\n\n";
+const TITLE_SECTION_END = "2. ПОДНАЗВАНИЕ";
+
+/**
+ * Title section for an AudioSprint booking: the product title is locked to the booked query
+ * (AudioSprintTitleLock), so the prompt asks to keep it exactly (t1440u).
+ */
+export const AUTHOR_SEO_PROMPT_EXACT_TITLE_SECTION = `${TITLE_SECTION_START}Название продукта уже определено: оно точно совпадает с основным SEO-запросом.
+
+В ответе в блоке «Название» приведи основной SEO-запрос дословно, без изменений и дополнений:
+
+{{SEO_QUERY}}
+
+Остальные тексты строй вокруг этого названия.
+
+`;
+
+function applyExactTitleSection(template: string): string {
+  const start = template.indexOf(TITLE_SECTION_START);
+  const end = template.indexOf(TITLE_SECTION_END);
+  if (start < 0 || end <= start) {
+    throw new Error("seo_prompt_title_section_missing");
+  }
+  return template.slice(0, start) + AUTHOR_SEO_PROMPT_EXACT_TITLE_SECTION + template.slice(end);
+}
+
 export function buildAuthorSeoProductPrompt(input: {
   seoQuery: string;
   productType: string;
   relatedQueries: string[];
   productSource: string;
+  /** AudioSprint booking: the title must equal the booked query exactly. */
+  exactTitle?: boolean;
 }): string {
   const seoQuery = input.seoQuery.trim();
   const productType = input.productType.trim();
@@ -701,7 +729,11 @@ export function buildAuthorSeoProductPrompt(input: {
     throw new Error("seo_prompt_missing_product_type");
   }
 
-  return AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE
+  const template = input.exactTitle
+    ? applyExactTitleSection(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE)
+    : AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE;
+
+  return template
     .replaceAll("{{SEO_QUERY}}", seoQuery)
     .replaceAll("{{PRODUCT_TYPE}}", productType)
     .replaceAll("{{RELATED_QUERIES}}", formatRelatedQueriesForPrompt(input.relatedQueries))
