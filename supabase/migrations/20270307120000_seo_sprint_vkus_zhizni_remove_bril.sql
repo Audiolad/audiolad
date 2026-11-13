@@ -18,7 +18,11 @@ BEGIN
   SELECT id INTO v_sprint_id FROM public.seo_sprints WHERE slug = 'vkus-zhizni-2026';
   SELECT id INTO v_query_id
   FROM public.seo_queries
-  WHERE normalized_query = public.normalize_seo_query('ансамбль современного джаза игоря бриля');
+  WHERE normalized_query = public.normalize_seo_query('ансамбль современного джаза игоря бриля')
+  -- Row lock held until COMMIT: reserve_seo_query locks the same row, and any new
+  -- reservation/product row takes FOR KEY SHARE on it through its FK, so nothing can be
+  -- attached between the check below and the DELETE (no silent cascade of a booking).
+  FOR UPDATE;
 
   IF v_sprint_id IS NOT NULL AND v_query_id IS NOT NULL THEN
     IF EXISTS (SELECT 1 FROM public.seo_query_reservations WHERE query_id = v_query_id)

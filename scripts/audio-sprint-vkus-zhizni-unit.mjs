@@ -103,6 +103,7 @@ assert.ok(![...musicItems, ...voiceItems].some((s) => /бриля/i.test(s)), "r
 const removal = readFileSync(path.join(root, "supabase/migrations/20270307120000_seo_sprint_vkus_zhizni_remove_bril.sql"), "utf8");
 assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)/);
 assert.match(removal, /seo_query_reservations WHERE query_id = v_query_id/);
+assert.match(removal, /normalize_seo_query\('ансамбль современного джаза игоря бриля'\)\n[\s\S]*?FOR UPDATE;/, "query row is locked before the booking check");
 assert.match(removal, /v_total <> 265 OR v_music <> 139 OR v_voice <> 126/);
 assert.doesNotMatch(removal, /osen-zvuchit|DROP |TRUNCATE /i);
 assert.equal((removal.match(/DELETE FROM/g) ?? []).length, 2);
