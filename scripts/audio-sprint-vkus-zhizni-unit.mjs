@@ -169,4 +169,12 @@ const sprintClient = readFileSync(path.join(root, "src/components/author-dashboa
 assert.match(sprintClient, /<AuthorSeoPromptBuilder\s+primaryQueryText=\{item\.queryText\}\s+primaryQueryId=\{item\.id\}\s+analyzedOpportunities=\{related\}\s+exactTitle\s*\/>/);
 assert.doesNotMatch(sprintClient, /osen-zvuchit-2026|AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG &&[^\n]*AuthorSeoPromptBuilder/);
 
+// t1441u: «Условия участия» use the /osen-zvuchit exact-title condition.
+const exactTitleCondition = '"название продукта точно совпадает с выбранным поисковым запросом;"';
+assert.ok(osenPage.includes(exactTitleCondition), "osen exact-title condition");
+const vkusConditions = page.split("const conditions = [")[1].split("];")[0];
+assert.ok(vkusConditions.includes(exactTitleCondition), "vkus exact-title condition");
+assert.doesNotMatch(page, /продукт отвечает выбранному поисковому запросу/);
+assert.equal((vkusConditions.match(/^  ".*",$/gm) ?? []).length, 4, "four conditions");
+
 console.log("audio-sprint-vkus-zhizni-unit: ok");
