@@ -127,9 +127,11 @@ test('only natural end of complete album can start radio', () => {
   for (const patch of [ { naturalEnd: false }, { enabled: false }, { repeatMode: 'one' }, { repeatMode: 'all' }, { queue: {} }, { seed: null } ]) {
     assert.equal(canStartAlbumRadio({ ...start, ...patch }), false);
   }
-  for (const patch of [{ tracks: [{ id: 'b' }] }, { practiceId: 'practice' }, { sourceType: 'private_audio' }, { playbackMode: 'preview' }, { isAuthorPreview: true }]) {
+  for (const patch of [{ tracks: [{ id: 'b' }] }, { practiceId: 'practice' }, { sourceType: 'private_audio' }, { playbackMode: 'preview' }, { isAuthorPreview: true }, { isAuthorPreview: true, albumRadioEligible: false }]) {
     assert.equal(canStartAlbumRadio({ ...start, session: { ...session, ...patch } }), false);
   }
+  // t1437u: an author member signed in on desktop hears their own published, listed album.
+  assert.equal(canStartAlbumRadio({ ...start, session: { ...session, isAuthorPreview: true, albumRadioEligible: true } }), true);
 });
 test('preference persists, notifies same tab and follows other tabs', () => {
   const data = new Map(); const events = new Map();

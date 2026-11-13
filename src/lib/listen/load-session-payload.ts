@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
+import { resolveAlbumRadioEligible } from "@/lib/listen/album-radio-eligibility";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { resolvePlaybackNavigationPolicy } from "@/lib/listen/playback-navigation";
 import {
@@ -21,7 +22,6 @@ import { isCoursePublication } from "@/lib/course-content/validators";
 import { shouldApplyEntitledPublishedAudioFilter } from "@/lib/listen/course-audio-status";
 import {
   canAccessCourseContent,
-  isPracticeCatalogListed,
   resolveProductAccess,
 } from "@/lib/products/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -346,6 +346,7 @@ export async function loadListenSessionPayload(
       }
     }
 
+    const albumRadioEligible = await resolveAlbumRadioEligible(supabase, practiceRow, access.mode);
     const playbackNavigation = resolvePlaybackNavigationPolicy(
       practiceRow.product_kind,
     );
@@ -365,9 +366,7 @@ export async function loadListenSessionPayload(
       ok: true,
       session: {
         practiceId: practiceRow.id,
-        albumRadioEligible: practiceRow.product_kind === "music" &&
-          (practiceRow.publication_class == null || practiceRow.publication_class === "release") && !practiceRow.deleted_at &&
-          isPracticeCatalogListed(practiceRow),
+        albumRadioEligible,
         authorSlug: resolvedAuthorSlug,
         productSlug: practiceRow.slug,
         practiceTitle: practiceRow.title,

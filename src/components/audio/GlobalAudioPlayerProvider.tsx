@@ -91,7 +91,7 @@ import {
 } from "@/lib/listen/repeat-mode";
 
 import {
-  canStartAlbumRadio, readAlbumRadioEnabled, writeAlbumRadioEnabled, subscribeAlbumRadioEnabled,
+  canStartAlbumRadio, isAlbumRadioAccessAllowed, readAlbumRadioEnabled, writeAlbumRadioEnabled, subscribeAlbumRadioEnabled,
 } from "@/lib/listen/album-radio-preference.mjs";
 
 export const GLOBAL_MINI_PLAYER_HEIGHT_PX = 72;
@@ -1542,7 +1542,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (activeQueue && activeQueue.source.kind !== "album_radio") return;
-    if (!session || !isCatalogGlobalPlayerSession(session) || session.isAuthorPreview || session.playbackMode === "preview" || session.albumRadioEligible === false) {
+    if (!session || !isCatalogGlobalPlayerSession(session) || !isAlbumRadioAccessAllowed(session) || session.playbackMode === "preview" || session.albumRadioEligible === false) {
       radioSeedRef.current = null;
       return;
     }

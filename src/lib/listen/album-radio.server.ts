@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPublishedCatalogProducts, type CatalogProduct } from "@/lib/products/catalog";
 import { loadListenSessionPayload } from "@/lib/listen/load-session-payload";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { isAlbumRadioAccessAllowed } from "@/lib/listen/album-radio-preference.mjs";
 import { chunkIds } from "@/lib/supabase/chunk";
 import {
   aggregateRadioProfile, metadataProfile, passportProfile, radioSimilarity, rankRadioCandidates,
@@ -80,7 +81,7 @@ export async function selectAlbumRadio(input: {
   const album = products.find((p) => p.authorSlug === input.author && p.slug === input.slug);
   if (!album) return null;
   const loaded = await loadListenSessionPayload(supabase, input.author, input.slug, userId, { forceStartAtBeginning: true });
-  if (!loaded.ok || !isCatalogGlobalPlayerSession(loaded.session) || loaded.session.isAuthorPreview) return null;
+  if (!loaded.ok || !isCatalogGlobalPlayerSession(loaded.session) || !isAlbumRadioAccessAllowed(loaded.session)) return null;
   if (input.enabled === false) return { title: album.title, trackIds: loaded.session.tracks.map((track) => track.id), entries: [] };
   const lastTrack = loaded.session.tracks.at(-1);
   if (!lastTrack) return null;
@@ -122,8 +123,10 @@ export async function selectAlbumRadio(input: {
   for (const product of [...ordered, ...remaining].slice(0, 24)) {
     if (Date.now() > deadline) break;
     const result = await loadListenSessionPayload(supabase, product.authorSlug!, product.slug, userId, { forceStartAtBeginning: true });
-    if (!result.ok || !isCatalogGlobalPlayerSession(result.session) || result.session.isAuthorPreview || result.session.albumRadioEligible !== true || result.session.playbackMode === "preview") continue;
-    const tracks = result.session.tracks.filter((track) => !track.id.startsWith("legacy-") && !input.exclude.includes(track.id)).slice(0, 12);
+    if (!result.ok || !isCatalogGlobalPlayerSession(result.session) || !isAlbumRadioAccessAllowed(result.session) || result.session.albumRadioEligible !== true || result.session.playbackMode === "preview") continue;
+    // An author member's session also lists drafts: radio takes only published audio_items (t1437u).
+    const published = new Set((catalogTracks.get(product.id) ?? []).map((t) => t.id));
+    const tracks = result.session.tracks.filter((track) => (!result.session.isAuthorPreview || published.has(track.id)) && !track.id.startsWith("legacy-") && !input.exclude.includes(track.id)).slice(0, 12);
     const enriched = tracks.map((track) => ({ track, profile: trackProfile(track.id, product, track.description) }));
     for (const { track, profile } of enriched) {
       if (candidates.length >= 72) break;

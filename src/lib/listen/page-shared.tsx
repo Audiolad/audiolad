@@ -51,6 +51,7 @@ import { buildPracticePublicPath } from "@/lib/products/paths";
 import { resolvePublicListeningNotice } from "@/lib/products/listening-notice";
 import { resolveLibraryAction } from "@/lib/products/practice-access-ui";
 import { createClient } from "@/lib/supabase/server";
+import { resolveAlbumRadioEligible } from "@/lib/listen/album-radio-eligibility";
 
 type PracticeRow = PublicPracticeRow & {
   use_shared_cover?: boolean | null;
@@ -398,6 +399,9 @@ export async function renderListenPage(
       use_shared_cover,
       updated_at,
       status,
+      deleted_at,
+      published_at,
+      scheduled_publish_at,
       is_free,
       is_catalog_listed,
       catalog_visibility,
@@ -624,6 +628,8 @@ export async function renderListenPage(
   ]);
   const initialSidebarPinned = readListenerSidebarPinnedState(cookieStore);
   const isAuthorPreview = access.mode === "author_preview";
+  // Same server rule as the listen payload API: a direct /listen open (author included) can seed radio.
+  const albumRadioEligible = await resolveAlbumRadioEligible(supabase, practiceRow, access.mode);
   const libraryAction = resolveLibraryAction({
     access: productAccess,
     practice: practiceRow,
@@ -647,6 +653,7 @@ export async function renderListenPage(
     coverImage,
     coverUpdatedAt,
     isAuthorPreview,
+    albumRadioEligible,
     guestProgressMode,
     guestProgressMeta: guestProgressMode
       ? { practiceSlug: practiceRow.slug }
@@ -692,6 +699,7 @@ export async function renderListenPage(
           coverImage={coverImage}
           coverUpdatedAt={coverUpdatedAt}
           isAuthorPreview={isAuthorPreview}
+          albumRadioEligible={albumRadioEligible}
           autoplay={options?.autoplay === true}
           promoConversionMode={promoConversionMode}
           isAuthenticated={isAuthenticated}

@@ -1,5 +1,6 @@
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { isAlbumRadioAccessAllowed } from "@/lib/listen/album-radio-preference.mjs";
 import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session";
 import {
   getQueueEntryListenSlugs,
@@ -67,7 +68,7 @@ export async function resolvePlaylistQueueEntrySession(
 
   if (listen.ok) {
     if (entry.kind === "audio_item" && entry.fullOnly &&
-        (listen.session.albumRadioEligible !== true || listen.session.playbackMode === "preview" || listen.session.isAuthorPreview)) {
+        (listen.session.albumRadioEligible !== true || listen.session.playbackMode === "preview" || !isAlbumRadioAccessAllowed(listen.session))) {
       return { ok: false, reason: "unavailable" };
     }
     const filtered = applyQueueEntryTrackFilter(listen.session, entry);
