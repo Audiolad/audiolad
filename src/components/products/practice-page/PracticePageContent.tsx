@@ -56,7 +56,6 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
         <section className="mt-6 min-w-0" data-practice-section="hero">
           <PracticeProductHero viewModel={viewModel} />
-          <ProductPublicationDate publishedAt={viewModel.firstPublishedAt} />
         </section>
 
         {viewModel.ratingsUiEnabled ? (
@@ -135,6 +134,8 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
             <ListeningNoticeCard notice={listeningNotice} variant="light" />
           </div>
         ) : null}
+
+        <ProductPublicationDate publishedAt={viewModel.firstPublishedAt} />
 
         <div data-practice-section="footer">
           <LegalFooter className="mt-8 xl:mt-10" />
