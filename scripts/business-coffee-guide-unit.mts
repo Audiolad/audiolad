@@ -169,6 +169,17 @@ const RETSEPTY_8D10_RELATED = [
   { phrase: "глясе рецепт для кофейни", frequency: 22 },
   { phrase: "мокачино рецепт для кофейни", frequency: 19 },
 ];
+// Core 8d10fcfc, t1432u (13.11.2026): the milk cluster C031 extends the live milk article instead of a new URL.
+const MOLOKO_8D10_RELATED = [
+  { phrase: "молоко для кофеен", frequency: 993 },
+  { phrase: "молоко для кофейни", frequency: 744 },
+  { phrase: "кофе и молоко кофейня", frequency: 179 },
+  { phrase: "молоко оптом для кофейни", frequency: 86 },
+  { phrase: "поставщик молока для кофейни", frequency: 73 },
+  { phrase: "купить молоко для кофейни", frequency: 31 },
+  { phrase: "чем взбивают молоко для кофе в кофейнях", frequency: 19 },
+  { phrase: "дозатор молока для кофейни", frequency: 5 },
+];
 // R1 (t1395u): the exact ТР ТС 021/2011 term «критические контрольные точки» is allowed in the ХАССП article only.
 const withoutHaccpTerm = (slug: string, text: string) => slug === "hassp-dlya-kofeyni" ? text.replace(/критическ\p{L}* контрольн\p{L}* точк\p{L}*/giu, "") : text;
 const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS, ...SET_03_SLUGS, ...SET_04_SLUGS, ...SET_05_SLUGS, ...SET_06_SLUGS, ...SET_07_SLUGS, ...SET_08_SLUGS, ...SET_09_SLUGS, ...SET_10_SLUGS, ...SET_11_SLUGS, ...SET_12_SLUGS, ...SET_13_SLUGS, ...SET_14_SLUGS, ...SET_15_SLUGS, ...SET_16_SLUGS, ...SET_17_SLUGS, ...SET_18_SLUGS, ...SET_19_SLUGS, ...SET_20_SLUGS, ...SET_21_SLUGS, ...SET_24_SLUGS, ...SET_33_SLUGS, ...SET_61_SLUGS, ...SET_59_SLUGS, ...SET_33_59_PAIR_SLUGS, ...SET_8D10_SLUGS];
@@ -763,8 +774,8 @@ for (const slug of SET_SLUGS) {
   assert.ok(article, `registered: ${slug}`);
   const brief = [...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles, ...set05Pack.articles, ...set06Pack.articles, ...set07Pack.articles, ...set08Pack.articles, ...set09Pack.articles, ...set10Pack.articles, ...set11Pack.articles, ...set12Pack.articles, ...set13Pack.articles, ...set14Pack.articles, ...set15Pack.articles, ...set16Pack.articles, ...set17Pack.articles, ...set18Pack.articles, ...set19Pack.articles, ...set20Pack.articles, ...set21Pack.articles, ...set24Pack.articles, ...set33Pack.articles, ...set61Pack.articles, ...set59Pack.articles, ...set3359PairPack.articles, ...set8d10Pack.articles].find((brief) => brief.slug === slug);
   if (brief) {
-    // Core 8d10fcfc (13.11.2026): targeted update of the live recipe book adds four Wordstat phrases after the pack ones; nothing else may differ.
-    const addedLater = slug === "retsepty-kofe-dlya-kofeen" ? RETSEPTY_8D10_RELATED : [];
+    // Core 8d10fcfc (13.11.2026): targeted updates of the live recipe book and milk article add Wordstat phrases after the pack ones; nothing else may differ.
+    const addedLater = slug === "retsepty-kofe-dlya-kofeen" ? RETSEPTY_8D10_RELATED : slug === "kakoe-moloko-ispolzuyut-v-kofeynyah" ? MOLOKO_8D10_RELATED : [];
     assert.deepEqual(article.relatedQueries.map(({ phrase, frequency }) => ({ phrase, frequency })), [...brief.relatedQueries, ...addedLater]);
     for (const [index, slot] of [article.expertOne, article.expertTwo].entries()) {
       assert.equal(slot.expertId, brief.experts[index]?.id, `${slug}: expert from pack`);
