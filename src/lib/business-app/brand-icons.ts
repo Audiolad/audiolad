@@ -27,10 +27,10 @@ type HostBrandMetadata = Pick<Metadata, "manifest" | "icons">;
 /**
  * audiolad.ru (and every non-business host, except coffee when its host flag is on)
  * uses the classic violet lotus mark. Bump CLASSIC_BRAND_ICON_VERSION when the
- * icon files change so browsers and iOS do not keep the previous dark-blue mark.
+ * icon files change so browsers and iOS do not keep the previous mark.
  * `/favicon.ico` itself is served from `public/`.
  */
-export const CLASSIC_BRAND_ICON_VERSION = "violet1";
+export const CLASSIC_BRAND_ICON_VERSION = "violet2";
 
 export function classicBrandAssetUrl(file: string): string {
   const path = file.startsWith("/") ? file : `/${file}`;
