@@ -2,7 +2,7 @@
 
 import BottomNav, { useCoffeeAuth } from "@/components/auth/AuthHostNavigation";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { BUSINESS_REGISTERED_NOTE, BUSINESS_SIGN_IN_INTRO } from "@/lib/access-grants/copy";
+import { BUSINESS_REGISTERED_NOTE, COFFEE_SIGN_IN_INTRO } from "@/lib/access-grants/copy";
 import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import {
@@ -101,13 +101,13 @@ function SignInForm() {
       >
         <header className="text-center">
           <Link href="/" className="text-[30px] font-semibold text-[var(--biz-accent,#7042c5)]">
-            {coffee ? "АудиоЛад Бизнес" : "АудиоЛад"}
+            {coffee ? "АудиоЛад Кофейня" : "АудиоЛад"}
           </Link>
 
           <h1 className="mt-8 text-[30px] font-semibold">Войти</h1>
 
           <p className="mt-3 text-sm leading-6 text-[var(--biz-text-muted,#7d70a2)]">
-            {coffee ? BUSINESS_SIGN_IN_INTRO : resolveSignInIntroCopy(searchParams.get("next"))}
+            {coffee ? COFFEE_SIGN_IN_INTRO : resolveSignInIntroCopy(searchParams.get("next"))}
           </p>
         </header>
 

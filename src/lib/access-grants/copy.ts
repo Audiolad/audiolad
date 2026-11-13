@@ -15,6 +15,15 @@ export const BUSINESS_SIGN_IN_INTRO =
 export const BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO =
   "Войдите, чтобы вернуться в кабинет АудиоЛад Бизнес.";
 
+export const COFFEE_SIGN_UP_INTRO =
+  `${BUSINESS_GIFT_TITLE} для АудиоЛад Кофейня. Карта не нужна, ничего не списывается. После подтверждения почты откроется кабинет, и в нём будет дата окончания.`;
+
+export const COFFEE_SIGN_IN_INTRO =
+  `Войдите, чтобы открыть кабинет АудиоЛад Кофейня. ${BUSINESS_GIFT_TITLE} даются один раз на адрес: повторная регистрация период не обновляет.`;
+
+export const COFFEE_PAYMENT_RETURN_SIGN_IN_INTRO =
+  "Войдите, чтобы вернуться в кабинет АудиоЛад Кофейня.";
+
 export const BUSINESS_REGISTERED_NOTE =
   `Регистрация прошла успешно. Подтвердите адрес по письму и войдите: кабинет откроется с периодом «${BUSINESS_GIFT_TITLE}».`;
 

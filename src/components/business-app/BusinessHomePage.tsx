@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { isCoffeeHostname } from "@/lib/business-app/host";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
@@ -111,7 +112,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
       <div className="mx-auto max-w-6xl">
         <header className="mb-5">
           <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">
-            Аудиолад Бизнес
+            {isCoffeeHostname(hostname) ? "АудиоЛад Кофейня" : "Аудиолад Бизнес"}
           </h1>
           <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
             Войдите в аккаунт, чтобы подключить кофейню и увидеть реальный статус.
