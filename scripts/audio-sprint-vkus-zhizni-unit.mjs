@@ -33,15 +33,31 @@ for (const text of [
   "1 000 ₽",
   "до пяти броней одновременно",
   "Каждая бронь действует семь дней",
-  "Дата розыгрыша будет объявлена позже.",
+  "Каждый продукт – отдельный шанс",
+  "Количество продуктов от одного автора не ограничено.",
+  "10 продуктов",
+  "Ограничение «до 5» относится только к количеству поисковых",
+  "Три денежных приза",
+  "После завершения «Вкус жизни» мы проведём розыгрыш",
+  "не более одного денежного",
+  "Розыгрыш состоится",
+  'const RAFFLE_DATE = "30 ноября 2026 года";',
   "Давайте вместе наполним жизнь красивым звучанием!",
   "АудиоЛад – пусть жизнь звучит красиво!",
 ]) {
   assert.ok(page.includes(text), `missing: ${text}`);
 }
 
-// No invented raffle date: the only date range on the page is the sprint window.
-assert.doesNotMatch(page, /Розыгрыш – \d/);
+// Raffle date is the owner's fact (t1418u): 30 November 2026, defined once.
+assert.equal((page.match(/ноября 2026 года"/g) ?? []).length, 1);
+assert.doesNotMatch(page, /будет объявлена позже/);
+assert.equal((page.match(/Каждый продукт – отдельный шанс/g) ?? []).length, 1);
+
+// Decorations: inline SVG only, hidden from assistive tech.
+const decor = readFileSync(path.join(root, "src/app/(platform)/(listener)/vkus-zhizni/decor.tsx"), "utf8");
+assert.doesNotMatch(decor, /https?:\/\/(?!www\.w3\.org)/);
+assert.doesNotMatch(decor, /<img|<image|url\(/);
+assert.equal((decor.match(/<svg/g) ?? []).length, (decor.match(/aria-hidden="true"/g) ?? []).length);
 
 // Topic list is not published before the owner approves it (Core 976eabbc).
 assert.match(page, /Список готовится/);

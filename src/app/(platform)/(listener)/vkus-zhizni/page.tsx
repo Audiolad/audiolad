@@ -7,6 +7,21 @@ import {
   SITE_BRAND,
 } from "@/lib/seo/public-page-metadata";
 
+import {
+  BookIcon,
+  CalendarIcon,
+  CornerBouquet,
+  CupIcon,
+  HeroDecor,
+  LotusIcon,
+  MoonIcon,
+  NoteIcon,
+  ParkIcon,
+  SideBranch,
+  SprigDivider,
+  SunIcon,
+} from "./decor";
+
 /**
  * АудиоСпринт «Вкус жизни», 14–29 ноября 2026 (Company Core eb792a06).
  *
@@ -70,6 +85,8 @@ const moments = [
   "Из таких маленьких моментов и складывается наша жизнь. И каждый из нас, авторов АудиоЛада, может сделать эти моменты чуточку прекраснее.",
 ];
 
+const momentIcons = [CupIcon, ParkIcon, SunIcon, MoonIcon];
+
 const benefits = [
   "Новые идеи для творчества.",
   "Темы, основанные на реальных поисковых запросах.",
@@ -101,6 +118,14 @@ const prizes = [
 
 const directions = ["Музыка", "Медитации"];
 
+const RAFFLE_DATE = "30 ноября 2026 года";
+
+const chances = [
+  ["1 продукт", "1 шанс"],
+  ["3 продукта", "3 шанса"],
+  ["10 продуктов", "10 шансов"],
+];
+
 function Section({
   id,
   title,
@@ -112,8 +137,9 @@ function Section({
 }) {
   return (
     <section id={id} className="mt-14 scroll-mt-24" aria-labelledby={`${id}-heading`}>
-      <h2 id={`${id}-heading`} className={headingClassName}>
-        {title}
+      <h2 id={`${id}-heading`} className={`${headingClassName} flex items-start gap-3`}>
+        <span aria-hidden="true" className="mt-[0.6em] h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-[#f2a7c0] to-[#7042c5]" />
+        <span>{title}</span>
       </h2>
       <div className="mt-5">{children}</div>
     </section>
@@ -130,7 +156,10 @@ function CtaButton() {
 
 export default function VkusZhizniPage() {
   return (
-    <article className="pb-16 pt-4">
+    <article className="relative overflow-hidden pb-16 pt-4">
+      <SideBranch className="pointer-events-none absolute right-4 top-[900px] hidden h-[360px] w-[120px] opacity-50 xl:block" />
+      <SideBranch className="pointer-events-none absolute right-24 top-[2300px] hidden h-[300px] w-[100px] -scale-x-100 opacity-40 xl:block" />
+      <SideBranch className="pointer-events-none absolute right-6 top-[3700px] hidden h-[340px] w-[110px] opacity-45 xl:block" />
       <nav aria-label="Хлебные крошки" className="text-sm text-[#7d70a2]">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -148,8 +177,9 @@ export default function VkusZhizniPage() {
         </ol>
       </nav>
 
-      <header className="mt-6 overflow-hidden rounded-[32px] border border-[#eadff8] bg-gradient-to-br from-[#fdf6ff] via-[#fffaff] to-[#f2e8ff] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
-        <div className="max-w-4xl">
+      <header className="relative mt-6 overflow-hidden rounded-[32px] border border-[#eadff8] bg-gradient-to-br from-[#fdf6ff] via-[#fffaff] to-[#eef7f1] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
+        <HeroDecor className="pointer-events-none absolute -right-10 -top-6 h-36 w-44 opacity-40 sm:h-48 sm:w-60 sm:opacity-60 lg:right-6 lg:top-1/2 lg:h-[300px] lg:w-[370px] lg:-translate-y-1/2 lg:opacity-100" />
+        <div className="relative max-w-4xl lg:max-w-[58%]">
           <p className="inline-flex rounded-full border border-[#e2c8ff] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[#7042c5]">
             14–29 ноября 2026 года
           </p>
@@ -168,7 +198,7 @@ export default function VkusZhizniPage() {
             медитацию, опубликуйте на АудиоЛаде.
           </p>
 
-          <div className="mt-7 grid max-w-3xl gap-3 sm:grid-cols-3">
+          <div className="mt-7 grid max-w-3xl gap-3 sm:grid-cols-3 lg:max-w-none">
             {[
               ["16 дней", ""],
               ["2 направления", ""],
@@ -193,11 +223,21 @@ export default function VkusZhizniPage() {
       </header>
 
       <div className="max-w-4xl">
+        <SprigDivider className="mx-auto mt-10 h-8 w-44" />
         <Section id="moments" title="У каждого момента жизни есть своё звучание">
-          <div className={proseClassName}>
-            {moments.map((text) => (
-              <p key={text}>{text}</p>
-            ))}
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {moments.slice(0, 4).map((text, index) => {
+              const Icon = momentIcons[index];
+              return (
+                <li key={text} className={`${cardClassName} flex gap-4`}>
+                  <Icon className="h-11 w-11 shrink-0" />
+                  <p className="text-[15px] leading-7 text-[#4a3d73] sm:text-base">{text}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <div className={`mt-6 ${proseClassName}`}>
+            <p>{moments[4]}</p>
             <p className="text-lg font-semibold text-[#7042c5]">
               Именно этому посвящён наш новый АудиоСпринт – «Вкус жизни».
             </p>
@@ -218,7 +258,10 @@ export default function VkusZhizniPage() {
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className={cardClassName}>
-              <h3 className="text-lg font-semibold text-[#25135c]">Музыка</h3>
+              <div className="flex items-center gap-3">
+                <NoteIcon className="h-10 w-10 shrink-0" />
+                <h3 className="text-lg font-semibold text-[#25135c]">Музыка</h3>
+              </div>
               <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
                 Джаз для кофеен, французские мелодии, аргентинское танго,
                 инструментальная музыка для отдыха и другие направления. Можно
@@ -227,7 +270,10 @@ export default function VkusZhizniPage() {
               </p>
             </div>
             <div className={cardClassName}>
-              <h3 className="text-lg font-semibold text-[#25135c]">Медитации</h3>
+              <div className="flex items-center gap-3">
+                <LotusIcon className="h-10 w-10 shrink-0" />
+                <h3 className="text-lg font-semibold text-[#25135c]">Медитации</h3>
+              </div>
               <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
                 Радость, спокойствие, вдохновение, благодарность, принятие себя,
                 отдых, гармония – каждая практика помогает слушателю уделить время
@@ -240,8 +286,9 @@ export default function VkusZhizniPage() {
         <Section id="why" title="Зачем участвовать">
           <ul className="grid gap-3 sm:grid-cols-2">
             {benefits.map((item) => (
-              <li key={item} className={`${cardClassName} text-[15px] leading-7 text-[#4a3d73] sm:text-base`}>
-                {item}
+              <li key={item} className={`${cardClassName} flex gap-3 text-[15px] leading-7 text-[#4a3d73] sm:text-base`}>
+                <span aria-hidden="true" className="mt-2.5 h-2 w-2 shrink-0 rounded-full bg-[#8cc4a4]" />
+                <span>{item}</span>
               </li>
             ))}
           </ul>
@@ -284,15 +331,36 @@ export default function VkusZhizniPage() {
         </Section>
 
         <Section id="conditions" title="Условия участия">
-          <ul className="list-disc space-y-2 pl-5 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+          <ul className={`${cardClassName} space-y-3 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8`}>
             {conditions.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item} className="flex gap-3">
+                <span aria-hidden="true" className="mt-0.5 font-bold text-[#7042c5]">✓</span>
+                <span>{item}</span>
+              </li>
             ))}
           </ul>
-          <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-            Количество работ не ограничено. Одна работа – один шанс в розыгрыше.
-            Пять – предел одновременной брони, а не общего количества работ.
-          </p>
+          <div className="mt-7">
+            <h3 className="text-xl font-semibold text-[#25135c]">
+              Каждый продукт – отдельный шанс
+            </h3>
+            <p className="mt-3 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+              Количество продуктов от одного автора не ограничено. Каждый
+              опубликованный по правилам спринта продукт даёт один отдельный шанс
+              в розыгрыше.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {chances.map(([products, chance]) => (
+                <div key={products} className={cardClassName}>
+                  <p className="text-base font-medium text-[#7d70a2]">{products}</p>
+                  <p className="mt-1 text-2xl font-semibold text-[#25135c]">{chance}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#7d70a2]">
+              Ограничение «до 5» относится только к количеству поисковых
+              запросов, которые можно одновременно держать в брони.
+            </p>
+          </div>
         </Section>
 
         <Section id="full-products" title="Создавайте полноценные аудиопродукты">
@@ -308,45 +376,83 @@ export default function VkusZhizniPage() {
           </div>
         </Section>
 
-        <Section id="prizes" title="Призовой фонд – 6 000 ₽">
-          <div className="grid gap-3 sm:grid-cols-3">
+        <section
+          id="prizes"
+          className="relative mt-14 scroll-mt-24 overflow-hidden rounded-[30px] border border-[#eadff8] bg-gradient-to-br from-[#f8f2ff] to-[#eef7f1] px-5 py-7 sm:px-7 sm:py-8"
+          aria-labelledby="prizes-heading"
+        >
+          <CornerBouquet className="pointer-events-none absolute right-2 top-2 h-20 w-24 opacity-70 sm:right-4 sm:top-3 sm:h-28 sm:w-32" />
+          <p className="relative text-sm font-semibold uppercase tracking-[0.16em] text-[#8b65c7]">
+            Призовой фонд – 6 000 ₽
+          </p>
+          <h2 id="prizes-heading" className="relative mt-2 text-2xl font-semibold tracking-tight text-[#25135c] sm:text-3xl">
+            Три денежных приза
+          </h2>
+          <p className="relative mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            После завершения «Вкус жизни» мы проведём розыгрыш среди всех
+            продуктов, которые выполнили условия участия.
+          </p>
+
+          <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
             {prizes.map(([place, amount]) => (
-              <div key={place} className={cardClassName}>
+              <div
+                key={place}
+                className="rounded-[22px] border border-white bg-white/85 px-5 py-6 text-center shadow-sm"
+              >
                 <p className="text-sm font-semibold text-[#7d70a2]">{place}</p>
-                <p className="mt-1 text-2xl font-semibold text-[#25135c]">{amount}</p>
+                <p className="mt-1 text-3xl font-semibold text-[#7042c5]">{amount}</p>
               </div>
             ))}
           </div>
-          <div className={`mt-5 ${proseClassName}`}>
-            <p>
-              Призы разыгрываются открыто. Одна опубликованная работа – один шанс.
-              Один автор может получить не более одного денежного приза; при
-              повторном выпадении проводится перерозыгрыш.
-            </p>
-            <p>Дата розыгрыша будет объявлена позже.</p>
-          </div>
-        </Section>
 
-        <Section id="who" title="Кто может участвовать">
-          <div className={proseClassName}>
+          <div className="relative mt-6 space-y-3 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
             <p>
+              Один автор может получить <strong className="text-[#25135c]">не более одного денежного
+              приза</strong>.
+            </p>
+            <p>
+              Если один и тот же автор выпадет в розыгрыше повторно,
+              соответствующий приз будет разыгран ещё раз среди остальных
+              участников.
+            </p>
+          </div>
+
+          <div className="relative mt-6 rounded-[20px] bg-[#25135c] px-5 py-4 text-white">
+            <p className="text-sm text-white/75">Розыгрыш состоится</p>
+            <p className="mt-1 text-xl font-semibold">{RAFFLE_DATE}</p>
+          </div>
+        </section>
+
+        <div className="mt-14 grid gap-4 sm:grid-cols-2">
+          <section id="who" className={`${cardClassName} scroll-mt-24`} aria-labelledby="who-heading">
+            <BookIcon className="h-11 w-11" />
+            <h2 id="who-heading" className="mt-3 text-xl font-semibold text-[#25135c]">
+              Кто может участвовать
+            </h2>
+            <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
               Действующие авторы АудиоЛада. Участие предполагает создание и
               публикацию авторского аудиопродукта с необходимыми правами на музыку
               и материалы.
             </p>
-          </div>
-        </Section>
+          </section>
+          <section id="when" className={`${cardClassName} scroll-mt-24`} aria-labelledby="when-heading">
+            <CalendarIcon className="h-11 w-11" />
+            <h2 id="when-heading" className="mt-3 text-xl font-semibold text-[#25135c]">
+              Когда проходит
+            </h2>
+            <p className="mt-2 text-[15px] leading-7 text-[#4a3d73] sm:text-base">
+              14–29 ноября 2026 года. 16 дней для творчества и публикации.
+            </p>
+          </section>
+        </div>
 
-        <Section id="when" title="Когда проходит">
-          <div className={proseClassName}>
-            <p>14–29 ноября 2026 года. 16 дней для творчества и публикации.</p>
-          </div>
-        </Section>
+        <SprigDivider className="mx-auto mt-12 h-8 w-44" />
 
         <section
-          className="mt-14 rounded-[30px] border border-[#e4d5f6] bg-[#faf7ff] px-5 py-8 sm:px-7 sm:py-9"
+          className="relative mt-8 overflow-hidden rounded-[30px] border border-[#e4d5f6] bg-gradient-to-br from-[#faf7ff] to-[#fff6ee] px-5 py-8 sm:px-7 sm:py-9"
           aria-labelledby="final-cta-heading"
         >
+          <CornerBouquet className="pointer-events-none absolute -bottom-4 -right-4 h-24 w-28 rotate-180 opacity-60 sm:h-32 sm:w-36" />
           <p className="text-sm font-semibold text-[#7042c5]">14–29 ноября 2026 года</p>
           <h2
             id="final-cta-heading"
@@ -364,6 +470,7 @@ export default function VkusZhizniPage() {
           <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-[#4a3d73]">
             <span>«Музыка» и «Медитации»</span>
             <span>Призовой фонд – 6 000 ₽</span>
+            <span>Розыгрыш – {RAFFLE_DATE}</span>
           </div>
           <div className="mt-7">
             <CtaButton />
