@@ -47,7 +47,7 @@ export function ogCardSvg(title) {
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_W}" height="${OG_H}" viewBox="0 0 ${OG_W} ${OG_H}">
 <rect width="${OG_W}" height="${OG_H}" fill="${BG}"/><rect width="14" height="${OG_H}" fill="${GOLD}"/>
-<text x="80" y="100" font-family="${SANS}" font-weight="600" font-size="30" fill="${GOLD}">АудиоЛад Кофейни</text>
+<text x="80" y="100" font-family="${SANS}" font-weight="600" font-size="30" fill="${GOLD}">АудиоЛад Кофейня</text>
 ${text}
 <line x1="80" y1="${OG_H - 110}" x2="260" y2="${OG_H - 110}" stroke="${GOLD}" stroke-width="3"/>
 <text x="80" y="${OG_H - 62}" font-family="${SANS}" font-size="28" fill="${MUTED}">Кофейня: открытие и работа</text>

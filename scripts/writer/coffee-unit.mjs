@@ -128,7 +128,7 @@ test("coffee never reaches sz and sz never reaches coffee (full import graph, bo
   for (const file of szGraph) assert.ok(!inside(file, coffeeDir), `sz достаёт до coffee: ${relative(here, file)}`);
   for (const file of szGraph) {
     if (!/\.(mjs|js|ts|mts)$/.test(file)) continue;
-    assert.doesNotMatch(readFileSync(file, "utf8"), /audiolad-coffee|АудиоЛад Кофейни/, `${relative(root, file)} (граф sz) знает о шаблоне coffee`);
+    assert.doesNotMatch(readFileSync(file, "utf8"), /audiolad-coffee|АудиоЛад Кофейни|АудиоЛад Кофейня/, `${relative(root, file)} (граф sz) знает о шаблоне coffee`);
   }
   // Shared modules reachable from coffee stay outside both template folders.
   for (const file of coffeeGraph) if (!inside(file, coffeeDir)) assert.ok(!inside(file, szDir));
@@ -163,9 +163,9 @@ test("separate ids: template, schema name, site, branch prefix", () => {
   assert.equal(COFFEE.site, "coffee");
   assert.equal(COFFEE.schemaName, "audiolad_coffee_guide_article");
   assert.notEqual(COFFEE.schemaName, "sergey_zoya_article");
-  assert.equal(COFFEE.byline, "АудиоЛад Кофейни");
+  assert.equal(COFFEE.byline, "АудиоЛад Кофейня");
   const verticals = readFileSync(join(root, COFFEE.verticalsFile), "utf8");
-  assert.match(verticals, /АудиоЛад Кофейни/);
+  assert.match(verticals, /АудиоЛад Кофейня/);
 });
 
 test("model defaults: sz unchanged, coffee explicit", () => {
@@ -210,7 +210,7 @@ test("coffee prompt carries coffee rules and no sz markers", () => {
   const messages = buildCoffeeMessages(brief, { experts, avoid: ["Как выбрать обжарщика"] });
   const text = messages.map((m) => m.content).join("\n");
   for (const marker of ["Зоя", "Сергей Петров", "ангел", "sergey_zoya", "Летописец"]) assert.ok(!text.includes(marker), `в промпте coffee есть «${marker}»`);
-  for (const marker of ["АудиоЛад Кофейни", "кофейн", "«точка»", "Редакция", "–", brief.primaryQuery]) assert.ok(text.includes(marker), `в промпте нет «${marker}»`);
+  for (const marker of ["АудиоЛад Кофейня", "кофейн", "«точка»", "Редакция", "–", brief.primaryQuery]) assert.ok(text.includes(marker), `в промпте нет «${marker}»`);
   assert.doesNotMatch(text.replace(/«\u2014»/g, ""), /\u2014/, "длинное тире в промпте (кроме самого правила «—»)");
   assert.ok(text.includes("Как выбрать обжарщика"));
   assert.ok(LESSONS.length >= 10 && corrections().length >= 8);
@@ -652,7 +652,7 @@ test("pipeline refuses an sz pack before any Cloud.ru call", async () => {
 test("PR body names template, byline and the coffee guide test to update", () => {
   const body = prBody({ articles: [{ slug: brief.slug, warnings: [] }], calls: [], spentRub: 0, model: "m", secretScan: { ok: true } }, [{ brief }], pack);
   assert.match(body, /audiolad-coffee-guide-v1/);
-  assert.match(body, /АудиоЛад Кофейни/);
+  assert.match(body, /АудиоЛад Кофейня/);
   assert.match(body, /business-coffee-guide-unit/);
   assert.match(body, /черновик Райтера, не публикация/);
   assert.match(body, /Codex делает финальную доводку и публикует/);
@@ -663,7 +663,7 @@ test("SEO audit 30.10.2026: dates in markup only, og card, «Коротко», �
   const article = assembleCoffeeArticle(brief, fields, { today: "2026-11-02" });
   assert.equal(article.publishedAt, "2026-11-02");
   assert.equal(article.updatedAt, "2026-11-02");
-  assert.deepEqual(article.ogImage, { src: `/images/b/coffee/og/${brief.slug}.jpg`, alt: `${brief.title} – текстовая обложка АудиоЛад Кофейни`, width: 1200, height: 630 });
+  assert.deepEqual(article.ogImage, { src: `/images/b/coffee/og/${brief.slug}.jpg`, alt: `${brief.title} – текстовая обложка АудиоЛад Кофейня`, width: 1200, height: 630 });
   assert.ok(article.summary.length >= 3 && article.summary.length <= 5);
   assert.ok(Array.isArray(article.intro[0]), "intro paragraphs are GuideParagraph arrays (links allowed)");
   const dated = assembleCoffeeArticle({ ...brief, publishedAt: "2026-10-29", updatedAt: "2026-10-30" }, fields);
