@@ -388,9 +388,8 @@ console.log("author-seo-prompt-builder-unit: ok");
 
 // t1440u: AudioSprint booking («Вкус жизни», «Осень звучит»): sprint-agnostic prompt, title = booked query.
 {
-  // The only em dash is inside the rule that names it («а не длинное тире «—»»).
-  const withoutDashRule = (text) => text.replace("а не длинное тире «\u2014»", "");
-  assert.doesNotMatch(withoutDashRule(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE), /\u2014/, "prompt body uses en dash only");
+  assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /\u2014/, "prompt body uses en dash only");
+  assert.ok(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE.includes("– Для тире используй только среднее тире «–» (U+2013)."));
   assert.doesNotMatch(AUTHOR_SEO_PRODUCT_PROMPT_TEMPLATE, /осен|октябр|ноябр|спринт/i, "prompt is sprint-agnostic");
   assert.doesNotMatch(builderUi, />[^<{]*\u2014[^<{]*</, "builder copy uses en dash only");
   assert.match(builderUi, /exactTitle = false/);
@@ -425,7 +424,8 @@ console.log("author-seo-prompt-builder-unit: ok");
     assert.equal(tail(sprint), tail(general));
     assert.equal(head(sprint), head(general));
     assert.ok(general.includes("Если точное вхождение звучит нормально, используй его как название."));
-    assert.doesNotMatch(withoutDashRule(sprint), /\u2014/);
+    assert.doesNotMatch(sprint, /\u2014/);
+    assert.doesNotMatch(general, /\u2014/);
   }
   assert.ok(AUTHOR_SEO_PROMPT_EXACT_TITLE_SECTION.startsWith("1. НАЗВАНИЕ ПРОДУКТА\n\n"));
   console.log("author-seo-prompt-builder-unit: t1440u sprint exact title ok");
