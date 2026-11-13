@@ -38,6 +38,8 @@ export type PublicPracticeRow = {
   status: string | null;
   deleted_at?: string | null;
   scheduled_publish_at?: string | null;
+  first_published_at?: string | null;
+  first_publication_date_unknown?: boolean;
   published_at?: string | null;
   updated_at: string | null;
   is_catalog_listed: boolean | null;
@@ -113,6 +115,8 @@ export async function getPracticeByAuthorAndSlug(
       status,
       deleted_at,
       scheduled_publish_at,
+      first_published_at,
+      first_publication_date_unknown,
       published_at,
       updated_at,
       is_catalog_listed,

@@ -73,6 +73,8 @@ const PRACTICE_DETAIL_SELECT = `
   deleted_by,
   deletion_reason,
   currency,
+  first_published_at,
+  first_publication_date_unknown,
   published_at,
   scheduled_publish_at,
   listening_notice_enabled,
@@ -330,7 +332,7 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, product_kind, publication_class, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at, published_at, scheduled_publish_at",
+      "id, title, slug, format, product_kind, publication_class, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, created_at, updated_at, first_published_at, first_publication_date_unknown, published_at, scheduled_publish_at",
     )
     .eq("author_id", authorId)
     .is("deleted_at", null)

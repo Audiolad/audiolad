@@ -27,6 +27,7 @@ export type PracticePagePublishPreview = {
 };
 
 export type PracticePageViewModel = {
+  firstPublishedAt?: string | null;
   practice: {
     id: string;
     slug: string;
