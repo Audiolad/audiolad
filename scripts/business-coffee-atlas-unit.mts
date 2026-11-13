@@ -99,7 +99,7 @@ const EXPECTED_TRACKS: Record<string, [string, string, string]> = {
   "cafe-san-alberto": ["kofeynik", "latinoamerikanskiy-dzhaz", "a496b83c-4d67-45e6-b669-2b9f12e7c4f3"],
   "truth-coffee-roasting": ["jazz-relax", "nuar-dzhaz", "3a9040fb-515d-4796-a892-c919e6f0a933"],
   "single-o-surry-hills": ["djazmanov", "legkiy-fank", "7ea01dd5-9e5d-458f-9641-901c587949d3"],
-  "la-colombe": ["djazmanov", "fortepiannyy-dzhaz", "8a1642df-677f-4e11-8db5-af1f5230fc9f"],
+  "la-colombe": ["djazmanov", "dzhazovaya-muzyka-dlya-kafe", "4b0d2a74-0ad7-489c-ba64-4e0b61a1a9f3"],
 };
 for (const slug of slugs) {
   const [authorSlug, productSlug, audioItemId] = EXPECTED_TRACKS[slug];
@@ -274,8 +274,8 @@ assert.deepEqual(playableBuilt["caffe-florian"], [], "published but unplayable a
 assert.deepEqual(playableBuilt["starbucks-reserve-shanghai"], [], "play-check failure hides the example");
 assert.deepEqual(playableBuilt["truth-coffee-roasting"], [], "track missing from the session is hidden – never another track");
 assert.equal(playableBuilt["la-colombe"]?.length, 1, "playable example stays");
-assert.equal(playableBuilt["la-colombe"]?.[0]?.trackTitle, "Трек fortepiannyy-dzhaz", "track title of the exact track");
-assert.equal(playableBuilt["la-colombe"]?.[0]?.albumTitle, "Альбом fortepiannyy-dzhaz", "album title below");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.trackTitle, "Трек dzhazovaya-muzyka-dlya-kafe", "track title of the exact track");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.albumTitle, "Альбом dzhazovaya-muzyka-dlya-kafe", "album title below");
 assert.equal(new Set(checked).size, checked.length, "each album is checked once");
 assert.deepEqual(
   await buildCoffeeAtlasMusic({
