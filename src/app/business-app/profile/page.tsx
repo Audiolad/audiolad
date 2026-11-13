@@ -117,7 +117,7 @@ export default async function BusinessProfilePage() {
           ) : null}
           {/* t1442u: an anonymous owner saves this address in «Вход в кабинет» above. */}
           {domain.status === "authenticated" && domain.needsReceiptEmail && user?.is_anonymous !== true ? (
-            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} anonymous={user?.is_anonymous === true} />
+            <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
           ) : null}
           {domain.location ? null : (
             <p>
