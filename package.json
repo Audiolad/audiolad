@@ -424,6 +424,7 @@
     "test:seo-wordstat-jazz-queries-seed": "node scripts/seo-wordstat-jazz-queries-seed-unit.mjs",
     "test:seo-reservation-product-create": "npx tsx scripts/seo-reservation-product-create-unit.mjs",
     "test:audio-sprint-osen-zvuchit": "npx tsx scripts/audio-sprint-osen-zvuchit-unit.mjs",
+    "test:audio-sprint-vkus-zhizni": "node scripts/audio-sprint-vkus-zhizni-unit.mjs",
     "test:author-published-product-seo-link": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-published-product-seo-link-unit.mjs",
     "test:author-create-seo-query-step": "npx tsx scripts/author-create-seo-query-step-unit.mjs",
     "test:author-seo-opportunities": "node scripts/author-seo-opportunities-unit.mjs",
