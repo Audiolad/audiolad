@@ -190,7 +190,7 @@ assert.doesNotMatch(checkoutSource, /console\.error\([^)]*rememberEmail/, "no em
   assert.match(actions, /export async function saveBusinessReceiptEmail/);
   assert.match(actions, /updateUser\(\{ data: \{ \[BUSINESS_RECEIPT_EMAIL_META_KEY\]: receiptEmail \} \}\)/);
   const page = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
-  assert.match(page, /domain\.needsReceiptEmail \? \(\s*<BusinessReceiptEmailForm receiptEmail=\{domain\.savedReceiptEmail \?\? null\} anonymous=\{user\?\.is_anonymous === true\} \/>/);
+  assert.match(page, /domain\.needsReceiptEmail && user\?\.is_anonymous !== true \? \(\s*<BusinessReceiptEmailForm receiptEmail=\{domain\.savedReceiptEmail \?\? null\} \/>/);
   assert.match(page, /Сюда же приходят чеки об оплате\./);
 }
 assert.match(checkoutSource, /error: "receipt_email_required" \}, \{ status: 400 \}/);
