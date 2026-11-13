@@ -1,3 +1,4 @@
+import { productFirstPublicationAt } from "@/lib/products/publication-dates";
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -835,6 +836,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   }
 
   const viewModel: PracticePageViewModel = {
+    firstPublishedAt: isPracticePublished(practice.status)
+      ? productFirstPublicationAt(practice)
+      : null,
     practice: {
       id: practice.id,
       slug: practice.slug,

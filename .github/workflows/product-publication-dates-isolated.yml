@@ -1,0 +1,35 @@
+name: Product Publication Dates Isolated SQL
+
+# Task 603aa2d6: local initdb harness for first-publication backfill and date guards.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/product-publication-dates-isolated.yml"
+      - "scripts/product-publication-dates-isolated.py"
+      - "scripts/product-publication-dates-unit.mts"
+      - "src/lib/products/publication-dates.ts"
+      - "supabase/migrations/20270308120000_product_first_publication_dates.sql"
+
+permissions:
+  contents: read
+
+jobs:
+  product-publication-dates-isolated:
+    name: Product Publication Dates Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Local PostgreSQL toolchain
+        run: |
+          set -euo pipefail
+          ls -d /usr/lib/postgresql/*/bin
+          psql --version
+      - name: Publication dates harness
+        run: |
+          set -euo pipefail
+          python3 scripts/product-publication-dates-isolated.py | tee harness.log
+          grep -q 'product-publication-dates-isolated: historical backfill, drafts, all types, publish, immutable dates, republish, schedule, late approval, claim + indexing outbox: PASS' harness.log

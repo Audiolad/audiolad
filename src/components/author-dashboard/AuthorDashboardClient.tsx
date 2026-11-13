@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatProductDate, productFirstPublicationAt } from "@/lib/products/publication-dates";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { useEffect, useState } from "react";
@@ -152,6 +153,9 @@ function ProductCard({
     publishedAt: product.published_at,
   });
 
+  const createdDate = formatProductDate(product.created_at);
+  const firstPublicationDate = formatProductDate(productFirstPublicationAt(product));
+
   const primaryActionLabel = isSubmitted ? "Просмотреть" : "Редактировать";
 
   return (
@@ -198,6 +202,8 @@ function ProductCard({
                 ? AUTHOR_PRODUCT_FREE_PRICE_LABEL
                 : formatPriceLabel(product.price, product.is_free)}
             </span>
+            {createdDate ? <span>Создан {createdDate}</span> : <span>Дата создания неизвестна</span>}
+            {productIsPublic && firstPublicationDate ? <span>Опубликовано {firstPublicationDate}</span> : null}
             <span>Обновлён {formatUpdatedAt(product.updated_at)}</span>
             {product.moderation_submitted_at ? (
               <span>

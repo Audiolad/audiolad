@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const { data: practices, error } = await supabase
       .from("practices")
       .select(
-        "id, title, slug, cover_url, cover_image, status, moderation_status, is_free, price, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, deleted_at, product_kind, publication_class, updated_at",
+        "id, title, slug, cover_url, cover_image, status, moderation_status, is_free, price, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, deleted_at, product_kind, publication_class, created_at, first_published_at, first_publication_date_unknown, published_at, scheduled_publish_at, updated_at",
       )
       .eq("author_id", authorId)
       .is("deleted_at", null)
@@ -64,6 +64,11 @@ export async function GET(request: Request) {
       return mapPracticeToStudioMusicListItem({
         practice: {
           id: practice.id,
+          created_at: practice.created_at,
+          first_published_at: practice.first_published_at,
+          first_publication_date_unknown: practice.first_publication_date_unknown,
+          published_at: practice.published_at,
+          scheduled_publish_at: practice.scheduled_publish_at,
           title: practice.title,
           slug: practice.slug,
           cover_url: practice.cover_url,

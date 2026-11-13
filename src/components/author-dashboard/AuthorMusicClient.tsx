@@ -1,5 +1,7 @@
 "use client";
 
+import { formatProductDate } from "@/lib/products/publication-dates";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -388,6 +390,7 @@ function MusicLibraryCard({
         />
         <div className="min-w-0 flex-1 space-y-2">
           <h3 className="text-base font-semibold text-[#3f3560]">{item.title}</h3>
+          <MusicProductDates item={item} />
           <p className="text-sm text-[#7d70a2]">
             {item.kindLabel}
             {item.trackCount > 0 ? ` · ${item.trackCount}` : ""}
@@ -473,6 +476,7 @@ function MusicStudioCard({
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h3 className="text-base font-semibold text-[#3f3560]">{item.title}</h3>
+            <MusicProductDates item={item} />
             <p className="text-sm text-[#7d70a2]">
               {item.kindLabel}
               {item.trackCount > 0 ? ` · ${item.trackCount}` : ""} ·{" "}
@@ -590,5 +594,16 @@ function MusicStudioCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function MusicProductDates({ item }: { item: AuthorStudioMusicListItem }) {
+  const created = formatProductDate(item.createdAt);
+  const published = formatProductDate(item.firstPublishedAt);
+  return (
+    <div className="text-sm text-[#7d70a2]">
+      <p>{created ? `Создан ${created}` : "Дата создания неизвестна"}</p>
+      {published ? <p>Опубликовано {published}</p> : null}
+    </div>
   );
 }
