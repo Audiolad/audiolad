@@ -19,6 +19,8 @@ export {
 
 export { validateEmailFormat } from "./validate-format";
 
+export { isNewEmailDomainAllowed } from "./new-email-policy";
+
 export {
   validateEmailDomainForRegistration,
   validatePersonalEmailDomainForRegistration,
@@ -27,6 +29,8 @@ export {
 export {
   EMAIL_FIELD_HINT,
   EMAIL_VALIDATION_MESSAGES,
+  NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE,
+  NEW_EMAIL_FIELD_HINT,
   getEmailValidationMessage,
   PASSWORD_MIN_LENGTH,
   PASSWORD_TOO_SHORT_MESSAGE,

@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { normalizeBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
+import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } from "@/lib/auth/email";
 
 export const RECEIPT_EMAIL_TAKEN_MESSAGE = "Эта почта уже привязана к другому аккаунту. Войдите в него или укажите другую почту.";
 export const LOGIN_EMAIL_RETRY_MESSAGE = "Не удалось сохранить почту. Попробуйте ещё раз.";
@@ -9,6 +10,8 @@ export async function linkBusinessLoginEmail(supabase: Pick<SupabaseClient, "aut
   if (!user.is_anonymous) return { ok: true, linked: false } as const;
   const email = normalizeBusinessReceiptEmail(raw);
   if (!email) return { ok: false, code: "receipt_email_required", error: "Проверьте почту – похоже, в адресе ошибка." } as const;
+  // t1446u: a new login email – Russian mail services only (same list as audiolad.ru sign-up).
+  if (!isNewEmailDomainAllowed(email)) return { ok: false, code: "receipt_email_domain_not_allowed", error: NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } as const;
   try {
     // GoTrue autoconfirm promotes this SAME anonymous user. No admin privileges or merge.
     const { data, error } = await supabase.auth.updateUser({

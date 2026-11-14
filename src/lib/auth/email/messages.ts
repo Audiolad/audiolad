@@ -5,6 +5,13 @@ export const SIGNUP_EMAIL_LABEL = "Email";
 export const EMAIL_FIELD_HINT =
   "Рекомендуем использовать Яндекс Почту (например, sergey@yandex.ru) - так письма и коды от АудиоЛада приходят стабильнее. Можно использовать и другой поддерживаемый почтовый сервис.";
 
+/** t1446u: a new email in the cafe / Business cabinet (receipt, login linking). */
+export const NEW_EMAIL_FIELD_HINT =
+  "Подойдёт российская почта: Яндекс, Mail.ru, Рамблер. Рекомендуем Яндекс Почту – так письма и коды приходят стабильнее.";
+
+export const NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE =
+  "Gmail и другие зарубежные почтовые сервисы указать нельзя. Подойдёт российская почта – рекомендуем Яндекс Почту.";
+
 export const SIGNUP_PASSWORD_LABEL = "Придумайте пароль";
 
 export const PASSWORD_MIN_LENGTH = 8;

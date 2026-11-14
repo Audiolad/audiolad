@@ -14,6 +14,7 @@ export type BusinessPayErrorCode =
   | "receipt_email_taken"
   | "login_email_failed"
   | "receipt_email_required"
+  | "receipt_email_domain_not_allowed"
   | "venue_topup_not_available"
   | "pending_order_mismatch"
   | "partner_terms_changed"
