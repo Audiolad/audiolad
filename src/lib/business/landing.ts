@@ -1,5 +1,6 @@
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
+import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } from "@/lib/auth/email";
 
 /** Public contact already printed in the site footer. Not a new inbox. */
 export const BUSINESS_INQUIRY_EMAIL = "1@audiolad.ru";
@@ -461,6 +462,9 @@ export function validateBusinessInquiry(
 
   if (!EMAIL_PATTERN.test(email) || email.length > 200) {
     errors.email = "Проверьте адрес электронной почты.";
+  } else if (!isNewEmailDomainAllowed(email, "client")) {
+    // t1446u: like the cafe cabinet and audiolad.ru sign-up – Russian mail services only.
+    errors.email = NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE;
   }
 
   if (!Number.isInteger(locations) || locations < 1 || locations > 10000) {
