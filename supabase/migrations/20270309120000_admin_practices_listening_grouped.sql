@@ -183,7 +183,7 @@ BEGIN
   ),
   usage_by_practice AS (
     -- Grouped helper (20270309120000): same per-practice sum and author
-    -- snapshot as GROUP BY practice_id over playback_usage_admin_facts.
+    -- snapshot as the former per-row facts aggregate.
     SELECT
       u.practice_id,
       u.listened_ms,
