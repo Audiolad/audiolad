@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import { NEW_EMAIL_FIELD_HINT } from "@/lib/auth/email/messages";
+
 import {
   BUSINESS_INQUIRY_EMAIL,
   buildBusinessInquiryMailto,
@@ -73,6 +75,7 @@ export default function BusinessInquiryForm() {
           aria-invalid={attempted && Boolean(errors.email)}
           onChange={(event) => update("email", event.target.value)}
         />
+        <span className="business-note" data-testid="business-inquiry-email-ru-hint">{NEW_EMAIL_FIELD_HINT}</span>
         {attempted && errors.email ? (
           <span className="business-field__error">{errors.email}</span>
         ) : null}

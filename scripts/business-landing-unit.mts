@@ -254,9 +254,25 @@ const inquiryErrors = validateBusinessInquiry({
 });
 assert.equal(hasBusinessInquiryErrors(inquiryErrors), true);
 
+// t1446u: inquiry email – Russian mail services only, same rule and texts as the cafe cabinet.
+const validInquiry = { name: "Анна", email: "anna@yandex.ru", company: "", locations: "1", message: "" };
+assert.deepEqual(validateBusinessInquiry(validInquiry), {});
+for (const email of ["anna@gmail.com", "Anna@GMAIL.COM", "anna@outlook.com", "anna@icloud.com"]) {
+  assert.equal(validateBusinessInquiry({ ...validInquiry, email }).email,
+    "Gmail и другие зарубежные почтовые сервисы указать нельзя. Подойдёт российская почта – рекомендуем Яндекс Почту.", email);
+}
+for (const email of ["anna@mail.ru", "anna@ya.ru", "anna@rambler.ru", "anna@bk.ru"]) {
+  assert.equal(validateBusinessInquiry({ ...validInquiry, email }).email, undefined, email);
+}
+assert.equal(validateBusinessInquiry({ ...validInquiry, email: "not-an-email" }).email, "Проверьте адрес электронной почты.");
+const inquiryForm = read("src/components/business/BusinessInquiryForm.tsx");
+assert.match(inquiryForm, /\{NEW_EMAIL_FIELD_HINT\}/);
+assert.match(read("src/lib/auth/email/messages.ts"),
+  /Подойдёт российская почта: Яндекс, Mail\.ru, Рамблер\. Рекомендуем Яндекс Почту – так письма и коды приходят стабильнее\./);
+
 const mailto = buildBusinessInquiryMailto({
   name: "Анна",
-  email: "anna@example.com",
+  email: "anna@yandex.ru",
   company: "Кафе",
   locations: "3",
   message: "Две точки в городе",
