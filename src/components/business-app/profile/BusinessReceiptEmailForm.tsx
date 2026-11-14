@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { saveBusinessReceiptEmail } from "@/app/business-app/profile/actions";
 import { normalizeBusinessReceiptEmail } from "@/lib/business/subscription-checkout";
+import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE, NEW_EMAIL_FIELD_HINT } from "@/lib/auth/email";
 import { BusinessEmailTakenActions } from "@/components/business-app/profile/BusinessEmailTakenActions";
 import "./profile.css";
 
@@ -27,6 +28,7 @@ export default function BusinessReceiptEmailForm({ receiptEmail, anonymous = fal
     setMessage(""); setError(""); setTaken(false);
     const email = normalizeBusinessReceiptEmail(value);
     if (!email) { setError("Проверьте почту – похоже, в адресе ошибка."); return; }
+    if (!isNewEmailDomainAllowed(email, "client")) { setError(NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE); return; }
     setBusy(true);
     try {
       const result = await saveBusinessReceiptEmail({ receiptEmail: email });
@@ -49,6 +51,7 @@ export default function BusinessReceiptEmailForm({ receiptEmail, anonymous = fal
         onChange={(e) => { setValue(e.target.value); setMessage(""); setError(""); }}
         aria-describedby={hintId} data-testid="biz-profile-receipt-email" />
       {anonymous ? <p className="text-sm">Эта почта станет почтой для входа в кабинет.</p> : null}
+      <p className="text-sm" data-testid="biz-profile-email-ru-hint">{NEW_EMAIL_FIELD_HINT}</p>
       <p id={hintId} className="text-sm text-[var(--biz-text-muted)]">
         {saved
           ? "Сюда приходят чеки об оплате подписки. Эта же почта подставится при следующей оплате."

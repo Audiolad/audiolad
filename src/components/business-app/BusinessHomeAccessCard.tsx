@@ -20,6 +20,7 @@ import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-gr
 import { BUSINESS_OFFER_EDITION, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { BUSINESS_PLAN_MONTHLY_PRICE_RUB, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { normalizeBusinessReceiptEmail, type BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE, NEW_EMAIL_FIELD_HINT } from "@/lib/auth/email";
 import {
   partnerConfirmedUnitPriceMinor,
   parsePartnerQuote,
@@ -49,6 +50,7 @@ export type PayError = { code: BusinessPayErrorCode; href: string | null };
 
 /** Shown before any request when the account has no email and the field is empty or invalid. */
 const RECEIPT_EMAIL_REQUIRED_ERROR = { code: "receipt_email_required" as const, href: null };
+const RECEIPT_EMAIL_DOMAIN_ERROR = { code: "receipt_email_domain_not_allowed" as const, href: null };
 
 function unavailablePayError(): PayError {
   return { code: "internal_error", href: null };
@@ -90,7 +92,7 @@ export function useBusinessHomePay() {
   }
   const setReceiptEmail = (value: string) => {
     setReceiptEmailState(value);
-    if (error?.code === "receipt_email_required" || error?.code === "receipt_email_taken") setError(null);
+    if (error?.code === "receipt_email_required" || error?.code === "receipt_email_taken" || error?.code === "receipt_email_domain_not_allowed") setError(null);
   };
 
   const accept = async () => {
@@ -122,6 +124,12 @@ export function useBusinessHomePay() {
     const typedEmail = askReceiptEmail ? normalizeBusinessReceiptEmail(receiptEmail) : null;
     if (askReceiptEmail && !typedEmail) {
       setError(RECEIPT_EMAIL_REQUIRED_ERROR);
+      return;
+    }
+    // t1446u: a new address – Russian mail only. The remembered one of a permanent account stays.
+    const anonymousOwner = domain.status === "authenticated" && domain.isAnonymousOwner === true;
+    if (typedEmail && (anonymousOwner || typedEmail !== savedReceiptEmail) && !isNewEmailDomainAllowed(typedEmail, "client")) {
+      setError(RECEIPT_EMAIL_DOMAIN_ERROR);
       return;
     }
     setBusy(true);
@@ -164,7 +172,7 @@ export function useBusinessHomePay() {
         const next = payErrorFromPayload(payload);
         // A newer offer edition was published after this page loaded: show «Принять условия» again.
         if (next.code === "offer_acceptance_required") setAccepted(false);
-        if (next.code === "receipt_email_required") setAskReceiptEmail(true);
+        if (next.code === "receipt_email_required" || next.code === "receipt_email_domain_not_allowed") setAskReceiptEmail(true);
         // t1322u: stale reservation / quote – re-reserve from the cookie and retry pay once
         // with the fresh personal price instead of dropping to 799 ₽.
         if (next.code === "partner_terms_changed") {
@@ -377,6 +385,7 @@ export function BusinessReceiptEmailField({ control, busy }: { control: NonNulla
         data-testid="biz-home-receipt-email-input"
       />
       {anonymous ? <p className="text-sm">Эта почта станет почтой для входа в кабинет.</p> : null}
+      <p className="text-sm" data-testid="biz-home-receipt-email-ru-hint">{NEW_EMAIL_FIELD_HINT}</p>
       <p id={`${id}-hint`} className="text-sm leading-6 text-[var(--biz-text-muted)]">
         {remembered
           ? "Чек придёт на эту почту. Изменить её можно здесь или в профиле."
@@ -537,6 +546,9 @@ export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; a
   }
   if (error.code === "support_mode_consent_forbidden") {
     return <p role="alert" data-testid="biz-home-pay-error">В режиме сопровождения оплату оформить нельзя.</p>;
+  }
+  if (error.code === "receipt_email_domain_not_allowed") {
+    return <p role="alert" data-testid="biz-home-pay-error">{NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE}</p>;
   }
   if (error.code === "receipt_email_required") {
     return (

@@ -2,6 +2,7 @@
 
 import { linkBusinessLoginEmail, businessPasswordError } from "@/lib/business-app/login-access";
 import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
+import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } from "@/lib/auth/email";
 import { businessLoginEmailSite } from "@/lib/email/business-login-email-site";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
@@ -119,6 +120,9 @@ export async function saveBusinessTimezone(input: { timezone: string }) {
 export async function saveBusinessReceiptEmail(input: { receiptEmail: string }) {
   const receiptEmail = normalizeBusinessReceiptEmail(input?.receiptEmail);
   if (!receiptEmail) return { ok: false, error: "Проверьте почту – похоже, в адресе ошибка." } as const;
+  if (!isNewEmailDomainAllowed(receiptEmail)) {
+    return { ok: false, code: "receipt_email_domain_not_allowed", error: NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } as const;
+  }
   if ((await cookies()).has(AUTHOR_SUPPORT_COOKIE_NAME) || await businessHallDeviceLocked()) {
     return { ok: false, error: "Почту для чеков меняет владелец в личном кабинете." } as const;
   }

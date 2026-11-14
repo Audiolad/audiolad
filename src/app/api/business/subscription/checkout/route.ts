@@ -3,6 +3,7 @@ import { AUTHOR_SUPPORT_COOKIE_NAME } from "@/lib/author-support/policy";
 import { linkBusinessLoginEmail } from "@/lib/business-app/login-access";
 import { sendBusinessLoginEmail } from "@/lib/email/send-business-login-email";
 import { businessLoginEmailSite } from "@/lib/email/business-login-email-site";
+import { isNewEmailDomainAllowed } from "@/lib/auth/email";
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { after, NextResponse } from "next/server";
 
@@ -14,6 +15,7 @@ import {
   mapBusinessSubscriptionRpcError,
   parseConfirmedUnitPriceMinor,
   businessReceiptEmailToRemember,
+  normalizeBusinessReceiptEmail,
   resolveBusinessReceiptEmail,
   savedBusinessReceiptEmail,
   BUSINESS_RECEIPT_EMAIL_META_KEY,
@@ -74,6 +76,15 @@ export async function POST(request: Request) {
   if (!customerEmail) {
     return NextResponse.json({ error: "receipt_email_required" }, { status: 400 });
   }
+  // t1446u: a NEW email (typed now, or about to become the login of a guest) – Russian mail
+  // services only. The account email and an earlier remembered receipt email of a permanent
+  // account stay as they are: existing customers keep paying.
+  const typedReceiptEmail = normalizeBusinessReceiptEmail(body?.receipt_email);
+  const newEmail = !user.email?.trim() &&
+    (user.is_anonymous || (customerEmail === typedReceiptEmail && customerEmail !== savedReceiptEmail));
+  if (newEmail && !isNewEmailDomainAllowed(customerEmail)) {
+    return NextResponse.json({ error: "receipt_email_domain_not_allowed" }, { status: 400 });
+  }
   if (!isPaymentsConfigured()) {
     return NextResponse.json({ error: "payments_not_configured" }, { status: 503 });
   }
@@ -106,7 +117,7 @@ export async function POST(request: Request) {
   }
   const linked = await linkBusinessLoginEmail(supabase, user, customerEmail);
   if (!linked.ok) {
-    return NextResponse.json({ error: linked.code }, { status: linked.code === "receipt_email_taken" ? 409 : 503 });
+    return NextResponse.json({ error: linked.code }, { status: linked.code === "receipt_email_taken" ? 409 : linked.code === "receipt_email_domain_not_allowed" ? 400 : 503 });
   }
   if (linked.linked) {
     const site = businessLoginEmailSite(request.headers);
