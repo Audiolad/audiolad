@@ -305,7 +305,11 @@ export default function AdminAnalyticsBreakdownPanel({
       ) : null}
 
       {!loading && !error && tab === "practices" ? (
-        practices.rows.length === 0 ? (
+        practices.error ? (
+          <p className="mt-6 text-sm text-[#b34f63]" role="alert">
+            Не удалось загрузить таблицу за этот период. Обновите страницу или выберите другой период.
+          </p>
+        ) : practices.rows.length === 0 ? (
           <p className="mt-6 text-sm text-[#9485b4]">
             {query
               ? "По запросу ничего не найдено. Измените поиск или Top N."
@@ -372,7 +376,11 @@ export default function AdminAnalyticsBreakdownPanel({
       ) : null}
 
       {!loading && !error && tab === "authors" ? (
-        authors.rows.length === 0 ? (
+        authors.error ? (
+          <p className="mt-6 text-sm text-[#b34f63]" role="alert">
+            Не удалось загрузить таблицу за этот период. Обновите страницу или выберите другой период.
+          </p>
+        ) : authors.rows.length === 0 ? (
           <p className="mt-6 text-sm text-[#9485b4]">Нет активности авторов за период.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
@@ -415,7 +423,11 @@ export default function AdminAnalyticsBreakdownPanel({
       ) : null}
 
       {!loading && !error && tab === "utm" ? (
-        acquisition.rows.length === 0 ? (
+        acquisition.error ? (
+          <p className="mt-6 text-sm text-[#b34f63]" role="alert">
+            Не удалось загрузить таблицу за этот период. Обновите страницу или выберите другой период.
+          </p>
+        ) : acquisition.rows.length === 0 ? (
           <p className="mt-6 text-sm text-[#9485b4]">Нет данных по источникам.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">

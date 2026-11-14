@@ -1035,6 +1035,52 @@ function testSourceContracts() {
     groupedTimeseries,
     /REVOKE ALL ON FUNCTION public\.playback_usage_admin_listened_ms_by_bucket\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text\s*\) FROM PUBLIC, anon, authenticated;/,
   );
+  // t1450u: per-practice listening for «Разрезы по практикам» is grouped too.
+  const groupedPractices = read(
+    "supabase/migrations/20270309120000_admin_practices_listening_grouped.sql",
+  );
+  const practiceHelperBody = groupedPractices.slice(
+    groupedPractices.indexOf("CREATE OR REPLACE FUNCTION public.playback_usage_admin_listened_ms_by_practice("),
+    groupedPractices.indexOf("COMMENT ON FUNCTION public.playback_usage_admin_listened_ms_by_practice("),
+  );
+  assert.match(practiceHelperBody, /WITH g AS MATERIALIZED \(/);
+  assert.match(practiceHelperBody, /GROUP BY f\.session_id, f\.user_id, f\.anonymous_id, f\.practice_id, f\.author_id_snapshot/);
+  assert.match(practiceHelperBody, /GROUP BY g\.practice_id;/);
+  assert.match(practiceHelperBody, /SECURITY DEFINER/);
+  assert.match(practiceHelperBody, /is_platform_staff\(g\.user_id\)/);
+  assert.match(practiceHelperBody, /is_analytics_test_user\(g\.user_id\)/);
+  assert.match(practiceHelperBody, /author_members/);
+  assert.doesNotMatch(practiceHelperBody, /playback_usage_admin_facts\(|g\.occurred_at|g\.listened_ms > 0|admin_analytics_visitor_key/);
+  const practicesRpcBody = groupedPractices.slice(
+    groupedPractices.indexOf("CREATE OR REPLACE FUNCTION public.admin_analytics_p2_practices("),
+    groupedPractices.indexOf("COMMENT ON FUNCTION public.admin_analytics_p2_practices("),
+  );
+  assert.match(practicesRpcBody, /FROM public\.playback_usage_admin_listened_ms_by_practice\(/);
+  assert.doesNotMatch(practicesRpcBody, /playback_usage_admin_facts\(/);
+  assert.doesNotMatch(groupedPractices, /CREATE INDEX|DROP TABLE|DROP FUNCTION|ALTER TABLE|TRUNCATE|DELETE FROM|UPDATE public\.|statement_timeout\s*=|ALTER ROLE|ALTER DATABASE/i);
+  assert.equal((groupedPractices.match(/GRANT EXECUTE/g) ?? []).length, 2);
+  assert.match(
+    groupedPractices,
+    /REVOKE ALL ON FUNCTION public\.playback_usage_admin_listened_ms_by_practice\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text\s*\) FROM PUBLIC, anon, authenticated;/,
+  );
+  assert.match(
+    groupedPractices,
+    /GRANT EXECUTE ON FUNCTION public\.playback_usage_admin_listened_ms_by_practice\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text\s*\) TO service_role;/,
+  );
+  assert.match(
+    groupedPractices,
+    /REVOKE ALL ON FUNCTION public\.admin_analytics_p2_practices\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text, int, int, text\s*\) FROM PUBLIC, anon, authenticated;/,
+  );
+  // A failed table must not read as "no activity for the period".
+  const breakdownPanel = read("src/components/admin/AdminAnalyticsBreakdownPanel.tsx");
+  for (const table of ["practices", "authors", "acquisition"]) {
+    assert.ok(
+      breakdownPanel.includes(`${table}.error ? (`) &&
+        breakdownPanel.indexOf(`${table}.error ? (`) < breakdownPanel.indexOf(`${table}.rows.length === 0`),
+      `${table} error state must render before the empty state`,
+    );
+  }
+  assert.match(queries, /admin_analytics_breakdown_table_failed/);
   const windowsMigration = read(
     "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
   );
