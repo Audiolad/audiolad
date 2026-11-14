@@ -627,10 +627,10 @@ export default function BusinessLandingView({
         <section className="business-section" id="connect" aria-labelledby="business-connect-title">
           <div className="business-wrap">
             <h2 id="business-connect-title" className="business-h2">
-              Нужна помощь с подключением?
+              Поможем подключить музыку
             </h2>
             <p className="business-lead">
-              Напишите, если хотите помощь со стартом или сетью. Это по вашей просьбе.
+              Оставьте почту – подскажем, как запустить музыку в вашем заведении или сразу в нескольких точках.
             </p>
             <div className="business-inquiry">
               <BusinessInquiryForm />
