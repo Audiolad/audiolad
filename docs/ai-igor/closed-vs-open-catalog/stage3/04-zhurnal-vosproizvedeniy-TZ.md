@@ -10,7 +10,7 @@
 
 Подробно:
 1. Таблица создана миграцией `20261231120000_business_spa_programs_playback_log.sql` для пилота «спа-программ». В комментарии к таблице прямо сказано: это «сырые события клиента», время клиента недостоверно, это **не** доказательство воспроизведения (не «Proof of Play»), а основной учёт – `playback_usage_facts`.
-2. Писать в неё может только функция `syncSpaPlaybackLog` (`src/app/business-app/spa/actions.ts`), её вызывает только `SpaPilotPlayer` (`src/components/business-app/SpaPilotPlayer.tsx`).
+2. Писать в неё может только функция `syncSpaPlaybackLog` (`src/app/business-app/spa/actions.ts`), её вызывает только `SpaPilotPlayer` (`src/components/business-app/SpaPilotPlayer.tsx`). Читают таблицу только админ-отчёты пилота спа (`src/lib/business-app/spa-admin.ts`, `spa-admin-report.ts`); других мест записи в коде и миграциях нет (кроме тестов).
 3. Этот плеер работает, только если пользователь есть в `business_pilot_allowlist` и у организации есть программа (`business_programs`). В проде обе таблицы пустые (0 строк), `business_program_items` – тоже 0. Значит, плеер `/spa` ни у кого не запускается.
 4. Залы работают через плеер точки: `POST /api/business/point` (`src/app/api/business/point/route.ts`) → функции `report_business_point_player` и `apply_business_point_usage_sample` → `apply_business_player_usage_sample` → запись в `playback_usage_facts` с `usage_kind = 'business'`. До `business_playback_log` этот путь не доходит.
 5. Ещё одна пустая таблица – `business_player_listening_history` (0 строк).
