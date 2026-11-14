@@ -1127,4 +1127,180 @@ BEGIN
 END
 $$;
 
+-- Grouped listening per practice (20270309120000, t1450u): reuse the grouped
+-- SUM fixture above. The helper must equal GROUP BY practice_id over
+-- playback_usage_admin_facts for every filter combination, and
+-- admin_analytics_p2_practices must take listenedMs from it.
+DO $$
+DECLARE
+  v_author_a uuid := 'ab111111-1111-4111-8111-1111111111a1';
+  v_author_b uuid := 'ab222222-2222-4222-8222-2222222222b2';
+  v_pa1 uuid := 'cb111111-1111-4111-8111-1111111111a1';
+  v_pb uuid := 'cb333333-3333-4333-8333-3333333333b3';
+  v_end timestamptz := timestamptz '2026-10-07 14:16:00+03';
+  v_def text;
+  v_payload jsonb;
+  v_checked integer := 0;
+  v_nonempty integer := 0;
+  v_rpc_checked integer := 0;
+  v_window record;
+  v_include boolean;
+  v_author uuid;
+  v_practice uuid;
+  v_utm text;
+  v_device text;
+BEGIN
+  IF to_regprocedure('public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)') IS NULL THEN
+    RAISE EXCEPTION 'playback_usage_admin_listened_ms_by_practice is missing';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR has_function_privilege('public', 'public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'grouped per-practice helper grants are not hardened';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,integer,integer,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,integer,integer,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,integer,integer,text)', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'admin_analytics_p2_practices grants changed';
+  END IF;
+
+  v_def := pg_get_functiondef('public.playback_usage_admin_listened_ms_by_practice(timestamptz,timestamptz,boolean,uuid,uuid,text,text)'::regprocedure);
+  IF position('AS MATERIALIZED' in v_def) = 0
+    OR position('SECURITY DEFINER' in v_def) = 0
+    OR position('playback_usage_admin_facts' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'grouped per-practice helper lost MATERIALIZED or SECURITY DEFINER: %', v_def;
+  END IF;
+
+  v_def := pg_get_functiondef('public.admin_analytics_p2_practices(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text,integer,integer,text)'::regprocedure);
+  IF position('playback_usage_admin_listened_ms_by_practice(' in v_def) = 0
+    OR position('playback_usage_admin_facts' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'admin_analytics_p2_practices does not use grouped per-practice listening: %', v_def;
+  END IF;
+
+  FOR v_window IN
+    SELECT * FROM (VALUES
+      (NULL::timestamptz, NULL::timestamptz),
+      (v_end - interval '1 day', v_end),
+      (v_end - interval '7 days', v_end),
+      (v_end - interval '30 days', v_end),
+      (v_end - interval '14 days', v_end - interval '7 days'),
+      (v_end - interval '60 days', v_end - interval '30 days'),
+      (v_end - interval '7 days', NULL::timestamptz)
+    ) AS w(p_from, p_to)
+  LOOP
+    FOREACH v_include IN ARRAY ARRAY[false, true] LOOP
+      FOREACH v_author IN ARRAY ARRAY[NULL, v_author_a, v_author_b]::uuid[] LOOP
+        FOREACH v_practice IN ARRAY ARRAY[NULL, v_pa1, v_pb]::uuid[] LOOP
+          FOREACH v_utm IN ARRAY ARRAY[NULL, 'telegram', '__none__']::text[] LOOP
+            FOREACH v_device IN ARRAY ARRAY[NULL, 'mobile', '']::text[] LOOP
+              IF EXISTS (
+                WITH grouped AS (
+                  SELECT g.practice_id, g.listened_ms
+                  FROM public.playback_usage_admin_listened_ms_by_practice(
+                    v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                  ) AS g
+                ), canonical AS (
+                  SELECT f.practice_id, coalesce(sum(f.listened_ms), 0)::bigint AS listened_ms
+                  FROM public.playback_usage_admin_facts(
+                    v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                  ) AS f
+                  GROUP BY f.practice_id
+                )
+                (SELECT * FROM grouped EXCEPT SELECT * FROM canonical)
+                UNION ALL
+                (SELECT * FROM canonical EXCEPT SELECT * FROM grouped)
+              ) THEN
+                RAISE EXCEPTION 'grouped per-practice <> canonical for from % to % include % author % practice % utm % device %',
+                  v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device;
+              END IF;
+
+              -- Author snapshot: null exactly when every canonical snapshot is
+              -- null, otherwise one of the canonical non-null values.
+              IF EXISTS (
+                SELECT 1
+                FROM public.playback_usage_admin_listened_ms_by_practice(
+                  v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                ) AS g
+                WHERE (
+                  g.author_id_snapshot IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM public.playback_usage_admin_facts(
+                      v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                    ) AS f
+                    WHERE f.practice_id = g.practice_id AND f.author_id_snapshot IS NOT NULL
+                  )
+                ) OR (
+                  g.author_id_snapshot IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM public.playback_usage_admin_facts(
+                      v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                    ) AS f
+                    WHERE f.practice_id = g.practice_id AND f.author_id_snapshot = g.author_id_snapshot
+                  )
+                )
+              ) THEN
+                RAISE EXCEPTION 'grouped per-practice author snapshot drifted for from % to % include % author % practice % utm % device %',
+                  v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device;
+              END IF;
+
+              IF EXISTS (
+                SELECT 1 FROM public.playback_usage_admin_listened_ms_by_practice(
+                  v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                )
+              ) THEN
+                v_nonempty := v_nonempty + 1;
+              END IF;
+              v_checked := v_checked + 1;
+
+              -- The RPC row for each practice carries the canonical listened_ms.
+              IF v_practice IS NULL AND v_device IS NULL THEN
+                SELECT public.admin_analytics_p2_practices(
+                  v_window.p_from, v_window.p_to, v_include, v_author, NULL, v_utm, NULL,
+                  'listened_ms', 'desc', 5000, 0, NULL
+                ) INTO v_payload;
+                IF (v_payload ->> 'listeningTimeUnmeasured')::boolean IS NOT TRUE AND EXISTS (
+                  WITH rpc AS (
+                    SELECT (r ->> 'practiceId')::uuid AS practice_id,
+                      (r ->> 'listenedMs')::bigint AS listened_ms
+                    FROM jsonb_array_elements(v_payload -> 'rows') AS r
+                    WHERE (r ->> 'listenedMs')::bigint > 0
+                  ), canonical AS (
+                    SELECT f.practice_id, coalesce(sum(f.listened_ms), 0)::bigint AS listened_ms
+                    FROM public.playback_usage_admin_facts(
+                      v_window.p_from, v_window.p_to, v_include, v_author, NULL, v_utm, NULL
+                    ) AS f
+                    GROUP BY f.practice_id
+                  )
+                  (SELECT * FROM rpc EXCEPT SELECT * FROM canonical)
+                  UNION ALL
+                  (SELECT * FROM canonical EXCEPT SELECT * FROM rpc)
+                ) THEN
+                  RAISE EXCEPTION 'admin_analytics_p2_practices listenedMs <> canonical for from % to % include % author % utm %: %',
+                    v_window.p_from, v_window.p_to, v_include, v_author, v_utm, v_payload;
+                END IF;
+                v_rpc_checked := v_rpc_checked + 1;
+              END IF;
+            END LOOP;
+          END LOOP;
+        END LOOP;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+
+  IF v_checked <> 7 * 2 * 3 * 3 * 3 * 3 OR v_rpc_checked <> 7 * 2 * 3 * 3 THEN
+    RAISE EXCEPTION 'grouped per-practice matrix incomplete: % comparisons, % RPCs', v_checked, v_rpc_checked;
+  END IF;
+  IF v_nonempty < 50 THEN
+    RAISE EXCEPTION 'grouped per-practice matrix is mostly empty: % non-empty of %', v_nonempty, v_checked;
+  END IF;
+END
+$$;
+
 ROLLBACK;

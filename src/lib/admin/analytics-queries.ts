@@ -1254,6 +1254,21 @@ export async function getAdminAnalyticsBreakdownBundle(
     }),
   ]);
 
+  for (const [table, res] of [
+    ["practices", practicesRes],
+    ["authors", authorsRes],
+    ["acquisition", acquisitionRes],
+  ] as const) {
+    if (res.error) {
+      // An empty table here used to read as "no activity"; keep the cause in logs.
+      console.error("admin_analytics_breakdown_table_failed", {
+        table,
+        code: res.error.code ?? null,
+        timeout: /timeout/i.test(res.error.message ?? ""),
+      });
+    }
+  }
+
   const practicesData = (practicesRes.data ?? {}) as {
     total?: number;
     rows?: Array<Record<string, unknown>>;

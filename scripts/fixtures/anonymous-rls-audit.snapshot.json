@@ -6589,6 +6589,16 @@
       "file": "supabase/migrations/20270302120000_business_partner_codes.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270309120000_admin_practices_listening_grouped.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.playback_usage_admin_listened_ms_by_practice( timestamptz, timestamptz, boolean, uuid, uuid, text, text ) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270309120000_admin_practices_listening_grouped.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.admin_analytics_p2_practices( timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text, int, int, text ) TO service_role;"
     }
   ]
 }

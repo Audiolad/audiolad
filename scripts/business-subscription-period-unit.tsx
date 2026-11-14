@@ -141,7 +141,8 @@ const paidAt = new Date("2026-11-09T10:00:00.000Z");
   };
   const html = renderToStaticMarkup(
     <BusinessDomainProvider value={ownerDomain}>
-      <BusinessChromeAccessProvider value={{ mode: "trial", endsAt: "2026-11-14T15:00:00.000Z" }}>
+      {/* Fixed far-future end: the UI branch reads the real clock (a 2026-11-14 date expired on that day). */}
+      <BusinessChromeAccessProvider value={{ mode: "trial", endsAt: "2099-11-14T15:00:00.000Z" }}>
         <BusinessPayControls
           canPay
           accepted
@@ -155,7 +156,7 @@ const paidAt = new Date("2026-11-09T10:00:00.000Z");
     </BusinessDomainProvider>,
   );
   assert.match(html, /data-testid="biz-home-carryover-note"/);
-  assert.match(html, /Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 14 декабря 2026\./);
+  assert.match(html, /Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 14 декабря 2099\./);
 }
 
 
