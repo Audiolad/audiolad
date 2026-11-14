@@ -1,6 +1,8 @@
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
-import { isNewEmailDomainAllowed, NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } from "@/lib/auth/email";
+// Direct modules (not the folder index): light for public pages and their import scanners.
+import { isNewEmailDomainAllowed } from "@/lib/auth/email/new-email-policy";
+import { NEW_EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE } from "@/lib/auth/email/messages";
 
 /** Public contact already printed in the site footer. Not a new inbox. */
 export const BUSINESS_INQUIRY_EMAIL = "1@audiolad.ru";

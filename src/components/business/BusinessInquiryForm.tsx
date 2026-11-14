@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
-import { NEW_EMAIL_FIELD_HINT } from "@/lib/auth/email";
+import { NEW_EMAIL_FIELD_HINT } from "@/lib/auth/email/messages";
 
 import {
   BUSINESS_INQUIRY_EMAIL,
