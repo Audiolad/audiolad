@@ -1238,15 +1238,43 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(groupedHtml, /Мягкий джаз/);
   assert.match(groupedHtml, /data-testid="biz-now-queue"/);
   assert.match(groupedHtml, /Дальше в очереди/);
-  assert.match(groupedHtml, /Аурафон/);
   assert.match(groupedHtml, /business-atmosphere-track__cover/);
   assert.match(groupedHtml, /loading="lazy"/);
   assert.match(groupedHtml, /practice-covers\/night\/xs\.webp/);
-  const queueHtml = groupedHtml.slice(groupedHtml.indexOf('data-testid="biz-now-queue"'));
+  const queueStart = groupedHtml.indexOf('data-testid="biz-now-queue"');
+  const queueHtml = groupedHtml.slice(queueStart, groupedHtml.indexOf('data-testid="biz-workspace-player"', queueStart));
+  assert.match(queueHtml, /Сон/);
+  assert.match(queueHtml, /Ночь/);
+  assert.doesNotMatch(queueHtml, /Аурафон/, "queue rows never show the artist");
+  assert.doesNotMatch(queueHtml, /Джаз Релакс/, "the now-playing artist stays out of the queue");
   assert.doesNotMatch(queueHtml, /business-atmosphere-track__mark/, "the up-next list has no restarting numbers");
   assert.match(groupedHtml, /business-music-stage/);
   assert.match(groupedHtml, /business-track-panel/);
   assert.doesNotMatch(groupedHtml, /token=|practice-audio|object\/sign/);
+  {
+    const albumOnly = renderToStaticMarkup(<BusinessWorkspace model={model({
+      tracks: [
+        { audioItemId: TRACK, title: "Уют в каждой ноте", durationSeconds: 180, authorId: null, authorName: "Джазманов", albumTitle: "Фоновый джаз без слов", shelf: "cafe" },
+        { audioItemId: "267f8644-4ad1-4bea-9de0-d44f911ae009", title: "Тихий вечер", durationSeconds: 90, authorId: null, authorName: "Джазманов", albumTitle: "Фоновый джаз без слов", shelf: "cafe" },
+        { audioItemId: "367f8644-4ad1-4bea-9de0-d44f911ae009", title: "Без альбома", durationSeconds: 90, authorId: null, authorName: "Джазманов", albumTitle: null, shelf: "cafe" },
+        { audioItemId: "467f8644-4ad1-4bea-9de0-d44f911ae009", title: "Пустой альбом", durationSeconds: 90, authorId: null, authorName: "Джазманов", albumTitle: "   ", shelf: "cafe" },
+      ],
+    })} />);
+    const nowHtml = albumOnly.slice(albumOnly.indexOf('data-testid="biz-now-playing"'), albumOnly.indexOf('data-testid="biz-now-queue"'));
+    assert.match(nowHtml, /Уют в каждой ноте/);
+    assert.match(nowHtml, /Джазманов/, "the now-playing card still shows the artist");
+    assert.match(nowHtml, /Фоновый джаз без слов/);
+    const qStart = albumOnly.indexOf('data-testid="biz-now-queue"');
+    const queueOnly = albumOnly.slice(qStart, albumOnly.indexOf('data-testid="biz-workspace-player"', qStart));
+    assert.match(queueOnly, /Тихий вечер/);
+    assert.match(queueOnly, /Фоновый джаз без слов/);
+    assert.match(queueOnly, /Без альбома/);
+    assert.match(queueOnly, /Пустой альбом/);
+    assert.doesNotMatch(queueOnly, /Джазманов/, "missing album must not fall back to the artist");
+    const withoutAlbumRow = queueOnly.slice(queueOnly.indexOf("Без альбома"));
+    const untilNext = withoutAlbumRow.slice(0, withoutAlbumRow.indexOf("Пустой альбом"));
+    assert.doesNotMatch(untilNext, /business-atmosphere-track__album/, "no second line when the album is missing");
+  }
   const blocked = renderToStaticMarkup(
     <BusinessAtmosphereTrackButton
       title="Тишина"
