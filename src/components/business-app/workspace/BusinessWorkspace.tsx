@@ -441,14 +441,13 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             ) : (
               <ol className="business-atmosphere-tracks mt-2">
                 {upcoming.slice(0, CAFE_QUEUE_PREVIEW).map(({ track, index }) => {
-                  const lineAuthor = track.authorName?.trim() ?? "";
+                  // Title + album only. If the album is missing, line 2 stays empty – never the artist.
                   const lineAlbum = track.albumTitle?.trim() ?? "";
-                  const subtitle = [lineAuthor, lineAlbum].filter(Boolean).join(" – ");
                   return (
                     <li key={`${track.audioItemId}:${index}`}>
                       <BusinessAtmosphereTrackButton
                         title={track.title}
-                        subtitle={subtitle}
+                        subtitle={lineAlbum}
                         time={track.durationSeconds != null ? formatPlaybackClock(track.durationSeconds) : null}
                         coverUrl={track.coverUrl}
                         disabled={!player.canChangeMusic}
