@@ -1,0 +1,74 @@
+/**
+ * 39a7ef48 PR-D: private covers of business-only («только Бизнес») albums.
+ *
+ * Objects live in the private `business-private-covers` bucket (no anon/authenticated
+ * storage policies). The database stores a reference, never a URL:
+ *   business-private-cover:practices/<practiceId>/variants/<version>/<file>
+ *   business-private-cover:practices/<practiceId>/track-covers/<audioItemId>/variants/<version>/<file>
+ * Public renderers treat a reference as "no cover". Only the authorised hall/owner
+ * workspace (and the album's editors) get a short-lived signed URL from the server.
+ * Pure module: safe for client components.
+ */
+export const BUSINESS_PRIVATE_COVERS_BUCKET = "business-private-covers";
+export const BUSINESS_PRIVATE_COVER_REF_PREFIX = "business-private-cover:";
+/** Signed URL lifetime for hall/owner covers and editor previews. */
+export const BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS = 120;
+/** Browser may reuse the redirect for less than the signed URL lifetime. */
+export const BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS = 60;
+export const BUSINESS_WORKSPACE_COVER_ROUTE = "/api/business/workspace/cover";
+
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const SAFE_TAIL = "(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.(?:webp|jpg|jpeg|png)";
+const REF_PATTERN = new RegExp(
+  `^business-private-cover:practices/(${UUID})/(?:track-covers/(${UUID})/)?variants/${SAFE_TAIL}$`,
+  "i",
+);
+
+export function isBusinessPrivateCoverRef(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().startsWith(BUSINESS_PRIVATE_COVER_REF_PREFIX);
+}
+
+/** Parsed reference, or null when malformed (never signed). */
+export function parseBusinessPrivateCoverRef(
+  value: string | null | undefined,
+): { path: string; practiceId: string; audioItemId: string | null } | null {
+  if (typeof value !== "string") return null;
+  const match = REF_PATTERN.exec(value.trim());
+  if (!match) return null;
+  return {
+    path: value.trim().slice(BUSINESS_PRIVATE_COVER_REF_PREFIX.length),
+    practiceId: match[1].toLowerCase(),
+    audioItemId: match[2]?.toLowerCase() ?? null,
+  };
+}
+
+export function businessPrivateCoverRef(storagePath: string): string {
+  return `${BUSINESS_PRIVATE_COVER_REF_PREFIX}${storagePath}`;
+}
+
+export function businessPrivateAlbumCoverPrefix(practiceId: string): string {
+  return `practices/${practiceId}/variants`;
+}
+
+export function businessPrivateTrackCoverPrefix(practiceId: string, audioItemId: string): string {
+  return `practices/${practiceId}/track-covers/${audioItemId}/variants`;
+}
+
+/** Stable, token-free app URL. Every load re-checks the hall/owner session server-side. */
+export function businessWorkspaceCoverUrl(audioItemId: string, spaceId: string): string {
+  const params = new URLSearchParams({ space: spaceId, track: audioItemId });
+  return `${BUSINESS_WORKSPACE_COVER_ROUTE}?${params.toString()}`;
+}
+
+export function isBusinessWorkspaceCoverUrl(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().startsWith(`${BUSINESS_WORKSPACE_COVER_ROUTE}?`);
+}
+
+/** Editor preview of a private cover (album or one track). Requires album edit access. */
+export function businessPrivateCoverPreviewUrl(practiceId: string, coverRef: string, audioItemId?: string | null): string {
+  const params = new URLSearchParams();
+  if (audioItemId) params.set("audio", audioItemId);
+  // Changes with every upload, so the browser does not show a stale preview.
+  params.set("v", coverRef.slice(-48));
+  return `/api/author/products/${practiceId}/cover/private-preview?${params.toString()}`;
+}

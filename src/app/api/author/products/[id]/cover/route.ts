@@ -1,4 +1,3 @@
-import { assertBusinessOnlyCoverUploadAllowed } from "@/lib/business-track-passports/cover-guard";
 import { NextResponse } from "next/server";
 
 import {
@@ -29,6 +28,11 @@ import {
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  removeBusinessPrivateCoverVersions,
+  storeBusinessPrivateCover,
+} from "@/lib/business-covers/private-cover.server";
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -74,6 +78,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     // here; migrations 20270117120000 and 20270118120000).
     const coverWriter = createPracticeImageWriteClient();
     await removePracticeCoverFiles(coverWriter, id);
+    if (isBusinessOnlyPractice(practice)) {
+      await removeBusinessPrivateCoverVersions({ writer: coverWriter, practiceId: id });
+    }
 
     if (existing?.cover_image) {
       await cleanupCoverManifestWithinPrefix(
@@ -95,7 +102,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     const product = await getAuthorProductDetail(supabase, id);
-    await schedulePublishedCoverIndexNow(supabase, practice);
+    if (!isBusinessOnlyPractice(practice)) {
+      await schedulePublishedCoverIndexNow(supabase, practice);
+    }
 
     return NextResponse.json({ product, cover_url: null });
   } catch (error) {
@@ -107,7 +116,6 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
-    assertBusinessOnlyCoverUploadAllowed(practice);
     await assertPracticePublicContentEditableForActor(
       supabase,
       practice,
@@ -126,6 +134,40 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isBusinessOnlyPractice(practice)) {
+      // 39a7ef48 PR-D: private bucket only, the column keeps a reference (no URL).
+      // No public variants, no IndexNow ping.
+      const privateWriter = createPracticeImageWriteClient();
+      const stored = await storeBusinessPrivateCover({
+        writer: privateWriter,
+        practiceId: id,
+        buffer,
+        declaredMime: file.type,
+      });
+      if (!stored.ok) {
+        return NextResponse.json(
+          {
+            error: stored.code,
+            message: imageProcessErrorMessage(stored.code as "corrupt_image", "product-cover"),
+          },
+          { status: stored.code === "upload_failed" ? 500 : 400 },
+        );
+      }
+      const privateWritten = await writePracticeCoverColumns(privateWriter, id, {
+        cover_url: stored.ref,
+        cover_image: null,
+        updated_at: new Date().toISOString(),
+      });
+      if (!privateWritten.ok) {
+        console.error("author_private_cover_update_error", privateWritten.error);
+        await removeBusinessPrivateCoverVersions({ writer: privateWriter, practiceId: id, keep: [] });
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+      await removeBusinessPrivateCoverVersions({ writer: privateWriter, practiceId: id, keep: stored.paths });
+      const privateProduct = await getAuthorProductDetail(supabase, id);
+      return NextResponse.json({ product: privateProduct, cover_url: stored.ref, cover_image: null });
+    }
 
     const { data: previousRow } = await supabase
       .from("practices")

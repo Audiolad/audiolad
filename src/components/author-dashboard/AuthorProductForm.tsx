@@ -1,7 +1,8 @@
 "use client";
 
 import { isBusinessOnlyPractice } from "@/lib/products/business-only";
-import { BUSINESS_ONLY_BADGE, BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
+import { BUSINESS_ONLY_BADGE } from "@/lib/business-track-passports/model";
+import { businessPrivateCoverPreviewUrl, isBusinessPrivateCoverRef } from "@/lib/business-covers/private-cover";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -4984,12 +4985,6 @@ export default function AuthorProductForm({
 
 {showWizardStep(2) ? (
         <>
-        {/* 39a7ef48: covers live in the public bucket – no new images for business-only albums; existing ones stay removable. */}
-        {businessOnly && !form.coverUrl ? (
-          <p role="status" className="rounded-[18px] border border-[#e4d7f4] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f4f86]">
-            {BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE}
-          </p>
-        ) : (
         <div data-submit-issue={coverSubmitError ? "" : undefined}>
           <CoverUploadBlock
             label="Обложка"
@@ -4998,6 +4993,12 @@ export default function AuthorProductForm({
             coverImage={form.coverImage}
             buildUploadUrl={(id) => `/api/author/products/${id}/cover`}
             buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
+            privatePreviewSrc={
+              // 39a7ef48 PR-D: business-only covers live in a private bucket; editors see a signed preview.
+              businessOnly && practiceId && isBusinessPrivateCoverRef(form.coverUrl)
+                ? businessPrivateCoverPreviewUrl(practiceId, form.coverUrl!)
+                : null
+            }
             getPracticeId={getPracticeIdForCoverUpload}
             onUpdated={handleProductCoverUpdated}
             hint={`${PRODUCT_LANGUAGE_GUIDELINES.coverTechnicalHint}. ${PRODUCT_LANGUAGE_GUIDELINES.fieldHints.cover}`}
@@ -5010,7 +5011,6 @@ export default function AuthorProductForm({
             </p>
           ) : null}
         </div>
-        )}
 
         {!businessOnly && !isCourse ? (
           <AuthorProductVideoExport
@@ -5805,8 +5805,7 @@ export default function AuthorProductForm({
                 ) : null}
               </label>
 
-              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST &&
-              !(businessOnly && !audioItem.cover_url) ? (
+              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
                 <div className="mt-4">
                   <CoverUploadBlock
                     label="Обложка трека"
@@ -5823,6 +5822,11 @@ export default function AuthorProductForm({
                       `/api/author/products/${id}/audio/${audioItem.id}/cover`
                     }
                     getPracticeId={getPracticeIdForCoverUpload}
+                    privatePreviewSrc={
+                      businessOnly && practiceId && isBusinessPrivateCoverRef(audioItem.cover_url)
+                        ? businessPrivateCoverPreviewUrl(practiceId, audioItem.cover_url!, audioItem.id)
+                        : null
+                    }
                     disabled={
                       audioItem.id.startsWith("temp-") ||
                       !practiceId ||

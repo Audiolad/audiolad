@@ -1,7 +1,7 @@
 import { isBusinessOnlyPractice, type BusinessOnlyFlagRow } from '@/lib/products/business-only';
 
 export const BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE =
-  'Обложки и изображения для закрытых альбомов Бизнеса пока не загружаются – приватное хранилище обложек ещё не готово.';
+  'Галерея недоступна для закрытых альбомов Бизнеса – используйте обложку альбома и обложки треков, они хранятся закрыто.';
 export const BUSINESS_ONLY_BADGE = 'Только для АудиоЛад Бизнес – не публикуется в открытом АудиоЛаде';
 export const PASSPORT_FIELDS = {
   al_code: 'Код AL-T-', generator_tool: 'Инструмент генерации', generator_plan: 'Тариф генератора',

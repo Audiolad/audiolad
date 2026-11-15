@@ -18,8 +18,6 @@ assert.equal(body.error, BUSINESS_ONLY_COVER_UPLOAD_BLOCKED);
 assert.equal(body.message, BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE);
 assert.doesNotMatch(body.message, /—/);
 const routes: [string, string, RegExp][] = [
-  ['src/app/api/author/products/[id]/cover/route.ts', 'export async function POST', /uploadOptimizedImageSet|writePracticeCoverColumns/],
-  ['src/app/api/author/products/[id]/audio/[audioId]/cover/route.ts', 'export async function POST', /uploadOptimizedImageSet|writeTrackCoverColumns/],
   ['src/app/api/author/products/[id]/gallery/route.ts', 'export async function POST', /insertAuthorGallerySlide|uploadOptimizedImageSet/],
   ['src/app/api/author/products/[id]/gallery/[slideId]/route.ts', 'export async function PATCH', /replaceAuthorGallerySlideImage|uploadOptimizedImageSet/],
 ];
@@ -37,9 +35,9 @@ for (const table of ['practices', 'audio_items', 'publication_gallery_slides']) 
   assert.match(sql, new RegExp(`BEFORE INSERT OR UPDATE ON public\\.${table}\\s+FOR EACH ROW EXECUTE FUNCTION public\\.guard_business_only_public_images`));
 }
 assert.match(read('supabase/rollback/20270311120000_business_track_passports.down.sql'), /DROP FUNCTION public\.guard_business_only_public_images\(\);/);
+// PR-D: album/track covers of closed albums go to the private bucket (business-private-covers-unit);
+// only the gallery stays blocked and hidden.
 const form = read('src/components/author-dashboard/AuthorProductForm.tsx');
-assert.match(form, /\{businessOnly && !form\.coverUrl \? \(/, 'album cover upload hidden for business-only without a cover');
-assert.match(form, /!\(businessOnly && !audioItem\.cover_url\)/, 'track cover upload hidden for business-only without a cover');
 assert.match(form, /\(!businessOnly \|\| \(initialProduct\?\.gallery_slides\?\.length \?\? 0\) > 0\)/, 'gallery hidden for business-only without slides');
 assert.match(read('supabase/migrations/20270311120000_business_track_passports.sql'), /^BEGIN;\nSET LOCAL lock_timeout = '5s';/m);
-console.log('business-only-cover-guard: PASS (helper 409 + Russian message, 4 upload routes guarded before storage, DB triggers on practices/audio_items/gallery, rollback, author form hides uploads, lock_timeout)');
+console.log('business-only-cover-guard: PASS (helper 409 + Russian message, 2 gallery upload routes guarded before storage, DB triggers on practices/audio_items/gallery, rollback, author form hides gallery, lock_timeout)');

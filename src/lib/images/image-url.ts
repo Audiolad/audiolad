@@ -1,3 +1,4 @@
+import { BUSINESS_PRIVATE_COVER_REF_PREFIX } from "@/lib/business-covers/private-cover";
 import { getCoverPublicUrl } from "@/lib/author-products/utils";
 import { getAuthorAssetPublicUrl } from "@/lib/authors/assets";
 import {
@@ -132,6 +133,11 @@ export function buildCoverDisplayUrlFromManifest(
 
   if (path) {
     return resolvePracticeCoverPublicUrl(path);
+  }
+
+  // 39a7ef48 PR-D: a private business-only cover reference is never a public image.
+  if (legacyUrl?.trim().startsWith(BUSINESS_PRIVATE_COVER_REF_PREFIX)) {
+    return null;
   }
 
   return legacyUrl?.trim() || null;

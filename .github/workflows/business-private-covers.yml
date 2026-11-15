@@ -1,0 +1,60 @@
+name: Business Private Covers
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/business-private-covers.yml'
+      - 'supabase/migrations/**'
+      - 'supabase/rollback/**'
+      - 'scripts/business-*.py'
+      - 'scripts/business-*.mts'
+      - 'src/lib/business-covers/**'
+      - 'src/lib/business-workspace/**'
+      - 'src/lib/business-app/**'
+      - 'src/lib/business-track-passports/**'
+      - 'src/lib/author-products/**'
+      - 'src/lib/images/**'
+      - 'src/lib/products/**'
+      - 'src/components/author-dashboard/**'
+      - 'src/app/api/author/products/**'
+      - 'src/app/api/business/**'
+      - 'package.json'
+permissions:
+  contents: read
+jobs:
+  private-covers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Local PostgreSQL toolchain
+        run: |
+          set -euo pipefail
+          ls -d /usr/lib/postgresql/*/bin
+          echo "PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)" >> "$GITHUB_ENV"
+      - name: Private covers (unit + isolated SQL with real RLS)
+        run: |
+          set -euo pipefail
+          npm run test:business-private-covers | tee /tmp/private-covers.log
+          grep -q 'business-private-covers-unit: PASS' /tmp/private-covers.log
+          grep -q 'business-private-covers-isolated: PASS' /tmp/private-covers.log
+      - run: npm run test:business-only-admin
+      - run: npm run test:business-only-leaks
+      - name: Lint private cover changes
+        run: >-
+          npx eslint src/lib/business-covers src/lib/business-workspace/cover-source.ts
+          src/lib/business-workspace/load.server.ts src/lib/business-app/album-cover.ts
+          'src/app/api/business/workspace/cover/route.ts'
+          'src/app/api/author/products/[id]/cover/route.ts'
+          'src/app/api/author/products/[id]/cover/private-preview/route.ts'
+          'src/app/api/author/products/[id]/audio/[audioId]/cover/route.ts'
+          src/components/author-dashboard/useCoverUpload.ts
+          src/components/author-dashboard/AuthorProductForm.tsx
+          scripts/business-private-covers-unit.mts

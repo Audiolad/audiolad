@@ -1,3 +1,4 @@
+import { BUSINESS_PRIVATE_COVER_REF_PREFIX } from "@/lib/business-covers/private-cover";
 const CYRILLIC_MAP: Record<string, string> = {
   а: "a",
   б: "b",
@@ -164,6 +165,11 @@ export function buildCoverDisplayUrl(
   }
 
   const trimmed = coverUrl.trim();
+
+  // 39a7ef48 PR-D: a private business-only cover reference is never a public image.
+  if (trimmed.startsWith(BUSINESS_PRIVATE_COVER_REF_PREFIX)) {
+    return null;
+  }
 
   if (!version?.trim()) {
     return trimmed;

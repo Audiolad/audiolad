@@ -2794,3 +2794,56 @@ WITH CSV HEADER` под админской ролью) – данные пасп
 Изолированный тест выполняет up/down, production не затрагивается. Место
 неизменяемого архива доказательств пока не определено; эта миграция хранит
 только ссылки на условия и хеш описи.
+
+### PR-D: закрытые обложки альбомов «только Бизнес» (39a7ef48)
+
+Миграция `20270312120000_business_only_private_covers.sql` (с `SET LOCAL
+lock_timeout = '5s'`) снимает запрет PR-C на обложки закрытых альбомов: у каждого
+закрытого альбома своя обложка, но только в закрытом хранилище.
+
+- Бакет `business-private-covers`: `public = false`, лимит 10 МБ, WebP/JPEG/PNG.
+  Разрешающих политик нет; RESTRICTIVE-ограждения
+  `business_private_covers_{read,insert,update,delete}_fence` запрещают anon и
+  authenticated любые операции с бакетом даже при старых широких политиках
+  `storage.objects`. Читает и пишет только сервер (service role).
+- В `practices.cover_url` и `audio_items.cover_url` хранится ссылка, а не URL:
+  `business-private-cover:practices/<альбом>/variants/<версия>/<файл>` и
+  `business-private-cover:practices/<альбом>/track-covers/<трек>/variants/<версия>/<файл>`.
+  `cover_image` (манифест публичных вариантов) у закрытых альбомов всегда NULL.
+- `guard_business_only_public_images` переопределена: для закрытого альбома и
+  его треков допустима только ссылка этого же альбома/трека
+  (`business_private_cover_ref_ok`, только service_role), иначе
+  `business_only_cover_must_be_private`. Ссылка на обычном альбоме –
+  `private_cover_requires_business_only`. Проверка срабатывает и при
+  назначении режима «только Бизнес» черновику с публичной обложкой. Галерея
+  закрытых альбомов по-прежнему запрещена (`business_only_cover_upload_blocked`).
+- `assert_practice_moderation_ready` v9 = v8 плюс одно правило: закрытому
+  альбому нужна закрытая ссылка (`business_only_cover_not_private`), обычному
+  она запрещена (`private_cover_on_public_product`). Поэтому
+  `publish_audio_product` публикует закрытый альбом с закрытой обложкой;
+  без обложки публикации нет. Обычные альбомы проверяются как раньше.
+
+Приложение. Маршруты загрузки обложки альбома и трека для закрытого альбома
+пишут файлы только в закрытый бакет, ссылку – в колонку, без пинга IndexNow.
+Все публичные рендеры (`buildCoverDisplayUrl`, `resolveProductCoverUrl`,
+`buildCoverDisplayUrlFromManifest`, `cabinetAlbumCoverUrl`) превращают ссылку в
+«нет обложки», поэтому ссылка не попадает на страницы, в OG, sitemap и каталог
+(сами закрытые альбомы там и так скрыты PR-A/PR-B). Плеер зала и владельца
+получает для трека закрытого альбома адрес без токена
+`/api/business/workspace/cover?space=…&track=…`. Маршрут повторяет проверки
+подписи аудио (`loadWorkspaceActor`, открытый плеер, трек в разрешённом
+каталоге этой сессии) и отвечает 302 на подписанную ссылку на 120 секунд
+(`Cache-Control: private, max-age=60`); иначе 404. Поведение плеера, дневные
+части и кнопка энергии не менялись – меняется только источник обложки.
+Редакторы альбома видят превью через
+`/api/author/products/[id]/cover/private-preview` (тот же доступ, что и к
+редактированию, подписанная ссылка на 120 секунд, `no-store`).
+
+Откат: `supabase/rollback/20270312120000_business_only_private_covers.down.sql`.
+Порядок: 1) код PR-D; 2) экспорт ссылок (`SELECT id, cover_url … LIKE
+'business-private-cover:%'` для `practices` и `audio_items`) и файлов бакета через
+Storage API; 3) откат PR-D – возвращает v8 проверки готовности и guard PR-C,
+очищает ссылки, удаляет `business_private_cover_ref_ok`; бакет и ограждения
+удаляются, только если бакет пуст, иначе остаются (файлы остаются закрытыми);
+4) затем, при необходимости, откаты PR-C и PR-A. После отката закрытые альбомы
+снова без обложек и не публикуются.

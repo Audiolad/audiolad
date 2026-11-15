@@ -16,7 +16,7 @@ import {
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
-import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
+import { workspaceTrackCoverUrl } from "@/lib/business-workspace/cover-source";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { loadBusinessLocationContext } from "@/lib/business-app/location-context.server";
@@ -171,6 +171,7 @@ async function candidatesFromPractices(
   nameByAuthor: ReadonlyMap<string | null, string>,
   sources: ReturnType<typeof sourcesForSpace>,
   requireKnownAuthor: boolean,
+  spaceId: BusinessSpaceId,
 ): Promise<WorkspaceCatalogCandidate[] | "error"> {
   const withCovers = await attachPracticeCovers(db, practices);
   if (withCovers === "error") return "error";
@@ -242,11 +243,7 @@ async function candidatesFromPractices(
       audioStatus: audio.status,
       audioPath: audio.audio_path,
       hasActiveDelivery: playableIds.has(audio.id) && !audio.audio_path?.trim(),
-      coverUrl: cabinetAlbumCoverUrl({
-        coverUrl: practice.cover_url,
-        coverImage: practice.cover_image,
-        updatedAt: practice.updated_at,
-      }),
+      coverUrl: workspaceTrackCoverUrl(practice, audio.id, spaceId),
     };
     if (!acceptWorkspaceCatalogSourceRow(row, allowedAuthors)) continue;
     sourceRows.push({ ...row, shelf: source?.shelf ?? "cafe" });
@@ -279,7 +276,7 @@ async function loadDirectionCandidates(
   if (!practices) return "error";
   const authorIds = [...new Set(practices.flatMap((row) => row.author_id ? [row.author_id] : []))].sort();
   const nameByAuthor = new Map(practices.map((row) => [row.author_id, row.author_name?.trim() || ""]));
-  return candidatesFromPractices(db, practices, authorIds, nameByAuthor, sourcesForSpace(spaceId), false);
+  return candidatesFromPractices(db, practices, authorIds, nameByAuthor, sourcesForSpace(spaceId), false, spaceId);
 }
 
 /** Gate off: published music of the curated authors, used only when the space has no per-track admissions. */
@@ -309,6 +306,7 @@ async function loadAuthorCuratedCandidates(
     nameByAuthor,
     sources,
     true,
+    spaceId,
   );
 }
 
@@ -355,13 +353,13 @@ function plainTrack(id: string, title: string | null, duration: number | null): 
   };
 }
 
-async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promise<Map<string, WorkspaceTrack> | null> {
+async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceId: BusinessSpaceId): Promise<Map<string, WorkspaceTrack> | null> {
   const byId = new Map<string, WorkspaceTrack>();
   for (let index = 0; index < ids.length; index += ID_CHUNK) {
     const chunk = ids.slice(index, index + ID_CHUNK);
     const joined = await db
       .from("audio_items")
-      .select("id, title, duration_seconds, practices(title, author_id, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
+      .select("id, title, duration_seconds, practices(title, author_id, business_only, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
       .in("id", chunk);
     if (joined.error || !Array.isArray(joined.data)) {
       const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
@@ -379,6 +377,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
       practices: {
         title?: string | null;
         author_id?: string | null;
+        business_only?: boolean | null;
         cover_url?: string | null;
         cover_image?: unknown;
         updated_at?: string | null;
@@ -386,6 +385,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
       } | {
         title?: string | null;
         author_id?: string | null;
+        business_only?: boolean | null;
         cover_url?: string | null;
         cover_image?: unknown;
         updated_at?: string | null;
@@ -398,11 +398,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
         authorId: practice?.author_id ?? null,
         authorName: embeddedName(practice?.authors) || null,
         albumTitle: practice?.title?.trim() || null,
-        coverUrl: cabinetAlbumCoverUrl({
-          coverUrl: practice?.cover_url,
-          coverImage: practice?.cover_image,
-          updatedAt: practice?.updated_at,
-        }),
+        coverUrl: workspaceTrackCoverUrl(practice, row.id, spaceId),
       });
       if (named) byId.set(row.id, named);
     }
@@ -443,7 +439,7 @@ async function loadCandidateTracks(
     admissionIds.push(row.audio_item_id);
   }
   if (admissionIds.length > 0) {
-    const meta = await loadAdmissionTracks(db, admissionIds);
+    const meta = await loadAdmissionTracks(db, admissionIds, spaceId);
     if (!meta) return "error";
     return admissionIds.flatMap((id) => {
       const track = meta.get(id);
