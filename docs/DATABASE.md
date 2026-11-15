@@ -1,3 +1,52 @@
+## Closed Business albums (39a7ef48, pending owner apply)
+
+Migration `20270310120000_business_only_practices.sql` adds
+`practices.business_only boolean NOT NULL DEFAULT false`. Existing rows retain
+all current access behavior. This migration has not been applied to a shared
+or production database.
+
+Designation is one-way and only postgres/service_role or a user with
+`admin_panel.access` may designate a never-published album. Both OLD and NEW
+status/date are checked; historical `first_publication_date_unknown` also
+rejects conversion because it cannot prove the album was never public.
+A validated CHECK requires `selected_users` and `is_catalog_listed=false`.
+The existing visibility sync trigger remains unchanged; attempts to expose a
+Business album through it fail the CHECK.
+
+`guard_practice_business_only` guards designation.
+`reject_business_only_listener_access` rejects INSERT/UPDATE in
+`practice_visibility_users` and `user_practices`, with a shared parent-row lock.
+Historical grant/allowlist rows do not confer Business access.
+`can_current_viewer_read_practice` permits non-deleted Business albums only to
+authenticated author members or platform admins; its normal-album branch is
+unchanged. `practice_is_business_only(uuid)` is a definer flag lookup for audio
+entitlement policies so hidden/deleted normal-album access is preserved.
+
+Modified SELECT policies:
+
+- practices: "Selected users can read allowlisted practices" (allowlist branch only).
+- practices: "Entitled users can read entitled practices".
+- audio_items: "Entitled users can read audio items".
+- storage.objects: "Authenticated users can read entitled practice audio".
+
+Other metadata policies inherit the read helper. Public practices require
+listed/unlisted, excluded by the CHECK. Author-member policies are unchanged.
+There is no `practice_tracks` table; `audio_items` is the track table.
+`music_audio_assets` already has RLS with no client SELECT policies.
+Public cover/author-asset buckets are independent of practice visibility and
+are unchanged; this migration does not revoke already issued URLs or change
+public storage bucket delivery.
+
+Run `npm run test:business-only-access`. The disposable PG17 harness compiles
+the real up/down scripts in single-user mode, compares all normal-album read
+paths before/after, and uses a Unix-socket-only postmaster for actual RLS SELECT.
+Where the sandbox denies sockets it evaluates the compiled policy predicates
+under each role and explicitly reports that limitation. CI requires actual RLS.
+Manual rollback is `supabase/rollback/20270310120000_business_only_practices.down.sql`;
+it restores the previous function and four policies before dropping the new
+objects. Review flagged albums first: rollback removes their Business boundary.
+No Business player, pool or eligibility functions are changed.
+
 ## Business track sound review (96a75b7b, pending owner apply)
 
 Migration `20270201120000_business_track_sound_reviews.sql` is applied after

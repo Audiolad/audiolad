@@ -1,0 +1,39 @@
+name: Business Only Access Isolated SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/business-only-access-isolated.yml"
+      - "scripts/business-only-access-isolated.py"
+      - "src/lib/products/business-only.ts"
+      - "supabase/migrations/**"
+      - "supabase/rollback/20270310120000_business_only_practices.down.sql"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  business-only-access-isolated:
+    name: Business Only Access Isolated SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Local PostgreSQL 17 toolchain
+        run: |
+          set -euo pipefail
+          if [ ! -x /usr/lib/postgresql/17/bin/postgres ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-17
+          fi
+          /usr/lib/postgresql/17/bin/postgres --version
+      - name: Business only access harness
+        run: |
+          set -euo pipefail
+          python3 scripts/business-only-access-isolated.py | tee harness.log
+          grep -q 'business-only-access-isolated:.*PASS' harness.log
+          grep -q 'RLS verification: actual RLS SELECT via Unix socket, TCP disabled' harness.log
