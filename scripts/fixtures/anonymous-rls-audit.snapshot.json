@@ -6644,6 +6644,26 @@
       "file": "supabase/migrations/20270310120000_business_only_practices.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270311120000_business_track_passports.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_track_passport_approved(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270311120000_business_track_passports.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.admin_upsert_business_track_passport(uuid,jsonb), public.admin_approve_business_track_passport(uuid),public.admin_revoke_business_track_passport(uuid) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270311120000_business_track_passports.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.record_business_master_hash(uuid,uuid,text,uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270311120000_business_track_passports.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.admin_create_business_album(uuid,text) TO authenticated;"
     }
   ]
 }

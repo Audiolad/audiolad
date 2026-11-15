@@ -1,3 +1,4 @@
+import { assertBusinessOnlyCoverUploadAllowed } from "@/lib/business-track-passports/cover-guard";
 import { NextResponse } from "next/server";
 
 import {
@@ -88,6 +89,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
+    assertBusinessOnlyCoverUploadAllowed(practice);
     assertAuthorProductGalleryEligible(practice);
     await assertPracticePublicContentEditableForActor(
       supabase,

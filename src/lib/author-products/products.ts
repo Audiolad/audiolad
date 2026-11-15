@@ -59,6 +59,7 @@ const PRACTICE_DETAIL_SELECT = `
   is_free,
   is_catalog_listed,
   catalog_visibility,
+  business_only,
   catalog_section,
   cover_url,
   cover_image,

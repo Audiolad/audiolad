@@ -1,5 +1,8 @@
 "use client";
 
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
+import { BUSINESS_ONLY_BADGE, BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1541,15 +1544,16 @@ export default function AuthorProductForm({
     selectedAuthorAccessStatus,
   );
 
+  const businessOnly = isBusinessOnlyPractice(initialProduct?.practice);
   const publicPath =
-    form.slug && selectedAuthor?.slug
+    !businessOnly && form.slug && selectedAuthor?.slug
       ? buildPracticePublicPath(selectedAuthor.slug, form.slug)
       : "";
   const publishPreviewPath =
-    form.slug && selectedAuthor?.slug
+    !businessOnly && form.slug && selectedAuthor?.slug
       ? buildPracticePublishPreviewPath(selectedAuthor.slug, form.slug)
       : "";
-  const maxProductDeepLink = practiceId
+  const maxProductDeepLink = !businessOnly && practiceId
     ? buildMaxProductDeepLink(practiceId) ?? ""
     : "";
 
@@ -2168,6 +2172,10 @@ export default function AuthorProductForm({
         slugLocked,
         canConfigureAppreciation,
       );
+      if (isBusinessOnlyPractice(initialProduct?.practice)) {
+        delete (productSavePayload as Record<string, unknown>).catalog_visibility;
+        delete (productSavePayload as Record<string, unknown>).is_catalog_listed;
+      }
       const response = await fetch(`/api/author/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -2459,7 +2467,7 @@ export default function AuthorProductForm({
     }
 
     if (
-      shouldOpenPublishPreviewFromForm({
+      !businessOnly && shouldOpenPublishPreviewFromForm({
         publishedAt: form.publishedAt,
         canBypassProductModeration,
       })
@@ -2599,7 +2607,7 @@ export default function AuthorProductForm({
         selectedAuthor?.slug;
       const productSlug = practice?.slug?.trim();
 
-      if (authorSlug && productSlug) {
+      if (!businessOnly && authorSlug && productSlug) {
         window.location.replace(
           buildPracticePublicPath(authorSlug, productSlug),
         );
@@ -4650,7 +4658,7 @@ export default function AuthorProductForm({
         >
 {showWizardStep(4) ? (
         <>
-        {form.productKind === PRODUCT_KIND.MUSIC ? (
+        {!businessOnly && form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
               {musicProductWizard
@@ -4976,6 +4984,12 @@ export default function AuthorProductForm({
 
 {showWizardStep(2) ? (
         <>
+        {/* 39a7ef48: covers live in the public bucket – no new images for business-only albums; existing ones stay removable. */}
+        {businessOnly && !form.coverUrl ? (
+          <p role="status" className="rounded-[18px] border border-[#e4d7f4] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f4f86]">
+            {BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE}
+          </p>
+        ) : (
         <div data-submit-issue={coverSubmitError ? "" : undefined}>
           <CoverUploadBlock
             label="Обложка"
@@ -4996,8 +5010,9 @@ export default function AuthorProductForm({
             </p>
           ) : null}
         </div>
+        )}
 
-        {!isCourse ? (
+        {!businessOnly && !isCourse ? (
           <AuthorProductVideoExport
             practiceId={practiceId || null}
             authorSlug={selectedAuthor?.slug ?? null}
@@ -5007,7 +5022,8 @@ export default function AuthorProductForm({
           />
         ) : null}
 
-        {isProductGalleryEligible(form.publicationClass, form.productKind) ? (
+        {isProductGalleryEligible(form.publicationClass, form.productKind) &&
+        (!businessOnly || (initialProduct?.gallery_slides?.length ?? 0) > 0) ? (
           <AuthorProductGallery
             practiceId={practiceId || null}
             initialSlides={initialProduct?.gallery_slides ?? []}
@@ -5206,7 +5222,7 @@ export default function AuthorProductForm({
             </div>
           ) : null}
 
-          {!form.isFree ? (
+          {!businessOnly && !form.isFree ? (
             <div className="mt-5">
               <span className="mb-2 block text-sm font-medium">Акции</span>
               <AuthorProductPromotions
@@ -5293,7 +5309,8 @@ export default function AuthorProductForm({
           />
         </div>
       ) : null}
-{showWizardStep(4) ? (
+{businessOnly ? <p role="status">{BUSINESS_ONLY_BADGE}</p> : null}
+{showWizardStep(4) && !businessOnly ? (
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">
             Кому показывать продукт?
@@ -5396,7 +5413,7 @@ export default function AuthorProductForm({
         ) : null
       ) : null}
 
-      {showWizardStep(4) ? (
+      {showWizardStep(4) && !businessOnly ? (
         practiceId ? (
           <AuthorPracticeAccessLinks
             practiceId={practiceId}
@@ -5463,7 +5480,7 @@ export default function AuthorProductForm({
       />
       ) : null}
 
-      {showWizardStep(4) && form.productKind === PRODUCT_KIND.AUDIO_POST ? (
+      {showWizardStep(4) && !businessOnly && form.productKind === PRODUCT_KIND.AUDIO_POST ? (
         <AuthorProductPostListenPromoSection
           promoEnabled={form.promoEnabled}
           promoTitle={form.promoTitle}
@@ -5788,7 +5805,8 @@ export default function AuthorProductForm({
                 ) : null}
               </label>
 
-              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
+              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST &&
+              !(businessOnly && !audioItem.cover_url) ? (
                 <div className="mt-4">
                   <CoverUploadBlock
                     label="Обложка трека"
@@ -6230,6 +6248,7 @@ export default function AuthorProductForm({
             Назад
           </button>
           <AuthorProductFormActions
+          businessOnly={businessOnly}
         mode={mode}
         busy={busy}
         publishing={publishing}
@@ -6264,6 +6283,7 @@ export default function AuthorProductForm({
 
       {!wizardEnabled ? (
         <AuthorProductFormActions
+          businessOnly={businessOnly}
           mode={mode}
           busy={busy}
           publishing={publishing}

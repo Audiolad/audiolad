@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -420,7 +421,7 @@ export async function requirePracticeAccess(practiceId: string) {
   const { data: practice, error: practiceError } = await dataClient
     .from("practices")
     .select(
-      "id, author_id, status, moderation_status, deleted_at, slug, published_at, scheduled_publish_at, use_shared_cover, is_free, price, product_kind, publication_class, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab, is_catalog_listed, catalog_visibility",
+      "id, author_id, status, moderation_status, deleted_at, slug, published_at, scheduled_publish_at, use_shared_cover, is_free, price, product_kind, publication_class, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab, is_catalog_listed, catalog_visibility, business_only",
     )
     .eq("id", practiceId)
     .maybeSingle();
@@ -452,6 +453,7 @@ export async function requirePracticeAccess(practiceId: string) {
       user,
       practice: practice as {
         id: string;
+        business_only?: boolean;
         author_id: string;
         status: string;
         moderation_status: string | null;
@@ -508,6 +510,7 @@ export async function requirePracticeAccess(practiceId: string) {
     user,
     practice: practice as {
       id: string;
+      business_only?: boolean;
       author_id: string;
       status: string;
       moderation_status: string | null;
@@ -542,6 +545,16 @@ export function handleAuthorRouteError(error: unknown) {
 
   if (error instanceof AuthorAccessError) {
     console.error("author_route_error", error.code, error.status);
+
+    if (error.code === "business_only_cover_upload_blocked") {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE,
+        },
+        { status: error.status },
+      );
+    }
 
     return jsonError(error.code, error.status);
   }

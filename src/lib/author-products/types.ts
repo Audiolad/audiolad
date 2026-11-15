@@ -85,6 +85,7 @@ export type AudioItemRow = {
 };
 
 export type PracticeRow = {
+  business_only?: boolean;
   id: string;
   author_id: string;
   title: string;

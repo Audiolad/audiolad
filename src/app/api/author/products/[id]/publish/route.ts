@@ -173,6 +173,7 @@ export async function POST(_request: Request, context: RouteContext) {
         schedulePracticePublishedSearchNotifications(
           {
             authorSlug,
+            business_only: product.practice.business_only,
             practiceSlug: product.practice.slug,
             previousStatus: practice.status,
             nextStatus: product.practice.status,

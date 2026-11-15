@@ -1,3 +1,4 @@
+import { assertBusinessOnlyCoverUploadAllowed } from "@/lib/business-track-passports/cover-guard";
 import { NextResponse } from "next/server";
 
 import {
@@ -88,6 +89,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
     const { supabase, practice } = await requirePracticeMutationAccess(id);
+    assertBusinessOnlyCoverUploadAllowed(practice);
 
     if (practice.use_shared_cover !== false) {
       return NextResponse.json(
