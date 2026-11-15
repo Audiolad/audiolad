@@ -1,5 +1,6 @@
 -- Manual admission of human-selected, human-mastered Business music. No generation or publication.
 BEGIN;
+SET LOCAL lock_timeout = '5s';
 CREATE TABLE public.business_track_passports (
  audio_item_id uuid PRIMARY KEY REFERENCES public.audio_items(id) ON DELETE CASCADE,
  practice_id uuid NOT NULL REFERENCES public.practices(id) ON DELETE CASCADE,

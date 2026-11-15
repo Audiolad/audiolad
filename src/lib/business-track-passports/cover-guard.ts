@@ -10,8 +10,7 @@ import { isBusinessOnlyPractice } from "@/lib/products/business-only";
  */
 export const BUSINESS_ONLY_COVER_UPLOAD_BLOCKED = "business_only_cover_upload_blocked";
 
-export const BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE =
-  "Обложки и изображения для закрытых альбомов Бизнеса пока не загружаются – приватное хранилище обложек ещё не готово.";
+export { BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
 
 export function assertBusinessOnlyCoverUploadAllowed(
   practice: { business_only?: boolean | null } | null | undefined,

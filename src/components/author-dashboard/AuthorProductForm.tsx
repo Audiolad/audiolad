@@ -1,7 +1,7 @@
 "use client";
 
 import { isBusinessOnlyPractice } from "@/lib/products/business-only";
-import { BUSINESS_ONLY_BADGE } from "@/lib/business-track-passports/model";
+import { BUSINESS_ONLY_BADGE, BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -4984,6 +4984,12 @@ export default function AuthorProductForm({
 
 {showWizardStep(2) ? (
         <>
+        {/* 39a7ef48: covers live in the public bucket – no new images for business-only albums; existing ones stay removable. */}
+        {businessOnly && !form.coverUrl ? (
+          <p role="status" className="rounded-[18px] border border-[#e4d7f4] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f4f86]">
+            {BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE}
+          </p>
+        ) : (
         <div data-submit-issue={coverSubmitError ? "" : undefined}>
           <CoverUploadBlock
             label="Обложка"
@@ -5004,6 +5010,7 @@ export default function AuthorProductForm({
             </p>
           ) : null}
         </div>
+        )}
 
         {!businessOnly && !isCourse ? (
           <AuthorProductVideoExport
@@ -5015,7 +5022,8 @@ export default function AuthorProductForm({
           />
         ) : null}
 
-        {isProductGalleryEligible(form.publicationClass, form.productKind) ? (
+        {isProductGalleryEligible(form.publicationClass, form.productKind) &&
+        (!businessOnly || (initialProduct?.gallery_slides?.length ?? 0) > 0) ? (
           <AuthorProductGallery
             practiceId={practiceId || null}
             initialSlides={initialProduct?.gallery_slides ?? []}
@@ -5797,7 +5805,8 @@ export default function AuthorProductForm({
                 ) : null}
               </label>
 
-              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
+              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST &&
+              !(businessOnly && !audioItem.cover_url) ? (
                 <div className="mt-4">
                   <CoverUploadBlock
                     label="Обложка трека"

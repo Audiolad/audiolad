@@ -37,4 +37,9 @@ for (const table of ['practices', 'audio_items', 'publication_gallery_slides']) 
   assert.match(sql, new RegExp(`BEFORE INSERT OR UPDATE ON public\\.${table}\\s+FOR EACH ROW EXECUTE FUNCTION public\\.guard_business_only_public_images`));
 }
 assert.match(read('supabase/rollback/20270311120000_business_track_passports.down.sql'), /DROP FUNCTION public\.guard_business_only_public_images\(\);/);
-console.log('business-only-cover-guard: PASS (helper 409 + Russian message, 4 upload routes guarded before storage, DB triggers on practices/audio_items/gallery, rollback)');
+const form = read('src/components/author-dashboard/AuthorProductForm.tsx');
+assert.match(form, /\{businessOnly && !form\.coverUrl \? \(/, 'album cover upload hidden for business-only without a cover');
+assert.match(form, /!\(businessOnly && !audioItem\.cover_url\)/, 'track cover upload hidden for business-only without a cover');
+assert.match(form, /\(!businessOnly \|\| \(initialProduct\?\.gallery_slides\?\.length \?\? 0\) > 0\)/, 'gallery hidden for business-only without slides');
+assert.match(read('supabase/migrations/20270311120000_business_track_passports.sql'), /^BEGIN;\nSET LOCAL lock_timeout = '5s';/m);
+console.log('business-only-cover-guard: PASS (helper 409 + Russian message, 4 upload routes guarded before storage, DB triggers on practices/audio_items/gallery, rollback, author form hides uploads, lock_timeout)');

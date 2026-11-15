@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -549,8 +550,7 @@ export function handleAuthorRouteError(error: unknown) {
       return NextResponse.json(
         {
           error: error.code,
-          message:
-            "Обложки и изображения для закрытых альбомов Бизнеса пока не загружаются – приватное хранилище обложек ещё не готово.",
+          message: BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE,
         },
         { status: error.status },
       );
