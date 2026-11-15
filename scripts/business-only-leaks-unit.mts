@@ -25,7 +25,9 @@ import { applyOrdinaryCatalogEligibility } from "../src/lib/catalog/visibility-q
 
 const root = resolve(import.meta.dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
-assert.equal(read("src/lib/products/business-only.ts"), readFileSync(resolve(root, "../seed-business-only.ts"), "utf8"));
+// Helper contract (in-repo; no external fixture): strict true-only check and the column name.
+assert.match(read("src/lib/products/business-only.ts"), /row\?\.business_only === true/);
+assert.match(read("src/lib/products/business-only.ts"), /BUSINESS_ONLY_COLUMN = "business_only"/);
 assert.equal(BUSINESS_ONLY_COLUMN, "business_only");
 assert.equal(isBusinessOnlyPractice(null), false);
 assert.equal(isBusinessOnlyPractice({ business_only: false }), false);
@@ -228,7 +230,9 @@ for (const file of files("src/app/api/listen").filter((f) => f.endsWith("route.t
   staticVectors.push(["listen route", file, "shared listen gate"]);
 }
 assert.match(read("next.config.ts"), /private, no-store/);
-assert.match(read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx"), /if \(error \|\| !practice\) \{\s*notFound\(\)/);
+// Metadata for a missing album stays generic (no title/cover); lookup already hides business-only rows.
+assert.match(read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx"), /if \(error \|\| !practice\) \{\s*return \{ \.\.\.PRACTICE_UNAVAILABLE_METADATA \};/);
+assert.match(read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx"), /getPracticeByAuthorAndSlug/);
 assert.match(read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx"), /dynamic = "force-dynamic"/);
 assert.match(read("src/lib/catalog/search.ts"), /CATALOG_PRACTICE_SEARCH_SELECT = `\s*business_only,/);
 for (const file of ["src/lib/business-workspace/sign.server.ts", "src/lib/business-workspace/load.server.ts"]) {
