@@ -37,6 +37,7 @@ import {
   isAudioSprintPoolVisible,
   reservePoolEnabled,
   selectVisibleAudioSprintQueries,
+  sortAudioSprintQueriesForListing,
 } from "../src/lib/seo-queries/audio-sprint.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,6 +81,74 @@ assert.deepEqual(
   visible.filter((item) => item.authorGroup === "voice").map((item) => item.queryText),
   ["Груша"],
 );
+
+const listingCard = (queryText, extra = {}) => ({
+  queryText,
+  lifecycle: "available",
+  reservedByCurrentUser: false,
+  reservationId: null,
+  releasedToGeneralAt: null,
+  ...extra,
+});
+
+const listingSorted = sortAudioSprintQueriesForListing([
+  listingCard("Яблоко", { lifecycle: "available" }),
+  listingCard("Абрикос", { lifecycle: "published" }),
+  listingCard("Вишня", {
+    lifecycle: "in_progress",
+    reservedByCurrentUser: true,
+    reservationId: "r-own",
+  }),
+  listingCard("Груша", { lifecycle: "in_progress" }),
+  listingCard("Дыня", { lifecycle: "moderation" }),
+  listingCard("Банан", { lifecycle: "available" }),
+  listingCard("Ежевика", {
+    lifecycle: "moderation",
+    reservedByCurrentUser: true,
+  }),
+  listingCard("Арбуз", {
+    lifecycle: "available",
+    releasedToGeneralAt: "2026-10-28T00:00:00Z",
+  }),
+  listingCard("Жасмин", {
+    lifecycle: "published",
+    reservationId: "r-own-published",
+    reservedByCurrentUser: true,
+  }),
+  listingCard("Ирис", {
+    lifecycle: "in_progress",
+    reservedByCurrentUser: true,
+    reservationId: null,
+  }),
+]);
+assert.deepEqual(
+  listingSorted.map((item) => item.queryText),
+  [
+    "Банан",
+    "Яблоко",
+    "Вишня",
+    "Ежевика",
+    "Ирис",
+    "Груша",
+    "Дыня",
+    "Абрикос",
+    "Жасмин",
+    "Арбуз",
+  ],
+);
+
+const searched = sortAudioSprintQueriesForListing(
+  ["Яблоко", "Вишня", "Груша", "Банан", "Абрикос"]
+    .map((queryText) =>
+      listingSorted.find((item) => item.queryText === queryText),
+    )
+    .filter(Boolean),
+);
+assert.deepEqual(
+  searched.map((item) => item.queryText),
+  ["Банан", "Яблоко", "Вишня", "Груша", "Абрикос"],
+);
+
 
 assert.equal(audioSprintPublicationClass("music"), "release");
 assert.equal(audioSprintPublicationClass("voice"), "practice");
@@ -490,6 +559,8 @@ assert.match(client, /canReserveAudioSprintQuery/);
 assert.match(client, /audioSprintReserveConflictLifecycle/);
 assert.match(client, /router\.refresh\(\)/);
 assert.match(client, /isAudioSprintPoolVisible/);
+assert.match(client, /sortAudioSprintQueriesForListing/);
+assert.doesNotMatch(client, /sortAudioSprintQueriesByCanonicalText/);
 assert.match(client, /Забронирован вами/);
 assert.match(client, /Забронирован в пространстве/);
 assert.match(client, /Открыть это пространство/);
