@@ -729,4 +729,56 @@ END $$;
 REVOKE ALL ON FUNCTION public.admin_create_business_album(uuid,text) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.admin_create_business_album(uuid,text) TO authenticated;
 
+-- Source: 20270202120000_business_artist_sound_auto.sql (latest definition); only the initial passport gate is added.
+CREATE OR REPLACE FUNCTION public.resolve_business_track_eligibility(
+  p_audio_item_id uuid, p_location_id uuid, p_zone_id uuid DEFAULT NULL,
+  p_use_type text DEFAULT 'business_background_playback', p_as_of timestamptz DEFAULT now()
+) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v jsonb; r record; v_direction text; v_admission jsonb; v_sound text; v_auto boolean;
+BEGIN
+  -- Business-only (39a7ef48): a closed track is never eligible without an approved passport,
+  -- independent of the manual content gate. Ordinary tracks: unchanged.
+  IF EXISTS (SELECT 1 FROM public.audio_items a JOIN public.practices p ON p.id=a.practice_id
+    WHERE a.id=p_audio_item_id AND p.business_only)
+    AND NOT public.business_track_passport_approved(p_audio_item_id) THEN
+    RETURN jsonb_build_object('audio_item_id', p_audio_item_id, 'decision', 'INELIGIBLE',
+      'reason_codes', jsonb_build_array('BUSINESS_TRACK_PASSPORT_REQUIRED'));
+  END IF;
+  v := public.resolve_business_track_eligibility_v1(p_audio_item_id, p_location_id, p_zone_id, p_use_type, p_as_of);
+  SELECT id, decision INTO r FROM public.business_track_eligibility_reviews
+    WHERE audio_item_id = p_audio_item_id
+      AND (coalesce(p_as_of, now()) >= now() OR created_at <= p_as_of)
+    ORDER BY created_at DESC, id DESC LIMIT 1;
+  IF FOUND AND r.decision IN ('blocked', 'proof_requested') THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || to_jsonb('BUSINESS_TRACK_ADMISSION_' || upper(r.decision)),
+      'business_track_review_id', r.id);
+  END IF;
+  IF NOT public.business_manual_content_gate_enabled() THEN
+    RETURN v;
+  END IF;
+  SELECT c.direction_key INTO v_direction FROM public.business_locations l
+    JOIN public.business_content_categories c ON c.category = lower(btrim(l.business_category))
+    WHERE l.id = p_location_id;
+  SELECT public.resolve_business_content_admission(ai.practice_id, v_direction) INTO v_admission
+    FROM public.audio_items ai WHERE ai.id = p_audio_item_id;
+  IF NOT coalesce((v_admission->>'allowed')::boolean, false) THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || '["MANUAL_DIRECTION_ADMISSION_REQUIRED"]'::jsonb);
+  END IF;
+  SELECT s.status INTO v_sound FROM public.business_track_sound_reviews s
+    JOIN public.audio_items a ON a.id = s.audio_item_id
+    WHERE s.audio_item_id = p_audio_item_id
+      AND s.audio_identity = public.business_sound_audio_identity(a);
+  SELECT public.business_artist_sound_auto_enabled(p.author_id) INTO v_auto
+    FROM public.audio_items a JOIN public.practices p ON p.id = a.practice_id
+    WHERE a.id = p_audio_item_id;
+  IF v_sound IS DISTINCT FROM 'approved' AND NOT (coalesce(v_auto, false) AND v_sound IS DISTINCT FROM 'rejected') THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || '["BUSINESS_SOUND_REVIEW_REQUIRED"]'::jsonb);
+  END IF;
+  RETURN v || jsonb_build_object('content_direction', v_direction, 'content_admission', v_admission);
+END;
+$$;
+
 COMMIT;

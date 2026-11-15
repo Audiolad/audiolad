@@ -10,7 +10,7 @@ import tempfile
 
 root = Path(__file__).resolve().parent.parent
 migrations = root / 'supabase/migrations'
-pg = Path(os.environ.get('PG_BIN', '/usr/lib/postgresql/17/bin'))
+pg = Path(os.environ.get('PG_BIN') or ([str(p.parent) for p in sorted(Path('/usr/lib/postgresql').glob('*/bin/postgres')) if '/17/' in str(p)] or [str(p.parent) for p in sorted(Path('/usr/lib/postgresql').glob('*/bin/postgres'))] or ['/usr/lib/postgresql/17/bin'])[0])
 # Reuse A's schema and original read policies without executing its test runner.
 a_path = root / 'scripts/business-only-access-isolated.py'
 a = {'__file__': str(a_path)}
@@ -27,39 +27,40 @@ def fn(file, name):
     return text[match.start():end].replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION', 1)
 
 extra = """
-CREATE TABLE auth.users(id uuid PRIMARY KEY);
-CREATE TABLE authors(id uuid PRIMARY KEY, name text, slug text, access_status text);
-ALTER TABLE author_members ADD COLUMN role text DEFAULT 'owner';
-ALTER TABLE practices ADD COLUMN title text, ADD COLUMN product_kind text, ADD COLUMN music_usage_permission text, ADD COLUMN format text,
- ADD COLUMN currency text, ADD COLUMN duration_minutes integer, ADD COLUMN audio_url text,
- ADD COLUMN moderation_status text DEFAULT 'approved', ADD COLUMN moderation_attempt integer DEFAULT 0;
-ALTER TABLE audio_items ADD COLUMN title text, ADD COLUMN duration_seconds integer, ADD COLUMN audio_path text,
- ADD COLUMN desired_music_master_asset_id uuid, ADD COLUMN active_music_delivery_asset_id uuid,
- ADD COLUMN position integer DEFAULT 0, ADD COLUMN updated_at timestamptz, ADD COLUMN analysis jsonb;
-ALTER TABLE music_audio_assets ADD COLUMN asset_role text, ADD COLUMN lifecycle_state text;
-ALTER TABLE profiles ADD COLUMN contact_email text, ADD COLUMN email text;
-CREATE TABLE business_space_admissions(space_id text, audio_item_id uuid, PRIMARY KEY(space_id,audio_item_id));
-CREATE TABLE business_locations(id uuid PRIMARY KEY,business_category text);
-CREATE TABLE business_programs(id uuid PRIMARY KEY,kind text);
-CREATE TABLE business_program_items(program_id uuid,audio_item_id uuid,excluded_at timestamptz);
-CREATE TABLE business_track_eligibility_reviews(id uuid PRIMARY KEY, audio_item_id uuid,decision text,created_at timestamptz);
+CREATE TABLE IF NOT EXISTS auth.users(id uuid PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS authors(id uuid PRIMARY KEY, name text, slug text, access_status text);
+ALTER TABLE authors ADD COLUMN IF NOT EXISTS name text, ADD COLUMN IF NOT EXISTS slug text, ADD COLUMN IF NOT EXISTS access_status text;
+ALTER TABLE author_members ADD COLUMN IF NOT EXISTS role text DEFAULT 'owner';
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS title text, ADD COLUMN IF NOT EXISTS product_kind text, ADD COLUMN IF NOT EXISTS music_usage_permission text, ADD COLUMN IF NOT EXISTS format text,
+ ADD COLUMN IF NOT EXISTS currency text, ADD COLUMN IF NOT EXISTS duration_minutes integer, ADD COLUMN IF NOT EXISTS audio_url text,
+ ADD COLUMN IF NOT EXISTS moderation_status text DEFAULT 'approved', ADD COLUMN IF NOT EXISTS moderation_attempt integer DEFAULT 0;
+ALTER TABLE audio_items ADD COLUMN IF NOT EXISTS title text, ADD COLUMN IF NOT EXISTS duration_seconds integer, ADD COLUMN IF NOT EXISTS audio_path text,
+ ADD COLUMN IF NOT EXISTS desired_music_master_asset_id uuid, ADD COLUMN IF NOT EXISTS active_music_delivery_asset_id uuid,
+ ADD COLUMN IF NOT EXISTS position integer DEFAULT 0, ADD COLUMN IF NOT EXISTS updated_at timestamptz, ADD COLUMN IF NOT EXISTS analysis jsonb;
+ALTER TABLE music_audio_assets ADD COLUMN IF NOT EXISTS asset_role text, ADD COLUMN IF NOT EXISTS lifecycle_state text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS contact_email text, ADD COLUMN IF NOT EXISTS email text;
+CREATE TABLE IF NOT EXISTS business_space_admissions(space_id text, audio_item_id uuid, PRIMARY KEY(space_id,audio_item_id));
+CREATE TABLE IF NOT EXISTS business_locations(id uuid PRIMARY KEY,business_category text);
+CREATE TABLE IF NOT EXISTS business_programs(id uuid PRIMARY KEY,kind text);
+CREATE TABLE IF NOT EXISTS business_program_items(program_id uuid,audio_item_id uuid,excluded_at timestamptz);
+CREATE TABLE IF NOT EXISTS business_track_eligibility_reviews(id uuid PRIMARY KEY, audio_item_id uuid,decision text,created_at timestamptz);
 CREATE FUNCTION public.resolve_business_track_eligibility_v1(uuid,uuid,uuid DEFAULT NULL,text DEFAULT 'business_background_playback',timestamptz DEFAULT now())
  RETURNS jsonb LANGUAGE sql AS $$ SELECT '{"decision":"ELIGIBLE","reason_codes":[]}'::jsonb $$;
-CREATE TABLE starter_practices(practice_id uuid,is_active boolean);
+CREATE TABLE IF NOT EXISTS starter_practices(practice_id uuid,is_active boolean);
 CREATE FUNCTION author_members_can_mutate(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 CREATE FUNCTION actor_can_bypass_product_moderation(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 CREATE FUNCTION author_access_allows_content_mutations(text) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 CREATE FUNCTION author_access_allows_paid_products(text) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 CREATE FUNCTION assert_practice_moderation_ready(uuid) RETURNS void LANGUAGE sql AS $$ SELECT $$;
-CREATE FUNCTION music_item_effective_publish_duration_seconds(uuid) RETURNS integer LANGUAGE sql AS $$ SELECT 60 $$;
-CREATE FUNCTION music_item_has_validated_active_delivery(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+-- music_item_effective_publish_duration_seconds: real definition comes from A's base.
+-- music_item_has_validated_active_delivery: real definition comes from A's base.
 CREATE FUNCTION record_author_support_mutation_audit(uuid,text,text,text,jsonb) RETURNS void LANGUAGE sql AS $$ SELECT $$;
-CREATE TABLE practice_moderation_events(id uuid DEFAULT gen_random_uuid(),practice_id uuid,author_id uuid,action text,
+CREATE TABLE IF NOT EXISTS practice_moderation_events(id uuid DEFAULT gen_random_uuid(),practice_id uuid,author_id uuid,action text,
  from_status text,to_status text,from_moderation_status text,to_moderation_status text,comment text,actor_user_id uuid,
  actor_type text,attempt integer,metadata jsonb,created_at timestamptz);
-CREATE TABLE practice_moderation_email_outbox(event_id uuid,practice_id uuid,author_id uuid,action text,
+CREATE TABLE IF NOT EXISTS practice_moderation_email_outbox(event_id uuid,practice_id uuid,author_id uuid,action text,
  recipient_role text,recipient_user_id uuid,recipient_email text,context jsonb,status text,error_code text,error_message text);
-CREATE TABLE scheduled_publish_notification_outbox(id uuid DEFAULT gen_random_uuid(),practice_id uuid UNIQUE,
+CREATE TABLE IF NOT EXISTS scheduled_publish_notification_outbox(id uuid DEFAULT gen_random_uuid(),practice_id uuid UNIQUE,
  author_id uuid,practice_slug text,author_slug text,catalog_visibility text,is_catalog_listed boolean,
  published_at timestamptz,prior_public_count integer);
 -- Both admin permissions for the C sound/RBAC fixtures.
@@ -70,7 +71,7 @@ GRANT SELECT ON authors TO authenticated;
 # A's base contains profiles for its order fixtures.
 if 'CREATE TABLE public.profiles' not in stubs + base and 'CREATE TABLE profiles' not in stubs + base:
     extra = 'CREATE TABLE profiles(id uuid);\n' + extra
-pre = [stubs, base, extra, source('20270310120000_business_only_practices.sql'),
+pre = [stubs, base, extra, source('20270310120000_business_only_practices.sql'), source('20270310120100_business_only_practices_validate.sql'),
        source('20270131120000_business_manual_admissions.sql'), source('20270201120000_business_track_sound_reviews.sql'),
        source('20270202120000_business_artist_sound_auto.sql')]
 for file, name in [('20261027120000_product_published_email_context_canonical.sql','log_practice_moderation_event'),
@@ -80,7 +81,7 @@ for file, name in [('20261027120000_product_published_email_context_canonical.sq
 fixtures = """
 SET test.uid='00000000-0000-0000-0000-000000000006';
 INSERT INTO auth.users VALUES('00000000-0000-0000-0000-000000000006');
-INSERT INTO authors VALUES('00000000-0000-0000-0000-000000000500','Артист','artist','active');
+INSERT INTO authors(id,name,slug,access_status) VALUES('00000000-0000-0000-0000-000000000500','Артист','artist','active') ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, slug=EXCLUDED.slug, access_status=EXCLUDED.access_status;
 INSERT INTO author_members(author_id,user_id,role) VALUES('00000000-0000-0000-0000-000000000500','00000000-0000-0000-0000-000000000006','owner');
 INSERT INTO business_locations VALUES('00000000-0000-0000-0000-000000000700','cafe');
 INSERT INTO practices(id,title,product_kind,status,catalog_visibility,is_catalog_listed)
@@ -97,6 +98,7 @@ INSERT INTO business_artist_sound_auto(author_id,enabled) VALUES('00000000-0000-
 CREATE TABLE before_c AS SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id),'[]') AS value
  FROM business_content_candidate_albums('00000000-0000-0000-0000-000000000700') x;
 CREATE TABLE sound_before_c AS SELECT id,business_sound_track_allowed(id,'cafe') AS allowed FROM audio_items;
+CREATE TABLE resolver_before_c AS SELECT id,resolve_business_track_eligibility(id,'00000000-0000-0000-0000-000000000700') AS v FROM audio_items;
 """
 checks = """
 SELECT check_test((SELECT value::text FROM before_c)=(SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id),'[]')::text
@@ -114,6 +116,8 @@ SELECT publish_audio_product(current_setting('test.album')::uuid);
 SELECT check_test((SELECT catalog_visibility='selected_users' AND NOT is_catalog_listed FROM practices WHERE id=current_setting('test.album')::uuid),'publish keeps selected_users');
 SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000801','{}');
 SELECT check_test(NOT business_sound_track_allowed('00000000-0000-0000-0000-000000000801','cafe'),'draft passport sound blocked');
+SELECT check_test(NOT EXISTS(SELECT 1 FROM resolver_before_c b WHERE b.v IS DISTINCT FROM resolve_business_track_eligibility(b.id,'00000000-0000-0000-0000-000000000700')),'ordinary resolver unchanged');
+SELECT check_test((SELECT v->>'decision'='INELIGIBLE' AND v->'reason_codes' ? 'BUSINESS_TRACK_PASSPORT_REQUIRED' FROM (SELECT resolve_business_track_eligibility('00000000-0000-0000-0000-000000000801','00000000-0000-0000-0000-000000000700') v) x),'draft passport resolver ineligible');
 SELECT check_test(NOT EXISTS(SELECT 1 FROM business_content_candidate_albums('00000000-0000-0000-0000-000000000700') WHERE id=current_setting('test.album')::uuid),'draft not candidate');
 DO $$ DECLARE full_evidence jsonb; k text; BEGIN
  full_evidence := jsonb_build_object('al_code','AL-T-test','generator_tool','Suno','generator_plan','Pro',
@@ -149,6 +153,7 @@ SET ROLE authenticated;
 SELECT admin_approve_business_track_passport('00000000-0000-0000-0000-000000000801');
 RESET ROLE;
 SELECT check_test(business_sound_track_allowed('00000000-0000-0000-0000-000000000801','cafe'),'approved sound allowed');
+SELECT check_test(NOT (resolve_business_track_eligibility('00000000-0000-0000-0000-000000000801','00000000-0000-0000-0000-000000000700')->'reason_codes' ? 'BUSINESS_TRACK_PASSPORT_REQUIRED'),'approved passport passes resolver gate');
 SELECT check_test(EXISTS(SELECT 1 FROM business_content_candidate_albums('00000000-0000-0000-0000-000000000700') WHERE id=current_setting('test.album')::uuid),'approved candidate');
 SELECT check_test((admin_business_sound_queue()->>'total')::integer>0,'queue accepts closed approved track');
 SELECT admin_review_business_track_sound('00000000-0000-0000-0000-000000000801','approved','Проверено',business_sound_audio_identity((SELECT a FROM audio_items a WHERE id='00000000-0000-0000-0000-000000000801')));
@@ -164,6 +169,7 @@ SELECT check_test((SELECT count(*)=1 FROM scheduled_publish_notification_outbox 
 SELECT check_test(NOT EXISTS(SELECT 1 FROM scheduled_publish_notification_outbox WHERE practice_id=current_setting('test.album')::uuid),'no closed scheduled release outbox');
 SELECT admin_revoke_business_track_passport('00000000-0000-0000-0000-000000000801');
 SELECT check_test(NOT business_sound_track_allowed('00000000-0000-0000-0000-000000000801','cafe'),'revocation immediate');
+SELECT check_test(resolve_business_track_eligibility('00000000-0000-0000-0000-000000000801','00000000-0000-0000-0000-000000000700')->'reason_codes' ? 'BUSINESS_TRACK_PASSPORT_REQUIRED','revoked passport resolver ineligible');
 UPDATE audio_items SET audio_path='replacement.mp3' WHERE id='00000000-0000-0000-0000-000000000801';
 SELECT check_test((SELECT status='draft' AND stored_master_sha256 IS NULL FROM business_track_passports),'replacement invalidates verification');
 SET test.uid='00000000-0000-0000-0000-000000000002';
@@ -203,4 +209,4 @@ with tempfile.TemporaryDirectory(prefix='audiolad-passports-') as scratch:
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'PASSPORTS_OK' not in result.stdout or 'ROLLBACK_OK' not in result.stdout:
         print(result.stdout,result.stderr)
         raise SystemExit(1)
-    print(f'business-track-passports-isolated: PASS ({mode}); real A+C + rollback, each missing field, hash, matches, pool snapshots, sound, revoke, replacement, publication side-effects, RBAC')
+    print(f'business-track-passports-isolated: PASS ({mode}); real A+C + rollback, each missing field, hash, matches, pool snapshots, resolver passport gate, sound, revoke, replacement, publication side-effects, RBAC')
