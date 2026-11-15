@@ -91,7 +91,7 @@ export async function approveAndPublishProductAction(
     publishedAt: publishedPractice.published_at,
   });
   const publicPath =
-    publiclyAvailable && detail?.authorSlug && detail.slug
+    !publishedPractice.business_only && publiclyAvailable && detail?.authorSlug && detail.slug
       ? buildPracticePublicPath(detail.authorSlug, detail.slug)
       : undefined;
   const scheduledStamp = formatMskPublicationStamp(
@@ -107,6 +107,7 @@ export async function approveAndPublishProductAction(
   if (authorSlug && practiceSlug) {
     schedulePracticePublishedSearchNotifications(
       {
+        business_only: publishedPractice.business_only,
         authorSlug,
         practiceSlug,
         previousStatus,

@@ -7,6 +7,7 @@ import { shouldShowProductActionsError } from "@/lib/author-products/publish-pre
 
 type AuthorProductFormActionsProps = {
   mode: "create" | "edit";
+  businessOnly?: boolean;
   busy: boolean;
   publishing: boolean;
   canEditPublicFields: boolean;
@@ -38,6 +39,7 @@ type AuthorProductFormActionsProps = {
 
 export default function AuthorProductFormActions({
   mode,
+  businessOnly = false,
   busy,
   publishing,
   canEditPublicFields,
@@ -112,6 +114,7 @@ export default function AuthorProductFormActions({
           >
             Перейти к редактированию
           </button>
+          {!businessOnly && (
           <button
             type="button"
             disabled={busy || !canMutateContent || !publishPreviewPath}
@@ -120,6 +123,7 @@ export default function AuthorProductFormActions({
           >
             Предпросмотр
           </button>
+          )}
           <button
             type="button"
             disabled={busy || publishing || !canMutateContent}
@@ -133,6 +137,7 @@ export default function AuthorProductFormActions({
 
       {isDraft && canBypassProductModeration ? (
         <>
+          {!businessOnly && (
           <button
             type="button"
             disabled={busy || publishing || !canMutateContent}
@@ -141,6 +146,7 @@ export default function AuthorProductFormActions({
           >
             Предпросмотр
           </button>
+          )}
           <button
             type="button"
             disabled={busy || publishing || !canMutateContent}
@@ -154,6 +160,7 @@ export default function AuthorProductFormActions({
 
       {isDraft && !canBypassProductModeration ? (
         <>
+          {!businessOnly && (
           <button
             type="button"
             disabled={busy || !canEditPublicFields}
@@ -162,6 +169,7 @@ export default function AuthorProductFormActions({
           >
             Предпросмотр
           </button>
+          )}
           <button
             type="button"
             disabled={busy || !canEditPublicFields}

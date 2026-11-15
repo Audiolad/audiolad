@@ -1,3 +1,4 @@
+import { businessOnlyVisibilityConflict } from "@/lib/business-track-passports/model";
 import { NextResponse } from "next/server";
 
 import {
@@ -232,6 +233,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
+
+    const closedVisibilityError = businessOnlyVisibilityConflict(practice, body as Record<string, unknown>);
+    if (closedVisibilityError) return NextResponse.json(closedVisibilityError, { status: 409 });
 
     const scheduleOnly =
       Object.keys(body).every((key) =>

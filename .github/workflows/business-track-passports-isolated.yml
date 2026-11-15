@@ -1,0 +1,56 @@
+name: Business Track Passports Isolated
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/business-track-passports-isolated.yml'
+      - 'supabase/migrations/**'
+      - 'supabase/rollback/**'
+      - 'scripts/business-*.py'
+      - 'scripts/business-*.mts'
+      - 'src/lib/business-track-passports/**'
+      - 'src/lib/business-workspace/**'
+      - 'src/lib/author-products/**'
+      - 'src/lib/admin/nav.ts'
+      - 'src/lib/seo/**'
+      - 'src/components/author-dashboard/**'
+      - 'src/app/(platform)/admin/**'
+      - 'src/app/api/author/products/**'
+      - 'package.json'
+permissions:
+  contents: read
+jobs:
+  passports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Local PostgreSQL 17
+        run: |
+          if [ ! -x /usr/lib/postgresql/17/bin/postgres ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-17
+          fi
+      - run: npm run test:business-track-passports
+      - run: npm run test:business-only-admin
+      - run: npm run test:business-manual-admissions
+      - run: npm run test:business-track-sound-review
+      - run: npm run test:business-pilot
+      - name: Lint passport changes
+        run: >-
+          npx eslint src/lib/business-track-passports
+          'src/app/(platform)/admin/business-catalog'
+          scripts/business-only-admin-unit.mts
+          src/lib/business-workspace/candidates.ts
+          src/lib/business-workspace/load.server.ts
+          'src/app/api/author/products/[id]/route.ts'
+          src/components/author-dashboard/AuthorProductForm.tsx
+          src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx
+      - run: npx tsc --noEmit

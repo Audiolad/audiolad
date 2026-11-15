@@ -4,7 +4,8 @@ import type { WorkspaceTrackShelf } from "./model";
 
 /**
  * Pure gate for the admission fallback. A row enters the rights check only when
- * the practice is published listed music, the track is published, and audio is
+ * the practice is published music with listed visibility or an approved closed
+ * passport, the track is published, and audio is
  * playable (non-empty audio path or a verified stream). Unpublished rows never
  * become admissions. The rights engine still has to say ELIGIBLE afterwards.
  */
@@ -20,6 +21,8 @@ export type WorkspaceCatalogSourceRow = {
   practiceStatus: string | null;
   productKind: string | null;
   catalogVisibility: string | null;
+  businessOnly?: boolean;
+  passportApproved?: boolean;
   deletedAt: string | null;
   audioStatus: string | null;
   audioPath: string | null;
@@ -44,12 +47,14 @@ export function isWorkspaceMusicPractice(row: {
   practiceStatus: string | null;
   productKind: string | null;
   catalogVisibility: string | null;
+  businessOnly?: boolean;
+  passportApproved?: boolean;
   deletedAt: string | null;
 }): boolean {
   return row.deletedAt == null
     && row.practiceStatus === "published"
     && row.productKind === "music"
-    && row.catalogVisibility === "listed";
+    && (row.catalogVisibility === "listed" || (row.businessOnly === true && row.passportApproved === true));
 }
 
 export function isPublishedWorkspaceAudio(row: { audioStatus: string | null }): boolean {

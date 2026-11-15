@@ -126,6 +126,8 @@ type PracticeRow = {
   status: string | null;
   product_kind: string | null;
   catalog_visibility: string | null;
+  business_only?: boolean;
+  passportApprovedIds?: string[];
   deleted_at: string | null;
   cover_url?: string | null;
   cover_image?: unknown;
@@ -147,12 +149,12 @@ type AudioRow = {
 async function attachPracticeCovers(db: ServiceDb, practices: PracticeRow[]): Promise<PracticeRow[] | "error"> {
   const missing = practices.filter((row) => !("cover_url" in row) && row.id);
   if (missing.length === 0) return practices;
-  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at">>();
+  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at" | "business_only">>();
   for (let index = 0; index < missing.length; index += ID_CHUNK) {
     const chunk = missing.slice(index, index + ID_CHUNK).flatMap((row) => row.id ? [row.id] : []);
-    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at").in("id", chunk);
+    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at, business_only").in("id", chunk);
     if (page.error || !Array.isArray(page.data)) return "error";
-    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null }[]) {
+    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null; business_only?: boolean }[]) {
       covers.set(row.id, row);
     }
   }
@@ -173,6 +175,14 @@ async function candidatesFromPractices(
   const withCovers = await attachPracticeCovers(db, practices);
   if (withCovers === "error") return "error";
   practices = withCovers;
+  // Service-only table. Ordinary albums do not issue any additional query.
+  for (const practice of practices) {
+    if (practice.business_only !== true) continue;
+    const passports = await db.from("business_track_passports").select("audio_item_id")
+      .eq("practice_id", practice.id).eq("status", "approved");
+    if (passports.error) return "error";
+    practice.passportApprovedIds = (passports.data ?? []).map((row: { audio_item_id: string }) => row.audio_item_id);
+  }
   const allowedAuthors = new Set(authorIds);
   const sourceByAuthor = new Map(sources.map((source) => [source.authorId, source]));
   const practiceById = new Map<string, PracticeRow>();
@@ -226,6 +236,8 @@ async function candidatesFromPractices(
       practiceStatus: practice.status,
       productKind: practice.product_kind,
       catalogVisibility: practice.catalog_visibility,
+      businessOnly: practice.business_only,
+      passportApproved: practice.passportApprovedIds?.includes(audio.id) === true,
       deletedAt: practice.deleted_at,
       audioStatus: audio.status,
       audioPath: audio.audio_path,
@@ -285,7 +297,7 @@ async function loadAuthorCuratedCandidates(
   );
   const practices = await selectPages<Omit<PracticeRow, "author_name">>((from, to) => db
     .from("practices")
-    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at, cover_url, cover_image, updated_at")
+    .select("id, title, author_id, status, product_kind, catalog_visibility, business_only, deleted_at, cover_url, cover_image, updated_at")
     .in("author_id", authorIds)
     .order("id", { ascending: true })
     .range(from, to));
@@ -304,7 +316,7 @@ function isListedPractice(practice: PracticeRow): boolean {
   return practice.deleted_at == null
     && practice.status === "published"
     && practice.product_kind === "music"
-    && practice.catalog_visibility === "listed";
+    && (practice.catalog_visibility === "listed" || (practice.business_only === true && Boolean(practice.passportApprovedIds?.length)));
 }
 
 function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {

@@ -33,8 +33,8 @@ assert.match(first, /Jazz first/);
 assert.doesNotMatch(first, /Jazz second/);
 assert.match(second, /Jazz second/);
 assert.doesNotMatch(second, /Jazz first/);
-assert.match(first, /aria-pressed="true"[^>]*>Точка 1/);
-assert.match(second, /aria-pressed="true"[^>]*>Точка 2/);
+assert.match(first, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Точка 1/);
+assert.match(second, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Точка 2/);
 // Every ordinary account with one hall gets the same add button, no per-client flag.
 const single = render(0, false, false, undefined, 3, [locations[0]]);
 assert.match(single, /\+ Добавить точку 2/, "single hall can add the second");

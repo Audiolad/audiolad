@@ -39,6 +39,8 @@ export function canSeeBusinessTrialStats(access: PlatformAccessSnapshot): boolea
  * Do not add empty future sections here until pages exist.
  */
 export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
+  { href: "/admin/business-catalog", label: "Закрытый каталог Бизнеса",
+    requiredPermission: "admin_panel.access", match: (path) => path.startsWith("/admin/business-catalog") },
   {
     href: "/admin",
     label: "Обзор",
