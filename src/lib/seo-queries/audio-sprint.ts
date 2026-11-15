@@ -276,6 +276,48 @@ export function sortAudioSprintQueriesByCanonicalText<
   );
 }
 
+/** Fields the author-cabinet sprint list uses when ranking cards. */
+export type AudioSprintListingSortable = {
+  queryText: string;
+  lifecycle: SeoQueryLifecycle;
+  reservedByCurrentUser?: boolean;
+  reservationId?: string | null;
+  releasedToGeneralAt?: string | null;
+};
+
+/**
+ * Author-cabinet list order: free first, then the current user's own
+ * in-progress and moderation bookings, then other booked or in-moderation
+ * queries, then published, then topics already released to the general SEO
+ * pool. Alphabetical (ru, base sensitivity) within each group.
+ *
+ * Own bookings stay near the top so "Мои запросы" remain easy to reach,
+ * including a reservation held in another of the author's workspaces.
+ */
+export function audioSprintListingSortRank(
+  item: AudioSprintListingSortable,
+): number {
+  if (item.releasedToGeneralAt) return 4;
+  if (item.lifecycle === "available") return 0;
+  const own =
+    Boolean(item.reservedByCurrentUser) || Boolean(item.reservationId);
+  if (item.lifecycle === "in_progress" || item.lifecycle === "moderation") {
+    return own ? 1 : 2;
+  }
+  return 3;
+}
+
+export function sortAudioSprintQueriesForListing<
+  T extends AudioSprintListingSortable,
+>(items: readonly T[]): T[] {
+  return [...items].sort((left, right) => {
+    const rank =
+      audioSprintListingSortRank(left) - audioSprintListingSortRank(right);
+    if (rank !== 0) return rank;
+    return compareAudioSprintQueryText(left.queryText, right.queryText);
+  });
+}
+
 export function selectVisibleAudioSprintQueries<
   T extends { pool: string; authorGroup: string; queryText: string },
 >(
