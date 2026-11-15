@@ -1391,6 +1391,57 @@ DROP TRIGGER reject_business_only_user_practice_trigger ON public.user_practices
 DROP TRIGGER guard_practice_business_only_trigger ON public.practices;
 DROP FUNCTION public.reject_business_only_listener_access();
 DROP FUNCTION public.guard_practice_business_only();
+-- Restore audio metadata RPCs (20261007180000_music_publish_playable_audio.sql).
+CREATE OR REPLACE FUNCTION public.music_item_has_validated_active_delivery(p_audio_item_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.audio_items AS item
+    JOIN public.music_audio_assets AS asset
+      ON asset.id = item.active_music_delivery_asset_id
+    WHERE item.id = p_audio_item_id
+      AND asset.audio_item_id = item.id
+      AND asset.asset_role = 'stream'
+      AND asset.lifecycle_state = 'verified'
+      AND asset.storage_bucket = 'music-streams'
+      AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.music_item_effective_publish_duration_seconds(p_audio_item_id uuid)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(
+    CASE
+      WHEN COALESCE(item.duration_seconds, 0) > 0 THEN item.duration_seconds
+    END,
+    CASE
+      WHEN public.music_item_has_validated_active_delivery(item.id)
+        AND COALESCE(asset.duration_seconds, 0) > 0
+      THEN asset.duration_seconds
+    END,
+    0
+  )
+  FROM public.audio_items AS item
+  LEFT JOIN public.music_audio_assets AS asset
+    ON asset.id = item.active_music_delivery_asset_id
+   AND asset.audio_item_id = item.id
+   AND asset.asset_role = 'stream'
+   AND asset.lifecycle_state = 'verified'
+   AND asset.storage_bucket = 'music-streams'
+   AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+  WHERE item.id = p_audio_item_id;
+$$;
+
 DROP FUNCTION public.practice_is_business_only(uuid);
 ALTER TABLE public.practices DROP CONSTRAINT practices_business_only_visibility_check;
 ALTER TABLE public.practices DROP COLUMN business_only;
