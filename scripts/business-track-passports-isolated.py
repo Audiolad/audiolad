@@ -97,6 +97,9 @@ INSERT INTO business_content_admissions(direction_key,author_id,allowed,changed_
 INSERT INTO business_artist_sound_auto(author_id,enabled) VALUES('00000000-0000-0000-0000-000000000500',true);
 CREATE TABLE before_c AS SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id),'[]') AS value
  FROM business_content_candidate_albums('00000000-0000-0000-0000-000000000700') x;
+ALTER TABLE practices ADD COLUMN IF NOT EXISTS cover_url text, ADD COLUMN IF NOT EXISTS cover_image jsonb;
+ALTER TABLE audio_items ADD COLUMN IF NOT EXISTS cover_url text, ADD COLUMN IF NOT EXISTS cover_image jsonb;
+CREATE TABLE IF NOT EXISTS publication_gallery_slides(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), publication_id uuid NOT NULL, image_url text NOT NULL, image_manifest jsonb NOT NULL);
 CREATE TABLE sound_before_c AS SELECT id,business_sound_track_allowed(id,'cafe') AS allowed FROM audio_items;
 CREATE TABLE resolver_before_c AS SELECT id,resolve_business_track_eligibility(id,'00000000-0000-0000-0000-000000000700') AS v FROM audio_items;
 """
@@ -112,6 +115,16 @@ SELECT check_test((SELECT business_only AND catalog_visibility='selected_users' 
 INSERT INTO audio_items(id,practice_id,title,status,audio_path) VALUES('00000000-0000-0000-0000-000000000801',current_setting('test.album')::uuid,'Закрытый трек','draft','master.mp3');
 INSERT INTO music_audio_assets(id,audio_item_id,asset_role,lifecycle_state) VALUES('00000000-0000-0000-0000-000000000901','00000000-0000-0000-0000-000000000801','master','verified');
 UPDATE audio_items SET desired_music_master_asset_id='00000000-0000-0000-0000-000000000901' WHERE id='00000000-0000-0000-0000-000000000801';
+SELECT expect_error(format('UPDATE practices SET cover_url=%L WHERE id=%L','c.webp',current_setting('test.album')),'business_only_cover_upload_blocked');
+SELECT expect_error(format('UPDATE practices SET cover_image=%L WHERE id=%L','{}',current_setting('test.album')),'business_only_cover_upload_blocked');
+SELECT expect_error('UPDATE audio_items SET cover_url=''t.webp'' WHERE id=''00000000-0000-0000-0000-000000000801''','business_only_cover_upload_blocked');
+SELECT expect_error('UPDATE audio_items SET cover_image=''{}'' WHERE id=''00000000-0000-0000-0000-000000000801''','business_only_cover_upload_blocked');
+SELECT expect_error(format('INSERT INTO publication_gallery_slides(publication_id,image_url,image_manifest) VALUES(%L,%L,%L)',current_setting('test.album'),'g.webp','{}'),'business_only_cover_upload_blocked');
+UPDATE practices SET cover_url=NULL,cover_image=NULL WHERE id=current_setting('test.album')::uuid;
+UPDATE practices SET cover_url='ordinary.webp' WHERE id='00000000-0000-0000-0000-000000000101';
+UPDATE audio_items SET cover_url='ordinary-track.webp' WHERE practice_id='00000000-0000-0000-0000-000000000101';
+INSERT INTO publication_gallery_slides(publication_id,image_url,image_manifest) VALUES('00000000-0000-0000-0000-000000000101','ordinary-g.webp','{}');
+SELECT check_test((SELECT cover_url='ordinary.webp' FROM practices WHERE id='00000000-0000-0000-0000-000000000101') AND EXISTS(SELECT 1 FROM publication_gallery_slides WHERE publication_id='00000000-0000-0000-0000-000000000101'),'ordinary covers and gallery unaffected');
 SELECT publish_audio_product(current_setting('test.album')::uuid);
 SELECT check_test((SELECT catalog_visibility='selected_users' AND NOT is_catalog_listed FROM practices WHERE id=current_setting('test.album')::uuid),'publish keeps selected_users');
 SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000801','{}');
@@ -187,7 +200,7 @@ SELECT 'PASSPORTS_OK';
 """
 blocks = pre + [fixtures, source('20270311120000_business_track_passports.sql'), checks,
                 (root / 'supabase/rollback/20270311120000_business_track_passports.down.sql').read_text(),
-                "SELECT 'ROLLBACK_OK';"]
+                "SELECT check_test(NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgname LIKE 'guard_business_only_%'),'rollback drops cover guards');\nSELECT 'ROLLBACK_OK';"]
 with tempfile.TemporaryDirectory(prefix='audiolad-passports-') as scratch:
     data = Path(scratch) / 'data'
     subprocess.run([str(pg/'initdb'),'-U','postgres','-D',str(data),'-A','trust','--locale=C.UTF-8','--encoding=UTF8'],check=True,capture_output=True)
@@ -209,4 +222,4 @@ with tempfile.TemporaryDirectory(prefix='audiolad-passports-') as scratch:
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'PASSPORTS_OK' not in result.stdout or 'ROLLBACK_OK' not in result.stdout:
         print(result.stdout,result.stderr)
         raise SystemExit(1)
-    print(f'business-track-passports-isolated: PASS ({mode}); real A+C + rollback, each missing field, hash, matches, pool snapshots, resolver passport gate, sound, revoke, replacement, publication side-effects, RBAC')
+    print(f'business-track-passports-isolated: PASS ({mode}); real A+C + rollback, each missing field, hash, matches, pool snapshots, resolver passport gate, business-only cover/gallery guard, sound, revoke, replacement, publication side-effects, RBAC')

@@ -781,4 +781,56 @@ BEGIN
 END;
 $$;
 
+
+-- Covers/gallery images live in the PUBLIC practice-covers bucket. Until a private
+-- covers storage exists, business-only albums may not attach any image (album cover,
+-- track cover, gallery slide) – for every role, including service_role. Clearing an
+-- image (to NULL) and deleting slides stay allowed. App routes check the same first,
+-- so no file is uploaded to the public bucket.
+CREATE FUNCTION public.guard_business_only_public_images()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_practice_id uuid;
+BEGIN
+  IF TG_TABLE_NAME = 'practices' THEN
+    IF NEW.business_only AND (
+      (NEW.cover_url IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.cover_url IS DISTINCT FROM OLD.cover_url))
+      OR (NEW.cover_image IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.cover_image IS DISTINCT FROM OLD.cover_image))
+    ) THEN
+      RAISE EXCEPTION 'business_only_cover_upload_blocked' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  ELSIF TG_TABLE_NAME = 'audio_items' THEN
+    IF (NEW.cover_url IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.cover_url IS DISTINCT FROM OLD.cover_url))
+       OR (NEW.cover_image IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.cover_image IS DISTINCT FROM OLD.cover_image)) THEN
+      v_practice_id := NEW.practice_id;
+    END IF;
+  ELSE -- publication_gallery_slides
+    IF TG_OP = 'INSERT' OR NEW.image_url IS DISTINCT FROM OLD.image_url
+       OR NEW.image_manifest IS DISTINCT FROM OLD.image_manifest
+       OR NEW.publication_id IS DISTINCT FROM OLD.publication_id THEN
+      v_practice_id := NEW.publication_id;
+    END IF;
+  END IF;
+  IF v_practice_id IS NOT NULL AND public.practice_is_business_only(v_practice_id) THEN
+    RAISE EXCEPTION 'business_only_cover_upload_blocked' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.guard_business_only_public_images() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER guard_business_only_practice_cover
+  BEFORE INSERT OR UPDATE ON public.practices
+  FOR EACH ROW EXECUTE FUNCTION public.guard_business_only_public_images();
+CREATE TRIGGER guard_business_only_track_cover
+  BEFORE INSERT OR UPDATE ON public.audio_items
+  FOR EACH ROW EXECUTE FUNCTION public.guard_business_only_public_images();
+CREATE TRIGGER guard_business_only_gallery_image
+  BEFORE INSERT OR UPDATE ON public.publication_gallery_slides
+  FOR EACH ROW EXECUTE FUNCTION public.guard_business_only_public_images();
+
 COMMIT;

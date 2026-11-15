@@ -545,6 +545,17 @@ export function handleAuthorRouteError(error: unknown) {
   if (error instanceof AuthorAccessError) {
     console.error("author_route_error", error.code, error.status);
 
+    if (error.code === "business_only_cover_upload_blocked") {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message:
+            "Обложки и изображения для закрытых альбомов Бизнеса пока не загружаются – приватное хранилище обложек ещё не готово.",
+        },
+        { status: error.status },
+      );
+    }
+
     return jsonError(error.code, error.status);
   }
 

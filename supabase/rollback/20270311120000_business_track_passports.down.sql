@@ -564,6 +564,10 @@ BEGIN
   );
 END;
 $$;
+DROP TRIGGER guard_business_only_practice_cover ON public.practices;
+DROP TRIGGER guard_business_only_track_cover ON public.audio_items;
+DROP TRIGGER guard_business_only_gallery_image ON public.publication_gallery_slides;
+DROP FUNCTION public.guard_business_only_public_images();
 DROP TRIGGER reset_business_passport_on_audio_change ON public.audio_items;
 DROP FUNCTION public.reset_business_passport_on_audio_change();
 DROP FUNCTION public.admin_upsert_business_track_passport(uuid,jsonb);

@@ -1,3 +1,4 @@
+import { assertBusinessOnlyCoverUploadAllowed } from "@/lib/business-track-passports/cover-guard";
 import { NextResponse } from "next/server";
 
 import {
@@ -106,6 +107,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
+    assertBusinessOnlyCoverUploadAllowed(practice);
     await assertPracticePublicContentEditableForActor(
       supabase,
       practice,

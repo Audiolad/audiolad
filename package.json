@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test:business-track-passports": "python3 scripts/business-track-passports-isolated.py",
-    "test:business-only-admin": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-only-admin-unit.mts",
+    "test:business-only-admin": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-only-admin-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-only-cover-guard-unit.mts",
     "test:business-only-access": "python3 scripts/business-only-access-isolated.py",
     "test:business-only-leaks": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' node --import tsx scripts/business-only-leaks-unit.mts",
     "test:product-publication-dates": "node --import tsx scripts/product-publication-dates-unit.mts && python3 scripts/product-publication-dates-isolated.py",
