@@ -17,7 +17,7 @@ import {
   buildAudioSprintProductCreateHref,
   canReserveAudioSprintQuery,
   isAudioSprintPoolVisible,
-  sortAudioSprintQueriesByCanonicalText,
+  sortAudioSprintQueriesForListing,
   type AudioSprintAuthorGroup,
   type AudioSprintQueryCard,
 } from "@/lib/seo-queries/audio-sprint";
@@ -71,7 +71,7 @@ export default function AuthorAudioSprintClient({
 
   const sectionItems = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("ru-RU");
-    return sortAudioSprintQueriesByCanonicalText(
+    return sortAudioSprintQueriesForListing(
       visibleItems.filter((item) => {
         if (item.authorGroup !== group) return false;
         if (!needle) return true;
