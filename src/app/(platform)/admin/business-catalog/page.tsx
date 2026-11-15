@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { loadClosedBusinessCatalog } from '@/lib/business-track-passports/admin.server';
 import { BUSINESS_ONLY_BADGE } from '@/lib/business-track-passports/model';
+import { loadPublishedBusinessCatalog } from '@/lib/business-admission/published-catalog.server';
 import PassportForm, { CreateClosedAlbum } from './PassportForm';
+import PublishedBusinessCatalog from './PublishedBusinessCatalog';
 export const dynamic = 'force-dynamic';
 
 const linkCardClassName =
@@ -29,6 +31,7 @@ function trackStatusClassName(status: string | undefined) {
 
 export default async function ClosedBusinessCatalogPage() {
   const { authors, albums } = await loadClosedBusinessCatalog();
+  const published = await loadPublishedBusinessCatalog();
   return <section className="space-y-6">
     <div>
       <h1 className="text-[21px] font-semibold text-[#25135c]">Закрытый каталог Бизнеса</h1>
@@ -46,6 +49,8 @@ export default async function ClosedBusinessCatalogPage() {
         <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">Допуск альбомов и авторов к направлениям заведений.</span>
       </Link>
     </div>
+    <PublishedBusinessCatalog closed={published.closed} open={published.open} />
+    <h2 className="text-[20px] font-semibold text-[#25135c]">Работа с закрытыми альбомами</h2>
     {albums.map((album) => <article key={album.id} className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[18px] font-semibold text-[#25135c]">{album.title}</h2>
