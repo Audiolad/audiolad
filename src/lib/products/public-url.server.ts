@@ -1,4 +1,3 @@
-import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parsePracticePublicPath } from "./paths";
 import { getPracticeByAuthorAndSlug } from "./lookup";
