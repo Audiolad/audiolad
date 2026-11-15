@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -171,6 +172,10 @@ export async function POST(request: Request) {
   }
 
   const orderRow = order as OrderRow;
+  if (orderRow.practice_id &&
+    !await canUsePracticeOnOpenPlatform(supabase, { id: orderRow.practice_id })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   const statusError = mapOrderStatusToHttpError(orderRow.status);
 
   if (statusError) {

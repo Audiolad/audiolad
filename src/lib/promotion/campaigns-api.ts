@@ -81,7 +81,8 @@ export async function GET(request: Request) {
         created_at,
         updated_at,
         practices (
-          title,
+          business_only,
+        title,
           slug,
           status,
           authors!practices_author_id_fkey (
@@ -195,7 +196,8 @@ export async function POST(request: Request) {
         created_at,
         updated_at,
         practices (
-          title,
+          business_only,
+        title,
           slug,
           status,
           authors!practices_author_id_fkey (

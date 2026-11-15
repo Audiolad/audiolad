@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import { requireAuthenticatedUser } from "@/lib/author-products/auth";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
@@ -112,7 +114,8 @@ async function loadCatalogRefs(
   const [practiceResult, audioResult] = await Promise.all([
     service
       .from("practices")
-      .select("id, deleted_at, product_kind, publication_class, author_id")
+      .select("business_only, id, deleted_at, product_kind, publication_class, author_id")
+        .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .maybeSingle(),
     service

@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -121,7 +122,8 @@ export async function countAuthorPublishedPractices(
 ): Promise<number> {
   const { count, error } = await supabase
     .from("practices")
-    .select("id", { count: "exact", head: true })
+    .select("business_only, id", { count: "exact", head: true })
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("author_id", authorId)
     .eq("status", "published");
 

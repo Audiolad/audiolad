@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
 /**
  * Аудиотека collection: merge user_practices (entitlement) + library_saves.
  *
@@ -26,6 +27,7 @@ export type LibraryCollectionSave = {
 };
 
 export type LibraryCollectionPractice = {
+  business_only?: boolean | null;
   id: string;
   title: string;
   slug: string;
@@ -57,6 +59,7 @@ type AuthorRow = {
 };
 
 type PracticeRow = {
+  business_only?: boolean | null;
   id: string;
   title: string;
   slug: string;
@@ -81,6 +84,7 @@ type EntitlementRow = {
 };
 
 const LIBRARY_CARD_PRACTICE_SELECT = `
+  business_only,
   id,
   title,
   slug,
@@ -98,6 +102,7 @@ const LIBRARY_CARD_PRACTICE_SELECT = `
 `;
 
 const LIBRARY_ENTITLED_PRACTICE_SELECT = `
+  business_only,
   id,
   title,
   slug,
@@ -198,7 +203,7 @@ export function toLibraryCollectionPractice(
   practice: PracticeRow | LibraryCollectionPractice | null,
   canListen: boolean,
 ): LibraryCollectionPractice | null {
-  if (!practice) {
+  if (!practice || isBusinessOnlyPractice(practice)) {
     return null;
   }
 
@@ -247,6 +252,7 @@ export function mergeLibraryCollection(input: {
   const items: LibraryCollectionItem[] = [];
 
   for (const practiceId of practiceIds) {
+    if (isBusinessOnlyPractice(input.practices.get(practiceId))) continue;
     const entitlement = entitlementsByPracticeId.get(practiceId) ?? null;
     const save = savesByPracticeId.get(practiceId) ?? null;
     const access = resolveLibraryCollectionAccess({
@@ -419,6 +425,7 @@ export async function loadLibraryCollection(
     const { data: savedPractices, error: savedPracticesError } = await supabase
       .from("practices")
       .select(LIBRARY_CARD_PRACTICE_SELECT)
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .in("id", missingPracticeIds);
 
     if (savedPracticesError) {

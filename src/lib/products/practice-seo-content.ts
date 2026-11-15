@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -157,8 +158,9 @@ export async function validateRelatedPracticeTargets(input: {
     input.supabase
       .from("practices")
       .select(
-        "id, author_id, status, deleted_at, catalog_visibility, is_catalog_listed, scheduled_publish_at, published_at",
+        "business_only, id, author_id, status, deleted_at, catalog_visibility, is_catalog_listed, scheduled_publish_at, published_at",
       )
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .in("id", input.relatedPracticeIds)
       .eq("status", "published")
       .is("deleted_at", null)
@@ -301,8 +303,9 @@ export async function loadPublicPracticeSeoContent(
         supabase
           .from("practices")
           .select(
-            "id, title, slug, format, duration_minutes, cover_url, cover_image, updated_at, scheduled_publish_at, published_at, authors!practices_author_id_fkey(slug, name)",
+            "business_only, id, title, slug, format, duration_minutes, cover_url, cover_image, updated_at, scheduled_publish_at, published_at, authors!practices_author_id_fkey(slug, name)",
           )
+          .eq(BUSINESS_ONLY_COLUMN, false)
           .in("id", ids)
           .eq("status", "published")
           .is("deleted_at", null)

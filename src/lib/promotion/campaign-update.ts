@@ -20,7 +20,8 @@ const CAMPAIGN_SELECT = `
   created_at,
   updated_at,
   practices (
-    title,
+    business_only,
+        title,
     slug,
     status,
     authors!practices_author_id_fkey (

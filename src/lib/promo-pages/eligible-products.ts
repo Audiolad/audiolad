@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isPracticePromoPageEligible } from "@/lib/promo-pages/validation";
@@ -67,8 +68,9 @@ export async function listPromoEligibleProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, duration_minutes, cover_url, cover_image, status, is_free, is_catalog_listed, guest_access_enabled, scheduled_publish_at, published_at",
+      "business_only, id, title, slug, format, duration_minutes, cover_url, cover_image, status, is_free, is_catalog_listed, guest_access_enabled, scheduled_publish_at, published_at",
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("author_id", authorId)
     .eq("status", "published")
     .order("updated_at", { ascending: false });

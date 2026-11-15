@@ -479,7 +479,8 @@ export async function loadPlaylistListingAccessByIds(
 
   const { data, error } = await supabase
     .from("playlist_items")
-    .select("playlist_id, practices!inner(is_free)")
+    .select("playlist_id, practices!inner(is_free, business_only)")
+    .eq("practices.business_only", false)
     .in("playlist_id", playlistIds);
 
   if (error) {

@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -54,6 +55,7 @@ type PracticeEmbed = {
   updated_at: string | null;
   use_shared_cover?: boolean | null;
   audio_url: string | null;
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   authors: AuthorEmbed | AuthorEmbed[] | null;
@@ -202,6 +204,7 @@ export async function loadEditorialWorkspaceDetail(
       audio_item_id,
       position,
       practices (
+        business_only,
         id,
         author_id,
         title,
@@ -262,6 +265,7 @@ export async function loadEditorialWorkspaceDetail(
 
   for (const row of rows) {
     const practice = normalizeOne(row.practices);
+    if (isBusinessOnlyPractice(practice)) continue;
 
     if (!practice) {
       items.push({

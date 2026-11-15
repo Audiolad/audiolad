@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { chunkIds } from "@/lib/supabase/chunk";
@@ -244,7 +246,8 @@ export async function resolveAudioSprintTitleConstraint(
   if (practiceId) {
     const { data: practice, error } = await supabase
       .from("practices")
-      .select("primary_seo_query_id, publication_class, product_kind")
+      .select("business_only, primary_seo_query_id, publication_class, product_kind")
+        .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .maybeSingle();
     if (error) return { ok: false };
@@ -387,7 +390,8 @@ export async function listAudioSprintForAuthor(
     (chunk) =>
       supabase
         .from("practices")
-        .select("id, title, status, moderation_status")
+        .select("business_only, id, title, status, moderation_status")
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .in("id", chunk),
   );
 

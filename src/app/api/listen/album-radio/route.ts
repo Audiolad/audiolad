@@ -16,7 +16,8 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     const result = await selectAlbumRadio({ supabase, userId: user?.id ?? null,
       author: body.author, slug: body.slug, exclude: body.exclude, enabled: body.enabled !== false });
-    return NextResponse.json({ ok: true, ...result, entries: result?.entries ?? [] }, { headers });
+    if (!result) return NextResponse.json({ ok: false, reason: "not_found", entries: [] }, { status: 404, headers });
+    return NextResponse.json({ ok: true, ...result, entries: result.entries }, { headers });
   } catch {
     return NextResponse.json({ ok: false, entries: [] }, { status: 503, headers });
   }

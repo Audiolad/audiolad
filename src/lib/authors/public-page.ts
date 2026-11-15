@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -165,8 +166,9 @@ export async function loadAuthorPublicPageData(
       supabase
         .from("practices")
         .select(
-          "id, title, slug, subtitle, description, format, product_kind, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at, scheduled_publish_at",
+          "business_only, id, title, slug, subtitle, description, format, product_kind, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at, scheduled_publish_at",
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("author_id", author.id)
         .eq("status", "published")
         .eq("is_catalog_listed", true),

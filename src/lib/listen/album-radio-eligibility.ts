@@ -1,8 +1,10 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isPracticeCatalogListed } from "@/lib/products/access";
 import type { ListenAccessMode } from "@/lib/listen/types";
 
 export type AlbumRadioReleaseRow = {
+  business_only?: boolean | null;
   id: string;
   product_kind?: string | null;
   publication_class?: string | null;
@@ -16,7 +18,7 @@ export type AlbumRadioReleaseRow = {
 
 /** Published, catalog-listed music release of the ordinary consumer catalog. */
 export function isAlbumRadioReleaseRow(row: AlbumRadioReleaseRow): boolean {
-  return row.product_kind === "music" &&
+  return !isBusinessOnlyPractice(row) && row.product_kind === "music" &&
     (row.publication_class == null || row.publication_class === "release") &&
     !row.deleted_at && isPracticeCatalogListed(row);
 }

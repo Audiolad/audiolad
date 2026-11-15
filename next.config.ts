@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      ...["/practice/:path*", "/listen/:path*", "/api/:path*", "/author-dashboard/:path*", "/admin/:path*", "/studio/:path*"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
+      })),
       {
         source: "/auth/:path*",
         headers: [

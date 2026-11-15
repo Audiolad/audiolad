@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -87,6 +88,10 @@ export async function PUT(request: Request) {
 
   if (!parsed.ok) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: parsed.practiceId })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc(

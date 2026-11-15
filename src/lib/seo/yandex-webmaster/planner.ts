@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { isListedCatalogVisibility } from "@/lib/products/catalog-visibility";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 
@@ -64,6 +65,7 @@ export function hasPracticeYandexRecrawlChanges(
 }
 
 function isPublicListed(input: {
+  business_only?: boolean | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
 }): boolean {
@@ -77,6 +79,7 @@ function isPublicListed(input: {
 export function planPracticeYandexRecrawl(input: {
   previousStatus?: string | null;
   nextStatus: string;
+  business_only?: boolean | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
   previousCatalogVisibility?: string | null;
@@ -87,6 +90,7 @@ export function planPracticeYandexRecrawl(input: {
   /** Approved earlier; this call is the first moment the page is public. */
   firstPublicGoLive?: boolean;
 }): YandexRecrawlPlan | null {
+  if (isBusinessOnlyPractice(input)) return null;
   const authorSlug = input.authorSlug.trim();
   const practiceSlug = input.practiceSlug.trim();
 

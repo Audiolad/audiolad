@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
@@ -95,6 +96,10 @@ export async function POST(request: Request) {
     return fail(STUDIO_MUSIC_CHECKOUT_STAGES.PARSE, "invalid_request", 400, {
       practiceId,
     });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: practiceId })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc("create_studio_music_order", {

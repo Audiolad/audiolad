@@ -47,6 +47,7 @@ assert.doesNotMatch(loaderSource, /auth\.uid\(/);
 
 function practice(input) {
   return {
+    business_only: input.businessOnly ?? false,
     id: input.id,
     title: input.title,
     slug: input.slug,

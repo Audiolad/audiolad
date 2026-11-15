@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
@@ -61,6 +62,10 @@ export async function POST(request: Request) {
 
   if (!practiceSlug) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { slug: practiceSlug })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const idempotencyKey = resolveIdempotencyKey(

@@ -275,6 +275,7 @@ function createSearchSupabase(dataset) {
 
 function practiceRow(overrides) {
   return {
+    business_only: overrides.business_only ?? false,
     id: overrides.id,
     author_id: overrides.author_id,
     title: overrides.title,

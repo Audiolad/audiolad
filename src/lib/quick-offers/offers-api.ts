@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 
 import {
@@ -133,7 +134,8 @@ async function assertPracticeOwnedAndEligible(
 ) {
   const { data, error } = await supabase
     .from("practices")
-    .select("id, author_id, status, is_free, price")
+    .select("business_only, id, author_id, status, is_free, price")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("id", practiceId)
     .maybeSingle();
 

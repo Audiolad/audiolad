@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 
 import {
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
 
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
-    .select("id")
+    .select("business_only, id")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("slug", practiceSlug)
     .maybeSingle();
 

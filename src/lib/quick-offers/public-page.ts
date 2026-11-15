@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { cache } from "react";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -61,6 +62,10 @@ async function loadPublicQuickOffer(
   const offer = mapRpcPublicOffer(data);
 
   if (!offer) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: offer.practice_id })) {
     return { ok: false, reason: "not_found" };
   }
 

@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -52,5 +53,9 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "order_not_found" }, { status: 404 });
   }
 
+  if (order.practice_id &&
+    !await canUsePracticeOnOpenPlatform(supabase, { id: order.practice_id })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   return NextResponse.json(toOrderStatusBody(order as OrderRow));
 }

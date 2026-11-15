@@ -1,3 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { canExposePracticeUrl } from "@/lib/products/public-url.server";
 import {
   getIndexNowConfig,
   type IndexNowConfig,
@@ -42,6 +45,8 @@ export type NotifyIndexNowResult = {
 };
 
 export type NotifyIndexNowOptions = IndexNowClientOptions & {
+  /** Trusted server dependency for isolated tests; never populated from request data. */
+  createPracticeClient?: () => SupabaseClient;
   env?: NodeJS.ProcessEnv;
   config?: IndexNowConfig;
   /** When true, never call the network even if canSubmit. */
@@ -72,7 +77,13 @@ export async function notifyIndexNowUrls(
 ): Promise<NotifyIndexNowResult> {
   try {
     const config = options.config ?? getIndexNowConfig(options.env);
-    const { accepted, rejected } = normalizeIndexNowUrls(urls);
+    const normalized = normalizeIndexNowUrls(urls);
+    const rejected = normalized.rejected;
+    let accepted = normalized.accepted;
+    if (config.canSubmit && !options.dryRun) {
+      const allowed = await Promise.all(accepted.map((url) => canExposePracticeUrl(options.createPracticeClient ?? createServiceRoleClient, url)));
+      accepted = accepted.filter((_, index) => allowed[index]);
+    }
 
     if (!config.canSubmit) {
       logIndexNowEvent("skip_disabled", {

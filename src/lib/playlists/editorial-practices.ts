@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
@@ -131,7 +132,7 @@ export async function listEditorialPracticeOptions(
       supabase
         .from("practices")
         .select(
-          `
+          `business_only,
       id,
       title,
       slug,
@@ -156,6 +157,7 @@ export async function listEditorialPracticeOptions(
       )
     `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("status", "published")
         .eq("is_catalog_listed", true)
         .not("slug", "is", null)

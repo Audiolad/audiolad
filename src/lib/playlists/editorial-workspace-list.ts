@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -14,8 +15,8 @@ type MosaicItemRow = {
   playlist_id: string;
   position: number;
   practices:
-    | { cover_url?: string | null; updated_at?: string | null }
-    | { cover_url?: string | null; updated_at?: string | null }[]
+    | { business_only?: boolean | null; cover_url?: string | null; updated_at?: string | null }
+    | { business_only?: boolean | null; cover_url?: string | null; updated_at?: string | null }[]
     | null;
 };
 
@@ -65,6 +66,7 @@ export async function listEditorialWorkspacePlaylists(
       playlist_id,
       position,
       practices (
+        business_only,
         author_id,
         cover_url,
         updated_at
@@ -89,6 +91,7 @@ export async function listEditorialWorkspacePlaylists(
     }
 
     const practice = normalizeOne(row.practices);
+    if (isBusinessOnlyPractice(practice)) continue;
     const authorId =
       practice && typeof practice === "object"
         ? ((practice as { author_id?: string | null }).author_id ?? null)

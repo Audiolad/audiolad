@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { listCoveringAcceptances } from "@/lib/author-terms/covering-acceptances";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -74,6 +75,7 @@ const FORBIDDEN_DTO_KEYS = [
 ] as const;
 
 export type StudioMusicCatalogPublication = StudioMusicPublicationInput & {
+  business_only?: boolean | null;
   author_id?: string | null;
   title?: string | null;
   slug?: string | null;
@@ -1056,6 +1058,7 @@ function applyStudioMusicCatalogSearch<T extends { or: (filters: string) => T }>
 }
 
 const PRACTICE_SELECT_PUBLIC = `
+  business_only,
   id,
   author_id,
   title,
@@ -1086,6 +1089,7 @@ const PRACTICE_SELECT_PUBLIC = `
 `;
 
 const PRACTICE_SELECT = `
+  business_only,
   id,
   author_id,
   title,
@@ -1193,6 +1197,7 @@ export function createSupabaseStudioMusicCatalogStore(
         supabase
           .from("practices")
           .select(PRACTICE_SELECT_PUBLIC)
+        .eq(BUSINESS_ONLY_COLUMN, false)
           .eq("status", "published")
           .is("deleted_at", null)
           .eq(
@@ -1295,6 +1300,7 @@ export function createSupabaseStudioMusicCatalogStore(
       let query = supabase
         .from("practices")
         .select(PRACTICE_SELECT)
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .is("deleted_at", null)
         .or("product_kind.eq.music,publication_class.eq.release");
 

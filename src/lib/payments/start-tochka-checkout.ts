@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { BUSINESS_SUBSCRIPTION_ORDER_KIND } from "@/lib/business/subscription-checkout";
 import { COURSE_UPGRADE_CHECKOUT_STAGES } from "@/lib/course-content/course-upgrade-stages";
 import {
@@ -209,6 +210,10 @@ export async function startTochkaCheckoutForPendingOrder(input: {
     };
   }
 
+  if (input.orderRow.practice_id &&
+    !await canUsePracticeOnOpenPlatform(input.serviceRoleClient, { id: input.orderRow.practice_id })) {
+    return { ok: false, status: 404, error: "not_found", stage: COURSE_UPGRADE_CHECKOUT_STAGES.START_TOCHKA };
+  }
   const statusError = mapOrderStatusToHttpError(input.orderRow.status);
 
   if (statusError) {

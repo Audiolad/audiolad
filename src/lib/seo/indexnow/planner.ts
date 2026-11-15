@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import {
   buildAuthorPublicPath,
   buildPracticeCanonicalUrl,
@@ -37,6 +38,7 @@ export function planPracticePublishIndexNow(input: {
   isFirstPublishOfPractice: boolean;
   /** Count of status=published practices before this publish. */
   publishedCountBefore: number;
+  business_only?: boolean | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
 }): Array<{ reason: IndexNowReason; urls: string[] }> {
@@ -48,6 +50,8 @@ export function planPracticePublishIndexNow(input: {
   ) {
     return [];
   }
+
+  if (isBusinessOnlyPractice(input)) return [];
 
   const practiceUrl = buildPracticeCanonicalUrl(
     input.authorSlug,
@@ -80,9 +84,11 @@ export function planPracticePublishIndexNow(input: {
 
 export function planPracticeSlugChangeIndexNow(input: {
   authorSlug: string;
+  business_only?: boolean | null;
   previousSlug: string;
   nextSlug: string;
 }): { reason: IndexNowReason; urls: string[] } | null {
+  if (isBusinessOnlyPractice(input)) return null;
   if (!input.previousSlug || !input.nextSlug || input.previousSlug === input.nextSlug) {
     return null;
   }

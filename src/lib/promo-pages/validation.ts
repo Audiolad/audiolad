@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { slugifyTitle } from "@/lib/author-products/utils";
 import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
@@ -243,6 +244,7 @@ export function validatePromoPagePublishProductCount(count: number): string | nu
 }
 
 export type PromoPageProductEligibilityInput = {
+  business_only?: boolean | null;
   status: string | null;
   is_free: boolean | null;
   is_catalog_listed?: boolean | null;
@@ -255,6 +257,7 @@ export function isPracticePromoPageEligible(
   practice: PromoPageProductEligibilityInput,
 ): boolean {
   if (
+    isBusinessOnlyPractice(practice) ||
     !isPracticePubliclyAvailable({
       status: practice.status,
       scheduledPublishAt: practice.scheduled_publish_at,

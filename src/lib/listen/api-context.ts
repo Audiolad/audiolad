@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -23,6 +24,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 type PracticeAccessRow = {
+  business_only?: boolean | null;
   id: string;
   author_id: string;
   is_free: boolean | null;
@@ -91,7 +93,7 @@ export async function loadListenApiContext(
     };
   }
 
-  if (!practiceRow?.id) {
+  if (!practiceRow?.id || isBusinessOnlyPractice(practiceRow)) {
     return {
       ok: false,
       response: NextResponse.json({ error: "not_found" }, { status: 404 }),

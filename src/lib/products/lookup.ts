@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -17,6 +18,7 @@ export type PublicPracticeAuthor = {
 };
 
 export type PublicPracticeRow = {
+  business_only?: boolean | null;
   id: string;
   author_id: string;
   title: string;
@@ -93,7 +95,7 @@ export async function getPracticeByAuthorAndSlug(
   const { data, error } = await supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       title,
@@ -150,6 +152,7 @@ export async function getPracticeByAuthorAndSlug(
       )
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("slug", productSlug)
     .eq("authors.slug", authorSlug)
     .maybeSingle();
@@ -159,7 +162,7 @@ export async function getPracticeByAuthorAndSlug(
   }
 
   const practice = (data as PublicPracticeRow | null) ?? null;
-  if (shouldBlockPublicPracticeAccess(practice)) {
+  if (isBusinessOnlyPractice(practice) || shouldBlockPublicPracticeAccess(practice)) {
     return { practice: null, error: false };
   }
 
@@ -191,7 +194,8 @@ export async function resolveLegacyPracticePath(
   if (!practiceId) {
     const { data: practices, error: practiceError } = await supabase
       .from("practices")
-      .select("id")
+      .select("business_only, id")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("slug", legacySlug);
 
     if (practiceError) {
@@ -212,7 +216,7 @@ export async function resolveLegacyPracticePath(
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       slug,
       cover_image,
       authors!practices_author_id_fkey (
@@ -220,6 +224,7 @@ export async function resolveLegacyPracticePath(
       )
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("id", practiceId)
     .maybeSingle();
 
@@ -227,7 +232,7 @@ export async function resolveLegacyPracticePath(
     return null;
   }
 
-  if (shouldBlockPublicPracticeAccess(practice)) {
+  if (isBusinessOnlyPractice(practice) || shouldBlockPublicPracticeAccess(practice)) {
     return null;
   }
 

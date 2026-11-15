@@ -17,6 +17,7 @@ export type ListenApiDecision =
   | { ok: false; error: "forbidden" };
 
 export function isCatalogStorefrontPreviewEligible(practice: {
+  business_only?: boolean | null;
   status: string | null | undefined;
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;

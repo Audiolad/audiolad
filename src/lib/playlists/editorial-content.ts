@@ -1,7 +1,9 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { isPracticePublished } from "@/lib/products/access";
 
 export type EditorialPracticeFields = {
   id?: string;
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
   slug?: string | null;
@@ -13,7 +15,7 @@ export function isPracticeEligibleForEditorialPlaylist(
   practice: EditorialPracticeFields,
   audioCount = 0,
 ): boolean {
-  if (!isPracticePublished(practice.status)) {
+  if (isBusinessOnlyPractice(practice) || !isPracticePublished(practice.status)) {
     return false;
   }
 

@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -233,7 +234,7 @@ export async function loadListenSessionPayload(
     const { data: practice, error: practiceError } = await supabase
       .from("practices")
       .select(
-        `
+        `business_only,
       id,
       author_id,
       title,
@@ -264,6 +265,7 @@ export async function loadListenSessionPayload(
       )
     `,
       )
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("slug", productSlug)
       .eq("authors.slug", authorSlug)
       .maybeSingle();
@@ -272,7 +274,7 @@ export async function loadListenSessionPayload(
       return { ok: false, reason: "error" };
     }
 
-    if (!practice) {
+    if (!practice || isBusinessOnlyPractice(practice)) {
       return { ok: false, reason: "not_found" };
     }
 

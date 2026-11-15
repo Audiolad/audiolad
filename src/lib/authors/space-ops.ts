@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { validateAuthorProjectSlug } from "@/lib/author-projects/slug";
@@ -358,7 +360,8 @@ export async function practiceBelongsToAuthor(
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from("practices")
-    .select("id")
+    .select("id, business_only")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("author_id", authorId)
     .eq("slug", productSlug)
     .is("deleted_at", null)

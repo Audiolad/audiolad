@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePublicationClass } from "@/lib/author-products/publication-class";
@@ -152,6 +154,7 @@ export async function resolveMaxStorefrontPreview(
   deps: MaxStorefrontPreviewDeps = {},
   options: { audioItemId?: string | null } = {},
 ): Promise<MaxStorefrontPreview> {
+  if (isBusinessOnlyPractice(practice)) return { ok: false, reason: "preview_unavailable" };
   try {
     const isCourse =
       resolvePublicationClass(practice.publication_class, practice.product_kind) ===
@@ -199,7 +202,8 @@ export async function resolveMaxStorefrontPreview(
         (async (practiceId: string) => {
           const { data, error } = await supabase
             .from("practices")
-            .select("audio_url")
+            .select("business_only, audio_url")
+            .eq(BUSINESS_ONLY_COLUMN, false)
             .eq("id", practiceId)
             .maybeSingle();
           if (error) {
@@ -254,6 +258,7 @@ export async function resolveMaxPreviewStorageSource(input: {
   | { ok: true; bucket: string; path: string }
   | { ok: false; reason: "preview_unavailable" | "storage_unavailable" }
 > {
+  if (isBusinessOnlyPractice(input.practice)) return { ok: false, reason: "preview_unavailable" };
   try {
     const audioPath = input.audioItem.audio_path?.trim() ?? "";
     if (audioPath) {

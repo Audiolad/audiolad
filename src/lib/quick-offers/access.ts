@@ -26,7 +26,8 @@ export const QUICK_OFFER_DETAIL_SELECT = `
   created_at,
   updated_at,
   practices (
-    id,
+    business_only,
+        id,
     slug,
     title,
     status,

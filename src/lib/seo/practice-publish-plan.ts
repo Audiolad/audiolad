@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { planPracticePublishIndexNow } from "@/lib/seo/indexnow/planner";
 import {
   planPracticeYandexRecrawl,
@@ -15,6 +16,7 @@ export type ClaimedScheduledPublication = {
   authorId: string;
   practiceSlug: string;
   authorSlug: string;
+  business_only?: boolean | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
   publishedAt: string;
@@ -34,7 +36,7 @@ export function planClaimedPublicationNotifications(
   const byAuthor = new Map<string, ClaimedScheduledPublication[]>();
 
   for (const row of rows) {
-    if (!row.authorSlug.trim() || !row.practiceSlug.trim()) {
+    if (isBusinessOnlyPractice(row) || !row.authorSlug.trim() || !row.practiceSlug.trim()) {
       continue;
     }
 
@@ -79,6 +81,7 @@ export type PracticePublishedSearchInput = {
   practiceSlug: string;
   previousStatus?: string | null;
   nextStatus?: string | null;
+  business_only?: boolean | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
   isFirstPublishOfPractice: boolean;
@@ -98,12 +101,13 @@ export function planPracticePublishedSearchNotifications(
 ): PracticePublishedSearchPlan {
   const nextStatus = input.nextStatus ?? "published";
 
-  if (input.publiclyAvailable === false) {
+  if (isBusinessOnlyPractice(input) || input.publiclyAvailable === false) {
     return { indexNow: [], yandex: null };
   }
 
   return {
     indexNow: planPracticePublishIndexNow({
+      business_only: input.business_only,
       authorSlug: input.authorSlug,
       practiceSlug: input.practiceSlug,
       isFirstPublishOfPractice: input.isFirstPublishOfPractice,
@@ -116,6 +120,7 @@ export function planPracticePublishedSearchNotifications(
       nextStatus,
       catalogVisibility: input.catalogVisibility,
       isCatalogListed: input.isCatalogListed,
+      business_only: input.business_only,
       authorSlug: input.authorSlug,
       practiceSlug: input.practiceSlug,
       firstPublicGoLive: input.firstPublicGoLive,

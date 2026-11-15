@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
+
 import { isDirectLinkPublicVisibility } from "@/lib/products/catalog-visibility";
 import {
   applyPracticePublicAvailabilityFilter,
@@ -52,6 +54,7 @@ function readTarget(data: {
 }
 
 type PublishedDirectLinkRow = {
+  business_only?: boolean | null;
   slug?: string | null;
   authors?: RelationSlug;
   status?: string | null;
@@ -71,7 +74,7 @@ export function readPublishedDirectLinkTarget(
   data: PublishedDirectLinkRow | null,
   now?: Date,
 ): PublishedProductTarget | null {
-  if (!data || data.deleted_at) return null;
+  if (!data || isBusinessOnlyPractice(data) || data.deleted_at) return null;
   if (
     !isPracticePubliclyAvailable({
       status: data.status,
@@ -109,6 +112,7 @@ export function setPublishedDirectLinkLookupForTests(
 }
 
 const PUBLISHED_LISTED_COLUMNS = `
+  business_only,
   id,
   slug,
   status,
@@ -136,6 +140,7 @@ export async function resolvePublishedListedProductById(
     supabase
       .from("practices")
       .select(PUBLISHED_LISTED_COLUMNS)
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .eq("status", "published")
       .is("deleted_at", null)
@@ -161,6 +166,7 @@ export async function resolvePublishedListedProductBySlug(
     supabase
       .from("practices")
       .select(PUBLISHED_LISTED_COLUMNS)
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("slug", product)
       .eq("authors.slug", author)
       .eq("status", "published")
@@ -192,6 +198,7 @@ export async function resolvePublishedDirectLinkProductById(
     supabase
       .from("practices")
       .select(PUBLISHED_LISTED_COLUMNS)
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .eq("status", "published")
       .is("deleted_at", null),

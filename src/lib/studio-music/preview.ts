@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -188,7 +189,7 @@ export function createSupabaseStudioMusicPreviewStore(
       const { data, error } = await supabase
         .from("practices")
         .select(
-          `
+          `business_only,
           id,
           author_id,
           title,
@@ -205,6 +206,7 @@ export function createSupabaseStudioMusicPreviewStore(
           is_catalog_listed
         `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("id", publicationId)
         .maybeSingle();
 
@@ -234,7 +236,8 @@ export function createSupabaseStudioMusicPreviewStore(
     async loadCanUse(userId, publicationId) {
       const { data: practice, error: practiceError } = await supabase
         .from("practices")
-        .select("id, author_id")
+        .select("business_only, id, author_id")
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("id", publicationId)
         .maybeSingle();
 

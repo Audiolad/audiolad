@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -329,7 +330,7 @@ export async function getListeningHistoryPageData(
       supabase
         .from("practices")
         .select(
-          `
+          `business_only,
           id,
           author_id,
           title,
@@ -347,6 +348,7 @@ export async function getListeningHistoryPageData(
           authors!practices_author_id_fkey (name, slug)
         `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .in("id", practiceIds),
       loadPracticeTracksMap(supabase, practiceIds),
       loadPublishedAudioSummaries(supabase, practiceIds).catch(() => []),

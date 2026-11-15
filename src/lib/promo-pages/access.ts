@@ -34,7 +34,8 @@ const PROMO_PAGE_DETAIL_SELECT = `
     position,
     practice_id,
     practices (
-      id,
+      business_only,
+        id,
       slug,
       title,
       format,

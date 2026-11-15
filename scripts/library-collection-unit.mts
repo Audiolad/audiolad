@@ -267,6 +267,7 @@ function createCollectionSupabase(input: {
         },
         eq(column: string, value: unknown) {
           calls.push({ table, select, eq: { column, value } });
+          if (table === "practices") return builder;
           if (table === LIBRARY_COLLECTION_TABLES.saves) {
             return Promise.resolve({
               data: (input.saves ?? []).filter((row) =>

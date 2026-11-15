@@ -106,6 +106,9 @@ function internalErrorResult(): LibrarySavesApiResult {
 }
 
 function mapStoreError(error: unknown): LibrarySavesApiResult {
+  if (error instanceof LibrarySavesStoreError && error.code === "not_found") {
+    return { status: 404, body: { error: "not_found" } };
+  }
   if (error instanceof LibrarySavesStoreError && error.code === "invalid_request") {
     return invalidRequestResult();
   }

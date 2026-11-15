@@ -145,6 +145,7 @@ export async function requirePromotionCampaignAccess(campaignId: string) {
       created_at,
       updated_at,
       practices (
+        business_only,
         title,
         slug,
         status,
@@ -193,6 +194,7 @@ export async function requirePromotionCampaignMutationAccess(campaignId: string)
       created_at,
       updated_at,
       practices (
+        business_only,
         title,
         slug,
         status,

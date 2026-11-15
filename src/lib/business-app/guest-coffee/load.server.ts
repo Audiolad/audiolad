@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
 import { loadCatalogPlaySession } from "@/lib/catalog/catalog-playback";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
@@ -26,7 +28,8 @@ async function loadStillFreeIds(supabase: ReturnType<typeof createGuestClient>, 
   if (ids.length === 0) return new Set();
   const { data, error } = await supabase
     .from("practices")
-    .select("id, is_free, status, catalog_visibility")
+    .select("business_only, id, is_free, status, catalog_visibility")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .in("id", [...ids]);
   if (error || !Array.isArray(data)) throw new Error("guest_coffee_free_check_unavailable");
   return new Set(

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -12,7 +14,7 @@ import {
 const PAGE_SIZE = 1000;
 const ID_CHUNK = 40;
 const PRACTICE_COLUMNS =
-  "id, author_id, title, status, deleted_at, primary_seo_query_id, seo_primary_query";
+  "business_only, id, author_id, title, status, deleted_at, primary_seo_query_id, seo_primary_query";
 
 function chunkIds(ids: string[], size: number): string[][] {
   const chunks: string[][] = [];
@@ -63,6 +65,7 @@ export async function loadPublishedSeoOccupancyForQueries(
     const { data, error } = await supabase
       .from("practices")
       .select(PRACTICE_COLUMNS)
+        .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("status", "published")
       .is("deleted_at", null)
       .in("primary_seo_query_id", ids);
@@ -78,6 +81,7 @@ export async function loadPublishedSeoOccupancyForQueries(
     const { data, error } = await supabase
       .from("practices")
       .select(PRACTICE_COLUMNS)
+        .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("status", "published")
       .is("deleted_at", null)
       .is("primary_seo_query_id", null)

@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 /**
  * Exact MAX product target.
  *
@@ -69,7 +70,7 @@ export async function evaluateLoadedMaxExactPractice(
   userId: string | null,
   deps?: MaxExactPracticeDeps,
 ): Promise<MaxExactPracticeResult> {
-  if (practice.deleted_at || !practiceDeclaresMaxVisibility(practice)) {
+  if (isBusinessOnlyPractice(practice) || practice.deleted_at || !practiceDeclaresMaxVisibility(practice)) {
     return { ok: false, reason: "not_found" };
   }
 

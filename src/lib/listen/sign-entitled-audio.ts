@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { canPlayCourseAudioItem } from "@/lib/course-content/learner-assets";
@@ -116,16 +118,16 @@ export async function signEntitledListenAudio(
   const loadActiveStream = deps.loadActiveStream ?? defaultLoadActiveStream;
   const signPath = deps.signPath ?? defaultSignPath;
 
-  let practice = input.practice ?? null;
-  if (!practice) {
-    const loaded = await getPractice(supabase, input.authorSlug, input.productSlug);
-    if (loaded.error) {
-      return { ok: false, reason: "storage_unavailable" };
-    }
-    practice = loaded.practice;
-  }
+  if (isBusinessOnlyPractice(input.practice)) return { ok: false, reason: "not_found" };
 
-  if (!practice) {
+  // Reload even a supplied snapshot before signing; service role bypasses RLS.
+  const loaded = await getPractice(supabase, input.authorSlug, input.productSlug);
+  if (loaded.error) {
+    return { ok: false, reason: "storage_unavailable" };
+  }
+  const practice = loaded.practice;
+
+  if (!practice || isBusinessOnlyPractice(practice)) {
     return { ok: false, reason: "not_found" };
   }
 
@@ -198,7 +200,8 @@ export async function signEntitledListenAudio(
   } else if (input.audioId === `legacy-${practice.id}`) {
     const { data: legacyPractice, error: legacyError } = await serviceRole
       .from("practices")
-      .select("audio_url")
+      .select("business_only, audio_url")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practice.id)
       .maybeSingle();
 

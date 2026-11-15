@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getAudioPostDisplayLabel } from "@/lib/author-products/format";
@@ -338,7 +339,7 @@ export async function getContinueListening(
       supabase
         .from("practices")
         .select(
-          `
+          `business_only,
       id,
       author_id,
       title,
@@ -361,6 +362,7 @@ export async function getContinueListening(
       authors!practices_author_id_fkey (name, slug)
     `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .in("id", practiceIds)
         .eq("status", "published")
         .eq("is_catalog_listed", true),
@@ -449,7 +451,7 @@ export async function getRecentlyListenedProducts(
       supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       title,
@@ -471,6 +473,7 @@ export async function getRecentlyListenedProducts(
       authors!practices_author_id_fkey (name, slug)
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .in("id", orderedPracticeIds)
     .eq("status", "published")
     .eq("is_catalog_listed", true),
@@ -540,7 +543,7 @@ export async function getActivePrograms(
       supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       title,
@@ -562,6 +565,7 @@ export async function getActivePrograms(
       authors!practices_author_id_fkey (name, slug)
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .in("id", multiTrackPracticeIds)
     .eq("status", "published")
     .eq("is_catalog_listed", true),

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -153,7 +155,8 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
   const { data: products, error: productError } = productIds.length
     ? await supabase
         .from("practices")
-        .select("id, title, status, moderation_status")
+        .select("business_only, id, title, status, moderation_status")
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .in("id", productIds)
     : { data: [], error: null };
   if (productError) throw new Error("seo_query_products_load_failed");

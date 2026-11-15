@@ -1,3 +1,5 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -115,6 +117,7 @@ export async function getAuthorProfileDetail(
       `
       position,
       practices!inner (
+        business_only,
         id,
         title,
         slug,
@@ -144,6 +147,7 @@ export async function getAuthorProfileDetail(
 
     if (
       !practice?.id ||
+      isBusinessOnlyPractice(practice) ||
       practice.author_id !== authorId ||
       !isPracticePubliclyAvailable({
         status: practice.status,
@@ -282,7 +286,8 @@ export async function replaceAuthorFeaturedProducts(
 
   const { data: products, error: productsError } = await supabase
     .from("practices")
-    .select("id, author_id, status, scheduled_publish_at, published_at")
+    .select("business_only, id, author_id, status, scheduled_publish_at, published_at")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .in("id", productIds);
 
   if (productsError) {
@@ -420,8 +425,9 @@ export async function listAuthorPublishedProductsForPicker(
     supabase
       .from("practices")
       .select(
-        "id, title, slug, format, cover_url, price, is_free, scheduled_publish_at, published_at",
+        "business_only, id, title, slug, format, cover_url, price, is_free, scheduled_publish_at, published_at",
       )
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("author_id", authorId)
       .eq("status", "published"),
   ).order("created_at", { ascending: false });

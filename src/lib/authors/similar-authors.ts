@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -84,7 +85,7 @@ export async function findSimilarAuthors(
     supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       cover_image,
@@ -98,6 +99,7 @@ export async function findSimilarAuthors(
       )
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("status", "published")
     .eq("is_catalog_listed", true)
     .neq("author_id", authorId),

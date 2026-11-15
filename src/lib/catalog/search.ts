@@ -28,6 +28,7 @@ export const CATALOG_SEARCH_SUGGESTION_LIMIT = CATALOG_PRODUCT_SUGGEST_LIMIT;
 export const CATALOG_SEARCH_SUGGEST_MIN_LENGTH = 2;
 
 const CATALOG_PRACTICE_SEARCH_SELECT = `
+  business_only,
   id,
   author_id,
   title,

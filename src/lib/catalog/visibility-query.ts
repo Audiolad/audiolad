@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
@@ -140,7 +141,7 @@ export function applyOrdinaryCatalogEligibility<T>(
     not: (column: string, operator: string, value: string) => unknown;
   };
 
-  let next = q.eq("status", "published") as typeof q;
+  let next = (q.eq(BUSINESS_ONLY_COLUMN, false) as typeof q).eq("status", "published") as typeof q;
 
   if (allowlisted.length === 0) {
     next = next.eq("catalog_visibility", "listed") as typeof q;
