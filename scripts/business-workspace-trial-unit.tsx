@@ -985,7 +985,9 @@ const loader = read("src/lib/business-workspace/load.server.ts");
 assert.match(loader, /selectWorkspaceTracks/);
 assert.match(loader, /resolve_business_track_eligibility/);
 assert.match(loader, /cover_url, cover_image, updated_at/);
-assert.match(loader, /cabinetAlbumCoverUrl/);
+assert.match(loader, /workspaceTrackCoverUrl/);
+// 39a7ef48 PR-D: ordinary albums still use the public catalog cover; closed albums get the hall cover route.
+assert.match(read("src/lib/business-workspace/cover-source.ts"), /cabinetAlbumCoverUrl/);
 assert.match(read("src/lib/business-workspace/model.ts"), /coverUrl\?: string \| null/);
 assert.doesNotMatch(read("src/lib/business-workspace/model.ts"), /audio_path|audioPath|signedUrl|createSignedUrl/);
 assert.match(loader, /sourcesForSpace/);

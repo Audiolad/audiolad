@@ -1,3 +1,4 @@
+import { isBusinessWorkspaceCoverUrl } from "@/lib/business-covers/private-cover";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
 /** Rendered size of a cabinet track thumbnail. Picks the public xs catalog variant. */
@@ -10,6 +11,8 @@ export const CABINET_TRACK_COVER_PX = 46;
 export function isCabinetPublicCoverUrl(url: string): boolean {
   const value = url.trim();
   if (!value || value.startsWith("data:") || value.startsWith("blob:")) return false;
+  // 39a7ef48 PR-D: same-origin, token-free route for private business-only covers.
+  if (isBusinessWorkspaceCoverUrl(value)) return true;
   const lower = value.toLowerCase();
   if (
     lower.includes("token=") ||
@@ -31,6 +34,7 @@ export function cabinetAlbumCoverUrl(input: {
   coverImage?: unknown;
   updatedAt?: string | null;
 }): string | null {
+  if (isBusinessWorkspaceCoverUrl(input.coverUrl)) return input.coverUrl!.trim();
   const resolved = getProductCoverDisplayUrl(
     input.coverUrl,
     input.updatedAt,

@@ -1,4 +1,3 @@
-import { assertBusinessOnlyCoverUploadAllowed } from "@/lib/business-track-passports/cover-guard";
 import { NextResponse } from "next/server";
 
 import {
@@ -21,6 +20,11 @@ import {
 } from "@/lib/images/image-upload-service";
 import { parseImageManifest } from "@/lib/images/image-manifest";
 import { imageProcessErrorMessage } from "@/lib/images/process-image";
+import {
+  removeBusinessPrivateCoverVersions,
+  storeBusinessPrivateCover,
+} from "@/lib/business-covers/private-cover.server";
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -32,7 +36,7 @@ const SHARED_COVER_ENABLED_MESSAGE =
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
 
     const { data: audioItem, error: lookupError } = await supabase
       .from("audio_items")
@@ -63,6 +67,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     await removeTrackCoverFiles(coverWriter, id, audioId);
+    if (isBusinessOnlyPractice(practice)) {
+      await removeBusinessPrivateCoverVersions({ writer: coverWriter, practiceId: id, audioItemId: audioId });
+    }
 
     const now = new Date().toISOString();
 
@@ -89,7 +96,6 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
     const { supabase, practice } = await requirePracticeMutationAccess(id);
-    assertBusinessOnlyCoverUploadAllowed(practice);
 
     if (practice.use_shared_cover !== false) {
       return NextResponse.json(
@@ -129,6 +135,41 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isBusinessOnlyPractice(practice)) {
+      // 39a7ef48 PR-D: private bucket only, the column keeps a reference (no URL).
+      const privateWriter = createPracticeImageWriteClient();
+      const stored = await storeBusinessPrivateCover({
+        writer: privateWriter,
+        practiceId: id,
+        audioItemId: audioId,
+        buffer,
+        declaredMime: file.type,
+      });
+      if (!stored.ok) {
+        return NextResponse.json(
+          {
+            error: stored.code,
+            message: imageProcessErrorMessage(stored.code as "corrupt_image", "track-cover"),
+          },
+          { status: stored.code === "upload_failed" ? 500 : 400 },
+        );
+      }
+      const privateWritten = await writeTrackCoverColumns(privateWriter, id, audioId, {
+        cover_url: stored.ref,
+        cover_image: null,
+        updated_at: new Date().toISOString(),
+      });
+      if (!privateWritten.ok) {
+        console.error("author_private_track_cover_update_error", privateWritten.error);
+        await removeBusinessPrivateCoverVersions({ writer: privateWriter, practiceId: id, audioItemId: audioId, keep: [] });
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+      await removeBusinessPrivateCoverVersions({ writer: privateWriter, practiceId: id, audioItemId: audioId, keep: stored.paths });
+      const privateProduct = await getAuthorProductDetail(supabase, id);
+      return NextResponse.json({ product: privateProduct, cover_url: stored.ref, cover_image: null });
+    }
+
     const previousManifest = parseImageManifest(audioItem.cover_image);
     // Cover objects and cover columns are server-only (1:1 is enforced
     // here; migrations 20270117120000 and 20270118120000).

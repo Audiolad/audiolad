@@ -6664,6 +6664,31 @@
       "file": "supabase/migrations/20270311120000_business_track_passports.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.admin_create_business_album(uuid,text) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY business_private_covers_read_fence ON storage.objects AS RESTRICTIVE FOR SELECT TO anon, authenticated USING (bucket_id <> 'business-private-covers');"
+    },
+    {
+      "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY business_private_covers_insert_fence ON storage.objects AS RESTRICTIVE FOR INSERT TO anon, authenticated WITH CHECK (bucket_id <> 'business-private-covers');"
+    },
+    {
+      "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY business_private_covers_update_fence ON storage.objects AS RESTRICTIVE FOR UPDATE TO anon, authenticated USING (bucket_id <> 'business-private-covers') WITH CHECK (bucket_id <> 'business-private-covers');"
+    },
+    {
+      "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY business_private_covers_delete_fence ON storage.objects AS RESTRICTIVE FOR DELETE TO anon, authenticated USING (bucket_id <> 'business-private-covers');"
+    },
+    {
+      "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_private_cover_ref_ok(text, uuid, uuid) TO service_role;"
     }
   ]
 }

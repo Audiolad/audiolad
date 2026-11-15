@@ -30,6 +30,8 @@ export type UseCoverUploadOptions = {
   onUpdated?: (result: CoverUploadResult) => void;
   deleteConfirmMessage?: string;
   disabled?: boolean;
+  /** 39a7ef48 PR-D: editor preview URL for a private business-only cover reference. */
+  privatePreviewSrc?: string | null;
 };
 
 export function useCoverUpload({
@@ -43,6 +45,7 @@ export function useCoverUpload({
   onUpdated,
   deleteConfirmMessage = "Удалить обложку?",
   disabled = false,
+  privatePreviewSrc = null,
 }: UseCoverUploadOptions) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -74,7 +77,7 @@ export function useCoverUpload({
 
   const previewKey = `${coverUrl ?? ""}:${coverVersion ?? ""}:${localPreviewUrl ?? ""}`;
   const previewFailed = previewFailureKey === previewKey;
-  const displaySrc = localPreviewUrl ?? resolvedCover.src;
+  const displaySrc = localPreviewUrl ?? resolvedCover.src ?? privatePreviewSrc;
   const showPreview = Boolean(displaySrc) && !previewFailed;
   const useManifestPreview = Boolean(resolvedCover.src) && !localPreviewUrl;
 
