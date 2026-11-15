@@ -32,12 +32,11 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Local PostgreSQL 17
+      - name: Local PostgreSQL toolchain
         run: |
-          if [ ! -x /usr/lib/postgresql/17/bin/postgres ]; then
-            sudo apt-get update
-            sudo apt-get install -y postgresql-17
-          fi
+          set -euo pipefail
+          ls -d /usr/lib/postgresql/*/bin
+          psql --version
       - run: npm run test:business-track-passports
       - run: npm run test:business-only-admin
       - run: npm run test:business-manual-admissions
