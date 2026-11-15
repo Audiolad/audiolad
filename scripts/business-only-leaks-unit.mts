@@ -19,7 +19,6 @@ import { mergeLibraryCollection } from "../src/lib/library/collection";
 import { createSupabaseLibrarySavesStore } from "../src/lib/library/saves";
 import { canExposePracticeUrl } from "../src/lib/products/public-url.server";
 import { practiceBelongsToAuthor } from "../src/lib/authors/space-ops";
-import { grantAccess } from "../src/lib/products/grant-access";
 import { evaluateLoadedMaxExactPractice } from "../src/lib/max/exact-product";
 import { mapPracticeRowsToSitemapEntries, mapAuthorPracticeRowsToSitemapEntries } from "../src/lib/seo/sitemap-data";
 import { applyOrdinaryCatalogEligibility } from "../src/lib/catalog/visibility-query";
@@ -95,7 +94,7 @@ for (const role of ["guest", "listener", "stale-entitlement", "b2b-owner", "auth
   }), { ok: false, reason: "not_found" });
   await assert.rejects(buildPublicPracticePreviewClip({ storageClient: db, practiceId: id, audioItem: { id: "known-track", audio_path: "secret.mp3", status: "published" } }), /not_found/);
   await assert.rejects(createSupabaseLibrarySavesStore(db).insert({ userId: role, practiceId: id, createdAt: "2026-01-01" }), /not_found/);
-  await assert.rejects(grantAccess(db, { userId: role, practiceId: id, targetLevel: 1 }), /not_found/);
+  // grantAccess: rejected in the database (user_practices trigger, PR-A isolated test); no extra app query on the payment path.
   assert.equal((await evaluateLoadedMaxExactPractice(db, row as never, userId)).ok, false);
   assert.deepEqual(mapPracticeRowsToSitemapEntries([{ ...row, created_at: null }]), []);
   assert.deepEqual(mapAuthorPracticeRowsToSitemapEntries([{ ...row, created_at: null }]), []);
@@ -198,7 +197,6 @@ for (const [file, guard] of [
   ["src/app/api/payments/route.ts", "canUsePracticeOnOpenPlatform"],
   ["src/app/api/library/claim/route.ts", "canUsePracticeOnOpenPlatform"],
   ["src/lib/library/saves.ts", "canUsePracticeOnOpenPlatform"],
-  ["src/lib/products/grant-access.ts", "canUsePracticeOnOpenPlatform"],
   ["src/lib/pricing/rpc.ts", "canUsePracticeOnOpenPlatform"],
   ["src/app/api/price-promotions/start/route.ts", "canUsePracticeOnOpenPlatform"],
   ["src/lib/quick-offers/public-page.ts", "canUsePracticeOnOpenPlatform"],
