@@ -48,6 +48,10 @@ jobs:
           npx eslint src/lib/business-track-passports
           'src/app/(platform)/admin/business-catalog'
           scripts/business-only-admin-unit.mts
+          scripts/published-business-catalog-unit.mts
+          src/lib/business-admission/published-catalog.ts
+          src/lib/business-admission/published-catalog.server.ts
+          src/app/api/admin/business-catalog/cover/route.ts
           src/lib/business-workspace/candidates.ts
           src/lib/business-workspace/load.server.ts
           'src/app/api/author/products/[id]/route.ts'
