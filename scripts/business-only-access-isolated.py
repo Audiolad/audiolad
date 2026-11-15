@@ -9,9 +9,21 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parent.parent
-pg = Path(os.environ.get('PG_BIN', '/usr/lib/postgresql/17/bin'))
+def pg_bin():
+    if os.environ.get('PG_BIN'):
+        return Path(os.environ['PG_BIN'])
+    # Prefer 17 (local convention); fall back to the newest installed server (CI runners).
+    found = sorted(Path('/usr/lib/postgresql').glob('*/bin/postgres'),
+                   key=lambda p: int(p.parent.parent.name) if p.parent.parent.name.isdigit() else 0)
+    preferred = Path('/usr/lib/postgresql/17/bin')
+    if (preferred / 'postgres').exists() or not found:
+        return preferred
+    return found[-1].parent
+
+pg = pg_bin()
 name = '20270310120000_business_only_practices'
 migrations = root / 'supabase/migrations'
+validation = (migrations / '20270310120100_business_only_practices_validate.sql').read_text()
 
 def source(file):
     return (migrations / file).read_text()
@@ -34,29 +46,36 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
 $$;
 CREATE FUNCTION public.has_platform_permission(u uuid, p text) RETURNS boolean
 LANGUAGE sql STABLE AS $$ SELECT u='00000000-0000-0000-0000-000000000006' AND p='admin_panel.access'; $$;
-CREATE FUNCTION public.is_practice_author_member(p uuid,u uuid) RETURNS boolean
-LANGUAGE sql STABLE AS $$ SELECT u='00000000-0000-0000-0000-000000000005'; $$;
 CREATE TABLE public.practices (
  author_id uuid DEFAULT '00000000-0000-0000-0000-000000000500',
  id uuid PRIMARY KEY, status text DEFAULT 'draft', deleted_at timestamptz,
  first_published_at timestamptz, first_publication_date_unknown boolean NOT NULL DEFAULT false, scheduled_publish_at timestamptz,
  published_at timestamptz, catalog_visibility text NOT NULL,
  is_free boolean DEFAULT false, price integer DEFAULT 100,
- slug text DEFAULT 'normal-album', publication_class text DEFAULT 'album',
+ title text DEFAULT 'Normal album', slug text DEFAULT 'normal-album', publication_class text DEFAULT 'album',
  cover_url text, updated_at timestamptz DEFAULT now(),
  is_catalog_listed boolean NOT NULL DEFAULT false,
  CHECK(catalog_visibility IN ('listed','unlisted','selected_users')),
  CHECK(is_catalog_listed = (catalog_visibility='listed'))
 );
 CREATE TABLE public.practice_visibility_users (practice_id uuid REFERENCES practices, user_id uuid);
-CREATE TABLE public.user_practices (practice_id uuid REFERENCES practices, user_id uuid, expires_at timestamptz, access_source text DEFAULT 'free_claim');
+CREATE TABLE public.user_practices (practice_id uuid REFERENCES practices, user_id uuid, expires_at timestamptz, access_source text DEFAULT 'free_claim', access_level integer DEFAULT 1, metadata jsonb DEFAULT '{}'::jsonb, UNIQUE(user_id,practice_id));
 CREATE TABLE public.audio_items (id uuid PRIMARY KEY, practice_id uuid REFERENCES practices, status text DEFAULT 'published');
 CREATE TABLE public.author_members (author_id uuid, user_id uuid);
 INSERT INTO public.author_members VALUES ('00000000-0000-0000-0000-000000000500','00000000-0000-0000-0000-000000000005');
+INSERT INTO public.author_members VALUES ('00000000-0000-0000-0000-000000000501','00000000-0000-0000-0000-000000000008');
+CREATE FUNCTION public.is_practice_author_member(p uuid,u uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+ SELECT EXISTS(SELECT 1 FROM public.practices AS practice JOIN public.author_members AS member
+ ON member.author_id=practice.author_id WHERE practice.id=p AND member.user_id=u);
+$$;
+CREATE TABLE public.authors (id uuid PRIMARY KEY, slug text);
+INSERT INTO public.authors VALUES ('00000000-0000-0000-0000-000000000500','own-author'),
+ ('00000000-0000-0000-0000-000000000501','unrelated-author');
 CREATE TABLE public.orders (id uuid, user_id uuid, practice_id uuid, status text,
  amount_minor bigint, price_minor_snapshot bigint, currency text, quick_offer_id uuid,
  updated_at timestamptz, idempotency_key text);
-CREATE TABLE public.practice_access_levels (id uuid);
+CREATE TABLE public.practice_access_levels (id uuid, practice_id uuid, level integer, title text, description text);
 CREATE TABLE public.quick_offers (id uuid, practice_id uuid, status text, promo_price integer, timer_duration_seconds integer);
 CREATE TABLE public.practice_price_promotions (
  id uuid PRIMARY KEY, practice_id uuid, name text, promotion_type text,
@@ -98,6 +117,18 @@ CREATE FUNCTION expect_error(command text, expected text) RETURNS void LANGUAGE 
  END;
 $$;
 """
+links_source = '20260926120000_practice_access_links.sql'
+permanent_source = '20260927120000_practice_access_link_permanent_entitlement.sql'
+stubs += 'CREATE TABLE IF NOT EXISTS' + source(links_source).split('CREATE TABLE IF NOT EXISTS', 1)[1].split('CREATE INDEX', 1)[0]
+stubs += "ALTER TABLE practice_access_links ENABLE ROW LEVEL SECURITY; REVOKE ALL ON practice_access_links FROM anon,authenticated; GRANT ALL ON practice_access_links TO service_role;"
+link_functions = [
+ (links_source, 'assert_practice_access_link_target', 'uuid,integer'),
+ (links_source, 'preview_practice_access_link', 'text,uuid'),
+ ('20260923120100_course_access_levels_foundation.sql', 'grant_practice_access', 'uuid,uuid,integer,text,jsonb'),
+ (links_source, 'create_practice_access_link', 'uuid,integer,text,uuid,uuid,timestamptz,jsonb'),
+ (permanent_source, 'activate_permanent_practice_access', 'uuid,uuid'),
+ (permanent_source, 'redeem_practice_access_link', 'text,uuid'),
+]
 base = function(schedule, 'viewer_can_commercially_access_practice') + function(schedule, 'practice_is_publicly_available') + function(schedule, 'can_current_viewer_read_practice')
 base += function('20260901120100_practice_catalog_visibility_modes.sql', 'sync_practice_catalog_visibility')
 base += '''CREATE TRIGGER trg_sync_practice_catalog_visibility BEFORE INSERT OR UPDATE ON practices
@@ -128,7 +159,14 @@ extra_functions = [
  ('20260823191000_quick_offers.sql', 'apply_quick_offer_amount', 'uuid,uuid,timestamptz'),
 ]
 base += function('20260823191000_quick_offers.sql', 'resolve_quick_offer_charge_rubles')
+extra_functions += link_functions
 base += ''.join(function(file, fn) for file, fn, signature in extra_functions)
+for file, fn, signature in link_functions:
+    base += f'REVOKE ALL ON FUNCTION public.{fn}({signature}) FROM PUBLIC,anon,authenticated; GRANT EXECUTE ON FUNCTION public.{fn}({signature}) TO service_role;'
+    comment = re.search(r"COMMENT ON FUNCTION public\."+fn+r"\(.*? IS\s*'(?:[^']|'')*';", source(file), re.S)
+    if comment:
+        base += comment[0]
+
 base += """
 REVOKE ALL ON FUNCTION public.can_current_viewer_read_practice(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO anon,authenticated,service_role;
@@ -148,7 +186,13 @@ CREATE TABLE original_functions AS
                            'public.start_practice_price_promotion(text,text,uuid)'::regprocedure,
                            'public.create_course_upgrade_order(uuid,uuid,integer)'::regprocedure,
                            'public.remove_library_practice(uuid)'::regprocedure,
-                           'public.apply_quick_offer_amount(uuid,uuid,timestamptz)'::regprocedure);
+                           'public.apply_quick_offer_amount(uuid,uuid,timestamptz)'::regprocedure,
+                           'public.assert_practice_access_link_target(uuid,integer)'::regprocedure,
+                           'public.preview_practice_access_link(text,uuid)'::regprocedure,
+                           'public.grant_practice_access(uuid,uuid,integer,text,jsonb)'::regprocedure,
+                           'public.create_practice_access_link(uuid,integer,text,uuid,uuid,timestamptz,jsonb)'::regprocedure,
+                           'public.activate_permanent_practice_access(uuid,uuid)'::regprocedure,
+                           'public.redeem_practice_access_link(text,uuid)'::regprocedure);
 CREATE TABLE original_policies AS
  SELECT polrelid, polname, polcmd, polroles, polpermissive,
         pg_get_expr(polqual,polrelid) AS qual,
@@ -156,27 +200,32 @@ CREATE TABLE original_policies AS
  FROM pg_policy;
 """
 fixtures = ''
-for person in [0,2,3,4,5,6]:
+for person in [0,2,3,4,5,6,8]:
     fixtures += f"INSERT INTO playlists VALUES ('{uid(300+person)}','{uid(person)}');\n"
 # Include deleted/draft/scheduled/expired-grant legacy rows in differential tests.
-for i,visibility in enumerate(['selected_users','listed','unlisted','selected_users','listed','selected_users','selected_users','selected_users'],1):
+for i,visibility in enumerate(['selected_users','listed','unlisted','selected_users','listed','selected_users','selected_users','selected_users','selected_users'],1):
     fixtures += f"INSERT INTO practices(id,status,catalog_visibility) VALUES ('{uid(100+i)}','{'draft' if i in (1,5,8) else 'published'}','{visibility}');\n"
     fixtures += f"UPDATE practices SET cover_url='cover-{i}' WHERE id='{uid(100+i)}';\n"
     fixtures += f"INSERT INTO practice_topics VALUES ('{uid(100+i)}','{uid(400)}');\n"
-    for person in [0,2,3,4,5,6]:
+    for person in [0,2,3,4,5,6,8]:
         fixtures += f"INSERT INTO playlist_items VALUES ('{uid(300+person)}','{uid(100+i)}',{i});\n"
     fixtures += f"INSERT INTO audio_items(id,practice_id) VALUES ('{uid(100+i)}','{uid(100+i)}');\n"
     fixtures += f"INSERT INTO music_audio_assets VALUES ('{uid(100+i)}','{uid(100+i)}');\n"
     fixtures += f"INSERT INTO storage.objects VALUES ('practice-audio','practices/{uid(100+i)}/track.wav');\n"
     fixtures += f"INSERT INTO user_practices(practice_id,user_id,expires_at) VALUES ('{uid(100+i)}','{uid(3)}',NULL);\n"
     fixtures += f"INSERT INTO practice_visibility_users VALUES ('{uid(100+i)}','{uid(4)}');\n"
+fixtures += f"UPDATE practices SET author_id='{uid(501)}' WHERE id='{uid(109)}';\n"
 fixtures += f"INSERT INTO user_practices(practice_id,user_id,expires_at) VALUES ('{uid(101)}','{uid(7)}',NULL),('{uid(102)}','{uid(7)}',NULL);\n"
 fixtures += f"UPDATE practices SET deleted_at=now() WHERE id='{uid(106)}'; UPDATE practices SET scheduled_publish_at=now()+interval '1 day' WHERE id='{uid(107)}';"
 fixtures += f"UPDATE practices SET first_publication_date_unknown=true WHERE id='{uid(108)}';"
 fixtures += f"INSERT INTO user_practices(practice_id,user_id,expires_at) VALUES ('{uid(104)}','{uid(2)}',now()-interval '1 day');"
+for album in range(101,110):
+    fixtures += f"INSERT INTO practice_access_links(practice_id,token_hash) VALUES ('{uid(album)}','{album:064x}');\n"
+for offset,status in enumerate(['redeemed','revoked','active'],1):
+    fixtures += f"INSERT INTO practice_access_links(practice_id,token_hash,status,expires_at) VALUES ('{uid(101)}','{110+offset:064x}','{status}',now()-interval '1 day');\n"
 # Snapshot results under actual roles before applying the migration.
 base += '''CREATE TABLE snapshot(person integer, kind text, ids text);
-GRANT SELECT,INSERT ON snapshot TO anon,authenticated;
+GRANT SELECT,INSERT ON snapshot TO anon,authenticated,service_role;
 '''
 def session(person):
     return f"SET ROLE {'anon' if person==0 else 'authenticated'}; SET test.uid='{'' if person==0 else uid(person)}';\n"
@@ -200,15 +249,29 @@ def observations(person, compare=False):
             sql += f"SELECT check_test(({q}) IS NOT DISTINCT FROM (SELECT ids FROM snapshot WHERE person={person} AND kind='{kind}'),'unchanged {person} {kind}');\n"
         else:
             sql += f"INSERT INTO snapshot SELECT {person},'{kind}',({q});\n"
+    sql += f"RESET ROLE; SET ROLE service_role; SET test.uid='{'' if person==0 else uid(person)}';\n"
+    viewer = 'NULL' if person == 0 else f"'{uid(person)}'"
+    q = f"SELECT string_agg(preview_practice_access_link(token_hash,{viewer}::uuid)::text,',' ORDER BY token_hash) FROM practice_access_links WHERE practice_id NOT IN ('{uid(101)}','{uid(106)}') AND token_hash<>'{900:064x}'"
+    if compare:
+        sql += f"SELECT check_test(({q}) IS NOT DISTINCT FROM (SELECT ids FROM snapshot WHERE person={person} AND kind='link_preview'),'unchanged {person} link preview');\n"
+    else:
+        sql += f"INSERT INTO snapshot SELECT {person},'link_preview',({q});\n"
     return sql+'RESET ROLE;\n'
 # Helper called against all normal IDs, independent of parent RLS.
 base += "CREATE TABLE practices_fixture AS SELECT id FROM practices WITH NO DATA; GRANT SELECT ON practices_fixture TO anon,authenticated;"
 fixtures += f"INSERT INTO practices_fixture SELECT id FROM practices WHERE id<>'{uid(101)}';"
-before = ''.join(observations(p) for p in [0,2,3,4,5,6])
-checks = f"SELECT check_test((SELECT bool_and(NOT business_only) FROM practices),'all existing rows default false');\n"
+before = ''.join(observations(p) for p in [0,2,3,4,5,6,8])
+before += 'SET ROLE service_role;'
+for token, status in [(101,'active'),(111,'redeemed'),(112,'revoked'),(113,'expired')]:
+    before += f"SELECT check_test(preview_practice_access_link('{token:064x}')->>'status'='{status}','old token works before designation {status}');"
+before += 'RESET ROLE;'
+
+checks = "SELECT check_test((SELECT NOT convalidated FROM pg_constraint WHERE conname='practices_business_only_visibility_check'),'boundary committed without validation');\n"
+checks += f"SELECT check_test((SELECT bool_and(NOT business_only) FROM practices),'all existing rows default false');\n"
 checks += f"UPDATE practices SET business_only=true WHERE id='{uid(101)}';\n"
-checks += ''.join(observations(p,True) for p in [0,2,3,4,5,6])
-for p in [0,2,3,4,5,6]:
+checks += f"SET ROLE service_role; SELECT expect_error($cmd$SELECT preview_practice_access_link('{101:064x}')$cmd$,'invalid_token'); RESET ROLE;\n"
+checks += ''.join(observations(p,True) for p in [0,2,3,4,5,6,8])
+for p in [0,2,3,4,5,6,8]:
     checks += session(p)+f"SELECT check_test(can_current_viewer_read_practice('{uid(101)}') IS {'TRUE' if p in (5,6) else 'FALSE'},'business draft helper persona {p}');\nRESET ROLE;\n"
 # A pre-existing promotion must not become a public metadata bypass.
 checks += f"INSERT INTO practice_price_promotions VALUES ('{uid(600)}','{uid(101)}','closed promo','personal_countdown',50,NULL,NULL,3600,true,'business-token');\n"
@@ -216,7 +279,7 @@ checks += f"INSERT INTO practice_price_promotions VALUES ('{uid(601)}','{uid(102
 # Publish after designation; even pre-existing grant/allowlist must not grant access.
 checks += f"UPDATE practices SET status='published' WHERE id='{uid(101)}';\n"
 checks += f"CREATE TABLE business_practice_fixture AS SELECT p AS row_data FROM practices AS p WHERE id='{uid(101)}'; GRANT SELECT ON business_practice_fixture TO anon,authenticated;\n"
-for p in [0,2,3,4,5,6]:
+for p in [0,2,3,4,5,6,8]:
     checks += session(p)
     for album in [102,103,104]:
         expected = album in (102,103) or p in (3,4,5,6)
@@ -236,8 +299,29 @@ for p in [0,2,3,4,5,6]:
             checks += f"SELECT check_test((SELECT count(*)=0 FROM {table} WHERE {where}),'closed {table} persona {p}');\n"
     checks += 'RESET ROLE;\n'
 
+# Old tokens must fail before any metadata is returned, for every viewer,
+# including the owner/admin. The endpoint already maps these errors to 404.
+for person in [0,2,3,4,5,6,8]:
+    checks += f"SET ROLE service_role; SET test.uid='{'' if person==0 else uid(person)}';\n"
+    for token in [101,111,112,113]:
+        checks += f"SELECT expect_error($cmd$SELECT preview_practice_access_link('{token:064x}','{uid(person)}')$cmd$,'invalid_token');\n"
+    checks += 'RESET ROLE;\n'
+checks += f"SELECT check_test(is_practice_author_member('{uid(109)}','{uid(8)}') AND NOT is_practice_author_member('{uid(101)}','{uid(8)}'),'practice-specific author memberships');\n"
+checks += session(8)+f"SELECT check_test(can_current_viewer_read_practice('{uid(109)}'),'second author can read own practice');\nRESET ROLE;\n"
 def reject(command, error):
     return f"SELECT expect_error($cmd${command}$cmd$,'{error}');\n"
+checks += 'SET ROLE service_role;\n'
+checks += reject(f"SELECT create_practice_access_link('{uid(101)}',1,'{900:064x}','{uid(5)}')", 'practice_not_found')
+checks += reject(f"INSERT INTO practice_access_links(practice_id,token_hash) VALUES ('{uid(101)}','{900:064x}')", 'business_only_listener_access_forbidden')
+checks += reject(f"UPDATE practice_access_links SET practice_id='{uid(101)}' WHERE token_hash='{102:064x}'", 'business_only_listener_access_forbidden')
+checks += reject(f"SELECT redeem_practice_access_link('{101:064x}','{uid(2)}')", 'practice_not_found')
+for person in [2,3]:  # New grant and legacy-grant upsert are both closed.
+    checks += reject(f"SELECT grant_practice_access('{uid(person)}','{uid(101)}',1,'external_manual')", 'practice_not_found')
+checks += f"SELECT check_test((SELECT status='active' AND redeemed_at IS NULL FROM practice_access_links WHERE token_hash='{101:064x}'),'closed token not consumed');\n"
+checks += f"SELECT create_practice_access_link('{uid(102)}',1,'{900:064x}','{uid(5)}');\n"
+checks += f"SELECT check_test(redeem_practice_access_link('{900:064x}','{uid(9)}')->>'code'='granted','normal link redemption');\n"
+checks += f"SELECT check_test((SELECT access_source='external_manual' AND access_level=1 AND expires_at IS NULL FROM user_practices WHERE practice_id='{uid(102)}' AND user_id='{uid(9)}'),'normal permanent entitlement');\n"
+checks += 'RESET ROLE;\n'
 checks += reject(f"UPDATE practices SET business_only=false WHERE id='{uid(101)}'",'business_only_is_one_way')
 for role in ['service_role','authenticated']:
     checks += f"SET ROLE {role}; SET test.uid='{uid(6)}';\n"
@@ -267,7 +351,7 @@ for table in ['practice_visibility_users','user_practices']:
 checks += reject(f"INSERT INTO playlist_items VALUES ('{uid(302)}','{uid(101)}',99)", 'business_only_listener_access_forbidden')
 checks += reject(f"UPDATE playlist_items SET practice_id='{uid(101)}' WHERE practice_id='{uid(102)}'", 'business_only_listener_access_forbidden')
 # Normal playlist writes remain accepted for each authenticated caller.
-for person in [2,3,4,5,6]:
+for person in [2,3,4,5,6,8]:
     checks += session(person)
     checks += f"INSERT INTO playlist_items VALUES ('{uid(300+person)}','{uid(102)}',99); UPDATE playlist_items SET practice_id='{uid(103)}' WHERE position=99;\n"
     checks += reject(f"INSERT INTO playlist_items VALUES ('{uid(300+person)}','{uid(101)}',100)", 'business_only_listener_access_forbidden')
@@ -286,7 +370,7 @@ checks += f"SET ROLE service_role; INSERT INTO practices(id,business_only,catalo
 checks += reject(f"INSERT INTO practices(id,business_only,catalog_visibility,status) VALUES ('{uid(202)}',true,'selected_users','published')",'business_only_requires_never_published')
 checks += reject(f"INSERT INTO practices(id,business_only,catalog_visibility,first_published_at) VALUES ('{uid(202)}',true,'selected_users',now())",'business_only_requires_never_published')
 for table in ['practice_visibility_users','user_practices']:
-    checks += f"INSERT INTO {table}(practice_id,user_id) VALUES ('{uid(102)}','{uid(3)}');\n"
+    checks += f"INSERT INTO {table}(practice_id,user_id) VALUES ('{uid(102)}','{uid(3)}') ON CONFLICT DO NOTHING;\n"
 # Other entitlement/order RPCs must not disclose closed metadata via legacy rows.
 checks += session(3)
 checks += reject(f"SELECT * FROM create_course_upgrade_order('{uid(101)}','{uid(700)}')", 'practice_not_found')
@@ -300,6 +384,7 @@ checks += f"SELECT check_test((apply_quick_offer_amount('{uid(702)}','{uid(703)}
 checks += session(7)
 checks += f"SELECT check_test(remove_library_practice('{uid(101)}')->>'practice_slug'='','library removal hides closed slug');\n"
 checks += f"SELECT check_test(remove_library_practice('{uid(102)}')->>'practice_slug'='normal-album','normal library removal slug');\nRESET ROLE;\n"
+checks += 'DROP TABLE business_practice_fixture;\n'
 rollback = (root / 'supabase/rollback' / (name+'.down.sql')).read_text()
 for filename, fn in [(schedule, 'can_current_viewer_read_practice'),
                      (schedule, 'viewer_can_commercially_access_practice'),
@@ -308,6 +393,8 @@ for filename, fn in [(schedule, 'can_current_viewer_read_practice'),
                      (pricing_source, 'start_practice_price_promotion')]:
     assert function(filename, fn) in rollback, f'rollback must restore {fn} byte-for-byte'
 for filename, fn, signature in extra_functions:
+    if fn in ['create_practice_access_link','activate_permanent_practice_access','redeem_practice_access_link']:
+        continue
     assert function(filename, fn) in rollback, f'rollback must restore {fn} byte-for-byte'
 for filename, pol in policy_sources:
     if pol in ['Selected users can read allowlisted practices', 'Entitled users can read entitled practices',
@@ -330,16 +417,20 @@ SELECT check_test(NOT EXISTS (
   SELECT polrelid,polname,polcmd,polroles,polpermissive,pg_get_expr(polqual,polrelid),pg_get_expr(polwithcheck,polrelid) FROM pg_policy)
 ), 'rollback restores all policy definitions');
 """
-after += ''.join(observations(p,True) for p in [0,2,3,4,5,6])
+after += ''.join(observations(p,True) for p in [0,2,3,4,5,6,8])
 # Extra rows are excluded from normal snapshots after checking the rollback column.
 after = after.replace("SELECT check_test(NOT EXISTS", "DELETE FROM practices WHERE id IN ('"+uid(200)+"','"+uid(201)+"'); SELECT check_test(NOT EXISTS",1)
-after += "SELECT 'business-only-access: PASS';"
+validated_check = "SELECT check_test((SELECT convalidated FROM pg_constraint WHERE conname='practices_business_only_visibility_check'),'separate validation completed');"
+# Exercise rollback a second time with validation still pending.
+pending_rollback = (migrations/(name+'.sql')).read_text() + "SELECT check_test((SELECT NOT convalidated FROM pg_constraint WHERE conname='practices_business_only_visibility_check'),'second apply remains NOT VALID');" + rollback + after
+finish = "SELECT 'business-only-access: PASS';"
+
 with tempfile.TemporaryDirectory(prefix='audiolad-business-only-') as tmp:
     data = Path(tmp) / 'data'
     subprocess.run([str(pg/'initdb'),'-U','postgres','-D',str(data),'-A','trust','--locale=C.UTF-8','--encoding=UTF8'],check=True,capture_output=True)
-    blocks = [stubs,base,fixtures,before,(migrations/(name+'.sql')).read_text(),checks,rollback,after]
+    blocks = [stubs,base,fixtures,before,(migrations/(name+'.sql')).read_text(),checks,validation,validated_check,rollback,after,pending_rollback,finish]
     # Single-user mode compiles real up/down, but internally bypasses RLS.
-    compile_blocks = [stubs,base,fixtures,(migrations/(name+'.sql')).read_text(),rollback]
+    compile_blocks = [stubs,base,fixtures,(migrations/(name+'.sql')).read_text(),validation,rollback,(migrations/(name+'.sql')).read_text(),rollback]
     sql = '\n'.join(' '.join(line for line in block.splitlines() if not line.lstrip().startswith('--')) for block in compile_blocks)+'\n'
     result = subprocess.run([str(pg/'postgres'),'--single','-D',str(data),'postgres'],input=sql,text=True,capture_output=True)
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr:
@@ -383,7 +474,7 @@ $$;
                     f"FROM {table} WHERE test_policy_allows('{table}',to_jsonb({alias})) AND")
             return block.replace("DELETE FROM practices WHERE test_policy_allows('practices',to_jsonb(practices)) AND", "DELETE FROM practices WHERE")
         fallback = [stubs,base,fixtures,evaluator,explicit_policies(before),
-                    (migrations/(name+'.sql')).read_text(),explicit_policies(checks),rollback,explicit_policies(after)]
+                    (migrations/(name+'.sql')).read_text(),explicit_policies(checks),validation,validated_check,rollback,explicit_policies(after),explicit_policies(pending_rollback),finish]
         sql = reset+'\n'.join(' '.join(line for line in b.splitlines() if not line.lstrip().startswith('--')) for b in fallback)+'\n'
         result = subprocess.run([str(pg/'postgres'),'--single','-D',str(data),'postgres'],input=sql,text=True,capture_output=True)
         mode = 'single-user compiled policy predicates (socket denied; actual RLS runs in CI)'
@@ -397,5 +488,5 @@ $$;
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'business-only-access: PASS' not in result.stdout:
         print(result.stdout,result.stderr)
         raise SystemExit(1)
-    print('business-only-access-isolated: real migration + rollback, 6 personas, legacy equivalence, grants/allowlist, one-way/admin/publication guards, draft-only designation, topics, mosaics, playlist writes, public pricing/promotions, commercial allowlists, legacy library/upgrade/orders, rollback definitions, sync CHECK, audio/storage RLS: PASS')
+    print('business-only-access-isolated: real migration + rollback, 7 personas (practice-specific authors), pre-existing access links, separate validation and both rollback states, legacy equivalence, grants/allowlist, one-way/admin/publication guards, draft-only designation, topics, mosaics, playlist writes, public pricing/promotions, commercial allowlists, legacy library/upgrade/orders, rollback definitions, sync CHECK, audio/storage RLS: PASS')
     print('RLS verification: '+mode)

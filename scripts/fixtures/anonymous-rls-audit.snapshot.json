@@ -6599,6 +6599,51 @@
       "file": "supabase/migrations/20270309120000_admin_practices_listening_grouped.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.admin_analytics_p2_practices( timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text, int, int, text ) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY \"Selected users can read allowlisted practices\" ON public.practices FOR SELECT TO authenticated USING ( public.practice_is_publicly_available( status, scheduled_publish_at, published_at ) AND deleted_at IS NULL AND catalog_visibility = 'selected_users' AND ( EXISTS ( SELECT 1 FROM public.practice_visibility_users AS v WHERE v.practice_id = practices.id AND NOT practices.business_only AND v.user_id = auth.uid() ) OR public.is_practice_author_member(practices.id, auth.uid()) OR public.has_platform_permission(auth.uid(), 'admin_panel.access') ) );"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY \"Entitled users can read entitled practices\" ON public.practices FOR SELECT TO authenticated USING ( deleted_at IS NULL AND NOT business_only AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.practice_id = practices.id AND up.user_id = auth.uid() AND (up.expires_at IS NULL OR up.expires_at > now()) ) );"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY \"Entitled users can read audio items\" ON public.audio_items FOR SELECT TO authenticated USING ( NOT public.practice_is_business_only(audio_items.practice_id) AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.user_id = auth.uid() AND up.practice_id = audio_items.practice_id AND ( up.expires_at IS NULL OR up.expires_at > now() ) ) );"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY \"Authenticated users can read entitled practice audio\" ON storage.objects FOR SELECT TO authenticated USING ( bucket_id = 'practice-audio' AND split_part(name, '/', 1) = 'practices' AND split_part(name, '/', 2) <> '' AND split_part(name, '/', 3) <> '' AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.user_id = auth.uid() AND NOT public.practice_is_business_only(up.practice_id) AND up.practice_id::text = split_part(name, '/', 2) AND ( up.expires_at IS NULL OR up.expires_at > now() ) ) );"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY \"Entitled users can read practice topics\" ON public.practice_topics FOR SELECT TO authenticated USING ( NOT public.practice_is_business_only(practice_topics.practice_id) AND EXISTS ( SELECT 1 FROM public.user_practices AS up WHERE up.user_id = auth.uid() AND up.practice_id = practice_topics.practice_id AND ( up.expires_at IS NULL OR up.expires_at > now() ) ) );"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.practice_is_business_only(uuid) TO anon, authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO anon;"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270310120000_business_only_practices.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO service_role;"
     }
   ]
 }
