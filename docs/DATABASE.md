@@ -1,3 +1,85 @@
+## Closed Business albums (39a7ef48, pending owner apply)
+
+Migration `20270310120000_business_only_practices.sql` adds
+`practices.business_only boolean NOT NULL DEFAULT false`. Existing rows retain
+all current access behavior. This migration has not been applied to a shared
+or production database.
+
+Designation is one-way and only postgres/service_role or a user with
+`admin_panel.access` may designate a never-published album. Both OLD and NEW
+status/date are checked and both statuses must be `draft` at designation;
+historical `first_publication_date_unknown` also
+rejects conversion because it cannot prove the album was never public.
+The metadata-only migration sets local lock/statement timeouts to 5s/30s and
+commits the full security boundary with the CHECK still NOT VALID (new writes
+are checked immediately). `20270310120100_business_only_practices_validate.sql`
+validates it in its own transaction after the metadata locks are released.
+Validation takes SHARE UPDATE EXCLUSIVE, which permits ordinary reads/writes;
+it uses a 5s lock timeout and no statement timeout for the table scan.
+The CHECK requires
+`selected_users` and `is_catalog_listed=false`.
+The existing visibility sync trigger remains unchanged; attempts to expose a
+Business album through it fail the CHECK.
+
+`guard_practice_business_only` guards designation.
+`reject_business_only_listener_access` rejects INSERT/UPDATE in
+`practice_visibility_users`, `user_practices` and `playlist_items`, with a
+shared parent-row lock. The same trigger rejects new or retargeted
+`practice_access_links`; revoking historical links remains possible.
+`preview_practice_access_link` returns the existing `invalid_token` error for
+Business albums, including tokens issued before designation, regardless of
+link status or viewer. `assert_practice_access_link_target` (used by create and
+redeem) and `grant_practice_access` reject Business albums with the existing
+`practice_not_found` error. Both errors map to HTTP 404 in the access-link API.
+These admission RPCs hold a shared parent-row lock through issuance/grant to
+serialize with designation; the user_practices trigger remains the backstop.
+Normal-album RPC behavior and existing service-only execution ACLs are preserved.
+Historical grant/allowlist rows do not confer Business access.
+`can_current_viewer_read_practice` permits non-deleted Business albums only to
+authenticated author members or platform admins; its normal-album branch is
+unchanged. `practice_is_business_only(uuid)` is a definer flag lookup for audio
+entitlement policies so hidden/deleted normal-album access is preserved.
+
+Modified SELECT policies:
+
+- practices: "Selected users can read allowlisted practices" (allowlist branch only).
+- practices: "Entitled users can read entitled practices".
+- practice_topics: "Entitled users can read practice topics".
+- audio_items: "Entitled users can read audio items".
+- storage.objects: "Authenticated users can read entitled practice audio".
+
+`get_owned_playlist_mosaic_covers()` skips Business albums, including legacy items.
+`resolve_practice_effective_price()` returns no Business pricing rows and
+`start_practice_price_promotion()` rejects Business promotion starts. Normal
+album pricing and promotion behavior is unchanged.
+`create_course_upgrade_order()` and `apply_quick_offer_amount()` reject
+Business albums even with legacy grants/orders; `remove_library_practice()`
+can remove a legacy save but suppresses its closed album slug.
+`viewer_can_commercially_access_practice()` ignores legacy Business allowlists,
+so checkout/claim/Studio callers retain the author/admin boundary.
+Other metadata policies inherit the read helper. Public practices require
+listed/unlisted, excluded by the CHECK. Author-member policies are unchanged.
+There is no `practice_tracks` table; `audio_items` is the track table.
+`music_audio_assets` already has RLS with no client SELECT policies.
+Public cover/author-asset buckets are independent of practice visibility and
+are unchanged; this migration does not revoke already issued URLs or change
+public storage bucket delivery. Business-only cover images must not be uploaded
+to the public `practice-covers` bucket; PR-C will store them privately (known PR-A limitation).
+
+Run `npm run test:business-only-access`. The disposable PG17 harness compiles
+both real migrations and rollback in single-user mode, tests seven personas
+including an unrelated author, checks pre-existing tokens and normal link
+creation/redemption, and compares all normal-album read
+paths before/after. It uses a Unix-socket-only postmaster for actual RLS SELECT.
+Where the sandbox denies sockets it evaluates the compiled policy predicates
+under each role and explicitly reports that limitation. CI requires actual RLS.
+Manual rollback is `supabase/rollback/20270310120000_business_only_practices.down.sql`;
+it restores the previous eleven functions byte-for-byte and five policies
+before dropping the new objects. The harness checks rollback both after
+validation and while the constraint is still NOT VALID. Review flagged albums
+first: rollback removes their Business boundary.
+No Business player, pool or eligibility functions are changed.
+
 ## Business track sound review (96a75b7b, pending owner apply)
 
 Migration `20270201120000_business_track_sound_reviews.sql` is applied after
