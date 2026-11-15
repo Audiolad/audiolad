@@ -1519,4 +1519,78 @@ BEGIN
 END;
 $$;
 
+
+-- Audio metadata RPCs (SECURITY DEFINER, EXECUTE for authenticated) copied from
+-- 20261007180000_music_publish_playable_audio.sql. For business_only albums they
+-- answer only to service_role/postgres, author members and admins. Internal
+-- callers (publish/moderation readiness) run as the author or admin, so they
+-- still get real values. Ordinary albums: unchanged.
+CREATE OR REPLACE FUNCTION public.music_item_has_validated_active_delivery(p_audio_item_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.audio_items AS item
+    JOIN public.music_audio_assets AS asset
+      ON asset.id = item.active_music_delivery_asset_id
+    WHERE item.id = p_audio_item_id
+      AND asset.audio_item_id = item.id
+      AND asset.asset_role = 'stream'
+      AND asset.lifecycle_state = 'verified'
+      AND asset.storage_bucket = 'music-streams'
+      AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+      -- Business-only: no delivery status for non-members (39a7ef48).
+      AND (
+        NOT public.practice_is_business_only(item.practice_id)
+        OR coalesce(nullif(current_setting('role', true), 'none'), session_user) IN ('service_role', 'postgres')
+        OR (auth.uid() IS NOT NULL AND (
+          public.is_practice_author_member(item.practice_id, auth.uid())
+          OR public.has_platform_permission(auth.uid(), 'admin_panel.access')
+        ))
+      )
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.music_item_effective_publish_duration_seconds(p_audio_item_id uuid)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(
+    CASE
+      WHEN COALESCE(item.duration_seconds, 0) > 0 THEN item.duration_seconds
+    END,
+    CASE
+      WHEN public.music_item_has_validated_active_delivery(item.id)
+        AND COALESCE(asset.duration_seconds, 0) > 0
+      THEN asset.duration_seconds
+    END,
+    0
+  )
+  FROM public.audio_items AS item
+  LEFT JOIN public.music_audio_assets AS asset
+    ON asset.id = item.active_music_delivery_asset_id
+   AND asset.audio_item_id = item.id
+   AND asset.asset_role = 'stream'
+   AND asset.lifecycle_state = 'verified'
+   AND asset.storage_bucket = 'music-streams'
+   AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+  WHERE item.id = p_audio_item_id
+    -- Business-only: no duration for non-members (39a7ef48); NULL instead of a value.
+    AND (
+      NOT public.practice_is_business_only(item.practice_id)
+      OR coalesce(nullif(current_setting('role', true), 'none'), session_user) IN ('service_role', 'postgres')
+      OR (auth.uid() IS NOT NULL AND (
+        public.is_practice_author_member(item.practice_id, auth.uid())
+        OR public.has_platform_permission(auth.uid(), 'admin_panel.access')
+      ))
+    );
+$$;
+
 COMMIT;

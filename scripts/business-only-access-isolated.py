@@ -60,7 +60,7 @@ CREATE TABLE public.practices (
 );
 CREATE TABLE public.practice_visibility_users (practice_id uuid REFERENCES practices, user_id uuid);
 CREATE TABLE public.user_practices (practice_id uuid REFERENCES practices, user_id uuid, expires_at timestamptz, access_source text DEFAULT 'free_claim', access_level integer DEFAULT 1, metadata jsonb DEFAULT '{}'::jsonb, UNIQUE(user_id,practice_id));
-CREATE TABLE public.audio_items (id uuid PRIMARY KEY, practice_id uuid REFERENCES practices, status text DEFAULT 'published');
+CREATE TABLE public.audio_items (id uuid PRIMARY KEY, practice_id uuid REFERENCES practices, status text DEFAULT 'published', duration_seconds numeric, active_music_delivery_asset_id uuid);
 CREATE TABLE public.author_members (author_id uuid, user_id uuid);
 INSERT INTO public.author_members VALUES ('00000000-0000-0000-0000-000000000500','00000000-0000-0000-0000-000000000005');
 INSERT INTO public.author_members VALUES ('00000000-0000-0000-0000-000000000501','00000000-0000-0000-0000-000000000008');
@@ -91,7 +91,7 @@ CREATE TABLE public.practice_topics (practice_id uuid REFERENCES practices, topi
 CREATE TABLE public.playlists (id uuid PRIMARY KEY, user_id uuid);
 CREATE TABLE public.playlist_items (playlist_id uuid REFERENCES playlists, practice_id uuid REFERENCES practices, position integer);
 ALTER TABLE practice_topics ENABLE ROW LEVEL SECURITY;
-CREATE TABLE public.music_audio_assets (id uuid PRIMARY KEY, audio_item_id uuid REFERENCES audio_items);
+CREATE TABLE public.music_audio_assets (id uuid PRIMARY KEY, audio_item_id uuid REFERENCES audio_items, asset_role text, lifecycle_state text, storage_bucket text, storage_path text, duration_seconds numeric);
 CREATE TABLE storage.objects (bucket_id text, name text);
 ALTER TABLE practices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audio_items ENABLE ROW LEVEL SECURITY;
@@ -167,6 +167,15 @@ for file, fn, signature in link_functions:
     if comment:
         base += comment[0]
 
+audio_meta_source = '20261007180000_music_publish_playable_audio.sql'
+audio_meta_functions = ['music_item_has_validated_active_delivery', 'music_item_effective_publish_duration_seconds']
+base += ''.join(function(audio_meta_source, fn) for fn in audio_meta_functions)
+base += """
+REVOKE ALL ON FUNCTION public.music_item_has_validated_active_delivery(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.music_item_has_validated_active_delivery(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.music_item_effective_publish_duration_seconds(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.music_item_effective_publish_duration_seconds(uuid) TO authenticated, service_role;
+"""
 base += """
 REVOKE ALL ON FUNCTION public.can_current_viewer_read_practice(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO anon,authenticated,service_role;
@@ -192,7 +201,9 @@ CREATE TABLE original_functions AS
                            'public.grant_practice_access(uuid,uuid,integer,text,jsonb)'::regprocedure,
                            'public.create_practice_access_link(uuid,integer,text,uuid,uuid,timestamptz,jsonb)'::regprocedure,
                            'public.activate_permanent_practice_access(uuid,uuid)'::regprocedure,
-                           'public.redeem_practice_access_link(text,uuid)'::regprocedure);
+                           'public.redeem_practice_access_link(text,uuid)'::regprocedure,
+                           'public.music_item_has_validated_active_delivery(uuid)'::regprocedure,
+                           'public.music_item_effective_publish_duration_seconds(uuid)'::regprocedure);
 CREATE TABLE original_policies AS
  SELECT polrelid, polname, polcmd, polroles, polpermissive,
         pg_get_expr(polqual,polrelid) AS qual,
@@ -215,6 +226,10 @@ for i,visibility in enumerate(['selected_users','listed','unlisted','selected_us
     fixtures += f"INSERT INTO user_practices(practice_id,user_id,expires_at) VALUES ('{uid(100+i)}','{uid(3)}',NULL);\n"
     fixtures += f"INSERT INTO practice_visibility_users VALUES ('{uid(100+i)}','{uid(4)}');\n"
 fixtures += f"UPDATE practices SET author_id='{uid(501)}' WHERE id='{uid(109)}';\n"
+# Verified stream delivery with a duration for the closed (101) and a normal (102) track.
+for item in (101, 102):
+    fixtures += f"UPDATE music_audio_assets SET asset_role='stream', lifecycle_state='verified', storage_bucket='music-streams', storage_path='s/{item}.mp3', duration_seconds=120 WHERE id='{uid(item)}';\n"
+    fixtures += f"UPDATE audio_items SET active_music_delivery_asset_id='{uid(item)}' WHERE id='{uid(item)}';\n"
 fixtures += f"INSERT INTO user_practices(practice_id,user_id,expires_at) VALUES ('{uid(101)}','{uid(7)}',NULL),('{uid(102)}','{uid(7)}',NULL);\n"
 fixtures += f"UPDATE practices SET deleted_at=now() WHERE id='{uid(106)}'; UPDATE practices SET scheduled_publish_at=now()+interval '1 day' WHERE id='{uid(107)}';"
 fixtures += f"UPDATE practices SET first_publication_date_unknown=true WHERE id='{uid(108)}';"
@@ -384,6 +399,16 @@ checks += f"SELECT check_test((apply_quick_offer_amount('{uid(702)}','{uid(703)}
 checks += session(7)
 checks += f"SELECT check_test(remove_library_practice('{uid(101)}')->>'practice_slug'='','library removal hides closed slug');\n"
 checks += f"SELECT check_test(remove_library_practice('{uid(102)}')->>'practice_slug'='normal-album','normal library removal slug');\nRESET ROLE;\n"
+# Audio metadata RPCs: closed track answers only to its author member/admin/service.
+for p in [2,3,4,5,6,7,8]:
+    member = p in (5,6)
+    checks += session(p)
+    checks += f"SELECT check_test(music_item_has_validated_active_delivery('{uid(101)}') IS {'TRUE' if member else 'FALSE'},'closed delivery status persona {p}');\n"
+    checks += f"SELECT check_test(music_item_effective_publish_duration_seconds('{uid(101)}') IS {'NOT DISTINCT FROM 120' if member else 'NULL'},'closed duration persona {p}');\n"
+    checks += f"SELECT check_test(music_item_has_validated_active_delivery('{uid(102)}') IS TRUE,'normal delivery status persona {p}');\n"
+    checks += f"SELECT check_test(music_item_effective_publish_duration_seconds('{uid(102)}')=120,'normal duration persona {p}');\n"
+    checks += 'RESET ROLE;\n'
+checks += f"SET ROLE service_role; SET test.uid=''; SELECT check_test(music_item_has_validated_active_delivery('{uid(101)}') AND music_item_effective_publish_duration_seconds('{uid(101)}')=120,'service role closed audio metadata'); RESET ROLE;\n"
 checks += 'DROP TABLE business_practice_fixture;\n'
 rollback = (root / 'supabase/rollback' / (name+'.down.sql')).read_text()
 for filename, fn in [(schedule, 'can_current_viewer_read_practice'),
@@ -392,6 +417,8 @@ for filename, fn in [(schedule, 'can_current_viewer_read_practice'),
                      (pricing_source, 'resolve_practice_effective_price'),
                      (pricing_source, 'start_practice_price_promotion')]:
     assert function(filename, fn) in rollback, f'rollback must restore {fn} byte-for-byte'
+for fn in audio_meta_functions:
+    assert function(audio_meta_source, fn) in rollback, f'rollback must restore {fn} byte-for-byte'
 for filename, fn, signature in extra_functions:
     if fn in ['create_practice_access_link','activate_permanent_practice_access','redeem_practice_access_link']:
         continue
@@ -488,5 +515,5 @@ $$;
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'business-only-access: PASS' not in result.stdout:
         print(result.stdout,result.stderr)
         raise SystemExit(1)
-    print('business-only-access-isolated: real migration + rollback, 7 personas (practice-specific authors), pre-existing access links, separate validation and both rollback states, legacy equivalence, grants/allowlist, one-way/admin/publication guards, draft-only designation, topics, mosaics, playlist writes, public pricing/promotions, commercial allowlists, legacy library/upgrade/orders, rollback definitions, sync CHECK, audio/storage RLS: PASS')
+    print('business-only-access-isolated: real migration + rollback, 7 personas (practice-specific authors), pre-existing access links, separate validation and both rollback states, legacy equivalence, grants/allowlist, one-way/admin/publication guards, draft-only designation, topics, mosaics, playlist writes, public pricing/promotions, commercial allowlists, legacy library/upgrade/orders, audio metadata RPCs, rollback definitions, sync CHECK, audio/storage RLS: PASS')
     print('RLS verification: '+mode)
