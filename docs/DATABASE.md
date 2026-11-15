@@ -10,8 +10,13 @@ Designation is one-way and only postgres/service_role or a user with
 status/date are checked and both statuses must be `draft` at designation;
 historical `first_publication_date_unknown` also
 rejects conversion because it cannot prove the album was never public.
-The migration sets local lock/statement timeouts to 5s/120s and adds the CHECK
-as NOT VALID before validating it in the same transaction. The CHECK requires
+The metadata-only migration sets local lock/statement timeouts to 5s/30s and
+commits the full security boundary with the CHECK still NOT VALID (new writes
+are checked immediately). `20270310120100_business_only_practices_validate.sql`
+validates it in its own transaction after the metadata locks are released.
+Validation takes SHARE UPDATE EXCLUSIVE, which permits ordinary reads/writes;
+it uses a 5s lock timeout and no statement timeout for the table scan.
+The CHECK requires
 `selected_users` and `is_catalog_listed=false`.
 The existing visibility sync trigger remains unchanged; attempts to expose a
 Business album through it fail the CHECK.
@@ -19,7 +24,16 @@ Business album through it fail the CHECK.
 `guard_practice_business_only` guards designation.
 `reject_business_only_listener_access` rejects INSERT/UPDATE in
 `practice_visibility_users`, `user_practices` and `playlist_items`, with a
-shared parent-row lock.
+shared parent-row lock. The same trigger rejects new or retargeted
+`practice_access_links`; revoking historical links remains possible.
+`preview_practice_access_link` returns the existing `invalid_token` error for
+Business albums, including tokens issued before designation, regardless of
+link status or viewer. `assert_practice_access_link_target` (used by create and
+redeem) and `grant_practice_access` reject Business albums with the existing
+`practice_not_found` error. Both errors map to HTTP 404 in the access-link API.
+These admission RPCs hold a shared parent-row lock through issuance/grant to
+serialize with designation; the user_practices trigger remains the backstop.
+Normal-album RPC behavior and existing service-only execution ACLs are preserved.
 Historical grant/allowlist rows do not confer Business access.
 `can_current_viewer_read_practice` permits non-deleted Business albums only to
 authenticated author members or platform admins; its normal-album branch is
@@ -53,13 +67,17 @@ public storage bucket delivery. Business-only cover images must not be uploaded
 to the public `practice-covers` bucket; PR-C will store them privately (known PR-A limitation).
 
 Run `npm run test:business-only-access`. The disposable PG17 harness compiles
-the real up/down scripts in single-user mode, compares all normal-album read
-paths before/after, and uses a Unix-socket-only postmaster for actual RLS SELECT.
+both real migrations and rollback in single-user mode, tests seven personas
+including an unrelated author, checks pre-existing tokens and normal link
+creation/redemption, and compares all normal-album read
+paths before/after. It uses a Unix-socket-only postmaster for actual RLS SELECT.
 Where the sandbox denies sockets it evaluates the compiled policy predicates
 under each role and explicitly reports that limitation. CI requires actual RLS.
 Manual rollback is `supabase/rollback/20270310120000_business_only_practices.down.sql`;
-it restores the previous eight functions and five policies before dropping the new
-objects. Review flagged albums first: rollback removes their Business boundary.
+it restores the previous eleven functions byte-for-byte and five policies
+before dropping the new objects. The harness checks rollback both after
+validation and while the constraint is still NOT VALID. Review flagged albums
+first: rollback removes their Business boundary.
 No Business player, pool or eligibility functions are changed.
 
 ## Business track sound review (96a75b7b, pending owner apply)

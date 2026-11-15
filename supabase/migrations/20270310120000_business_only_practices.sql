@@ -1,7 +1,7 @@
 -- Closed Business albums. Existing albums retain their current access semantics.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
-SET LOCAL statement_timeout = '120s';
+SET LOCAL statement_timeout = '30s';
 
 ALTER TABLE public.practices
   ADD COLUMN business_only boolean NOT NULL DEFAULT false;
@@ -9,8 +9,7 @@ ALTER TABLE public.practices
   ADD CONSTRAINT practices_business_only_visibility_check
   CHECK (business_only = false OR
     (catalog_visibility = 'selected_users' AND is_catalog_listed = false)) NOT VALID;
-ALTER TABLE public.practices
-  VALIDATE CONSTRAINT practices_business_only_visibility_check;
+-- Validate separately after COMMIT so the metadata locks are released first.
 
 COMMENT ON COLUMN public.practices.business_only IS
   'Только Бизнес – необратимый закрытый режим нового альбома. Only author members and platform admins may read it; no listener grants or allowlist. Business playback is gated separately. Known PR-A limitation: business-only cover images must not be uploaded to the public practice-covers bucket; PR-C will store them privately. Existing public delivery is unchanged.';
@@ -84,6 +83,12 @@ CREATE TRIGGER reject_business_only_user_practice_trigger
 
 CREATE TRIGGER reject_business_only_playlist_item_trigger
   BEFORE INSERT OR UPDATE ON public.playlist_items
+  FOR EACH ROW EXECUTE FUNCTION public.reject_business_only_listener_access();
+
+-- Guard direct service-role issuance/retargeting too. Revocation of historical
+-- links remains possible without rewriting practice_id.
+CREATE TRIGGER reject_business_only_access_link_trigger
+  BEFORE INSERT OR UPDATE OF practice_id ON public.practice_access_links
   FOR EACH ROW EXECUTE FUNCTION public.reject_business_only_listener_access();
 
 -- Flag lookup must bypass parent RLS: normal legacy entitlements can read
@@ -1211,4 +1216,307 @@ $$;
 -- Audio metadata/gallery/topics/classical links inherit the updated read helper.
 -- Author-member policies stay unchanged. practice_tracks does not exist;
 -- music_audio_assets has RLS enabled and no client SELECT policies.
+-- External access links: retain normal-album behavior and existing RPC ACLs.
+
+-- Previous definition: 20260926120000_practice_access_links.sql
+CREATE OR REPLACE FUNCTION public.preview_practice_access_link(
+  p_token_hash text,
+  p_user_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_link public.practice_access_links%ROWTYPE;
+  v_practice public.practices%ROWTYPE;
+  v_author_slug text;
+  v_level_title text;
+  v_level_description text;
+  v_display_status text;
+BEGIN
+  IF p_token_hash IS NULL OR p_token_hash !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'invalid_token'
+      USING ERRCODE = 'P0002', DETAIL = 'invalid_token';
+  END IF;
+
+  SELECT *
+  INTO v_link
+  FROM public.practice_access_links
+  WHERE token_hash = p_token_hash;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'invalid_token'
+      USING ERRCODE = 'P0002', DETAIL = 'invalid_token';
+  END IF;
+
+  SELECT p.*
+  INTO v_practice
+  FROM public.practices AS p
+  WHERE p.id = v_link.practice_id;
+
+  IF NOT FOUND OR v_practice.deleted_at IS NOT NULL OR v_practice.business_only THEN
+    RAISE EXCEPTION 'invalid_token'
+      USING ERRCODE = 'P0002', DETAIL = 'invalid_token';
+  END IF;
+
+  SELECT a.slug
+  INTO v_author_slug
+  FROM public.authors AS a
+  WHERE a.id = v_practice.author_id;
+
+  SELECT pal.title, pal.description
+  INTO v_level_title, v_level_description
+  FROM public.practice_access_levels AS pal
+  WHERE pal.practice_id = v_link.practice_id
+    AND pal.level = v_link.target_access_level;
+
+  IF v_link.status = 'revoked' THEN
+    v_display_status := 'revoked';
+  ELSIF v_link.status = 'redeemed' THEN
+    IF p_user_id IS NOT NULL
+       AND v_link.redeemed_by_user_id IS NOT DISTINCT FROM p_user_id THEN
+      v_display_status := 'already_redeemed_by_you';
+    ELSE
+      v_display_status := 'redeemed';
+    END IF;
+  ELSIF v_link.expires_at IS NOT NULL AND v_link.expires_at < clock_timestamp() THEN
+    v_display_status := 'expired';
+  ELSE
+    v_display_status := 'active';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'status', v_display_status,
+    'product_title', v_practice.title,
+    'product_slug', v_practice.slug,
+    'author_slug', v_author_slug,
+    'publication_class', v_practice.publication_class,
+    'target_access_level', v_link.target_access_level,
+    'level_title', v_level_title,
+    'level_description', v_level_description,
+    'expires_at', v_link.expires_at
+  );
+END;
+$$;
+
+-- Previous definition: 20260926120000_practice_access_links.sql
+CREATE OR REPLACE FUNCTION public.assert_practice_access_link_target(
+  p_practice_id uuid,
+  p_target_level integer
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_practice public.practices%ROWTYPE;
+  v_has_catalog boolean;
+  v_level_exists boolean;
+BEGIN
+  IF p_practice_id IS NULL THEN
+    RAISE EXCEPTION 'practice_not_found'
+      USING ERRCODE = 'P0002', DETAIL = 'practice_not_found';
+  END IF;
+
+  IF p_target_level IS NULL OR p_target_level < 1 THEN
+    RAISE EXCEPTION 'invalid_access_level'
+      USING ERRCODE = '22023', DETAIL = 'level_must_be_gte_1';
+  END IF;
+
+  SELECT p.*
+  INTO v_practice
+  FROM public.practices AS p
+  WHERE p.id = p_practice_id
+    AND p.deleted_at IS NULL
+  FOR SHARE;
+
+  IF NOT FOUND OR v_practice.business_only THEN
+    RAISE EXCEPTION 'practice_not_found'
+      USING ERRCODE = 'P0002', DETAIL = 'practice_not_found';
+  END IF;
+
+  IF p_target_level > 1
+     AND v_practice.publication_class IS DISTINCT FROM 'course' THEN
+    RAISE EXCEPTION 'access_level_not_available'
+      USING ERRCODE = '22023', DETAIL = 'course_only';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.practice_access_levels AS pal
+    WHERE pal.practice_id = p_practice_id
+  )
+  INTO v_has_catalog;
+
+  IF NOT v_has_catalog THEN
+    IF p_target_level <> 1 THEN
+      RAISE EXCEPTION 'target_level_not_configured'
+        USING ERRCODE = '22023', DETAIL = 'legacy_level_1_only';
+    END IF;
+    RETURN;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.practice_access_levels AS pal
+    WHERE pal.practice_id = p_practice_id
+      AND pal.level = p_target_level
+  )
+  INTO v_level_exists;
+
+  IF NOT v_level_exists THEN
+    RAISE EXCEPTION 'target_level_not_configured'
+      USING ERRCODE = '22023', DETAIL = 'level_not_in_catalog';
+  END IF;
+END;
+$$;
+
+-- Previous definition: 20260923120100_course_access_levels_foundation.sql
+CREATE OR REPLACE FUNCTION public.grant_practice_access(
+  p_user_id uuid,
+  p_practice_id uuid,
+  p_target_level integer,
+  p_access_source text DEFAULT 'admin',
+  p_metadata jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_practice public.practices%ROWTYPE;
+  v_access_source text;
+  v_has_catalog boolean;
+  v_level_exists boolean;
+  v_inserted boolean;
+  v_previous integer;
+  v_result_level integer;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'user_id_required'
+      USING ERRCODE = '22023', DETAIL = 'user_id_required';
+  END IF;
+
+  IF p_practice_id IS NULL THEN
+    RAISE EXCEPTION 'practice_id_required'
+      USING ERRCODE = '22023', DETAIL = 'practice_id_required';
+  END IF;
+
+  IF p_target_level IS NULL OR p_target_level < 1 THEN
+    RAISE EXCEPTION 'invalid_access_level'
+      USING ERRCODE = '22023', DETAIL = 'level_must_be_gte_1';
+  END IF;
+
+  v_access_source := coalesce(nullif(btrim(coalesce(p_access_source, '')), ''), 'admin');
+
+  IF v_access_source NOT IN (
+    'starter',
+    'free_claim',
+    'purchase',
+    'gift',
+    'subscription',
+    'program',
+    'admin',
+    'external_manual'
+  ) THEN
+    RAISE EXCEPTION 'invalid_access_source'
+      USING ERRCODE = '22023', DETAIL = 'invalid_access_source';
+  END IF;
+
+  SELECT p.*
+  INTO v_practice
+  FROM public.practices AS p
+  WHERE p.id = p_practice_id
+  FOR SHARE;
+
+  IF NOT FOUND OR v_practice.business_only THEN
+    RAISE EXCEPTION 'practice_not_found'
+      USING ERRCODE = 'P0002', DETAIL = 'practice_not_found';
+  END IF;
+
+  -- Public-path invariant: L2+ only for explicit courses. Not a table CHECK
+  -- so future publication classes can grow without a schema rewrite.
+  IF p_target_level > 1
+     AND v_practice.publication_class IS DISTINCT FROM 'course' THEN
+    RAISE EXCEPTION 'access_level_not_available'
+      USING ERRCODE = '22023', DETAIL = 'course_only';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.practice_access_levels AS pal
+    WHERE pal.practice_id = p_practice_id
+  )
+  INTO v_has_catalog;
+
+  IF v_has_catalog THEN
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.practice_access_levels AS pal
+      WHERE pal.practice_id = p_practice_id
+        AND pal.level = p_target_level
+    )
+    INTO v_level_exists;
+
+    -- Level 1 is the implicit baseline (native purchase / legacy owners)
+    -- even when the catalog only lists a higher tier. Target > 1 must exist.
+    IF p_target_level > 1 AND NOT v_level_exists THEN
+      RAISE EXCEPTION 'access_level_not_configured'
+        USING ERRCODE = '22023', DETAIL = 'level_not_in_catalog';
+    END IF;
+  ELSIF p_target_level <> 1 THEN
+    RAISE EXCEPTION 'access_level_not_configured'
+      USING ERRCODE = '22023', DETAIL = 'legacy_level_1_only';
+  END IF;
+
+  SELECT up.access_level
+  INTO v_previous
+  FROM public.user_practices AS up
+  WHERE up.user_id = p_user_id
+    AND up.practice_id = p_practice_id;
+
+  INSERT INTO public.user_practices (
+    user_id,
+    practice_id,
+    access_source,
+    access_level,
+    metadata
+  )
+  VALUES (
+    p_user_id,
+    p_practice_id,
+    v_access_source,
+    p_target_level,
+    coalesce(p_metadata, '{}'::jsonb)
+  )
+  ON CONFLICT (user_id, practice_id) DO UPDATE
+  SET
+    access_level = GREATEST(
+      public.user_practices.access_level,
+      EXCLUDED.access_level
+    ),
+    metadata = CASE
+      WHEN EXCLUDED.access_level > public.user_practices.access_level THEN
+        public.user_practices.metadata || EXCLUDED.metadata
+      ELSE
+        public.user_practices.metadata
+    END
+  RETURNING (xmax = 0), access_level
+  INTO v_inserted, v_result_level;
+
+  RETURN jsonb_build_object(
+    'user_id', p_user_id,
+    'practice_id', p_practice_id,
+    'access_level', v_result_level,
+    'previous_access_level', v_previous,
+    'inserted', v_inserted,
+    'raised', coalesce(v_previous, 0) < v_result_level
+  );
+END;
+$$;
+
 COMMIT;
