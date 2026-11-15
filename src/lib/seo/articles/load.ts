@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
@@ -44,8 +45,9 @@ async function resolvePrimaryLibraryAction(
   const { data: practiceRow, error } = await supabase
     .from("practices")
     .select(
-      "id, author_id, is_free, status, is_catalog_listed, guest_access_enabled",
+      "business_only, id, author_id, is_free, status, is_catalog_listed, guest_access_enabled",
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("id", product.id)
     .maybeSingle();
 

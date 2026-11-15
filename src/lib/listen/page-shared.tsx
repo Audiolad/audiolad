@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -385,7 +386,7 @@ export async function renderListenPage(
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       title,
@@ -418,6 +419,7 @@ export async function renderListenPage(
       )
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("slug", productSlug)
     .eq("authors.slug", authorSlug)
     .maybeSingle();

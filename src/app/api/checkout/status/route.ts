@@ -1,3 +1,5 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
@@ -54,7 +56,7 @@ export async function GET(request: Request) {
   const { data: order, error: orderError } = await serviceRoleClient
     .from("orders")
     .select(
-      "id, status, practice_slug_snapshot, practice_title_snapshot, order_kind, target_access_level, amount_minor, currency",
+      "id, practice_id, status, practice_slug_snapshot, practice_title_snapshot, order_kind, target_access_level, amount_minor, currency",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -70,6 +72,12 @@ export async function GET(request: Request) {
     return errorResponse("invalid_token", 400, orderId);
   }
 
+  // Order snapshots must not reveal a Business-only title through a valid old token.
+  if (order.practice_id &&
+    !await canUsePracticeOnOpenPlatform(serviceRoleClient, { id: order.practice_id })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
   const practiceSlug =
     typeof order.practice_slug_snapshot === "string"
       ? order.practice_slug_snapshot
@@ -79,7 +87,8 @@ export async function GET(request: Request) {
   if (practiceSlug) {
     const { data: practice } = await serviceRoleClient
       .from("practices")
-      .select("authors!practices_author_id_fkey ( slug )")
+      .select("business_only, authors!practices_author_id_fkey ( slug )")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("slug", practiceSlug)
       .maybeSingle();
 

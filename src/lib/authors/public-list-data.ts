@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isFixtureMarkedAuthor, isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
@@ -42,7 +43,7 @@ export async function loadPublicAuthorsList(
     supabase
     .from("practices")
     .select(
-      `
+      `business_only,
       id,
       author_id,
       cover_image,
@@ -58,6 +59,7 @@ export async function loadPublicAuthorsList(
       )
     `,
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("status", "published")
     .eq("is_catalog_listed", true)
     .not("author_id", "is", null),

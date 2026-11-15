@@ -45,7 +45,7 @@ export type LibrarySavesAsyncStore = {
   listSavedPracticeIds(userId: string, practiceIds: string[]): Promise<string[]>;
 };
 
-export type LibrarySavesStoreErrorCode = "invalid_request" | "internal_error";
+export type LibrarySavesStoreErrorCode = "invalid_request" | "internal_error" | "not_found";
 
 export class LibrarySavesStoreError extends Error {
   readonly code: LibrarySavesStoreErrorCode;
@@ -294,6 +294,10 @@ export function createSupabaseLibrarySavesStore(
 
   return {
     async insert(save) {
+      const { canUsePracticeOnOpenPlatform } = await import("@/lib/products/business-only.server");
+      if (!await canUsePracticeOnOpenPlatform(supabase, { id: save.practiceId })) {
+        throw new LibrarySavesStoreError("not_found");
+      }
       const { error } = await table()
         .insert(toLibrarySaveRow(save))
         .select("user_id, practice_id, created_at")

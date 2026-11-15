@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/course-content/validators";
@@ -9,6 +10,7 @@ import {
 import type { ListenAccess } from "./types";
 
 type PracticeAccessRow = {
+  business_only?: boolean | null;
   id: string;
   author_id: string;
   is_free: boolean | null;
@@ -28,6 +30,7 @@ export async function resolveListenAccess(
   practice: PracticeAccessRow,
   options?: { now?: Date },
 ): Promise<ListenAccess | null> {
+  if (isBusinessOnlyPractice(practice)) return null;
   const access = await resolveProductAccess(
     supabase,
     practice,

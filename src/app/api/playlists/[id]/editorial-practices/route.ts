@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -142,6 +143,12 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!canManage) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  for (const item of parsed.items) {
+    if (!await canUsePracticeOnOpenPlatform(supabase, { id: item.practiceId })) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
   }
 
   const { data, error } = await supabase.rpc("add_editorial_playlist_practices", {

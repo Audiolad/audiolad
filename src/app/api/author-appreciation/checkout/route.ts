@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
@@ -230,7 +231,8 @@ export async function startAuthorAppreciationCheckout(input: {
   if (practiceId) {
     const { data: practice, error: practiceError } = await service
       .from("practices")
-      .select("id, author_id, title, slug, status, is_free, publication_class, product_kind, catalog_visibility, is_catalog_listed, listener_appreciation_override")
+      .select("business_only, id, author_id, title, slug, status, is_free, publication_class, product_kind, catalog_visibility, is_catalog_listed, listener_appreciation_override")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .eq("author_id", authorId)
       .maybeSingle();

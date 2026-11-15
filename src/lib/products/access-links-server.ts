@@ -1,5 +1,9 @@
 import "server-only";
 
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
+
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AuthorAccessError } from "@/lib/author-products/auth";
@@ -134,7 +138,8 @@ export async function loadPracticeForAccessLinks(
 }> {
   const { data, error } = await service
     .from("practices")
-    .select("id, author_id, title, slug, publication_class, deleted_at")
+    .select("business_only, id, author_id, title, slug, publication_class, deleted_at")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("id", practiceId)
     .maybeSingle();
 
@@ -375,6 +380,7 @@ export async function previewPracticeAccessLink(input: {
   }
 
   const service = createServiceRoleClient();
+  await assertOpenPlatformAccessLink(service, tokenHash);
   const { data, error } = await service.rpc(PREVIEW_PRACTICE_ACCESS_LINK_RPC, {
     p_token_hash: tokenHash,
     p_user_id: input.userId ?? null,
@@ -426,6 +432,7 @@ export async function redeemPracticeAccessLink(input: {
 }): Promise<RedeemPracticeAccessLinkResult> {
   const tokenHash = await hashIncomingAccessToken(input.rawToken);
   const service = createServiceRoleClient();
+  await assertOpenPlatformAccessLink(service, tokenHash);
   const { data, error } = await service.rpc(REDEEM_PRACTICE_ACCESS_LINK_RPC, {
     p_token_hash: tokenHash,
     p_user_id: input.userId,
@@ -500,4 +507,13 @@ export async function requirePlatformAdminAccessLinkActor() {
   }
 
   return { supabase, user };
+}
+
+async function assertOpenPlatformAccessLink(service: SupabaseClient, tokenHash: string) {
+  const { data, error } = await service.from("practice_access_links")
+    .select("practice_id").eq("token_hash", tokenHash).maybeSingle();
+  if (error || !data?.practice_id ||
+    !await canUsePracticeOnOpenPlatform(service, { id: data.practice_id })) {
+    throw new AccessLinkError("practice_not_found", 404);
+  }
 }

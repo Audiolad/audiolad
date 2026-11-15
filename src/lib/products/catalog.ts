@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { catalogTypeQueryFilter } from "@/lib/catalog/type-filter";
@@ -165,7 +166,8 @@ export async function getPublishedPracticeIdsForTopicKey(
 
   const { data: practiceRows, error: practicesError } =
     await applyOrdinaryCatalogEligibility(
-      supabase.from("practices").select("id"),
+      supabase.from("practices").select("business_only, id")
+    .eq(BUSINESS_ONLY_COLUMN, false),
       viewer,
     );
 
@@ -333,7 +335,7 @@ export async function getPublishedCatalogProducts(
     supabase
       .from("practices")
       .select(
-        `
+        `business_only,
       id,
       author_id,
       title,
@@ -361,7 +363,8 @@ export async function getPublishedCatalogProducts(
         slug
       )
     `,
-      ),
+      )
+      .eq(BUSINESS_ONLY_COLUMN, false),
     viewer,
   )
     .not("slug", "is", null)

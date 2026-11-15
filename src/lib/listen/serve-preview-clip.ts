@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -245,4 +246,14 @@ export async function buildPracticePreviewClip(input: {
     endMs,
     expiresIn: LISTEN_SIGNED_URL_TTL_SECONDS,
   };
+}
+
+/** Public clip entry point: check before reading the in-process byte cache. */
+export async function buildPublicPracticePreviewClip(
+  input: Parameters<typeof buildPracticePreviewClip>[0],
+) {
+  if (!await canUsePracticeOnOpenPlatform(input.storageClient, { id: input.practiceId })) {
+    throw new Error("not_found");
+  }
+  return buildPracticePreviewClip(input);
 }

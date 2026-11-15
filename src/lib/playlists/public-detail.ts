@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
@@ -46,6 +47,7 @@ type PracticeEmbed = {
   cover_image?: unknown;
   updated_at: string | null;
   use_shared_cover?: boolean | null;
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   catalog_visibility?: string | null;
@@ -202,6 +204,7 @@ export async function loadPublicPlaylistBySlugWithClient(
       audio_item_id,
       position,
       practices (
+        business_only,
         id,
         title,
         slug,
@@ -239,6 +242,7 @@ export async function loadPublicPlaylistBySlugWithClient(
 
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
+    if (isBusinessOnlyPractice(practice)) continue;
       if (practice?.id) {
         practiceIdsForAudio.push(practice.id);
       }
@@ -275,6 +279,7 @@ export async function loadPublicPlaylistBySlugWithClient(
 
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
+    if (isBusinessOnlyPractice(practice)) continue;
 
       // Public playlist_items RLS permits only listed products. A missing
       // embed means its product is not public to this viewer, so omit it
@@ -285,6 +290,7 @@ export async function loadPublicPlaylistBySlugWithClient(
 
       // Storefront playable (paid preview allowed), not gift-membership eligibility.
       const storefrontPlayable = isPracticePlayableOnPublicStorefront({
+        business_only: practice.business_only,
         id: practice.id,
         status: practice.status,
         is_catalog_listed: practice.is_catalog_listed,

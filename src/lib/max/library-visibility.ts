@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN, isBusinessOnlyPractice } from "@/lib/products/business-only";
 /**
  * Saved-only metadata for the MAX library.
  *
@@ -15,6 +16,7 @@ import {
 import { canRevealPublicProductPage } from "@/lib/products/publish-preview";
 
 type VisibilityRow = {
+  business_only?: boolean | null;
   id: string;
   status: string | null;
   deleted_at: string | null;
@@ -36,6 +38,7 @@ function asVisibilityRow(value: unknown): VisibilityRow | null {
   }
 
   return {
+    business_only: row.business_only,
     id: row.id,
     status: typeof row.status === "string" ? row.status : null,
     deleted_at: typeof row.deleted_at === "string" ? row.deleted_at : null,
@@ -93,8 +96,9 @@ export async function redactMaxLibraryCatalogVisibility(
       supabase
         .from("practices")
         .select(
-          "id, status, deleted_at, catalog_visibility, is_catalog_listed, scheduled_publish_at, published_at, author_id",
+          "business_only, id, status, deleted_at, catalog_visibility, is_catalog_listed, scheduled_publish_at, published_at, author_id",
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .in("id", practiceIds),
       supabase
         .from("practice_visibility_users")
@@ -132,7 +136,7 @@ export async function redactMaxLibraryCatalogVisibility(
     error: false,
     items: items.map((item) => {
       const row = practices.get(item.practiceId) ?? null;
-      if (!row || row.deleted_at || !item.practice) {
+      if (!row || isBusinessOnlyPractice(row) || row.deleted_at || !item.practice) {
         return unavailableItem(item);
       }
 

@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
 
   if (!practiceSlug) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { slug: practiceSlug })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc("claim_free_practice", {

@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
@@ -221,7 +222,8 @@ async function loadEligibleAuthorCounts(
   let query = applyPracticePublicAvailabilityFilter(
     supabase
       .from("practices")
-      .select("author_id, cover_image, scheduled_publish_at, published_at")
+      .select("business_only, author_id, cover_image, scheduled_publish_at, published_at")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("status", "published")
       .eq("is_catalog_listed", true)
       .not("slug", "is", null)

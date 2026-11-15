@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -138,8 +139,9 @@ export async function listPlaylistMembershipForPractice(
   const { data: practiceRow, error: practiceError } = await supabase
     .from("practices")
     .select(
-      "id, author_id, status, is_free, price, is_catalog_listed, scheduled_publish_at, published_at",
+      "business_only, id, author_id, status, is_free, price, is_catalog_listed, scheduled_publish_at, published_at",
     )
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("id", practiceId)
     .maybeSingle();
 

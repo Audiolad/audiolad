@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -86,6 +87,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!oldAudioItemIdResult.ok) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: parsed.practiceId })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc("replace_playlist_item", {

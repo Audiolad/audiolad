@@ -1,8 +1,10 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 
 export type PlaylistPublishPractice = {
   id: string;
+  business_only?: boolean | null;
   status: string | null;
   is_free: boolean | null;
   price: number | null;
@@ -15,6 +17,7 @@ export type PlaylistPublishPractice = {
 
 export type PlaylistStorefrontPractice = {
   id?: string;
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;
@@ -35,7 +38,7 @@ export type PlaylistStorefrontPractice = {
 function isPublishedListedNonFixturePractice(
   practice: PlaylistStorefrontPractice,
 ): boolean {
-  if (isFixtureMarkedPractice(practice)) {
+  if (isBusinessOnlyPractice(practice) || isFixtureMarkedPractice(practice)) {
     return false;
   }
 

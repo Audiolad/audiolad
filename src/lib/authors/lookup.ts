@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -84,8 +85,9 @@ export async function getAuthorPublishedPractices(
     supabase
       .from("practices")
       .select(
-        "id, title, slug, subtitle, format, duration_minutes, price, is_free, cover_image, scheduled_publish_at, published_at",
+        "business_only, id, title, slug, subtitle, format, duration_minutes, price, is_free, cover_image, scheduled_publish_at, published_at",
       )
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("author_id", authorId)
       .eq("status", "published")
       .eq("is_catalog_listed", true),

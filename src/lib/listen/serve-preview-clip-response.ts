@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 
 import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/learner-assets";
@@ -9,14 +10,14 @@ import {
   sliceBytesForRange,
 } from "@/lib/listen/preview-clip-http";
 import {
-  buildPracticePreviewClip,
+  buildPublicPracticePreviewClip,
   type PreviewAudioItemRow,
 } from "@/lib/listen/serve-preview-clip";
 
 function clipErrorStatus(error: unknown): { status: number; code: string } {
   const code = error instanceof Error ? error.message : "preview_clip_failed";
 
-  if (code === "audio_missing") {
+  if (code === "not_found" || code === "audio_missing") {
     return { status: 404, code };
   }
 
@@ -66,7 +67,8 @@ export async function serveListenPreviewClip(
   if (!item?.id && audioId === `legacy-${practice.id}`) {
     const { data: legacyPractice, error: legacyError } = await storageClient
       .from("practices")
-      .select("audio_url")
+      .select("business_only, audio_url")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practice.id)
       .maybeSingle();
 
@@ -115,7 +117,7 @@ export async function serveListenPreviewClip(
   }
 
   try {
-    const clip = await buildPracticePreviewClip({
+    const clip = await buildPublicPracticePreviewClip({
       storageClient,
       practiceId: practice.id,
       audioItem: item,

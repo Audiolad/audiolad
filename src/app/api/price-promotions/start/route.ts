@@ -1,3 +1,5 @@
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import { resolveValidatedNextPath } from "@/lib/auth/routes";
@@ -42,6 +44,14 @@ async function startPromotion(request: Request, token: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const service = createServiceRoleClient();
+  const { data: promotion, error: promotionError } = await service
+    .from("practice_price_promotions").select("practice_id")
+    .eq("start_token", token).maybeSingle();
+  if (promotionError || !promotion?.practice_id ||
+    !await canUsePracticeOnOpenPlatform(service, { id: promotion.practice_id })) {
+    return { error: { message: "promotion_not_found" } };
+  }
   const { data, error } = await supabase.rpc("start_practice_price_promotion", {
     p_start_token: token,
     p_visitor_id: visitorId,

@@ -1,3 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { canExposePracticeUrl } from "@/lib/products/public-url.server";
 import {
   getYandexWebmasterConfig,
   type YandexWebmasterConfig,
@@ -37,6 +40,8 @@ export type NotifyYandexRecrawlResult = {
 };
 
 export type NotifyYandexRecrawlOptions = YandexWebmasterClientOptions & {
+  /** Trusted server dependency for isolated tests; never populated from request data. */
+  createPracticeClient?: () => SupabaseClient;
   config?: YandexWebmasterConfig;
   dryRun?: boolean;
 };
@@ -106,6 +111,10 @@ export async function notifyYandexRecrawlUrl(
       };
     }
 
+    if (!options.dryRun && trimmedUrl &&
+      !await canExposePracticeUrl(options.createPracticeClient ?? createServiceRoleClient, trimmedUrl)) {
+      return { status: "foreign_origin", reason, url: trimmedUrl, canSubmit: false, http: null };
+    }
     if (!trimmedUrl) {
       return {
         status: "failed",

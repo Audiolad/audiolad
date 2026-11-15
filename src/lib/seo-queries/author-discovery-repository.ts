@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import type {
@@ -340,7 +342,8 @@ export async function loadDiscoveryContextForPhrases(input: {
         if (batch.length === 0) continue;
         const { data: products, error: productError } = await supabase
           .from("practices")
-          .select("id, title")
+          .select("business_only, id, title")
+        .eq(BUSINESS_ONLY_COLUMN, false)
           .in("id", batch);
         if (productError) {
           return {
@@ -640,7 +643,8 @@ export async function loadRankedAnalyzedQueriesForSeed(input: {
       for (const productBatch of chunkList([...new Set(productIds)])) {
         const { data: products, error: productError } = await supabase
           .from("practices")
-          .select("id, title")
+          .select("business_only, id, title")
+        .eq(BUSINESS_ONLY_COLUMN, false)
           .in("id", productBatch);
         if (productError) {
           supplementaryStage ??= "seo_discovery_products_load_failed";

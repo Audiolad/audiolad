@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -237,7 +238,8 @@ export async function listEditorialPlaylists(
         playlist_id,
         position,
         practices (
-          cover_url,
+          business_only,
+        cover_url,
           updated_at
         )
       `,
@@ -270,7 +272,7 @@ export async function listEditorialPlaylists(
         ? row.practices[0]
         : row.practices;
 
-      if (practice && typeof practice === "object") {
+      if (practice && !isBusinessOnlyPractice(practice) && typeof practice === "object") {
         current.push(
           getProductCoverDisplayUrl(
             (practice as { cover_url?: string | null }).cover_url ?? null,
@@ -481,6 +483,7 @@ export async function loadPlaylistPracticesForPublishCheck(
       `
       practice_id,
       practices (
+        business_only,
         id,
         status,
         is_free,
@@ -548,6 +551,7 @@ export async function assertEditorialPlaylistPublishReady(
       `
       practice_id,
       practices (
+        business_only,
         id,
         status,
         is_catalog_listed,
@@ -583,6 +587,7 @@ export async function assertEditorialPlaylistPublishReady(
     if (
       isPracticeEligibleForEditorialPlaylist(
         practice as {
+          business_only?: boolean | null;
           status: string | null;
           is_catalog_listed: boolean | null;
           slug: string | null;

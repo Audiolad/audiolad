@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { cache } from "react";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -214,6 +215,12 @@ export async function loadPublicPromoPage(
 
   if (!page) {
     return { ok: false, reason: "not_found" };
+  }
+
+  for (const product of page.products) {
+    if (!await canUsePracticeOnOpenPlatform(supabase, { id: product.practice_id })) {
+      return { ok: false, reason: "not_found" };
+    }
   }
 
   return {

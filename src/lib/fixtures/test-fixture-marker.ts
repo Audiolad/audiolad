@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 
 /**
@@ -44,6 +45,7 @@ export function isFixtureMarkedAuthor(row: {
 
 export function shouldBlockPublicPracticeAccess(
   practice: {
+    business_only?: boolean | null;
     cover_image?: unknown;
     status?: string | null;
     is_catalog_listed?: boolean | null;
@@ -52,10 +54,11 @@ export function shouldBlockPublicPracticeAccess(
   if (!practice) {
     return true;
   }
-  return isFixtureMarkedPractice(practice);
+  return isBusinessOnlyPractice(practice) || isFixtureMarkedPractice(practice);
 }
 
 export function isPublicCatalogPracticeRow(row: {
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   slug: string | null;
@@ -64,7 +67,7 @@ export function isPublicCatalogPracticeRow(row: {
   scheduled_publish_at?: string | null;
   published_at?: string | null;
 }): boolean {
-  if (isFixtureMarkedPractice(row)) {
+  if (isBusinessOnlyPractice(row) || isFixtureMarkedPractice(row)) {
     return false;
   }
 
@@ -81,10 +84,10 @@ export function isPublicCatalogPracticeRow(row: {
   );
 }
 
-export function filterPublicPracticeRows<T extends { cover_image?: unknown }>(
+export function filterPublicPracticeRows<T extends { cover_image?: unknown; business_only?: boolean | null }>(
   rows: T[],
 ): T[] {
-  return rows.filter((row) => !isFixtureMarkedPractice(row));
+  return rows.filter((row) => !isBusinessOnlyPractice(row) && !isFixtureMarkedPractice(row));
 }
 
 export function filterPublicCatalogPracticeRows<

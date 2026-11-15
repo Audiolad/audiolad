@@ -252,13 +252,14 @@ function testCatalogQueryBuilder() {
   };
 
   applyOrdinaryCatalogEligibility(query, GUEST_ORDINARY_CATALOG_VIEWER);
-  assert.equal(calls.length, 3);
-  assert.deepEqual(calls.slice(0, 2), [
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls.slice(0, 3), [
+    ["eq", "business_only", false],
     ["eq", "status", "published"],
     ["eq", "catalog_visibility", "listed"],
   ]);
-  assert.equal(calls[2][0], "or");
-  assert.match(String(calls[2][1]), /scheduled_publish_at\.is\.null/);
+  assert.equal(calls[3][0], "or");
+  assert.match(String(calls[3][1]), /scheduled_publish_at\.is\.null/);
 
   calls.length = 0;
   const allowId = "11111111-1111-4111-8111-111111111111";
@@ -269,12 +270,13 @@ function testCatalogQueryBuilder() {
     entitledPracticeIds: [hiddenId],
     hiddenPracticeIds: [hiddenId],
   });
-  assert.equal(calls[0][0], "eq");
-  assert.equal(calls[1][0], "or");
-  assert.match(String(calls[1][1]), /catalog_visibility\.eq\.listed/);
-  assert.match(String(calls[1][1]), /selected_users/);
-  assert.equal(calls[2][0], "not");
-  assert.equal(calls[2][3], postgrestInList([hiddenId]));
+  assert.deepEqual(calls[0], ["eq", "business_only", false]);
+  assert.equal(calls[1][0], "eq");
+  assert.equal(calls[2][0], "or");
+  assert.match(String(calls[2][1]), /catalog_visibility\.eq\.listed/);
+  assert.match(String(calls[2][1]), /selected_users/);
+  assert.equal(calls[3][0], "not");
+  assert.equal(calls[3][3], postgrestInList([hiddenId]));
 }
 
 function testHasGrantAdapter() {

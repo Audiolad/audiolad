@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRICE_CHANGED_MESSAGE } from "@/lib/pricing/resolve";
@@ -91,6 +92,10 @@ export async function resolvePracticePriceRpc(input: {
   userId?: string | null;
   now?: Date;
 }): Promise<ResolvedPracticePrice | null> {
+  if (!await canUsePracticeOnOpenPlatform(input.supabase, { id: input.practiceId })) {
+    return null;
+  }
+
   await bindPracticePricePromotionStarts({
     supabase: input.supabase,
     visitorId: input.visitorId,

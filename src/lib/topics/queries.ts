@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
@@ -205,7 +206,8 @@ export async function listTopicsWithCatalogCounts(
     await applyPracticePublicAvailabilityFilter(
       supabase
         .from("practices")
-        .select("id, cover_image, scheduled_publish_at, published_at")
+        .select("business_only, id, cover_image, scheduled_publish_at, published_at")
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("status", "published")
         .eq("is_catalog_listed", true),
     );

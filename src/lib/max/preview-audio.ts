@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { buildPreviewClipFromStorageSource } from "@/lib/listen/serve-preview-clip";
@@ -26,6 +28,7 @@ export async function buildMaxStorefrontPreviewClip(input: {
   trackId: string;
   preview?: MaxStorefrontPreviewDeps;
 }): Promise<BuildMaxPreviewClipResult> {
+  if (isBusinessOnlyPractice(input.practice)) return { ok: false, reason: "preview_unavailable" };
   try {
     const preview = await resolveMaxStorefrontPreview(
       input.practice,

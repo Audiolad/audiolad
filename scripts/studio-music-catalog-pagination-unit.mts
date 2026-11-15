@@ -45,6 +45,7 @@ function publication(
     product_kind: "music",
     publication_class: "release",
     music_usage_permission: "platform_reuse_allowed",
+    business_only: false,
     status: "published",
     deleted_at: null,
     is_free: false,
@@ -325,6 +326,12 @@ function createRecordingSupabase(input: {
       limit(value: number) {
         query.limitValue = value;
         return builder;
+      },
+      async maybeSingle() {
+        const data = input.practices.find((practice) => query.eqs.every(
+          ([column, value]) => applyEq(practice as Record<string, unknown>, column, value),
+        ));
+        return { data: data ?? null, error: null };
       },
       then(
         onFulfilled?: (value: { data: unknown; error: null }) => unknown,

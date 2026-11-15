@@ -268,7 +268,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   );
 
   if (error || !practice) {
-    return { ...PRACTICE_UNAVAILABLE_METADATA };
+    notFound();
   }
 
   const {

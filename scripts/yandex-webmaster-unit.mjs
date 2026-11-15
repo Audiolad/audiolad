@@ -279,6 +279,15 @@ assert.deepEqual(
   },
 );
 
+// Real public URL gate with an isolated listed-practice repository.
+function createPracticeClient() {
+  const query = {
+    select() { return query; }, eq() { return query; },
+    async maybeSingle() { return { data: { id: "public-practice", business_only: false }, error: null }; },
+  };
+  return { from() { return query; } };
+}
+
 function mockFetch(handlers) {
   const calls = [];
   const fetchImpl = async (url, init) => {
@@ -372,6 +381,7 @@ await withEnvAsync(productionGateEnv(), async () => {
         }),
     ]);
     const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      createPracticeClient,
       fetchImpl,
       sleepImpl: async () => {},
     verifiedHostId: "https:audiolad.ru:443",
@@ -505,6 +515,7 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(202, { task_id: "after-429" }),
   ]);
   const notifyResult = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      createPracticeClient,
     fetchImpl,
     sleepImpl: async () => {},
     verifiedHostId: "https:audiolad.ru:443",
@@ -602,6 +613,7 @@ await withEnvAsync(productionGateEnv(), async () => {
   };
   try {
     const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      createPracticeClient,
       fetchImpl: mockFetch([
         () => jsonResponse(200, { daily_quota: 10, quota_remainder: 3 }),
         () => jsonResponse(202, { task_id: "logged" }),
@@ -629,6 +641,7 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(202, { task_id: "after-quota-timeout", quota_remainder: 3 }),
   ]);
   const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      createPracticeClient,
     fetchImpl,
     sleepImpl: async () => {},
     verifiedHostId: "https:audiolad.ru:443",
@@ -654,6 +667,7 @@ await withEnvAsync(productionGateEnv(), async () => {
   };
   try {
     const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
+      createPracticeClient,
       fetchImpl: mockFetch([() => jsonResponse(401, {})]),
       sleepImpl: async () => {},
     verifiedHostId: "https:audiolad.ru:443",

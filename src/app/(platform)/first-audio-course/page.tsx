@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -59,7 +60,8 @@ export default async function FirstAudioCoursePage() {
   const supabase = await createClient();
   const { data: coursePractice } = await supabase
     .from("practices")
-    .select("id, author_id, price")
+    .select("business_only, id, author_id, price")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("slug", FIRST_AUDIO_COURSE_SLUG)
     .maybeSingle();
 

@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { MetadataRoute } from "next";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -148,6 +149,7 @@ export function buildStaticSitemapEntries(
 
 type PracticeSitemapRow = {
   slug: string;
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   author_id: string | null;
@@ -232,6 +234,7 @@ export function mapPracticeRowsToSitemapEntries(
 }
 
 type AuthorPracticeSitemapRow = {
+  business_only?: boolean | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   slug: string | null;
@@ -348,6 +351,7 @@ export function mapPlaylistRowsToSitemapEntries(
 }
 
 type PromoProductEmbed = {
+  business_only?: boolean | null;
   status: string | null;
   is_free: boolean | null;
   is_catalog_listed: boolean | null;
@@ -469,7 +473,7 @@ async function fetchProductSitemapEntries(
       supabase
         .from("practices")
         .select(
-          `
+          `business_only,
         slug,
         status,
         is_catalog_listed,
@@ -485,6 +489,7 @@ async function fetchProductSitemapEntries(
         )
       `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("status", "published")
         .eq("is_catalog_listed", true)
         .not("slug", "is", null)
@@ -512,7 +517,7 @@ async function fetchAuthorSitemapEntries(
       supabase
         .from("practices")
         .select(
-          `
+          `business_only,
         status,
         is_catalog_listed,
         slug,
@@ -528,6 +533,7 @@ async function fetchAuthorSitemapEntries(
         )
       `,
         )
+        .eq(BUSINESS_ONLY_COLUMN, false)
         .eq("status", "published")
         .eq("is_catalog_listed", true)
         .not("author_id", "is", null),
@@ -589,7 +595,8 @@ async function fetchPromoPageSitemapEntries(): Promise<SitemapEntry[]> {
         ),
         promo_page_products (
           practices (
-            status,
+            business_only,
+        status,
             is_free,
             is_catalog_listed,
             guest_access_enabled,

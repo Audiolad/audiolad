@@ -1,3 +1,4 @@
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { NextResponse } from "next/server";
 
 import { listCourseStorefrontPreviewAudioItemIds } from "@/lib/course-content/learner-assets";
@@ -225,7 +226,8 @@ export async function serveListenSignedAudio(
   } else if (audioId === `legacy-${practice.id}`) {
     const { data: legacyPractice, error: legacyError } = await storageClient
       .from("practices")
-      .select("audio_url")
+      .select("business_only, audio_url")
+      .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practice.id)
       .maybeSingle();
 

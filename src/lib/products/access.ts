@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/course-content/validators";
@@ -21,6 +22,7 @@ export type ProductAccessReason =
   | "unavailable";
 
 export type ProductAccessInput = {
+  business_only?: boolean | null;
   id: string;
   author_id: string;
   is_free: boolean | null;
@@ -77,6 +79,7 @@ export function isPracticeArchived(status: string | null | undefined): boolean {
 
 export function isPracticeCatalogListed(
   practice: {
+    business_only?: boolean | null;
     status: string | null | undefined;
     is_catalog_listed?: boolean | null;
     catalog_visibility?: string | null;
@@ -86,6 +89,7 @@ export function isPracticeCatalogListed(
   options?: { now?: Date },
 ): boolean {
   return (
+    !isBusinessOnlyPractice(practice) &&
     isPracticePubliclyAvailable({
       status: practice.status,
       scheduledPublishAt: practice.scheduled_publish_at,
@@ -115,6 +119,7 @@ export function canAcquirePractice(
   options?: { canSeeSelectedUsers?: boolean; now?: Date },
 ): boolean {
   if (
+    isBusinessOnlyPractice(practice) ||
     !isPracticePubliclyAvailable({
       status: practice.status,
       scheduledPublishAt: practice.scheduled_publish_at,
@@ -209,6 +214,16 @@ export async function resolveProductAccess(
   userId: string | null,
   options?: { now?: Date },
 ): Promise<ProductAccessResult> {
+  // Open-platform access never permits Business-only audio, including stale grants.
+  // Authoring and Business signing have their own authenticated paths.
+  if (isBusinessOnlyPractice(practice)) {
+    return {
+      canListen: false, canAcquire: false, isPubliclyListed: false,
+      reason: "unavailable", isAuthorMember: false, accessSource: null,
+      hasEntitlement: false, accessLevel: null, canSeeSelectedUsers: false,
+      catalogVisibility: "selected_users",
+    };
+  }
   const catalogVisibility = parseCatalogVisibility(
     practice.catalog_visibility,
     practice.is_catalog_listed,

@@ -1,3 +1,4 @@
+import { isBusinessOnlyPractice } from "@/lib/products/business-only";
 import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 
 /**
@@ -112,6 +113,7 @@ export function isDirectLinkPublicVisibility(
  * A future scheduled_publish_at keeps an approved product out of the catalog.
  */
 export function isOrdinaryCatalogEligible(input: {
+  business_only?: boolean | null;
   status?: string | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
@@ -121,6 +123,7 @@ export function isOrdinaryCatalogEligible(input: {
   now?: Date;
 }): boolean {
   if (
+    isBusinessOnlyPractice(input) ||
     !isPracticePubliclyAvailable({
       status: input.status,
       scheduledPublishAt: input.scheduledPublishAt,

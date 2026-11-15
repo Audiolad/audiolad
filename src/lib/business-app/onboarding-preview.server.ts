@@ -1,5 +1,7 @@
 import "server-only";
 
+import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
+
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
 import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
@@ -74,7 +76,8 @@ async function findPreviewSource(atmosphereId: string): Promise<PreviewSource | 
   }
   const { data: practices, error } = await db
     .from("practices")
-    .select("id, title, authors!practices_author_id_fkey(name)")
+    .select("business_only, id, title, authors!practices_author_id_fkey(name)")
+    .eq(BUSINESS_ONLY_COLUMN, false)
     .eq("author_id", source.authorId)
     .eq("status", "published")
     .eq("product_kind", "music")

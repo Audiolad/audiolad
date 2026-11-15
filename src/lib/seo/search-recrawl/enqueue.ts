@@ -1,3 +1,5 @@
+import { canExposePracticeUrl } from "@/lib/products/public-url.server";
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isAudioladRecrawlUrl } from "@/lib/seo/search-recrawl/origin";
 import type {
@@ -57,6 +59,13 @@ export async function enqueueSearchRecrawl(
 
   try {
     const supabase = createServiceRoleClient();
+    if (!await canExposePracticeUrl(supabase, url)) {
+      return { outcome: "rejected", reason: "invalid" };
+    }
+    if (input.entityType === "practice" && input.entityId &&
+      !await canUsePracticeOnOpenPlatform(supabase, { id: input.entityId })) {
+      return { outcome: "rejected", reason: "invalid" };
+    }
     const { data, error } = await supabase.rpc("enqueue_search_recrawl", {
       p_url: url,
       p_engine: input.engine,

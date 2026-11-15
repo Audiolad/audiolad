@@ -1,3 +1,4 @@
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
 import { NextResponse } from "next/server";
 
 import {
@@ -168,6 +169,10 @@ export async function POST(request: Request) {
       practiceId,
       targetAccessLevel,
     });
+  }
+
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: practiceId })) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc("create_course_upgrade_order", {

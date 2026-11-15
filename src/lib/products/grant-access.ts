@@ -1,5 +1,7 @@
 import "server-only";
 
+import { canUsePracticeOnOpenPlatform } from "@/lib/products/business-only.server";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const GRANT_PRACTICE_ACCESS_RPC = "grant_practice_access" as const;
@@ -40,6 +42,10 @@ export async function grantAccess(
   supabase: SupabaseClient,
   input: GrantAccessInput,
 ): Promise<GrantAccessResult> {
+  if (!await canUsePracticeOnOpenPlatform(supabase, { id: input.practiceId })) {
+    throw new Error("not_found");
+  }
+
   const { data, error } = await supabase.rpc(GRANT_PRACTICE_ACCESS_RPC, {
     p_user_id: input.userId,
     p_practice_id: input.practiceId,
