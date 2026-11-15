@@ -1,0 +1,29 @@
+name: Business Only Leaks Unit
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  business-only-leaks:
+    name: Business Only Leaks Unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Business-only leak matrix (roles × known URL/ID, static wiring)
+        run: |
+          set -euo pipefail
+          npm run test:business-only-leaks | tee leaks.log
+          grep -q 'business-only-leaks: PASS' leaks.log
