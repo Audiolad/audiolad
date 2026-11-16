@@ -216,6 +216,14 @@ END $$;
   );
 }
 
+function applyAcquisitionColumnSortSection() {
+  const lines = readFileSync(migration("20261206120100_stats_table_column_sort.sql"), "utf8").split("\n");
+  const start = lines.findIndex((line) => line.startsWith("DROP FUNCTION IF EXISTS public.admin_analytics_p2_acquisition("));
+  const end = lines.lastIndexOf("COMMIT;");
+  assert(start > 0 && end > start, "acquisition section of 20261206120100 found");
+  psql(TEST_DB, lines.slice(start, end).join("\n"));
+}
+
 function applyMigrations() {
   psqlFile(TEST_DB, migration("20260725140000_admin_analytics_dashboard_snapshot.sql"));
   psqlFile(TEST_DB, migration("20260725160000_platform_analytics_p1_identity.sql"));
@@ -227,6 +235,11 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20261006120400_analytics_owner_overview.sql"));
   psqlFile(TEST_DB, migration("20261209120000_owner_overview_sequential_completion.sql"));
   psqlFile(TEST_DB, migration("20261221120000_admin_overview_analytics_timeout.sql"));
+  // 20261206120100 also needs playback_usage tables (practices); only its
+  // acquisition section is applied so the prefetch-ghost migration replaces
+  // the production signature.
+  applyAcquisitionColumnSortSection();
+  psqlFile(TEST_DB, migration("20270315120000_analytics_prefetch_ghost_visitors.sql"));
 }
 
 /**
@@ -777,6 +790,100 @@ WHERE n.nspname = 'public' AND p.proname = '${name}';`);
   }
 }
 
+// t1508u: search prefetch/prerender "ghost" sessions are not visitors.
+const GHOST_FROM = "2026-08-09T21:00:00Z";
+const GHOST_TO = "2026-08-10T21:00:00Z";
+const CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36";
+const YA_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 YaBrowser/25.10.0.0 Safari/537.36";
+
+function testPrefetchGhostSessionsAreNotVisitors() {
+  const t0 = "2026-08-10 09:00:00+00";
+  const sessions = [
+    // id suffix, anon, user, last_seen, referrer, device, ua, expected ghost
+    ["01", "ghost-kz", "NULL", t0, "yandex.kz", "desktop", CHROME_UA, true],
+    ["02", "ghost-ru", "NULL", "2026-08-10 09:00:00.5+00", "yandex.ru", "desktop", CHROME_UA, true],
+    ["03", "kz-play", "NULL", t0, "yandex.kz", "desktop", CHROME_UA, false],
+    ["04", "kz-long", "NULL", "2026-08-10 09:05:00+00", "yandex.kz", "desktop", CHROME_UA, false],
+    ["05", "ru-mobile", "NULL", t0, "yandex.ru", "mobile", CHROME_UA, false],
+    ["06", "kz-returning", "NULL", t0, "yandex.kz", "desktop", CHROME_UA, false],
+    ["07", "kz-yabrowser", "NULL", t0, "yandex.kz", "desktop", YA_UA, false],
+    ["08", "direct-zero", "NULL", t0, null, "desktop", CHROME_UA, false],
+    ["09", "kz-user", `'${USER_HUMAN_ONE}'`, t0, "yandex.kz", "desktop", CHROME_UA, false],
+    ["10", "kz-two-pages", "NULL", t0, "yandex.kz", "desktop", CHROME_UA, false],
+    ["11", "kz-anon-play", "NULL", t0, "yandex.kz", "desktop", CHROME_UA, false],
+  ];
+  const id = (suffix) => `f00000${suffix}-0000-0000-0000-000000000000`;
+  const values = sessions
+    .map(([suffix, anon, user, lastSeen, referrer, device, ua]) =>
+      `('${id(suffix)}','${anon}',${user},'${t0}','${lastSeen}',${referrer ? `'${referrer}'` : "NULL"},'/practice/x','${device}','${ua}',false,false,false,'human')`,
+    )
+    .join(",\n  ");
+  psql(
+    TEST_DB,
+    `
+INSERT INTO public.analytics_sessions(
+  id,anonymous_id,user_id,started_at,last_seen_at,referrer_domain,landing_path,device_type,user_agent,
+  is_staff,is_test,is_bot,traffic_class
+) VALUES
+  ${values};
+-- earlier visit of the returning anonymous id (outside the window)
+INSERT INTO public.analytics_sessions(anonymous_id,started_at,last_seen_at,device_type,is_staff,is_test,is_bot,traffic_class)
+VALUES ('kz-returning','2026-08-01 09:00:00+00','2026-08-01 09:10:00+00','desktop',false,false,false,'human');
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,event_name,practice_id,path,occurred_at,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('${id("01")}','ghost-kz',NULL,'page_view',NULL,'/practice/x','2026-08-10 09:00:01+00',false,false,false,'human'),
+  ('${id("03")}','kz-play',NULL,'page_view',NULL,'/practice/x','2026-08-10 09:00:01+00',false,false,false,'human'),
+  ('${id("03")}','kz-play',NULL,'audio_play_started','${PRACTICE_ONE}',NULL,'2026-08-10 09:00:02+00',false,false,false,'human'),
+  ('${id("10")}','kz-two-pages',NULL,'page_view',NULL,'/practice/x','2026-08-10 09:00:01+00',false,false,false,'human'),
+  ('${id("10")}','kz-two-pages',NULL,'page_view',NULL,'/practice/y','2026-08-10 09:00:03+00',false,false,false,'human'),
+  (NULL,'kz-anon-play',NULL,'audio_play_started','${PRACTICE_ONE}',NULL,'2026-08-10 09:00:04+00',false,false,false,'human');
+`,
+  );
+
+  for (const [suffix, anon, user, lastSeen, referrer, device, ua, expected] of sessions) {
+    const ghost = scalar(`
+SELECT public.analytics_session_is_prefetch_ghost(
+  s.id, s.user_id, s.anonymous_id, s.started_at, s.last_seen_at, s.referrer_domain, s.device_type, s.user_agent
+)::text FROM public.analytics_sessions AS s WHERE s.id = '${id(suffix)}';`);
+    assertEqual(ghost, String(expected), `ghost classification for ${anon}`);
+  }
+
+  const window = (includeTest) =>
+    summary({ from: `'${GHOST_FROM}'`, to: `'${GHOST_TO}'`, includeTest });
+  const human = window(false);
+  const all = window(true);
+  assertEqual(human.audience.visitors, 9, "ghost sessions are not visitors");
+  assertEqual(human.audience.sessions, 9, "ghost sessions are not counted as sessions");
+  assertEqual(human.audience.excluded_service_visitors, 2, "ghosts are reported as excluded");
+  assertEqual(all.audience.visitors, 11, "include_test shows ghosts again");
+  assertEqual(human.events.play_starts, all.events.play_starts, "plays are unchanged by the ghost filter");
+  assertEqual(human.events.play_starts, 2, "both plays are kept");
+  assertEqual(human.people.listeners, 2, "listeners are kept");
+
+  const series = json(
+    `SELECT public.admin_analytics_p2_timeseries('${GHOST_FROM}', '${GHOST_TO}', false)::text;`,
+  );
+  assertEqual(series.points.length, 1, "one bucket");
+  assertEqual(series.points[0].visitors, 9, "chart visitors exclude ghosts");
+  assertEqual(series.points[0].play_starts, 2, "chart plays unchanged");
+  const seriesAll = json(
+    `SELECT public.admin_analytics_p2_timeseries('${GHOST_FROM}', '${GHOST_TO}', true)::text;`,
+  );
+  assertEqual(seriesAll.points[0].visitors, 11, "chart with include_test shows ghosts");
+
+  const acquisition = json(
+    `SELECT public.admin_analytics_p2_acquisition('${GHOST_FROM}', '${GHOST_TO}', false, NULL, NULL, NULL, NULL, 20, 0)::text;`,
+  );
+  const rows = acquisition.rows ?? acquisition.items ?? [];
+  const acquisitionSessions = rows.reduce((total, row) => total + (row.sessions ?? 0), 0);
+  assertEqual(acquisitionSessions, 9, "acquisition sessions exclude ghosts");
+
+  for (const role of ["anon", "authenticated", "public"]) {
+    const granted = scalar(`
+SELECT has_function_privilege('${role}', 'public.analytics_session_is_prefetch_ghost(uuid,uuid,text,timestamptz,timestamptz,text,text,text)', 'EXECUTE')::text;`);
+    assertEqual(granted, "false", `ghost helper must not be executable by ${role}`);
+  }
+}
+
 function main() {
   setup();
   testSummaryMatchesDirectSql();
@@ -792,6 +899,7 @@ function main() {
   testAcquisition();
   testP0SnapshotStillWorks();
   testGrantsAreServiceRoleOnly();
+  testPrefetchGhostSessionsAreNotVisitors();
   console.log("platform-analytics-p2-sql-unit: ok");
 }
 
