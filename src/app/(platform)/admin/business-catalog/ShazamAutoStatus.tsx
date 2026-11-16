@@ -17,8 +17,10 @@ const shortLabel: Record<string, string> = {
   error: 'Shazam: проверьте вручную',
 };
 
-export function ShazamAutoBadge({ check, passport }: { check?: ShazamCheckRow | null; passport?: Passport }) {
-  const view = shazamCheckView(check, passport);
+type ShazamAutoProps = { check?: ShazamCheckRow | null; finalCheck?: ShazamCheckRow | null; passport?: Passport };
+
+export function ShazamAutoBadge({ check, finalCheck, passport }: ShazamAutoProps) {
+  const view = shazamCheckView(check, passport, finalCheck);
   if (view.state === 'none') return null;
   return (
     <span className={badgeClassName[view.state]} data-shazam-auto={view.state}>
@@ -27,8 +29,8 @@ export function ShazamAutoBadge({ check, passport }: { check?: ShazamCheckRow | 
   );
 }
 
-export function ShazamAutoStatus({ check, passport }: { check?: ShazamCheckRow | null; passport?: Passport }) {
-  const view = shazamCheckView(check, passport);
+export function ShazamAutoStatus({ check, finalCheck, passport }: ShazamAutoProps) {
+  const view = shazamCheckView(check, passport, finalCheck);
   if (view.state === 'none') {
     return (
       <p className="text-sm leading-6 text-[#7d70a2]" data-shazam-auto="none">

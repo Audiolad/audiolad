@@ -9,6 +9,7 @@ import {
   classifyShazamSegments,
   parseShazamHelperOutput,
   planShazamSegments,
+  moscowDay,
   shazamCheckView,
   shazamJobRetryDelaySeconds,
   shazamRateLimitBackoffMs,
@@ -232,6 +233,27 @@ assert.deepEqual(match.state === 'match' ? match.matches : [], [{ title: 'Song',
 const manual = shazamCheckView({ audio_item_id: 'a', status: 'match', finished_at: '2026-11-16T08:00:00Z', segments: [] }, { shazam_result: 'not_found', shazam_checked_at: '2026-11-16T09:00:00Z' });
 assert.equal(manual.state, 'no_match', 'manual «совпадений нет» after a match is respected');
 assert.equal(shazamCheckView(null, null).state, 'none');
+// Delta review fix 1: a later error/skipped check of the same master never hides its match.
+{
+  const earlierMatch = { audio_item_id: 'a', master_asset_id: 'm', status: 'match' as const, finished_at: '2026-11-16T08:00:00Z', segments: [{ matched: true, title: 'Song', artist: 'Band', timeskew: 0.0004, frequencyskew: 0, offset_seconds: 30 }] };
+  const preMatchManual = { shazam_result: 'not_found', shazam_checked_at: '2026-11-14T09:00:00Z' };
+  for (const status of ['error', 'skipped'] as const) {
+    const later = { audio_item_id: 'a', master_asset_id: 'm', status, finished_at: '2026-11-16T09:00:00Z' };
+    assert.equal(shazamCheckView(later, preMatchManual, earlierMatch).state, 'match', `${status} after a match keeps the match`);
+  }
+  assert.equal(shazamCheckView({ audio_item_id: 'a', status: 'pending' }, preMatchManual, earlierMatch).state, 'pending');
+  assert.equal(shazamCheckView({ audio_item_id: 'a', status: 'error' }, preMatchManual, null).state, 'no_match', 'no final check of the current master: manual value shown');
+  // Delta review fix 2: Moscow calendar day, date-only counts as that day.
+  assert.equal(shazamCheckView(earlierMatch, { shazam_result: 'not_found', shazam_checked_at: '2026-11-16' }, earlierMatch).state, 'no_match', 'date-only on the match day lifts the match');
+  assert.equal(shazamCheckView(earlierMatch, { shazam_result: 'not_found', shazam_checked_at: '2026-11-15' }, earlierMatch).state, 'match', 'the day before does not');
+  assert.equal(moscowDay('2026-11-16T22:30:00Z'), '2026-11-17', 'Moscow day, not UTC day');
+  const ui = renderToStaticMarkup(createElement(ShazamAutoStatus, { check: { audio_item_id: 'a', status: 'error' }, finalCheck: earlierMatch, passport: preMatchManual }));
+  assert.match(ui, /«Song» – Band/);
+  const adminSource = read('src/lib/business-track-passports/admin.server.ts');
+  assert.match(adminSource, /\.in\('status', \['match', 'no_match'\]\)/);
+  assert.match(adminSource, /не раньше дня совпадения \(по Москве\)/);
+  assert.match(read('supabase/migrations/20270313120000_business_passport_shazam_checks.sql'), /AND c\.status IN \('match','no_match'\)/);
+}
 assert.equal(shazamCheckView({ audio_item_id: 'a', status: 'error' }, null).state, 'error');
 const html = renderToStaticMarkup(createElement(ShazamAutoStatus, { check: { audio_item_id: 'a', status: 'match', segments: [{ matched: true, title: 'Song', artist: 'Band', timeskew: 0.0004, frequencyskew: 0, offset_seconds: 30 }] } }));
 assert.match(html, /«Song» – Band, перекос 0,0004/);

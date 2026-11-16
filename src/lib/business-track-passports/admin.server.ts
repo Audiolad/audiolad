@@ -18,26 +18,43 @@ function rpcError(error: { message: string } | null) {
     if (error.message.includes('passport_hash_mismatch')) throw new Error('Хеш мастер-файла не совпадает.');
     if (error.message.includes('passport_fingerprint_match')) throw new Error('Найдено совпадение Shazam или AcoustID. Допуск заблокирован.');
     if (error.message.includes('passport_shazam_pending')) throw new Error('Shazam ещё проверяет этот трек. Допустить его можно, когда проверка закончится.');
-    if (error.message.includes('passport_shazam_match')) throw new Error('Shazam нашёл совпадение у текущего мастер-файла. Допуск заблокирован. Если это ложное срабатывание, укажите вручную «Совпадений нет» и текущую дату, затем допустите трек.');
+    if (error.message.includes('passport_shazam_match')) throw new Error('Shazam нашёл совпадение у текущего мастер-файла. Допуск заблокирован. Если это ложное срабатывание, укажите вручную «Совпадений нет» с датой проверки не раньше дня совпадения (по Москве), затем допустите трек.');
     if (error.message.includes('passport_shazam_stale')) throw new Error('Результат Shazam относится к прежнему мастер-файлу. Дождитесь проверки нового мастера.');
     throw new Error('Операция не выполнена. Обновите страницу и проверьте поля паспорта.');
   }
 }
-// t1485u: latest automatic Shazam check per track. A missing queue table (migration not yet
-// applied) must never break the closed catalog page, so errors yield an empty map.
-async function loadLatestShazamChecks(db: ReturnType<typeof createServiceRoleClient>, trackIds: string[]) {
+// t1485u: latest automatic Shazam check per track (any status) and the latest FINAL check
+// (match | no_match) of the track's current master – the same rule as the approval RPC, so a
+// later error/skipped check never hides an earlier match. A missing queue table (migration not
+// yet applied) must never break the closed catalog page, so errors yield empty maps.
+const SHAZAM_CHECK_COLUMNS = 'id,audio_item_id,master_asset_id,status,attempts,segments,error,passport_written,library_version,created_at,finished_at';
+async function loadLatestShazamChecks(db: ReturnType<typeof createServiceRoleClient>, tracks: { id: string; master: string | null }[]) {
   const latest = new Map<string, ShazamCheckRow>();
-  if (trackIds.length === 0) return latest;
+  const final = new Map<string, ShazamCheckRow | null>();
+  const trackIds = tracks.map((track) => track.id);
+  if (trackIds.length === 0) return { latest, final };
   const { data, error } = await db.from('business_passport_shazam_checks')
-    .select('id,audio_item_id,status,attempts,segments,error,passport_written,library_version,created_at,finished_at')
+    .select(SHAZAM_CHECK_COLUMNS)
     .in('audio_item_id', trackIds)
     .order('created_at', { ascending: false })
     .limit(Math.min(1000, trackIds.length * 10));
-  if (error) return latest;
+  if (error) return { latest, final };
   for (const row of (data ?? []) as ShazamCheckRow[]) {
     if (!latest.has(row.audio_item_id)) latest.set(row.audio_item_id, row);
   }
-  return latest;
+  const finals = await db.from('business_passport_shazam_checks')
+    .select(SHAZAM_CHECK_COLUMNS)
+    .in('audio_item_id', trackIds)
+    .in('status', ['match', 'no_match'])
+    .order('created_at', { ascending: false })
+    .limit(Math.min(1000, trackIds.length * 10));
+  if (finals.error) return { latest, final };
+  const masters = new Map(tracks.map((track) => [track.id, track.master]));
+  for (const track of tracks) final.set(track.id, null);
+  for (const row of (finals.data ?? []) as ShazamCheckRow[]) {
+    if (final.get(row.audio_item_id) === null && row.master_asset_id === masters.get(row.audio_item_id)) final.set(row.audio_item_id, row);
+  }
+  return { latest, final };
 }
 export async function loadClosedBusinessCatalog() {
   const admin = await requireAdminPanelAccess();
@@ -60,10 +77,13 @@ export async function loadClosedBusinessCatalog() {
   }
   const rows = [];
   for (const album of albums.data ?? []) {
-    const tracks = await db.from('audio_items').select('id,title,music_track_code').eq('practice_id', album.id).order('position');
+    const tracks = await db.from('audio_items').select('id,title,music_track_code,desired_music_master_asset_id').eq('practice_id', album.id).order('position');
     const passports = await db.from('business_track_passports').select('*').eq('practice_id', album.id);
     if (tracks.error || passports.error) throw new Error('Не удалось загрузить паспорта.');
-    const shazamChecks = await loadLatestShazamChecks(db, (tracks.data ?? []).map((track) => String(track.id)));
+    const shazamChecks = await loadLatestShazamChecks(db, (tracks.data ?? []).map((track) => ({
+      id: String(track.id),
+      master: typeof track.desired_music_master_asset_id === 'string' ? track.desired_music_master_asset_id : null,
+    })));
     rows.push({
       ...album,
       authorName: names.get(String(album.author_id ?? '')) ?? '',
@@ -71,7 +91,8 @@ export async function loadClosedBusinessCatalog() {
         ...track,
         music_track_code: typeof track.music_track_code === 'string' ? track.music_track_code : null,
         passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined,
-        shazamCheck: shazamChecks.get(String(track.id)) ?? null,
+        shazamCheck: shazamChecks.latest.get(String(track.id)) ?? null,
+        shazamFinalCheck: shazamChecks.final.has(String(track.id)) ? shazamChecks.final.get(String(track.id)) ?? null : undefined,
       })),
       licenseRef: licenseRefs.albumLicenseRefs[String(album.id)] ?? null,
       defaults: defaults.albumDefaults[String(album.id)] ?? null,

@@ -252,9 +252,11 @@ CREATE TRIGGER reset_business_passport_shazam_on_master_change
 
 -- Same body as 20270311120000 plus the Shazam queue gate. Approval is refused:
 --  * while a check for this track is queued or running;
---  * when the latest check of the current master found a match, unless the operator entered
---    «not_found» manually after that check finished (the documented false-positive fallback;
---    an automatic «not_found» never counts as that decision);
+--  * when the latest FINAL check (match | no_match) of the current master found a match, unless
+--    the operator entered «not_found» manually dated on or after the day of that match in
+--    Europe/Moscow (the documented false-positive fallback; a date-only value counts; an
+--    automatic «not_found» never counts as that decision). A later error/skipped check of the
+--    same master never hides an earlier match;
 --  * when the passport «not_found» was written automatically for another master.
 CREATE OR REPLACE FUNCTION public.admin_approve_business_track_passport(p_audio_item_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
@@ -281,10 +283,12 @@ BEGIN
    RAISE EXCEPTION 'passport_shazam_pending' USING ERRCODE='55000'; END IF;
  SELECT * INTO v_last FROM public.business_passport_shazam_checks c
   WHERE c.audio_item_id=p_audio_item_id AND c.master_asset_id IS NOT DISTINCT FROM v_current
+    AND c.status IN ('match','no_match')
   ORDER BY c.created_at DESC LIMIT 1;
  v_auto_master := public.business_passport_auto_shazam_master(p_audio_item_id);
  IF v_last.id IS NOT NULL AND v_last.status='match' AND NOT (v_auto_master IS NULL
-    AND b.shazam_checked_at > coalesce(v_last.finished_at, v_last.updated_at)) THEN
+    AND (b.shazam_checked_at AT TIME ZONE 'Europe/Moscow')::date
+        >= (coalesce(v_last.finished_at, v_last.updated_at) AT TIME ZONE 'Europe/Moscow')::date) THEN
    RAISE EXCEPTION 'passport_shazam_match' USING ERRCODE='23514'; END IF;
  IF v_auto_master IS NOT NULL AND v_auto_master IS DISTINCT FROM v_current THEN
    RAISE EXCEPTION 'passport_shazam_stale' USING ERRCODE='55000'; END IF;

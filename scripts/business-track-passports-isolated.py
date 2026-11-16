@@ -266,6 +266,7 @@ SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-00000000080
 SELECT record_business_master_hash('00000000-0000-0000-0000-000000000802','00000000-0000-0000-0000-000000000904',repeat('b',64),auth.uid());
 SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-0000-0000-0000-000000000802'')','passport_shazam_pending');
 SELECT complete_business_shazam_check(current_setting('test.job')::uuid,'w3','match',jsonb_build_array(pg_temp.seg(false),pg_temp.seg(true),pg_temp.seg(false)),'0.9.0',NULL);
+SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_checked_at',now()-interval '2 days'));
 SELECT check_test((SELECT shazam_result='not_found' FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802'),'shazam: earlier manual not_found still in passport');
 SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-0000-0000-0000-000000000802'')','passport_shazam_match');
 SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_result','not_found','shazam_checked_at',clock_timestamp()));
@@ -297,6 +298,33 @@ SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-000
 SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_checked_at',clock_timestamp()));
 SELECT admin_approve_business_track_passport('00000000-0000-0000-0000-000000000802');
 SELECT check_test((SELECT status='approved' FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802'),'shazam: manual decision after a failed check allows approval');
+-- t1485u delta review fix 1: a later error/skipped check of the same master never hides its match.
+UPDATE audio_items SET desired_music_master_asset_id='00000000-0000-0000-0000-000000000904' WHERE id='00000000-0000-0000-0000-000000000802';
+SELECT check_test((SELECT status='draft' FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802') AND EXISTS(SELECT 1 FROM business_passport_shazam_checks WHERE audio_item_id='00000000-0000-0000-0000-000000000802' AND master_asset_id='00000000-0000-0000-0000-000000000904' AND status='match'),'shazam: back to a master that already has a match');
+SELECT set_config('test.job',(SELECT id::text FROM claim_business_shazam_check('w1')),false);
+SELECT check_test((SELECT master_asset_id='00000000-0000-0000-0000-000000000904' FROM business_passport_shazam_checks WHERE id=current_setting('test.job')::uuid),'shazam: second check of the same master');
+SELECT complete_business_shazam_check(current_setting('test.job')::uuid,'w1','error','[]','0.9.0','timeout');
+SELECT record_business_master_hash('00000000-0000-0000-0000-000000000802','00000000-0000-0000-0000-000000000904',repeat('b',64),auth.uid());
+SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_result','not_found','shazam_checked_at',now()-interval '2 days'));
+SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-0000-0000-0000-000000000802'')','passport_shazam_match');
+INSERT INTO music_audio_assets(id,audio_item_id,asset_role,lifecycle_state) VALUES('00000000-0000-0000-0000-000000000907','00000000-0000-0000-0000-000000000802','master','verified');
+UPDATE audio_items SET desired_music_master_asset_id='00000000-0000-0000-0000-000000000907' WHERE id='00000000-0000-0000-0000-000000000802';
+UPDATE audio_items SET desired_music_master_asset_id='00000000-0000-0000-0000-000000000904' WHERE id='00000000-0000-0000-0000-000000000802';
+SELECT set_config('test.job',(SELECT id::text FROM claim_business_shazam_check('w1')),false);
+SELECT check_test((SELECT master_asset_id='00000000-0000-0000-0000-000000000904' FROM business_passport_shazam_checks WHERE id=current_setting('test.job')::uuid),'shazam: third check of the same master');
+SELECT complete_business_shazam_check(current_setting('test.job')::uuid,'w1','skipped','[]','0.9.0','master_missing');
+SELECT record_business_master_hash('00000000-0000-0000-0000-000000000802','00000000-0000-0000-0000-000000000904',repeat('b',64),auth.uid());
+SELECT check_test((SELECT shazam_result='not_found' FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802'),'shazam: pre-match manual not_found still there');
+SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-0000-0000-0000-000000000802'')','passport_shazam_match');
+-- t1485u delta review fix 2: a date-only manual value is compared by Moscow calendar day.
+CREATE TEMP TABLE match_day AS SELECT (finished_at AT TIME ZONE 'Europe/Moscow')::date AS d FROM business_passport_shazam_checks
+ WHERE audio_item_id='00000000-0000-0000-0000-000000000802' AND master_asset_id='00000000-0000-0000-0000-000000000904' AND status='match' ORDER BY created_at DESC LIMIT 1;
+SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_result','not_found','shazam_checked_at',to_char((SELECT d-1 FROM match_day),'YYYY-MM-DD')));
+SELECT expect_error('SELECT admin_approve_business_track_passport(''00000000-0000-0000-0000-000000000802'')','passport_shazam_match');
+SELECT admin_upsert_business_track_passport('00000000-0000-0000-0000-000000000802',jsonb_build_object('shazam_result','not_found','shazam_checked_at',to_char((SELECT d FROM match_day),'YYYY-MM-DD')));
+SELECT check_test((SELECT shazam_checked_at < (SELECT finished_at FROM business_passport_shazam_checks WHERE audio_item_id='00000000-0000-0000-0000-000000000802' AND master_asset_id='00000000-0000-0000-0000-000000000904' AND status='match' ORDER BY created_at DESC LIMIT 1) FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802'),'shazam: date-only value is earlier than the match time');
+SELECT admin_approve_business_track_passport('00000000-0000-0000-0000-000000000802');
+SELECT check_test((SELECT status='approved' FROM business_track_passports WHERE audio_item_id='00000000-0000-0000-0000-000000000802'),'shazam: date-only manual not_found on the match day allows approval');
 SELECT check_test(NOT EXISTS(SELECT 1 FROM business_passport_shazam_checks c JOIN business_track_passports b USING(audio_item_id) WHERE b.status='approved' AND c.finished_at>b.approved_at),'shazam: worker never approves');
 SELECT check_test(NOT has_table_privilege('authenticated','business_passport_shazam_checks','SELECT') AND NOT has_table_privilege('anon','business_passport_shazam_checks','SELECT'),'shazam: no client table grants');
 SELECT check_test(NOT has_table_privilege('service_role','business_passport_shazam_checks','INSERT') AND has_table_privilege('service_role','business_passport_shazam_checks','SELECT'),'shazam: service reads, writes via RPC only');

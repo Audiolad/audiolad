@@ -26,7 +26,7 @@ type ClosedAlbum = {
   updated_at?: string | null;
   licenseRef?: string | null;
   defaults?: CatalogPassportDefaults | null;
-  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null }[];
+  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null; shazamFinalCheck?: ShazamCheckRow | null }[];
 };
 
 function albumStatusLabel(status: string) {
@@ -111,10 +111,10 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
                 <summary className="cursor-pointer text-sm font-medium text-[#25135c]">
                   <span>{track.title}</span>{' '}
                   <span className={trackStatusClassName(track.passport?.status)}>{trackStatusLabel(track.passport?.status)}</span>{' '}
-                  <ShazamAutoBadge check={track.shazamCheck} passport={track.passport} />
+                  <ShazamAutoBadge check={track.shazamCheck} finalCheck={track.shazamFinalCheck} passport={track.passport} />
                 </summary>
                 <div className="mt-3">
-                  <ShazamAutoStatus check={track.shazamCheck} passport={track.passport} />
+                  <ShazamAutoStatus check={track.shazamCheck} finalCheck={track.shazamFinalCheck} passport={track.passport} />
                 </div>
                 <PassportForm
                   key={`${track.id}:${JSON.stringify(track.passport)}`}
