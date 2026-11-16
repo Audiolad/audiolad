@@ -65,3 +65,7 @@ next-env.d.ts
 # DB-IP Lite GeoIP database: downloaded on the server, never committed (task 253821e0)
 *.mmdb
 *.mmdb.gz
+
+# Python bytecode (t1485u Shazam helper)
+__pycache__/
+*.pyc

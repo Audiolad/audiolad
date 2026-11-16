@@ -6689,6 +6689,11 @@
       "file": "supabase/migrations/20270312120000_business_only_private_covers.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_private_cover_ref_ok(text, uuid, uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270313120000_business_passport_shazam_checks.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_business_shazam_check(uuid,text), public.claim_business_shazam_check(text), public.heartbeat_business_shazam_check(uuid,text), public.complete_business_shazam_check(uuid,text,text,jsonb,text,text,integer) TO service_role;"
     }
   ]
 }

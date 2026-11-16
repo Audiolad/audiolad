@@ -8,6 +8,10 @@ on:
       - 'supabase/rollback/**'
       - 'scripts/business-*.py'
       - 'scripts/business-*.mts'
+      - 'scripts/business-shazam/**'
+      - 'deploy/business-shazam-worker.ecosystem.config.cjs'
+      - 'deploy/scripts/ensure-business-shazam-worker.sh'
+      - 'deploy/scripts/setup-business-shazam-venv.sh'
       - 'src/lib/business-track-passports/**'
       - 'src/lib/business-workspace/**'
       - 'src/lib/author-products/**'
@@ -40,6 +44,7 @@ jobs:
           echo "PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)" >> "$GITHUB_ENV"
       - run: npm run test:business-track-passports
       - run: npm run test:business-only-admin
+      - run: npm run test:business-shazam
       - run: npm run test:business-manual-admissions
       - run: npm run test:business-track-sound-review
       - run: npm run test:business-pilot
@@ -50,6 +55,8 @@ jobs:
           scripts/business-only-admin-unit.mts
           scripts/published-business-catalog-unit.mts
           scripts/business-passport-autofill-unit.mts
+          scripts/business-shazam-worker-unit.mts
+          scripts/run-business-shazam-worker.mts
           src/lib/business-admission/published-catalog.ts
           src/lib/business-admission/published-catalog.server.ts
           src/app/api/admin/business-catalog/cover/route.ts

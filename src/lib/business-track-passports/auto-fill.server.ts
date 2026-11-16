@@ -24,6 +24,7 @@ import {
 } from '@/lib/business-track-passports/shared';
 import { findBusinessPassportLicense, loadCatalogPassportDefaults } from '@/lib/business-track-passports/license.server';
 import { saveBusinessPassport, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
+import { SHAZAM_QUEUED_MESSAGE, SHAZAM_QUEUE_UNAVAILABLE_MESSAGE } from '@/lib/business-track-passports/shazam';
 
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -246,6 +247,12 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
   filled.push(PASSPORT_FIELDS.generator_tool, PASSPORT_FIELDS.generator_plan, PASSPORT_FIELDS.generated_at, PASSPORT_FIELDS.generation_ref, PASSPORT_FIELDS.human_contribution, PASSPORT_FIELDS.never_published_checked_at);
   if (shared.terms_snapshot_ref) filled.push(PASSPORT_FIELDS.terms_snapshot_ref);
   else errors.push('Сначала загрузите образец лицензии в настройках каталога.');
+
+  // t1485u: Shazam runs in the background worker, never in this request. Only the queue row is written here.
+  const { error: shazamQueueError } = await db.rpc('enqueue_business_shazam_check', { p_audio_item_id: audioItemId, p_reason: 'autofill' });
+  skipped.push(shazamQueueError
+    ? SHAZAM_QUEUE_UNAVAILABLE_MESSAGE
+    : SHAZAM_QUEUED_MESSAGE);
 
   return withLowPriority(async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'audiolad-passport-'));

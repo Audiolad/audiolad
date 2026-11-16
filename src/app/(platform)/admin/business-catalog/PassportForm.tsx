@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { PASSPORT_FIELDS, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
+import { PASSPORT_FIELDS, changedPassportKeys, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
 import { businessPassportLicensePreviewHrefFromRef, licenseIdFromNotes, notesWithOptionalLicenseId } from '@/lib/business-track-passports/shared';
 import { closedCatalogAction } from './actions';
 
@@ -80,14 +80,17 @@ export default function PassportForm({ audioItemId, passport, suggestedAlCode }:
   const locked = passport?.status === 'approved' || passport?.status === 'revoked';
   const payload = { ...fields, notes: notesWithOptionalLicenseId(fields.notes, licenseId) };
   const run = (command: string) => start(async () => {
-    const result = await closedCatalogAction(command, audioItemId, payload);
+    // Only fields the operator changed since the form was opened are saved. The rest keep their
+    // current server value, so a Shazam result the worker wrote meanwhile is never wiped.
+    const options = command === 'save' ? { keys: changedPassportKeys(passport, payload) } : undefined;
+    const result = await closedCatalogAction(command, audioItemId, payload, options);
     setMessage(result.message);
     setOk(result.ok);
     if (result.ok) { setDirty(false); router.refresh(); }
   });
   return <div className="space-y-3 pt-3">
     <p className="text-sm text-[#5f5484]">Паспорт: {passport?.status === 'approved' ? 'допущен' : passport?.status === 'revoked' ? 'отозван' : 'черновик'}</p>
-    <p className="text-sm leading-6 text-[#5f5484]">После автоматического заполнения остаётся указать результат Shazam и дату, затем нажать «Допустить в Бизнес». Лицензию трека прикладывать не нужно. ID лицензии MusicGPT и ссылку на историю указывать необязательно, допуск не блокирует.</p>
+    <p className="text-sm leading-6 text-[#5f5484]">Shazam проверяется автоматически и сам записывает «совпадений нет» с датой. Ручной ввод Shazam ниже остаётся запасным вариантом. Затем нажмите «Допустить в Бизнес». Лицензию трека прикладывать не нужно. ID лицензии MusicGPT и ссылку на историю указывать необязательно, допуск не блокирует.</p>
     <label className="block text-sm font-medium text-[#25135c]">ID лицензии MusicGPT (необязательно)
       <input className={fieldClassName} value={licenseId} disabled={pending || locked} onChange={(e) => { setLicenseId(e.target.value); setDirty(true); }} />
     </label>
