@@ -18,6 +18,7 @@ import {
   nextVisibleProductWizardStep,
   previousVisibleProductWizardStep,
   shouldHideOpenCatalogAlbumFields,
+  shouldShowPassportCreateOnLastWizardStep,
   visibleProductWizardSteps,
 } from '../src/lib/authors/closed-catalog-only';
 import { closedAlbumEditHref, closedBusinessAlbumInsertRow, parseCreateClosedAlbumResponse } from '../src/lib/business-track-passports/create-album';
@@ -61,6 +62,18 @@ assert.equal(clampProductWizardStep(4, true), 2);
 assert.equal(clampProductWizardStep(2, true), 2);
 assert.equal(clampProductWizardStep(3, false), 3, 'other authors still open step 3');
 assert.equal(visibleProductWizardSteps(true).some((item) => item.label === 'Описание и продвижение'), false);
+
+// t1511u: last step (step 2) still offers the passport create button, never step-3 continue labels.
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'idle', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'saving', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'enqueueing', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'failed', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'partial', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'stale', continueInBackground: false }), true);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'completed', continueInBackground: false }), false);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'analyzing', continueInBackground: true }), false);
+assert.equal(shouldShowPassportCreateOnLastWizardStep({ kind: 'queued', continueInBackground: true }), false);
+
 
 // 3. Cabinet insert is the same closed album as the admin RPC (auto-Shazam keys off business_only).
 const row = closedBusinessAlbumInsertRow(authorId, 'Утро без суеты', albumId);
@@ -236,6 +249,19 @@ assert.match(form, /wizardStep === lastWizardStep/);
 assert.match(form, /!hideOpenCatalogFields/);
 assert.doesNotMatch(form, /nextProductWizardStep\(wizardStep\)/);
 
+// t1511u: #1280 hid the step-nav on the last step, which also hid «Сохранить и создать музыкальный паспорт».
+const lastStepStart = form.indexOf('wizardEnabled && wizardStep === lastWizardStep');
+const lastStepBlock = form.slice(lastStepStart, form.indexOf('{!wizardEnabled', lastStepStart));
+assert.match(lastStepBlock, /shouldShowPassportCreateOnLastWizardStep\(passportActivity\)/);
+assert.match(lastStepBlock, /data-passport-create=/);
+assert.match(lastStepBlock, /saveWizardStepAndContinue\(\)/);
+assert.match(lastStepBlock, /passportActivity\.buttonLabel/);
+assert.doesNotMatch(lastStepBlock, /Продолжить без музыкального паспорта/);
+assert.doesNotMatch(lastStepBlock, /Перейти к оформлению/);
+assert.doesNotMatch(lastStepBlock, /Продолжить – паспорт создаётся в фоне/);
+assert.match(form, /jazzRelaxMusicPassport && wizardStep === 2 \? <JazzRelaxPassportHelp/);
+assert.match(form, /showWizardStep\(3\) && !hideOpenCatalogFields/);
+
 const toggleSrc = read('src/app/(platform)/admin/business-catalog/ClosedCatalogOnlySettings.tsx');
 assert.match(toggleSrc, /fetch\(CLOSED_CATALOG_ONLY_TOGGLE_ROUTE/);
 assert.doesNotMatch(toggleSrc, /use server/);
@@ -257,4 +283,4 @@ assert.match(productsSrc, /closedCatalogDecision === "unavailable"/);
 assert.match(productsSrc, /throw new Error\("draft_create_failed"\)/);
 assert.doesNotMatch(productsSrc, /!closedCatalogAuthor\.error && isClosedCatalogOnlyAuthor/);
 
-console.log('closed-catalog-only-cabinet: PASS (flag, cabinet route, admin toggle, simplified wizard, other authors unchanged)');
+console.log('closed-catalog-only-cabinet: PASS (flag, cabinet route, admin toggle, simplified wizard, last-step passport CTA, other authors unchanged)');

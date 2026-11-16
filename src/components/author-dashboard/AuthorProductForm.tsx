@@ -89,6 +89,7 @@ import {
   nextVisibleProductWizardStep,
   previousVisibleProductWizardStep,
   shouldHideOpenCatalogAlbumFields,
+  shouldShowPassportCreateOnLastWizardStep,
   visibleProductWizardSteps,
 } from "@/lib/authors/closed-catalog-only";
 import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
@@ -6265,6 +6266,25 @@ export default function AuthorProductForm({
 
       {wizardEnabled && wizardStep === lastWizardStep ? (
         <div className="flex flex-col gap-3">
+          {jazzRelaxMusicPassport
+          && wizardStep === 2
+          && shouldShowPassportCreateOnLastWizardStep(passportActivity) ? (
+            <button
+              type="button"
+              data-passport-create=""
+              disabled={
+                busy
+                || passportActivity.buttonDisabled
+                || !(canEditPublicFields || canEditSchedule)
+                || musicQueueHasLocalFile(musicQueue)
+              }
+              aria-busy={passportActivity.ariaBusy ? true : undefined}
+              onClick={() => void saveWizardStepAndContinue()}
+              className="w-fit max-w-full rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
+            >
+              {passportActivity.buttonLabel}
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={busy}

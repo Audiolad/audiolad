@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>t1511u cabinet passport button</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f4eefc;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #25135c;
+    }
+    .page { padding: 32px 40px 48px; }
+    .caption { margin: 0 0 16px; font-size: 16px; color: #6a5b8c; }
+    .card {
+      background: #f7f2fd;
+      border: 1px solid #eadff8;
+      border-radius: 28px;
+      padding: 20px 20px 8px;
+    }
+    .title-chip {
+      display: inline-block;
+      min-width: 260px;
+      border: 1px solid #c9b6ef;
+      border-radius: 22px;
+      background: #fff;
+      padding: 12px 18px;
+      font-size: 18px;
+      color: #4b2f9a;
+    }
+    .label { margin: 22px 0 8px; font-size: 14px; font-weight: 600; }
+    .subtitle {
+      height: 72px;
+      border: 1px solid #c9b6ef;
+      border-radius: 22px;
+      background: #fff;
+    }
+    .ready { margin: 22px 0 10px; font-size: 14px; font-weight: 600; }
+    .player {
+      height: 48px;
+      border-radius: 24px;
+      background: #eeeaf4;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      color: #6a5b8c;
+      font-size: 14px;
+    }
+    .play {
+      width: 0; height: 0;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 11px solid #5f5484;
+    }
+    .bar { flex: 1; height: 3px; background: #cfc6de; border-radius: 2px; }
+    .hint { margin: 10px 0 16px; font-size: 13px; color: #5f5484; line-height: 1.45; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+    .btn {
+      border-radius: 22px;
+      padding: 16px 22px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: default;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .solid { background: #7042c5; color: #fff; border: 0; }
+    .ghost { background: #fff; color: #5f5484; border: 1px solid #d9c9ef; }
+    .outline { background: #fff; color: #7042c5; border: 1px solid #c6afe6; }
+    .danger { background: #fff; color: #9b3d3d; border: 1px solid #f2c7c7; }
+    .actions { margin-top: 28px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+    .help { color: #4b2f9a; font-size: 16px; text-decoration: underline; margin: 18px 0 8px; }
+    .actions-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    @media (max-width: 500px) {
+      .page { padding: 20px 16px 32px; }
+      .title-chip { min-width: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <p class="caption">После: кнопка паспорта на последнем шаге закрытого альбома</p>
+    <div class="card">
+      <div class="title-chip">Хорошие новости</div>
+      <div class="label">Подназвание (необязательно)</div>
+      <div class="subtitle"></div>
+      <div class="ready">Аудио готово к прослушиванию</div>
+      <div class="player"><span class="play"></span><span>0:00 / 0:00</span><span class="bar"></span></div>
+      <p class="hint">Поддерживаются WAV, MP3 и OGG (Opus/Vorbis). Предпочтительный формат – WAV: мы автоматически подготовим версию для прослушивания.</p>
+      <div class="row">
+        <button class="btn solid">Заменить аудио</button>
+        <button class="btn ghost">Удалить аудио</button>
+        <button class="btn danger">Удалить</button>
+      </div>
+    </div>
+    <p class="help">Зачем нужен музыкальный паспорт?</p>
+    <div class="actions">
+      <button class="btn solid" data-passport-create="">Сохранить и создать музыкальный паспорт</button>
+      <button class="btn ghost">Назад</button>
+      <div class="actions-row">
+        <button class="btn outline">Сохранить черновик</button>
+        <button class="btn solid">Опубликовать</button>
+        <button class="btn danger">Удалить продукт</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
