@@ -59,8 +59,12 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
   </form>;
 }
 
-export default function PassportForm({ audioItemId, passport }: { audioItemId: string; passport?: Passport }) {
-  const [fields, setFields] = useState<Passport>(passport ?? {});
+export default function PassportForm({ audioItemId, passport, suggestedAlCode }: { audioItemId: string; passport?: Passport; suggestedAlCode?: string | null }) {
+  const [fields, setFields] = useState<Passport>(() => {
+    const initial = passport ?? {};
+    const code = initial.al_code?.trim() || suggestedAlCode?.trim() || '';
+    return code && !initial.al_code ? { ...initial, al_code: code } : initial;
+  });
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
   const [dirty, setDirty] = useState(false);

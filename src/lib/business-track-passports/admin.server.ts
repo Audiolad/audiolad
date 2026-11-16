@@ -21,15 +21,31 @@ export async function loadClosedBusinessCatalog() {
   const admin = await requireAdminPanelAccess();
   const authors = await listAuthorWorkspacesForUser(admin.userId);
   const db = createServiceRoleClient();
-  const albums = await db.from('practices').select('id,title,author_id,status').eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
+  const albums = await db.from('practices')
+    .select('id,title,author_id,status,cover_url,cover_image,updated_at')
+    .eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
   if (albums.error) throw new Error('Не удалось загрузить закрытый каталог.');
+  const authorIds = [...new Set((albums.data ?? []).map((album) => String(album.author_id ?? '')).filter(Boolean))];
+  const names = new Map<string, string>();
+  for (let index = 0; index < authorIds.length; index += 100) {
+    const { data, error } = await db.from('authors').select('id, name').in('id', authorIds.slice(index, index + 100));
+    if (error) throw new Error('Не удалось загрузить закрытый каталог.');
+    for (const row of (data ?? []) as { id: string; name: string | null }[]) names.set(row.id, row.name?.trim() ?? '');
+  }
   const rows = [];
   for (const album of albums.data ?? []) {
-    const tracks = await db.from('audio_items').select('id,title').eq('practice_id', album.id).order('position');
+    const tracks = await db.from('audio_items').select('id,title,music_track_code').eq('practice_id', album.id).order('position');
     const passports = await db.from('business_track_passports').select('*').eq('practice_id', album.id);
     if (tracks.error || passports.error) throw new Error('Не удалось загрузить паспорта.');
-    rows.push({ ...album, tracks: (tracks.data ?? []).map((track) => ({ ...track,
-      passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined })) });
+    rows.push({
+      ...album,
+      authorName: names.get(String(album.author_id ?? '')) ?? '',
+      tracks: (tracks.data ?? []).map((track) => ({
+        ...track,
+        music_track_code: typeof track.music_track_code === 'string' ? track.music_track_code : null,
+        passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined,
+      })),
+    });
   }
   return { authors, albums: rows };
 }
