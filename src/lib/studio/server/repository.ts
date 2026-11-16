@@ -150,6 +150,28 @@ export async function listStudioProjects(authorId: string) {
   return (data ?? []) as StudioProjectListItem[];
 }
 
+/**
+ * Active projects of all the given author workspaces, newest first.
+ * Callers must pass only workspace ids resolved server-side for the signed-in user
+ * (StudioActor.workspaces), never ids from the request.
+ */
+export async function listStudioProjectsForWorkspaces(authorIds: readonly string[]) {
+  if (authorIds.length === 0) {
+    return [] as StudioProjectListItem[];
+  }
+  const service = createServiceRoleClient();
+  const { data, error } = await service
+    .from("studio_projects")
+    .select(`${PROJECT_LIST_SELECT}, author_id`)
+    .in("author_id", [...authorIds])
+    .eq("status", "active")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    mapServiceError(error);
+  }
+  return (data ?? []) as StudioProjectListItem[];
+}
+
 export async function listStudioProjectsForGuest(guestSessionId: string) {
   const service = createServiceRoleClient();
   const { data, error } = await service

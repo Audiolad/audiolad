@@ -7,6 +7,7 @@ import { StudioBrand } from "@/components/studio/StudioBrand";
 import { StudioChromeNav } from "@/components/studio/StudioChromeNav";
 import { StudioProjectLibrary } from "@/components/studio/StudioProjectLibrary";
 import { requireStudioEditorAccess } from "@/lib/studio/guest-access";
+import { studioAuthorNames } from "@/lib/studio/home-workspace";
 import { resolveStudioHomeWorkspace } from "@/lib/studio/server/home-workspace";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,10 @@ export default async function StudioProjectsPage({
     workspace && typeof author === "string" && author.trim() === workspace.slug
       ? workspace.slug
       : null;
+  const authorNames =
+    actor.kind === "author" && actor.workspaces.length > 1
+      ? studioAuthorNames(actor.workspaces)
+      : undefined;
   const otherWorkspaces =
     actor.kind === "author" && workspace
       ? actor.workspaces.filter((item) => item.id !== workspace.id)
@@ -48,7 +53,8 @@ export default async function StudioProjectsPage({
         {workspace ? (
           <section className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#ddd2f5]">
             <span>
-              Автор: <strong className="font-semibold text-white">{workspace.name}</strong>
+              {authorNames ? "Новые проекты создаются у автора: " : "Автор: "}
+              <strong className="font-semibold text-white">{workspace.name}</strong>
             </span>
             {otherWorkspaces.length > 0 ? (
               <details className="relative">
@@ -74,6 +80,7 @@ export default async function StudioProjectsPage({
         <StudioProjectLibrary
           authorId={authorId}
           authorSlug={workspace?.slug}
+          authorNames={authorNames}
           accessMode={accessMode}
         />
       </div>

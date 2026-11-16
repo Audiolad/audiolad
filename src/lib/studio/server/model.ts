@@ -121,7 +121,8 @@ export type StudioAssetPeaksDto = {
 export type StudioProjectListItem = Pick<
   StudioProjectRow,
   "id" | "name" | "updated_at" | "last_opened_at" | "revision"
->;
+> &
+  Partial<Pick<StudioProjectRow, "author_id">>;
 
 export function toStudioProjectDto(project: StudioProjectRow) {
   return {
@@ -145,6 +146,7 @@ export function toStudioProjectListItemDto(project: StudioProjectListItem) {
     updatedAt: project.updated_at,
     lastOpenedAt: project.last_opened_at,
     revision: project.revision,
+    ...(project.author_id ? { authorId: project.author_id } : {}),
   };
 }
 

@@ -78,3 +78,14 @@ export function needsLatestProjectLookup(
     return Boolean(slug) && workspaces.some((workspace) => workspace.slug === slug);
   });
 }
+
+/** id → name of the user's authors, for labelling projects in the combined list (t1484u). */
+export function studioAuthorNames(
+  workspaces: readonly { id: string; name: string }[],
+): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const workspace of workspaces) {
+    names[workspace.id] = workspace.name;
+  }
+  return names;
+}

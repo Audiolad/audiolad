@@ -26,12 +26,16 @@ function formatUpdatedAt(value: string): string {
 export function StudioProjectLibrary({
   authorId,
   authorSlug,
+  authorNames,
   accessMode = "author",
 }: {
   authorId?: string;
   authorSlug?: string;
+  /** id → name of every author of the user; when given, the list shows all their projects. */
+  authorNames?: Record<string, string>;
   accessMode?: "author" | "guest";
 }) {
+  const allAuthors = accessMode === "author" && authorNames !== undefined;
   const newProjectHref = authorSlug
     ? `/studio/project/new?author=${encodeURIComponent(authorSlug)}`
     : "/studio/project/new";
@@ -48,7 +52,7 @@ export function StudioProjectLibrary({
   useEffect(() => {
     const controller = new AbortController();
 
-    void listStudioProjects({ authorId, signal: controller.signal })
+    void listStudioProjects({ authorId, allAuthors, signal: controller.signal })
       .then((items) => {
         if (!controller.signal.aborted) setProjects(items);
       })
@@ -62,7 +66,7 @@ export function StudioProjectLibrary({
       });
 
     return () => controller.abort();
-  }, [authorId, retryCount]);
+  }, [authorId, allAuthors, retryCount]);
 
   const retry = useCallback(() => {
     setProjects(null);
@@ -203,6 +207,11 @@ export function StudioProjectLibrary({
                       <span className="mt-1 block text-sm text-[#cfc4e4]">
                         Изменён {formatUpdatedAt(project.updatedAt)}
                       </span>
+                      {allAuthors && project.authorId && authorNames?.[project.authorId] ? (
+                        <span className="mt-1 block truncate text-sm text-[#ddd2f5]">
+                          Автор: {authorNames[project.authorId]}
+                        </span>
+                      ) : null}
                     </span>
                   </Link>
                   <div className="flex shrink-0 items-center gap-2">

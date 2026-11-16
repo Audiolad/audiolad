@@ -4,6 +4,7 @@ import {
   needsLatestProjectLookup,
   pickLatestWorkspaceId,
   pickStudioWorkspace,
+  studioAuthorNames,
 } from "../src/lib/studio/home-workspace";
 
 // t1477u/t1478u: workspaces are sorted by name, so "АудиоЛад" (new, 0 projects)
@@ -34,4 +35,13 @@ assert.equal(needsLatestProjectLookup(all, "aurafon", null), false);
 assert.equal(needsLatestProjectLookup(all, null, "zoya"), false);
 assert.equal(needsLatestProjectLookup(all, "foreign", " "), true);
 assert.equal(needsLatestProjectLookup([aurafon], null, null), false);
+// t1484u: the combined list labels each project with its author's name
+assert.deepEqual(
+  studioAuthorNames([
+    { id: aurafon.id, name: "Аурафон" },
+    { id: "7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c", name: "Сергей Петров" },
+  ]),
+  { [aurafon.id]: "Аурафон", "7f3a9c12-4b8e-4d21-9c6a-1e2f4d6b8a0c": "Сергей Петров" },
+);
+assert.deepEqual(studioAuthorNames([]), {});
 console.log("studio-home-workspace-unit: ok");

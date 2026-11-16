@@ -108,6 +108,7 @@ export type StudioProjectListItem = {
   updatedAt: string;
   lastOpenedAt: string | null;
   revision: number;
+  authorId?: string;
 };
 
 export type StudioProjectAssetMetadata = StudioUploadedAsset;
@@ -185,15 +186,20 @@ function isProjectListItem(value: unknown): value is StudioProjectListItem {
 
 export async function listStudioProjects({
   authorId,
+  allAuthors = false,
   signal,
 }: {
   authorId?: string;
+  /** All authors of the signed-in user in one list (t1484u). */
+  allAuthors?: boolean;
   signal?: AbortSignal;
 }): Promise<StudioProjectListItem[]> {
   const response = await studioFetch(
-    authorId
-      ? `/api/studio/projects?authorId=${encodeURIComponent(authorId)}`
-      : "/api/studio/projects",
+    allAuthors
+      ? "/api/studio/projects?scope=all"
+      : authorId
+        ? `/api/studio/projects?authorId=${encodeURIComponent(authorId)}`
+        : "/api/studio/projects",
     { signal },
   );
   if (!response.ok) throw await toStudioFetchError(response);

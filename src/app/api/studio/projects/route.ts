@@ -5,6 +5,7 @@ import {
   createStudioProject,
   listStudioProjects,
   listStudioProjectsForGuest,
+  listStudioProjectsForWorkspaces,
 } from "@/lib/studio/server/repository";
 import {
   toStudioProjectDto,
@@ -23,7 +24,21 @@ function handleError(error: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const authorIdParam = new URL(request.url).searchParams.get("authorId");
+    const searchParams = new URL(request.url).searchParams;
+    if (searchParams.get("scope") === "all") {
+      // t1484u: one list with the projects of every author the user owns/edits.
+      const actor = await resolveStudioActor();
+      if (actor.kind === "author") {
+        const projects = await listStudioProjectsForWorkspaces(
+          actor.workspaces.map((workspace) => workspace.id),
+        );
+        return NextResponse.json({
+          projects: projects.map(toStudioProjectListItemDto),
+        });
+      }
+    }
+
+    const authorIdParam = searchParams.get("authorId");
     if (authorIdParam) {
       const authorId = parseUuid(authorIdParam, "invalid_author_id");
       const projects = await listStudioProjects(authorId);
