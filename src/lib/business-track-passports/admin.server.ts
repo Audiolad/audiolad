@@ -5,7 +5,8 @@ import { listAuthorWorkspacesForUser } from '@/lib/author-products/auth';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { PASSPORT_FIELDS, type Passport } from './model';
-import { loadCatalogAndAlbumLicenseRefs } from '@/lib/business-track-passports/license.server';
+import { loadCatalogAndAlbumDefaults, loadCatalogAndAlbumLicenseRefs } from '@/lib/business-track-passports/license.server';
+import { resolveCatalogPassportDefaults } from '@/lib/business-track-passports/shared';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function id(value: string) { if (!UUID.test(value)) throw new Error('Некорректный идентификатор.'); }
@@ -26,7 +27,10 @@ export async function loadClosedBusinessCatalog() {
     .select('id,title,author_id,status,cover_url,cover_image,updated_at')
     .eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
   if (albums.error) throw new Error('Не удалось загрузить закрытый каталог.');
-  const licenseRefs = await loadCatalogAndAlbumLicenseRefs((albums.data ?? []).map((album) => String(album.id)));
+  const albumIds = (albums.data ?? []).map((album) => String(album.id));
+  const licenseRefs = await loadCatalogAndAlbumLicenseRefs(albumIds);
+  const defaults = await loadCatalogAndAlbumDefaults(albumIds);
+  const catalogDefaults = resolveCatalogPassportDefaults(null, defaults.catalogDefaults);
   const authorIds = [...new Set((albums.data ?? []).map((album) => String(album.author_id ?? '')).filter(Boolean))];
   const names = new Map<string, string>();
   for (let index = 0; index < authorIds.length; index += 100) {
@@ -48,9 +52,10 @@ export async function loadClosedBusinessCatalog() {
         passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined,
       })),
       licenseRef: licenseRefs.albumLicenseRefs[String(album.id)] ?? null,
+      defaults: defaults.albumDefaults[String(album.id)] ?? null,
     });
   }
-  return { authors, albums: rows, catalogLicenseRef: licenseRefs.catalogLicenseRef };
+  return { authors, albums: rows, catalogLicenseRef: licenseRefs.catalogLicenseRef, catalogDefaults };
 }
 export async function createClosedBusinessAlbum(authorId: string, title: string) {
   const admin = await requireAdminPanelAccess();

@@ -5,8 +5,10 @@ import {
   ruTrackCountLabel,
 } from '@/lib/business-admission/published-catalog';
 import type { Passport } from '@/lib/business-track-passports/model';
+import type { CatalogPassportDefaults } from '@/lib/business-track-passports/shared';
+import { DEFAULT_CATALOG_PASSPORT_DEFAULTS } from '@/lib/business-track-passports/shared';
 import PassportForm from './PassportForm';
-import AlbumPassportTools, { CatalogLicensePanel } from './AlbumPassportTools';
+import AlbumPassportTools, { CatalogSettingsPanel } from './AlbumPassportTools';
 
 const editLinkClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]';
@@ -21,6 +23,7 @@ type ClosedAlbum = {
   cover_image?: unknown;
   updated_at?: string | null;
   licenseRef?: string | null;
+  defaults?: CatalogPassportDefaults | null;
   tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport }[];
 };
 
@@ -44,7 +47,7 @@ function trackStatusClassName(status: string | undefined) {
   return 'rounded-full bg-[#f4eefe] px-2.5 py-0.5 text-xs font-semibold text-[#7042c5]';
 }
 
-function AlbumCard({ album, catalogLicenseRef }: { album: ClosedAlbum; catalogLicenseRef: string | null }) {
+function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: ClosedAlbum; catalogLicenseRef: string | null; catalogDefaults: CatalogPassportDefaults }) {
   const approved = album.tracks.filter((track) => track.passport?.status === 'approved').length;
   const coverUrl = publishedBusinessCoverUrl({
     id: album.id,
@@ -93,6 +96,8 @@ function AlbumCard({ album, catalogLicenseRef }: { album: ClosedAlbum; catalogLi
           tracks={album.tracks}
           licenseRef={album.licenseRef ?? null}
           catalogLicenseRef={catalogLicenseRef}
+          catalogDefaults={catalogDefaults}
+          albumDefaults={album.defaults ?? null}
         />
       ) : null}
       {album.tracks.length > 0 ? (
@@ -122,22 +127,22 @@ function AlbumCard({ album, catalogLicenseRef }: { album: ClosedAlbum; catalogLi
   );
 }
 
-export default function ClosedAlbumWork({ albums, catalogLicenseRef = null }: { albums: ClosedAlbum[]; catalogLicenseRef?: string | null }) {
+export default function ClosedAlbumWork({ albums, catalogLicenseRef = null, catalogDefaults = DEFAULT_CATALOG_PASSPORT_DEFAULTS }: { albums: ClosedAlbum[]; catalogLicenseRef?: string | null; catalogDefaults?: CatalogPassportDefaults }) {
   return (
     <section className="space-y-4" data-closed-album-work="">
       <div>
         <h2 className="text-[20px] font-semibold text-[#25135c]">Работа с закрытыми альбомами</h2>
         <p className="mt-2 max-w-[760px] text-sm leading-6 text-[#5f5484]">
-          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Общие поля и образец лицензии заполняются один раз на альбом, хеши и AcoustID можно посчитать кнопкой «Заполнить автоматически», затем в каждом треке указать результат Shazam и нажать «Допустить в Бизнес».
+          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Инструмент и тариф задаются один раз в настройках каталога, дата берётся из файла мастера, затем кнопка «Заполнить автоматически» считает хеши и AcoustID. После этого в каждом треке остаётся указать результат Shazam и нажать «Допустить в Бизнес».
         </p>
       </div>
-      <CatalogLicensePanel catalogLicenseRef={catalogLicenseRef} />
+      <CatalogSettingsPanel catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} albums={albums} />
       {albums.length === 0 ? (
         <p className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm leading-6 text-[#7d70a2]">
           Пока нет закрытых альбомов.
         </p>
       ) : (
-        <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} catalogLicenseRef={catalogLicenseRef} />)}</div>
+        <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} />)}</div>
       )}
     </section>
   );

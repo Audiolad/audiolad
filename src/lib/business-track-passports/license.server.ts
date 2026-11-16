@@ -5,9 +5,14 @@ import {
   BUSINESS_PASSPORT_LICENSE_BUCKET,
   BUSINESS_PASSPORT_LICENSE_MAX_BYTES,
   BUSINESS_PASSPORT_LICENSE_MIME,
+  businessPassportDefaultsPath,
   businessPassportLicensePath,
   businessPassportLicenseRef,
   parseBusinessPassportLicenseRef,
+  parseCatalogDefaultsPdf,
+  parseCatalogPassportDefaults,
+  wrapCatalogDefaultsPdf,
+  type CatalogPassportDefaults,
 } from '@/lib/business-track-passports/shared';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -93,4 +98,49 @@ export async function loadCatalogAndAlbumLicenseRefs(albumIds: string[]): Promis
     if (await licenseObjectExists(path)) albumLicenseRefs[albumId] = businessPassportLicenseRef(path);
   }
   return { catalogLicenseRef, albumLicenseRefs };
+}
+
+function defaultsPath(scope: PassportLicenseScope): string {
+  if (scope === 'catalog') return businessPassportDefaultsPath('catalog');
+  if (!UUID.test(scope.albumId)) throw new Error('Некорректный идентификатор.');
+  return businessPassportDefaultsPath({ albumId: scope.albumId });
+}
+
+export async function loadCatalogPassportDefaults(scope: PassportLicenseScope = 'catalog'): Promise<CatalogPassportDefaults | null> {
+  await requireAdminPanelAccess();
+  const db = createServiceRoleClient();
+  const { data, error } = await db.storage.from(BUSINESS_PASSPORT_LICENSE_BUCKET).download(defaultsPath(scope));
+  if (error || !data) return null;
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  return parseCatalogDefaultsPdf(bytes);
+}
+
+export async function saveCatalogPassportDefaults(scope: PassportLicenseScope, fields: Record<string, string>): Promise<CatalogPassportDefaults> {
+  await requireAdminPanelAccess();
+  if (scope !== 'catalog') {
+    const db = createServiceRoleClient();
+    const { data, error } = await db.from('practices').select('id, business_only').eq('id', scope.albumId).maybeSingle();
+    if (error || !data || data.business_only !== true) throw new Error('Нужен закрытый альбом Бизнеса.');
+  }
+  const defaults = parseCatalogPassportDefaults(fields);
+  const bytes = wrapCatalogDefaultsPdf(defaults);
+  if (bytes.byteLength > BUSINESS_PASSPORT_LICENSE_MAX_BYTES) throw new Error('Не удалось сохранить настройки каталога.');
+  const db = createServiceRoleClient();
+  const { error } = await db.storage.from(BUSINESS_PASSPORT_LICENSE_BUCKET).upload(defaultsPath(scope), bytes, {
+    contentType: BUSINESS_PASSPORT_LICENSE_MIME,
+    upsert: true,
+  });
+  if (error) throw new Error('Не удалось сохранить настройки каталога.');
+  return defaults;
+}
+
+export async function loadCatalogAndAlbumDefaults(albumIds: string[]): Promise<{ catalogDefaults: CatalogPassportDefaults | null; albumDefaults: Record<string, CatalogPassportDefaults> }> {
+  const catalogDefaults = await loadCatalogPassportDefaults('catalog');
+  const albumDefaults: Record<string, CatalogPassportDefaults> = {};
+  for (const albumId of albumIds) {
+    if (!UUID.test(albumId)) continue;
+    const loaded = await loadCatalogPassportDefaults({ albumId });
+    if (loaded) albumDefaults[albumId] = loaded;
+  }
+  return { catalogDefaults, albumDefaults };
 }

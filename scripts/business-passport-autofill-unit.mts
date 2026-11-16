@@ -13,10 +13,16 @@ import {
   isBusinessPassportLicenseRef,
   licenseIdFromNotes,
   notesWithOptionalLicenseId,
+  generatedAtFromTimestamps,
+  generationRefForTrackTitle,
   parseAcoustIdLookup,
   parseBusinessPassportLicenseRef,
+  parseCatalogDefaultsPdf,
+  parseCatalogPassportDefaults,
   parseFpcalcJson,
   pickAlbumSharedPassport,
+  wrapCatalogDefaultsPdf,
+  DEFAULT_CATALOG_PASSPORT_DEFAULTS,
 } from '../src/lib/business-track-passports/shared';
 import { passportMissing } from '../src/lib/business-track-passports/model';
 
@@ -115,13 +121,17 @@ assert.match(tools, /Подтвердить допуск готовых/);
 assert.match(tools, /Автоматического допуска нет/);
 assert.match(tools, /Лицензию каждого трека загружать не нужно/);
 assert.match(tools, /ID лицензии трека указывать необязательно/);
-assert.match(tools, /Дата генерации – одна дата, не диапазон/);
-assert.doesNotMatch(tools, /uploadPassportLicenseAction\(\) without confirm/);
+assert.match(tools, /Изменить для этого альбома/);
+assert.match(tools, /Настройки каталога/);
+assert.match(tools, /Заполнить автоматически все закрытые альбомы/);
+assert.match(tools, /ссылку на историю MusicGPT указывать не нужно/);
+assert.doesNotMatch(tools, /Применить ко всем черновикам альбома/);
 
 const form = read('src/app/(platform)/admin/business-catalog/PassportForm.tsx');
 assert.match(form, /ID лицензии MusicGPT \(необязательно\)/);
 assert.match(form, /допуск не блокирует/);
 assert.match(form, /Лицензию трека прикладывать не нужно/);
+assert.match(form, /ссылку на историю указывать необязательно/);
 
 const autoFill = read('src/lib/business-track-passports/auto-fill.server.ts');
 assert.match(autoFill, /Ключ AcoustID не задан/);
@@ -129,10 +139,35 @@ assert.match(autoFill, /chromaprint-tools/);
 assert.doesNotMatch(autoFill, /acoustid_result: 'not_found'/);
 assert.match(autoFill, /passportMissing\(passport\)/);
 assert.match(autoFill, /nice/);
+assert.match(autoFill, /generationRefForTrackTitle/);
+assert.match(autoFill, /generatedAtFromTimestamps/);
+assert.match(autoFill, /created_at,verified_at/);
+assert.doesNotMatch(autoFill, /https:\/\/musicgpt/);
+
+
+const defaults = parseCatalogPassportDefaults({});
+assert.equal(defaults.generator_tool, 'MusicGPT');
+assert.equal(defaults.generator_plan, 'Pro');
+assert.equal(defaults.human_contribution, 'human');
+const wrapped = wrapCatalogDefaultsPdf(DEFAULT_CATALOG_PASSPORT_DEFAULTS);
+assert.ok(Buffer.from(wrapped).toString('utf8').startsWith('%PDF-'));
+assert.deepEqual(parseCatalogDefaultsPdf(wrapped), parseCatalogPassportDefaults(DEFAULT_CATALOG_PASSPORT_DEFAULTS));
+assert.equal(parseCatalogDefaultsPdf(new Uint8Array([1, 2, 3])), null);
+assert.equal(
+  generationRefForTrackTitle('  Светофор на зелёный  '),
+  'История MusicGPT аккаунта ИП Петров С.С., трек «Светофор на зелёный»',
+);
+assert.doesNotMatch(generationRefForTrackTitle('Светофор на зелёный'), /https?:\/\//);
+assert.equal(
+  generatedAtFromTimestamps('not-a-date', '2026-11-10T09:00:00.000Z', '2026-11-01T00:00:00.000Z'),
+  '2026-11-10T09:00:00.000Z',
+);
+assert.equal(generatedAtFromTimestamps(null, undefined, ''), null);
 
 const work = read('src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx');
-assert.match(work, /CatalogLicensePanel/);
+assert.match(work, /CatalogSettingsPanel/);
 assert.match(work, /Заполнить автоматически/);
+assert.match(work, /настройках каталога/);
 
 const licenseServer = read('src/lib/business-track-passports/license.server.ts');
 const sharedSource = read('src/lib/business-track-passports/shared.ts');
@@ -140,5 +175,9 @@ assert.match(sharedSource, /BUSINESS_PASSPORT_LICENSE_BUCKET = 'business-rightsh
 assert.match(licenseServer, /BUSINESS_PASSPORT_LICENSE_BUCKET/);
 assert.doesNotMatch(licenseServer, /business-private-covers/);
 assert.doesNotMatch(sharedSource, /business-private-covers/);
+assert.match(sharedSource, /passport-licenses\/catalog\/v1\/defaults\.pdf/);
+assert.match(read('src/lib/business-track-passports/license.server.ts'), /wrapCatalogDefaultsPdf/);
+assert.doesNotMatch(read('src/lib/business-track-passports/license.server.ts') + autoFill, /CREATE TABLE/);
+
 
 console.log('business-passport-autofill-unit: ok');

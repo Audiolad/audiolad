@@ -15,11 +15,14 @@ import {
   ALBUM_SHARED_PASSPORT_FIELDS,
   evidenceInventorySha256,
   findConfiguredAcoustIdEnvName,
+  generatedAtFromTimestamps,
+  generationRefForTrackTitle,
   parseAcoustIdLookup,
   parseFpcalcJson,
   pickAlbumSharedPassport,
+  resolveCatalogPassportDefaults,
 } from '@/lib/business-track-passports/shared';
-import { findBusinessPassportLicense } from '@/lib/business-track-passports/license.server';
+import { findBusinessPassportLicense, loadCatalogPassportDefaults } from '@/lib/business-track-passports/license.server';
 import { saveBusinessPassport, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
 
 const execFileAsync = promisify(execFile);
@@ -155,6 +158,31 @@ export type AutoFillTrackResult = {
   message: string;
 };
 
+
+async function defaultsForAlbum(albumId: string) {
+  const album = await loadCatalogPassportDefaults({ albumId });
+  const catalog = await loadCatalogPassportDefaults('catalog');
+  return resolveCatalogPassportDefaults(album, catalog);
+}
+
+async function sharedAutoFields(albumId: string, title: string, generatedAt: string | null, existingTerms: string | null): Promise<Record<string, string>> {
+  const defaults = await defaultsForAlbum(albumId);
+  const albumLicense = await findBusinessPassportLicense({ albumId });
+  const catalogLicense = albumLicense ? null : await findBusinessPassportLicense('catalog');
+  const terms = (existingTerms && existingTerms.trim()) || albumLicense || catalogLicense || '';
+  const fields: Record<string, string> = {
+    generator_tool: defaults.generator_tool,
+    generator_plan: defaults.generator_plan,
+    human_contribution: defaults.human_contribution,
+    human_contribution_details: defaults.human_contribution_details,
+    generation_ref: generationRefForTrackTitle(title),
+    never_published_checked_at: new Date().toISOString(),
+  };
+  if (generatedAt) fields.generated_at = generatedAt;
+  if (terms) fields.terms_snapshot_ref = terms;
+  return fields;
+}
+
 export async function autoFillBusinessPassportTrack(audioItemId: string): Promise<AutoFillTrackResult> {
   const admin = await requireAdminPanelAccess();
   id(audioItemId);
@@ -164,7 +192,7 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
   const db = createServiceRoleClient();
   const { data: audio, error: audioError } = await db
     .from('audio_items')
-    .select('id,title,music_track_code,desired_music_master_asset_id,practice_id')
+    .select('id,title,music_track_code,desired_music_master_asset_id,practice_id,created_at')
     .eq('id', audioItemId)
     .single();
   const title = typeof audio?.title === 'string' ? audio.title : '';
@@ -193,7 +221,7 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
   }
 
   const { data: asset, error: assetError } = await db.from('music_audio_assets')
-    .select('id,storage_bucket,storage_path,size_bytes,duration_seconds,source_asset_id')
+    .select('id,storage_bucket,storage_path,size_bytes,duration_seconds,source_asset_id,created_at,verified_at')
     .eq('id', audio.desired_music_master_asset_id)
     .eq('audio_item_id', audioItemId)
     .eq('asset_role', 'master')
@@ -202,6 +230,22 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
   if (assetError || !asset || asset.storage_bucket !== 'music-masters') {
     return fail('Мастер-файл ещё не проверен при загрузке.');
   }
+
+  const generatedAt = generatedAtFromTimestamps(
+    typeof asset.created_at === 'string' ? asset.created_at : null,
+    typeof asset.verified_at === 'string' ? asset.verified_at : null,
+    typeof audio.created_at === 'string' ? audio.created_at : null,
+  );
+  if (!generatedAt) {
+    errors.push('Не удалось определить дату файла мастера.');
+    return fail('Не удалось определить дату файла мастера.');
+  }
+  const existingTerms = typeof passport.terms_snapshot_ref === 'string' ? passport.terms_snapshot_ref : null;
+  const shared = await sharedAutoFields(String(audio.practice_id), title, generatedAt, existingTerms);
+  await saveBusinessPassport(audioItemId, { ...shared, ...(alCode ? { al_code: alCode } : {}) }, { keys: Object.keys({ ...shared, ...(alCode ? { al_code: alCode } : {}) }) });
+  filled.push(PASSPORT_FIELDS.generator_tool, PASSPORT_FIELDS.generator_plan, PASSPORT_FIELDS.generated_at, PASSPORT_FIELDS.generation_ref, PASSPORT_FIELDS.human_contribution, PASSPORT_FIELDS.never_published_checked_at);
+  if (shared.terms_snapshot_ref) filled.push(PASSPORT_FIELDS.terms_snapshot_ref);
+  else errors.push('Сначала загрузите образец лицензии в настройках каталога.');
 
   return withLowPriority(async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'audiolad-passport-'));

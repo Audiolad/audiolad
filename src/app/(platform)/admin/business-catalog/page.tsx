@@ -11,7 +11,7 @@ const linkCardClassName =
   'rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-4 text-left transition hover:border-[#9a74d8] hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]';
 
 export default async function ClosedBusinessCatalogPage() {
-  const { authors, albums, catalogLicenseRef } = await loadClosedBusinessCatalog();
+  const { authors, albums, catalogLicenseRef, catalogDefaults } = await loadClosedBusinessCatalog();
   const published = await loadPublishedBusinessCatalog();
   return <section className="space-y-6">
     <div>
@@ -20,7 +20,7 @@ export default async function ClosedBusinessCatalogPage() {
       <p className="mt-3 max-w-[760px] text-sm leading-6 text-[#5f5484]">Человек вручную создаёт, выбирает и мастерит музыку. Администратор загружает мастер и заполняет паспорт. Допуск не публикует альбом автоматически. Права, направления для заведений и качество звука проверяются отдельно.</p>
     </div>
     <CreateClosedAlbum authors={authors} />
-    <ClosedAlbumWork albums={albums} catalogLicenseRef={catalogLicenseRef} />
+    <ClosedAlbumWork albums={albums} catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} />
     <div className="grid gap-3 sm:grid-cols-2">
       <Link href="/admin/business-track-review" className={linkCardClassName}>
         <span className="block text-sm font-medium text-[#3f3560]">Проверка качества звука</span>

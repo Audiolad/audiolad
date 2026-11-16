@@ -172,3 +172,87 @@ export function parseFpcalcJson(raw: string): { duration: number; fingerprint: s
   }
   return { duration, fingerprint };
 }
+
+
+export type CatalogPassportDefaults = {
+  generator_tool: string;
+  generator_plan: string;
+  human_contribution: 'human' | 'none';
+  human_contribution_details: string;
+};
+
+export const DEFAULT_CATALOG_PASSPORT_DEFAULTS: CatalogPassportDefaults = {
+  generator_tool: 'MusicGPT',
+  generator_plan: 'Pro',
+  human_contribution: 'human',
+  human_contribution_details: 'Человек выбирает и мастерит готовый трек.',
+};
+
+export const CATALOG_PASSPORT_DEFAULTS_MARKER = 'AUDIOLAD_PASSPORT_DEFAULTS\n';
+
+export function businessPassportDefaultsPath(scope: 'catalog' | { albumId: string }): string {
+  if (scope === 'catalog') return 'passport-licenses/catalog/v1/defaults.pdf';
+  return `passport-licenses/practices/${scope.albumId}/v1/defaults.pdf`;
+}
+
+function clipDefaultText(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+export function parseCatalogPassportDefaults(input: unknown): CatalogPassportDefaults {
+  const body = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  const human = body.human_contribution === 'none' ? 'none' : body.human_contribution === 'human' ? 'human' : DEFAULT_CATALOG_PASSPORT_DEFAULTS.human_contribution;
+  const details = clipDefaultText(body.human_contribution_details, 2000);
+  return {
+    generator_tool: clipDefaultText(body.generator_tool, 300) || DEFAULT_CATALOG_PASSPORT_DEFAULTS.generator_tool,
+    generator_plan: clipDefaultText(body.generator_plan, 300) || DEFAULT_CATALOG_PASSPORT_DEFAULTS.generator_plan,
+    human_contribution: human,
+    human_contribution_details: human === 'human' ? (details || DEFAULT_CATALOG_PASSPORT_DEFAULTS.human_contribution_details) : details,
+  };
+}
+
+export function resolveCatalogPassportDefaults(album: CatalogPassportDefaults | null | undefined, catalog: CatalogPassportDefaults | null | undefined): CatalogPassportDefaults {
+  return parseCatalogPassportDefaults({
+    ...DEFAULT_CATALOG_PASSPORT_DEFAULTS,
+    ...(catalog ?? {}),
+    ...(album ?? {}),
+  });
+}
+
+export function generationRefForTrackTitle(title: string): string {
+  const name = title.trim() || 'без названия';
+  return `История MusicGPT аккаунта ИП Петров С.С., трек «${name}»`;
+}
+
+export function generatedAtFromTimestamps(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) continue;
+    return new Date(parsed).toISOString();
+  }
+  return null;
+}
+
+export function wrapCatalogDefaultsPdf(defaults: CatalogPassportDefaults): Uint8Array {
+  const json = JSON.stringify(parseCatalogPassportDefaults(defaults));
+  const payload = Buffer.from(`${CATALOG_PASSPORT_DEFAULTS_MARKER}${json}`, 'utf8');
+  const header = Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Length ${payload.length} >>\nstream\n`, 'utf8');
+  const footer = Buffer.from('\nendstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n', 'utf8');
+  return new Uint8Array(Buffer.concat([header, payload, footer]));
+}
+
+export function parseCatalogDefaultsPdf(bytes: Uint8Array): CatalogPassportDefaults | null {
+  const text = Buffer.from(bytes).toString('utf8');
+  if (!text.startsWith('%PDF-')) return null;
+  const marker = text.indexOf(CATALOG_PASSPORT_DEFAULTS_MARKER);
+  if (marker < 0) return null;
+  const start = marker + CATALOG_PASSPORT_DEFAULTS_MARKER.length;
+  const end = text.indexOf('\nendstream', start);
+  const raw = text.slice(start, end === -1 ? undefined : end).trim();
+  try {
+    return parseCatalogPassportDefaults(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}

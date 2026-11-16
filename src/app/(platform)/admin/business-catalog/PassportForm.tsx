@@ -87,7 +87,7 @@ export default function PassportForm({ audioItemId, passport, suggestedAlCode }:
   });
   return <div className="space-y-3 pt-3">
     <p className="text-sm text-[#5f5484]">Паспорт: {passport?.status === 'approved' ? 'допущен' : passport?.status === 'revoked' ? 'отозван' : 'черновик'}</p>
-    <p className="text-sm leading-6 text-[#5f5484]">После общих данных альбома и автоматического заполнения остаётся указать результат Shazam и дату, затем нажать «Допустить в Бизнес». Лицензию трека прикладывать не нужно. ID лицензии MusicGPT необязателен и допуск не блокирует.</p>
+    <p className="text-sm leading-6 text-[#5f5484]">После автоматического заполнения остаётся указать результат Shazam и дату, затем нажать «Допустить в Бизнес». Лицензию трека прикладывать не нужно. ID лицензии MusicGPT и ссылку на историю указывать необязательно, допуск не блокирует.</p>
     <label className="block text-sm font-medium text-[#25135c]">ID лицензии MusicGPT (необязательно)
       <input className={fieldClassName} value={licenseId} disabled={pending || locked} onChange={(e) => { setLicenseId(e.target.value); setDirty(true); }} />
     </label>

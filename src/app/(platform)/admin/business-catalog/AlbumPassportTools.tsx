@@ -3,17 +3,16 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Passport } from '@/lib/business-track-passports/model';
 import {
-  ALBUM_SHARED_FIELD_LABELS,
-  ALBUM_SHARED_PASSPORT_FIELDS,
+  DEFAULT_CATALOG_PASSPORT_DEFAULTS,
   adminPassportLicensePreviewHref,
   isBusinessPassportLicenseRef,
-  pickAlbumSharedPassport,
+  type CatalogPassportDefaults,
 } from '@/lib/business-track-passports/shared';
 import {
-  applyAlbumSharedPassportAction,
   autoFillPassportTrackAction,
   approveReadyPassportsAction,
   uploadPassportLicenseAction,
+  saveCatalogDefaultsAction,
 } from './actions';
 
 const fieldClassName =
@@ -24,12 +23,12 @@ const secondaryButtonClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60';
 
 type Track = { id: string; title: string; music_track_code?: string | null; passport?: Passport };
-
-function firstDraftShared(tracks: Track[]): Record<string, string> {
-  const draft = tracks.find((track) => track.passport && track.passport.status !== 'approved' && track.passport.status !== 'revoked')
-    ?? tracks.find((track) => track.passport);
-  return draft?.passport ? pickAlbumSharedPassport(draft.passport) : pickAlbumSharedPassport({});
-}
+type AlbumTools = {
+  id: string;
+  tracks: Track[];
+  licenseRef?: string | null;
+  defaults?: CatalogPassportDefaults | null;
+};
 
 function LicenseUpload({
   scope,
@@ -57,7 +56,7 @@ function LicenseUpload({
   return (
     <div className="space-y-3">
       <p className="text-sm leading-6 text-[#5f5484]">
-        Один образец лицензии (тип/шаблон) загружается один раз и закрыто хранится в кабинете. Он заполняет «ссылку на сохранённые условия тарифа» у всех черновиков. Лицензию каждого трека загружать не нужно – она остаётся в истории MusicGPT и её можно запросить отдельно. ID лицензии трека указывать необязательно, без него допуск не блокируется.
+        Один образец лицензии загружается один раз и закрыто хранится в кабинете. Он заполняет условия тарифа у всех черновиков. Лицензию каждого трека загружать не нужно – она остаётся в истории MusicGPT и её можно запросить отдельно. ID лицензии трека указывать необязательно, без него допуск не блокируется.
       </p>
       {preview ? (
         <p className="text-sm leading-6 text-[#5f5484]">
@@ -84,14 +83,7 @@ function LicenseUpload({
       >
         <label className="block min-w-0 flex-1 text-sm font-medium text-[#25135c]">
           PDF образца лицензии
-          <input
-            type="file"
-            name="file"
-            accept="application/pdf,.pdf"
-            required
-            disabled={busy}
-            className={`${fieldClassName} mt-2`}
-          />
+          <input type="file" name="file" accept="application/pdf,.pdf" required disabled={busy} className={`${fieldClassName} mt-2`} />
         </label>
         <button type="submit" disabled={busy} className={secondaryButtonClassName}>
           {scope === 'catalog' ? 'Сохранить образец для каталога' : 'Сохранить образец для альбома'}
@@ -101,21 +93,136 @@ function LicenseUpload({
   );
 }
 
-export function CatalogLicensePanel({ catalogLicenseRef }: { catalogLicenseRef: string | null }) {
+function DefaultsFields({
+  value,
+  pending,
+  onChange,
+}: {
+  value: CatalogPassportDefaults;
+  pending: boolean;
+  onChange: (next: CatalogPassportDefaults) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="block text-sm font-medium text-[#25135c]">
+        Инструмент генерации
+        <input className={`${fieldClassName} mt-2`} value={value.generator_tool} disabled={pending} onChange={(event) => onChange({ ...value, generator_tool: event.target.value })} />
+      </label>
+      <label className="block text-sm font-medium text-[#25135c]">
+        Тариф генератора
+        <input className={`${fieldClassName} mt-2`} value={value.generator_plan} disabled={pending} onChange={(event) => onChange({ ...value, generator_plan: event.target.value })} />
+      </label>
+      <label className="block text-sm font-medium text-[#25135c]">
+        Вклад человека
+        <select className={`${fieldClassName} mt-2`} value={value.human_contribution} disabled={pending} onChange={(event) => onChange({ ...value, human_contribution: event.target.value === 'none' ? 'none' : 'human' })}>
+          <option value="human">Есть</option>
+          <option value="none">Нет</option>
+        </select>
+      </label>
+      <label className="block text-sm font-medium text-[#25135c]">
+        Описание вклада человека
+        <input className={`${fieldClassName} mt-2`} value={value.human_contribution_details} disabled={pending || value.human_contribution !== 'human'} onChange={(event) => onChange({ ...value, human_contribution_details: event.target.value })} />
+      </label>
+    </div>
+  );
+}
+
+async function fillTracks(tracks: Track[], reportLine: (line: string) => void): Promise<boolean> {
+  let allOk = true;
+  for (const track of tracks) {
+    if (track.passport?.status === 'approved' || track.passport?.status === 'revoked') {
+      reportLine(`${track.title}: пропущен, паспорт уже допущен или отозван.`);
+      continue;
+    }
+    const result = await autoFillPassportTrackAction(track.id);
+    allOk = allOk && result.ok;
+    const extra = [...result.errors, ...result.skipped].filter(Boolean);
+    reportLine(`${result.title || track.title}: ${result.message}${extra.length ? ` ${extra.join(' ')}` : ''}`);
+  }
+  return allOk;
+}
+
+export function CatalogSettingsPanel({
+  catalogLicenseRef,
+  catalogDefaults,
+  albums,
+}: {
+  catalogLicenseRef: string | null;
+  catalogDefaults: CatalogPassportDefaults;
+  albums: AlbumTools[];
+}) {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [fields, setFields] = useState(catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS);
+  const trackCount = albums.reduce((sum, album) => sum + album.tracks.length, 0);
+
   return (
-    <section className="rounded-[24px] border border-[#eadff8] bg-white p-5" data-catalog-license-panel="">
-      <h3 className="text-[18px] font-semibold text-[#25135c]">Образец лицензии каталога</h3>
-      <div className="mt-3">
+    <section className="rounded-[24px] border border-[#eadff8] bg-white p-5" data-catalog-license-panel="" data-catalog-settings-panel="">
+      <h3 className="text-[18px] font-semibold text-[#25135c]">Настройки каталога</h3>
+      <p className="mt-2 text-sm leading-6 text-[#5f5484]">
+        Инструмент, тариф и вклад человека задаются один раз для всего закрытого каталога. Их можно поменять здесь, если сменится тариф. Дата генерации берётся из даты загрузки мастер-файла, ссылку на историю MusicGPT указывать не нужно – в паспорт записывается нейтральная отсылка к истории аккаунта и названию трека.
+      </p>
+      <div className="mt-4">
         <LicenseUpload
           scope="catalog"
           licenseRef={catalogLicenseRef}
           pending={pending}
-          onDone={(nextOk, nextMessage) => start(() => { setOk(nextOk); setMessage(nextMessage); })}
+          onDone={(nextOk, nextMessage) => { setOk(nextOk); setMessage(nextMessage); }}
         />
       </div>
+      <div className="mt-5">
+        <DefaultsFields value={fields} pending={pending} onChange={setFields} />
+      </div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          className={secondaryButtonClassName}
+          onClick={() => start(async () => {
+            const result = await saveCatalogDefaultsAction('catalog', '', fields);
+            setOk(result.ok);
+            setMessage(result.message);
+            if (result.ok) router.refresh();
+          })}
+        >
+          Сохранить настройки каталога
+        </button>
+        <button
+          type="button"
+          disabled={pending || trackCount === 0}
+          className={primaryButtonClassName}
+          onClick={() => start(async () => {
+            const saved = await saveCatalogDefaultsAction('catalog', '', fields);
+            if (!saved.ok) {
+              setOk(false);
+              setMessage(saved.message);
+              return;
+            }
+            const lines: string[] = [];
+            let allOk = true;
+            for (const album of albums) {
+              const albumOk = await fillTracks(album.tracks, (line) => lines.push(line));
+              allOk = allOk && albumOk;
+            }
+            setOk(allOk);
+            setLogs(lines);
+            setMessage(allOk
+              ? 'Автоматическое заполнение всех закрытых альбомов завершено. Осталось указать Shazam у каждого трека и допустить паспорта.'
+              : 'Автоматическое заполнение завершено с ошибками.');
+            router.refresh();
+          })}
+        >
+          Заполнить автоматически все закрытые альбомы
+        </button>
+      </div>
+      {logs.length > 0 ? (
+        <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-[#5f5484]">
+          {logs.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      ) : null}
       <p
         role="status"
         className={message
@@ -135,15 +242,19 @@ export default function AlbumPassportTools({
   tracks,
   licenseRef,
   catalogLicenseRef,
+  catalogDefaults,
+  albumDefaults,
 }: {
   albumId: string;
   tracks: Track[];
   licenseRef: string | null;
   catalogLicenseRef: string | null;
+  catalogDefaults: CatalogPassportDefaults;
+  albumDefaults?: CatalogPassportDefaults | null;
 }) {
   const router = useRouter();
-  const initial = useMemo(() => firstDraftShared(tracks), [tracks]);
-  const [fields, setFields] = useState(initial);
+  const initialOverride = useMemo(() => albumDefaults ?? catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS, [albumDefaults, catalogDefaults]);
+  const [fields, setFields] = useState(initialOverride);
   const [pending, start] = useTransition();
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
@@ -159,87 +270,17 @@ export default function AlbumPassportTools({
 
   return (
     <div className="space-y-5 rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] p-4" data-album-passport-tools="">
-      <div>
-        <h4 className="text-sm font-semibold text-[#25135c]">Общие данные паспорта альбома</h4>
-        <p className="mt-2 text-sm leading-6 text-[#5f5484]">
-          Заполните один раз и примените ко всем черновикам треков этого альбома. Поля каждого трека после этого можно поправить отдельно. Дата генерации – одна дата, не диапазон. «ID или ссылка генерации» – ссылка или номер из истории MusicGPT, это не ID лицензии трека.
-        </p>
-      </div>
-      <LicenseUpload
-        scope="album"
-        albumId={albumId}
-        licenseRef={licenseRef}
-        catalogLicenseRef={catalogLicenseRef}
-        pending={pending}
-        onDone={(nextOk, nextMessage) => start(() => report(nextOk, nextMessage))}
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {ALBUM_SHARED_PASSPORT_FIELDS.map((field) => {
-          const label = ALBUM_SHARED_FIELD_LABELS[field];
-          if (field === 'human_contribution') {
-            return (
-              <label key={field} className="block text-sm font-medium text-[#25135c]">
-                {label}
-                <select
-                  className={`${fieldClassName} mt-2`}
-                  value={fields[field]}
-                  disabled={pending}
-                  onChange={(event) => setFields({ ...fields, [field]: event.target.value })}
-                >
-                  <option value="">Выберите</option>
-                  <option value="none">Нет</option>
-                  <option value="human">Есть</option>
-                </select>
-              </label>
-            );
-          }
-          return (
-            <label key={field} className="block text-sm font-medium text-[#25135c]">
-              {label}
-              <input
-                className={`${fieldClassName} mt-2`}
-                value={fields[field]}
-                disabled={pending}
-                placeholder={field.endsWith('_at') ? 'ГГГГ-ММ-ДДTЧЧ:ММ:СС+03:00' : field === 'terms_snapshot_ref' ? 'Можно оставить пустым – подставится образец лицензии' : undefined}
-                onChange={(event) => setFields({ ...fields, [field]: event.target.value })}
-              />
-              {field === 'terms_snapshot_ref' ? (
-                <span className="mt-1 block text-xs font-normal leading-5 text-[#7d70a2]">Если поле пустое, подставится закрытая ссылка на загруженный образец лицензии альбома или каталога.</span>
-              ) : null}
-            </label>
-          );
-        })}
-      </div>
+      <p className="text-sm leading-6 text-[#5f5484]">
+        Общие поля подставляются из настроек каталога, дата генерации – из даты загрузки мастера, ссылка на историю не нужна. Нажмите «Заполнить автоматически», затем у каждого трека укажите только результат Shazam и дату и нажмите «Допустить в Бизнес». Автоматического допуска нет.
+      </p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           disabled={pending || tracks.length === 0}
           className={secondaryButtonClassName}
           onClick={() => start(async () => {
-            const result = await applyAlbumSharedPassportAction(albumId, fields);
-            report(result.ok, result.message);
-            if (result.ok) router.refresh();
-          })}
-        >
-          Применить ко всем черновикам альбома
-        </button>
-        <button
-          type="button"
-          disabled={pending || tracks.length === 0}
-          className={secondaryButtonClassName}
-          onClick={() => start(async () => {
             const lines: string[] = [];
-            let allOk = true;
-            for (const track of tracks) {
-              if (track.passport?.status === 'approved' || track.passport?.status === 'revoked') {
-                lines.push(`${track.title}: пропущен, паспорт уже допущен или отозван.`);
-                continue;
-              }
-              const result = await autoFillPassportTrackAction(track.id);
-              allOk = allOk && result.ok;
-              const extra = [...result.errors, ...result.skipped].filter(Boolean);
-              lines.push(`${result.title || track.title}: ${result.message}${extra.length ? ` ${extra.join(' ')}` : ''}`);
-            }
+            const allOk = await fillTracks(tracks, (line) => lines.push(line));
             report(allOk, allOk ? 'Автоматическое заполнение завершено. Осталось указать Shazam и допустить треки вручную.' : 'Автоматическое заполнение завершено с ошибками.', lines);
             router.refresh();
           })}
@@ -267,13 +308,35 @@ export default function AlbumPassportTools({
           {confirmBulk ? 'Подтвердить допуск готовых' : 'Допустить все готовые'}
         </button>
       </div>
-      <p className="text-sm leading-6 text-[#5f5484]">
-        Автоматически считаются хеш мастера, хеш исходника, если он есть, аудиоотпечаток и AcoustID. Результат Shazam и дату проверки нужно указать вручную у каждого трека, затем нажать «Допустить в Бизнес». Автоматического допуска нет.
-      </p>
-      {isBusinessPassportLicenseRef(fields.terms_snapshot_ref) ? (
-        <p className="text-sm leading-6 text-[#5f5484]">
-          В условиях тарифа указан закрытый образец лицензии.
-        </p>
+      <details className="rounded-[18px] border border-[#e4d7f4] bg-white p-3">
+        <summary className="cursor-pointer text-sm font-medium text-[#25135c]">Изменить для этого альбома</summary>
+        <div className="mt-3 space-y-4">
+          <p className="text-sm leading-6 text-[#5f5484]">Если у этого альбома другой тариф или вклад человека, сохраните отдельные настройки. Они заменят каталожные только для этого альбома.</p>
+          <LicenseUpload
+            scope="album"
+            albumId={albumId}
+            licenseRef={licenseRef}
+            catalogLicenseRef={catalogLicenseRef}
+            pending={pending}
+            onDone={(nextOk, nextMessage) => start(() => report(nextOk, nextMessage))}
+          />
+          <DefaultsFields value={fields} pending={pending} onChange={setFields} />
+          <button
+            type="button"
+            disabled={pending}
+            className={secondaryButtonClassName}
+            onClick={() => start(async () => {
+              const result = await saveCatalogDefaultsAction('album', albumId, fields);
+              report(result.ok, result.message);
+              if (result.ok) router.refresh();
+            })}
+          >
+            Сохранить настройки альбома
+          </button>
+        </div>
+      </details>
+      {isBusinessPassportLicenseRef(licenseRef) || isBusinessPassportLicenseRef(catalogLicenseRef) ? (
+        <p className="text-sm leading-6 text-[#5f5484]">Условия тарифа заполняются закрытым образцом лицензии.</p>
       ) : null}
       {logs.length > 0 ? (
         <ul className="list-disc space-y-1 pl-5 text-sm text-[#5f5484]">

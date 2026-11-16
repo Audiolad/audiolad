@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClosedBusinessAlbum, saveBusinessPassport, verifyBusinessMaster, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
 import { applyAlbumSharedPassportFields, autoFillBusinessPassportTrack, approveReadyBusinessPassports } from '@/lib/business-track-passports/auto-fill.server';
-import { uploadBusinessPassportLicense } from '@/lib/business-track-passports/license.server';
+import { saveCatalogPassportDefaults, uploadBusinessPassportLicense } from '@/lib/business-track-passports/license.server';
 
 function fail(error: unknown) {
   return { ok: false as const, message: error instanceof Error ? error.message : 'Не удалось сохранить изменения.' };
@@ -80,6 +80,17 @@ export async function uploadPassportLicenseAction(formData: FormData) {
     const ref = await uploadBusinessPassportLicense(scope, file);
     revalidatePath('/admin/business-catalog');
     return { ok: true as const, message: 'Образец лицензии сохранён закрыто и может заполнять условия тарифа у всех треков.', ref };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function saveCatalogDefaultsAction(scopeValue: string, albumId: string, fields: Record<string, string>) {
+  try {
+    const scope = scopeValue === 'catalog' ? 'catalog' as const : { albumId };
+    const defaults = await saveCatalogPassportDefaults(scope, fields);
+    revalidatePath('/admin/business-catalog');
+    return { ok: true as const, message: scopeValue === 'catalog' ? 'Настройки каталога сохранены. Их можно поменять, если сменится тариф.' : 'Настройки этого альбома сохранены и будут использованы вместо каталожных.', defaults };
   } catch (error) {
     return fail(error);
   }
