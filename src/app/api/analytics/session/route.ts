@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPrefetchOrPrerenderRequest } from "@/lib/analytics/page-presence";
 import { parseSessionBody, checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
@@ -9,6 +10,11 @@ function getClientKey(request: Request, anonymousId: string): string {
 }
 
 export async function POST(request: Request) {
+  // t1508u: prefetch / prerender is not a visit. No session row, no visitor.
+  if (isPrefetchOrPrerenderRequest(request.headers)) {
+    return NextResponse.json({ session_id: null, skipped: "prefetch" }, { status: 200 });
+  }
+
   let body: unknown;
 
   try {

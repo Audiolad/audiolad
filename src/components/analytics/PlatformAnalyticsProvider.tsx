@@ -22,6 +22,7 @@ import {
   isSessionStateActive,
   readSessionState,
 } from "@/lib/analytics/session-state";
+import { whenDocumentPresentForAnalytics } from "@/lib/analytics/page-presence";
 import { extractReferrerDomain } from "@/lib/analytics/sources";
 
 export default function PlatformAnalyticsProvider({
@@ -95,18 +96,31 @@ export default function PlatformAnalyticsProvider({
       })();
     };
 
-    if (typeof window.requestIdleCallback === "function") {
-      const idleId = window.requestIdleCallback(runAnalytics, { timeout: 4000 });
-      return () => {
-        cancelled = true;
-        window.cancelIdleCallback(idleId);
-      };
-    }
+    let cancelScheduled: () => void = () => {};
+    const scheduleAnalytics = () => {
+      if (cancelled) {
+        return;
+      }
+      if (typeof window.requestIdleCallback === "function") {
+        const idleId = window.requestIdleCallback(runAnalytics, { timeout: 4000 });
+        cancelScheduled = () => window.cancelIdleCallback(idleId);
+        return;
+      }
+      const timeoutId = window.setTimeout(runAnalytics, 2000);
+      cancelScheduled = () => window.clearTimeout(timeoutId);
+    };
 
-    const timeoutId = window.setTimeout(runAnalytics, 2000);
+    // t1508u: prerendered or background-opened pages (search prefetch) must not
+    // open an analytics session until a person can see the page.
+    const cancelPresenceWait = whenDocumentPresentForAnalytics(
+      typeof document !== "undefined" ? document : null,
+      scheduleAnalytics,
+    );
+
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      cancelPresenceWait();
+      cancelScheduled();
     };
   }, [pathname]);
 
