@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { createClosedBusinessAlbum, saveBusinessPassport, verifyBusinessMaster, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
 import { applyAlbumSharedPassportFields, autoFillBusinessPassportTrack, approveReadyBusinessPassports } from '@/lib/business-track-passports/auto-fill.server';
 import { saveCatalogPassportDefaults, uploadBusinessPassportLicense } from '@/lib/business-track-passports/license.server';
+import { formatApprovalSummary, summarizeApproval } from '@/lib/business-track-passports/admission-ui';
 
 function fail(error: unknown) {
   return { ok: false as const, message: error instanceof Error ? error.message : 'Не удалось сохранить изменения.' };
@@ -60,15 +61,19 @@ export async function approveReadyPassportsAction(albumId: string) {
   try {
     const result = await approveReadyBusinessPassports(albumId);
     revalidatePath('/admin/business-catalog');
-    const errors = result.errors.length
-      ? ` Ошибки: ${result.errors.map((item) => `${item.title} – ${item.message}`).join(' ')}`
-      : '';
+    // t1490u: a persistent, grouped result instead of a message that disappears with the button.
+    const summary = summarizeApproval(result.tracks);
+    const { approvedLine, refusedLine } = formatApprovalSummary(summary);
+    const errorLines = result.errors.map((item) => `${item.title} – ${item.message}`);
     return {
-      ...result,
       ok: result.errors.length === 0,
-      message: result.approved === 0 && result.errors.length === 0
-        ? 'Нет готовых черновиков для допуска. Нужны заполненные поля, проверка хеша мастера и результат Shazam «совпадений нет».'
-        : `Допущено ${result.approved} паспорт(ов). Пропущено: ${result.skipped}.${errors}`,
+      approved: result.approved,
+      skipped: result.skipped,
+      summary,
+      approvedLine,
+      refusedLine,
+      errorLines,
+      message: refusedLine ? `${approvedLine} ${refusedLine}` : approvedLine,
     };
   } catch (error) {
     return fail(error);

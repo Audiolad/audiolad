@@ -25,6 +25,7 @@ import {
 import { findBusinessPassportLicense, loadCatalogPassportDefaults } from '@/lib/business-track-passports/license.server';
 import { saveBusinessPassport, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
 import { SHAZAM_QUEUED_MESSAGE, SHAZAM_QUEUE_UNAVAILABLE_MESSAGE } from '@/lib/business-track-passports/shazam';
+import { passportRefusalCodes, refusalCodeFromRpcError, type ApprovalTrackOutcome } from '@/lib/business-track-passports/admission-ui';
 
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -377,7 +378,15 @@ export async function applyAlbumSharedPassportFields(albumId: string, fields: Re
   return { ok: true, applied, skipped };
 }
 
-export async function approveReadyBusinessPassports(albumId: string): Promise<{ approved: number; skipped: number; errors: { title: string; message: string }[] }> {
+export type ApproveReadyResult = {
+  approved: number;
+  skipped: number;
+  errors: { title: string; message: string }[];
+  /** t1490u: per-track outcome with grouped refusal codes, for the result shown to the operator. */
+  tracks: ApprovalTrackOutcome[];
+};
+
+export async function approveReadyBusinessPassports(albumId: string): Promise<ApproveReadyResult> {
   await requireAdminPanelAccess();
   id(albumId);
   const db = createServiceRoleClient();
@@ -388,28 +397,49 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<{ 
   const { data: passports, error: passportsError } = await db.from('business_track_passports').select('*').eq('practice_id', albumId);
   if (passportsError) throw new Error('Не удалось загрузить паспорта.');
   const byTrack = new Map((passports ?? []).map((row) => [row.audio_item_id as string, row as Passport]));
+  // Read-only: which tracks still have a Shazam job in the queue. Only used to name the reason.
+  const trackIds = (tracks ?? []).map((track) => String(track.id));
+  const shazamActive = new Set<string>();
+  if (trackIds.length > 0) {
+    const { data: active, error: activeError } = await db.from('business_passport_shazam_checks')
+      .select('audio_item_id').in('audio_item_id', trackIds).in('status', ['pending', 'running']);
+    if (!activeError) for (const row of active ?? []) shazamActive.add(String(row.audio_item_id));
+  }
   let approved = 0;
   let skipped = 0;
   const errors: { title: string; message: string }[] = [];
+  const outcomes: ApprovalTrackOutcome[] = [];
   for (const track of tracks ?? []) {
     const passport = byTrack.get(track.id);
     const title = typeof track.title === 'string' ? track.title : track.id;
-    if (!passport || passport.status === 'approved' || passport.status === 'revoked') {
+    const trackId = String(track.id);
+    if (passport?.status === 'approved') {
       skipped += 1;
+      outcomes.push({ id: trackId, title, outcome: 'already_approved', reasons: [] });
+      continue;
+    }
+    if (!passport || passport.status === 'revoked') {
+      skipped += 1;
+      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: passportRefusalCodes(passport, shazamActive.has(trackId)) });
       continue;
     }
     const missing = passportMissing(passport);
     if (missing.length > 0) {
       skipped += 1;
+      const reasons = passportRefusalCodes(passport, shazamActive.has(trackId));
+      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: reasons.length ? reasons : ['fields'] });
       continue;
     }
     try {
       await decideBusinessPassport(track.id, 'approve');
       approved += 1;
+      outcomes.push({ id: trackId, title, outcome: 'approved', reasons: [] });
     } catch (error) {
-      errors.push({ title, message: error instanceof Error ? error.message : 'Не удалось допустить паспорт.' });
+      const message = error instanceof Error ? error.message : 'Не удалось допустить паспорт.';
+      const rpcCode = error instanceof Error && 'rpcCode' in error ? String((error as Error & { rpcCode?: unknown }).rpcCode ?? '') : '';
+      errors.push({ title, message });
+      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: [refusalCodeFromRpcError(rpcCode)], message });
     }
   }
-  return { approved, skipped, errors };
+  return { approved, skipped, errors, tracks: outcomes };
 }
-

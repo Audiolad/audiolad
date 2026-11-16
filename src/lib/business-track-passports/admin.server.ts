@@ -11,7 +11,7 @@ import type { ShazamCheckRow, ShazamGateFacts } from '@/lib/business-track-passp
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function id(value: string) { if (!UUID.test(value)) throw new Error('Некорректный идентификатор.'); }
-function rpcError(error: { message: string } | null) {
+function throwRpcError(error: { message: string } | null) {
   if (error) {
     const fields = error.message.match(/passport_missing_fields: (.+)/)?.[1];
     if (fields) throw new Error(`Заполните обязательные поля: ${fields.split(',').map((key) => PASSPORT_FIELDS[key as keyof typeof PASSPORT_FIELDS] ?? key).join(', ')}.`);
@@ -21,6 +21,16 @@ function rpcError(error: { message: string } | null) {
     if (error.message.includes('passport_shazam_match')) throw new Error('Shazam нашёл совпадение. Если это ложное срабатывание, проверьте трек вручную и укажите «Совпадений нет», затем допустите трек.');
     if (error.message.includes('passport_shazam_stale')) throw new Error('Результат Shazam относится к прежнему мастер-файлу. Дождитесь проверки нового мастера.');
     throw new Error('Операция не выполнена. Обновите страницу и проверьте поля паспорта.');
+  }
+}
+// t1490u: the raw RPC code stays on the thrown error (server-side only, never sent to the
+// browser) so the bulk approval can group refusals. Visible messages are unchanged.
+function rpcError(error: { message: string } | null) {
+  try {
+    throwRpcError(error);
+  } catch (thrown) {
+    if (thrown instanceof Error && error) Object.assign(thrown, { rpcCode: error.message });
+    throw thrown;
   }
 }
 // t1485u: per track, the facts admin_approve_business_track_passport uses, so the status line
