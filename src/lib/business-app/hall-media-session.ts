@@ -4,9 +4,11 @@
  *
  * `lockedAppleScreen()` tells the online player when to hand the next track over before the
  * end (spa-online-player.ts `backgroundAdvance`). `syncPlayerMediaSession()` keeps the page the
- * «Now Playing» owner of the lock screen: title, artist, cover, play / pause / next. Every call
- * is best effort: a browser without the Media Session API, or one that throws, changes nothing.
+ * «Now Playing» owner of the lock screen: title, album (in the artist field), cover, play /
+ * pause / next. Every call is best effort: a browser without the Media Session API, or one
+ * that throws, changes nothing.
  */
+import { cabinetAlbumLabel } from "./cabinet-track-label";
 import { isAppleTouchDevice, type FadeNavigator } from "./player-fade";
 
 type VisibilityDoc = { visibilityState?: string; hidden?: boolean } | null | undefined;
@@ -89,7 +91,7 @@ export function syncPlayerMediaSession(
 export function playerSessionState(input: {
   open: boolean;
   mirror: boolean;
-  track: { title: string; authorName?: string | null } | null;
+  track: { title: string; albumTitle?: string | null; authorName?: string | null } | null;
   artwork: string | null;
   status: string;
   pointDevice: boolean;
@@ -98,7 +100,7 @@ export function playerSessionState(input: {
   if (!input.open || input.mirror || !input.track) return null;
   return {
     title: input.track.title,
-    artist: input.track.authorName?.trim() || "",
+    artist: cabinetAlbumLabel(input.track),
     artwork: input.artwork,
     playing: input.status === "playing" || input.status === "loading",
     canNext: !input.pointDevice || input.pointCanEdit,

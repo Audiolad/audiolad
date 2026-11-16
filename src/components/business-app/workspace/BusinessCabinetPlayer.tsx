@@ -52,6 +52,7 @@ import {
 } from "@/lib/business-app/hall-auto-resume";
 import { prepareLoopAudio } from "@/lib/business-app/hall-loop-audio";
 import { HallWakeIntentTracker, HallWakeLock, type WakeLockNavigator } from "@/lib/business-app/hall-wake-lock";
+import { cabinetMiniBarTitle } from "@/lib/business-app/cabinet-track-label";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession, type PlayerSessionState, type SessionAction } from "@/lib/business-app/hall-media-session";
 import { startWakeTicker } from "@/lib/business-app/wake-ticker";
 import { HALL_MIRROR_PENDING_MS, HALL_MIRROR_POLL_MS, hallMirrorView, hallShownView, hallUpcomingSnapshot, parseHallNowPlaying, type HallNowPlaying, type HallPending } from "@/lib/business-app/hall-mirror";
@@ -1884,8 +1885,7 @@ export function BusinessCabinetPlayerProvider({
     ? async () => { await sendHall(shownView.status === "playing" ? "pause" : "resume"); }
     : toggle;
   const track = mirror ? (model?.tracks[mirror.index] ?? null) : (model?.tracks[view.index] ?? model?.tracks[playback.index] ?? null);
-  const author = track?.authorName?.trim() || "";
-  const nowTitle = track ? (author ? `${track.title} – ${author}` : track.title) : null;
+  const nowTitle = cabinetMiniBarTitle(track);
   const duration = shownView.duration > 0 ? shownView.duration : (track?.durationSeconds ?? 0);
   const playing = shownView.status === "playing" || shownView.status === "loading";
 
