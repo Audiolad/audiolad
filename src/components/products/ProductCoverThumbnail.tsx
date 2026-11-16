@@ -30,6 +30,11 @@ type ProductCoverThumbnailProps = {
   displayWidth?: number;
   variant?: ImageVariantKey;
   priority?: boolean;
+  /**
+   * t1504u: signed-preview route of a private («только Бизнес») cover, e.g.
+   * businessPrivateCoverPreviewUrl(). Used as-is, without the public manifest/srcset.
+   */
+  privateCoverSrc?: string | null;
 };
 
 function resolveCoverAlt({
@@ -65,10 +70,12 @@ export default function ProductCoverThumbnail({
   displayWidth = 168,
   variant,
   priority = false,
+  privateCoverSrc = null,
 }: ProductCoverThumbnailProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const resolvedUrl = useMemo(
     () =>
+      privateCoverSrc ||
       getProductCoverDisplayUrl(
         coverUrl,
         updatedAt,
@@ -76,11 +83,11 @@ export default function ProductCoverThumbnail({
         displayWidth,
         variant,
       ),
-    [coverImage, coverUrl, displayWidth, updatedAt, variant],
+    [coverImage, coverUrl, displayWidth, privateCoverSrc, updatedAt, variant],
   );
   const manifest = useMemo(
-    () => sanitizePublicImageManifest(coverImage),
-    [coverImage],
+    () => (privateCoverSrc ? null : sanitizePublicImageManifest(coverImage)),
+    [coverImage, privateCoverSrc],
   );
   const srcSet = useMemo(
     () =>
@@ -94,7 +101,7 @@ export default function ProductCoverThumbnail({
   const gradient = getProductCoverGradient(slug);
   const symbol = getProductCoverSymbol(slug);
   const alt = resolveCoverAlt({ title, authorName, format, coverAlt });
-  const placeholder = getProductCoverPlaceholder(coverImage);
+  const placeholder = privateCoverSrc ? null : getProductCoverPlaceholder(coverImage);
 
   if (showCover && resolvedUrl) {
     return (

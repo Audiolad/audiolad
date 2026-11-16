@@ -23,13 +23,22 @@ let serviceCalls = 0;
 let rpcFailure: { message: string } | null = null;
 const masterChanged = false;
 const calls: { name: string; args: Record<string, unknown> }[] = [];
+const createdAlbumId = '00000000-0000-0000-0000-000000000777';
+const existingAlbumId = '00000000-0000-0000-0000-000000000778';
+let recentAlbums: { id: string; title: string; created_at: string }[] = [];
+const recentLookups: unknown[][][] = [];
 const bytes = new TextEncoder().encode('human mastered file');
 const sha256 = createHash('sha256').update(bytes).digest('hex');
 const db = {
-  rpc: async (name: string, args: Record<string, unknown>) => { calls.push({ name, args }); return { data: 'album', error: rpcFailure }; },
+  rpc: async (name: string, args: Record<string, unknown>) => { calls.push({ name, args }); return { data: name === 'admin_create_business_album' ? createdAlbumId : 'album', error: rpcFailure }; },
   from(table: string) {
+    const filters: unknown[][] = [];
     const q = {
-      select() { return q; }, eq() { return q; },
+      select() { return q; }, eq(...args: unknown[]) { filters.push(['eq', ...args]); return q; },
+      // t1504u: recent same-title lookup before creating a closed album.
+      is(...args: unknown[]) { filters.push(['is', ...args]); return q; }, gte(...args: unknown[]) { filters.push(['gte', ...args]); return q; },
+      order() { return q; },
+      limit: async () => { recentLookups.push(filters); return { data: recentAlbums, error: null }; },
       single: async () => ({ error: null, data: table === 'audio_items' ? { practice_id: 'album', desired_music_master_asset_id: assetId }
         : table === 'practices' ? { business_only: true }
           : { id: masterChanged ? 'new-master' : assetId, storage_bucket: 'music-masters', storage_path: 'private/master.wav', size_bytes: bytes.length } }),
@@ -57,8 +66,26 @@ for (const operation of [() => server.createClosedBusinessAlbum(authorId, 'Ал�
 }
 admin = true;
 await assert.rejects(() => server.createClosedBusinessAlbum(assetId, 'Альбом'), /Нет доступа/);
-await server.createClosedBusinessAlbum(authorId, ' Альбом ');
+assert.deepEqual(await server.createClosedBusinessAlbum(authorId, ' Альбом '), { id: createdAlbumId, reused: false });
 assert.deepEqual(calls.at(-1), { name: 'admin_create_business_album', args: { p_author_id: authorId, p_title: 'Альбом' } });
+// t1504u: the duplicate lookup is scoped to this author's live closed albums.
+const lookup = recentLookups.at(-1)!;
+assert.deepEqual(lookup.slice(0, 3), [['eq', 'author_id', authorId], ['eq', 'business_only', true], ['is', 'deleted_at', null]]);
+assert.equal(lookup[3][0], 'gte'); assert.equal(lookup[3][1], 'created_at');
+// A repeated create of the same title (other case/spaces) opens the album created a minute ago – no second RPC.
+recentAlbums = [{ id: existingAlbumId, title: 'Утро  без СУЕТЫ', created_at: new Date(Date.now() - 60_000).toISOString() }];
+const rpcBefore = calls.length;
+assert.deepEqual(await server.createClosedBusinessAlbum(authorId, 'утро без суеты'), { id: existingAlbumId, reused: true });
+assert.equal(calls.length, rpcBefore);
+// Another title still creates a new album.
+assert.deepEqual(await server.createClosedBusinessAlbum(authorId, 'Вечер без суеты'), { id: createdAlbumId, reused: false });
+recentAlbums = [];
+// RPC refusals become clear Russian messages.
+rpcFailure = { message: 'author_not_manageable' };
+await assert.rejects(() => server.createClosedBusinessAlbum(authorId, 'Альбом'), /Нет доступа к автору/);
+rpcFailure = { message: 'boom' };
+await assert.rejects(() => server.createClosedBusinessAlbum(authorId, 'Альбом'), /Не удалось создать альбом/);
+rpcFailure = null;
 await server.saveBusinessPassport(audioId, { al_code: 'AL-T-123', stored_master_sha256: sha256, stored_master_sha256_verified_at: 'fake', status: 'approved', approved_by: adminId });
 assert.equal((calls.at(-1)!.args.p_fields as Record<string, unknown>).al_code, 'AL-T-123');
 for (const key of ['stored_master_sha256', 'stored_master_sha256_verified_at', 'status', 'approved_by']) assert.ok(!(key in (calls.at(-1)!.args.p_fields as object)));
@@ -121,7 +148,7 @@ const closedMarkup = renderToStaticMarkup(createElement(FormActions, { ...action
 assert.doesNotMatch(closedMarkup, /Предпросмотр|Открыть публичную карточку/);
 assert.match(closedMarkup, /Опубликовать/);
 assert.match(renderToStaticMarkup(createElement(FormActions, actionProps)), /Предпросмотр/);
-mock('next/navigation', { useRouter: () => ({ refresh() {} }) });
+mock('next/navigation', { useRouter: () => ({ refresh() {}, push() {} }) });
 const catalogForm = require('../src/app/(platform)/admin/business-catalog/PassportForm.tsx') as typeof import('../src/app/(platform)/admin/business-catalog/PassportForm');
 const createHtml = renderToStaticMarkup(createElement(catalogForm.CreateClosedAlbum, { authors: [{ id: authorId, name: 'Аурафон' }] }));
 assert.match(createHtml, /name="author_id"/);
@@ -133,6 +160,7 @@ assert.match(createHtml, /rounded-full bg-\[#7042c5\]/);
 assert.match(createHtml, /w-full rounded-\[18px\] border border-\[#e4d7f4\]/);
 assert.match(createHtml, /Аурафон/);
 assert.doesNotMatch(createHtml, /Для загрузки нужен доступ владельца или редактора к автору/);
+assert.match(createHtml, /откроется альбом в кабинете автора/);
 const emptyCreate = renderToStaticMarkup(createElement(catalogForm.CreateClosedAlbum, { authors: [] }));
 assert.match(emptyCreate, /Для загрузки нужен доступ владельца или редактора к автору/);
 const pageSrc = read('src/app/(platform)/admin/business-catalog/page.tsx');

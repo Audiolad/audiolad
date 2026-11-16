@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatProductDate, productFirstPublicationAt } from "@/lib/products/publication-dates";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { authorProductListPrivateCoverSrc } from "@/lib/business-covers/private-cover";
 import { useEffect, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
@@ -167,6 +168,7 @@ function ProductCard({
           coverUrl={product.cover_url}
           coverImage={product.cover_image}
           updatedAt={product.updated_at}
+          privateCoverSrc={authorProductListPrivateCoverSrc(product)}
           displayWidth={96}
           className="h-24 w-24 shrink-0 rounded-[18px]"
         />
