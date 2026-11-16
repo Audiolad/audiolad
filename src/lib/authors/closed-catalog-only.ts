@@ -109,3 +109,17 @@ export function shouldHideOpenCatalogAlbumFields(
 ): boolean {
   return isClosedCatalogOnlyAuthor(closedCatalogOnly);
 }
+
+/**
+ * Closed-catalog albums end on step 2, so the usual step-nav CTA
+ * («Сохранить и продолжить») is hidden. The music passport still belongs
+ * on that last step: show create / retry / «Создаём…», but never labels
+ * that advance to the removed step 3 («Перейти к оформлению»,
+ * «Продолжить – паспорт создаётся в фоне»).
+ */
+export function shouldShowPassportCreateOnLastWizardStep(activity: {
+  kind: string;
+  continueInBackground: boolean;
+}): boolean {
+  return activity.kind !== "completed" && !activity.continueInBackground;
+}
