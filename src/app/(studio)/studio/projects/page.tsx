@@ -5,13 +5,14 @@ import { StudioBrand } from "@/components/studio/StudioBrand";
 import { StudioChromeNav } from "@/components/studio/StudioChromeNav";
 import { StudioProjectLibrary } from "@/components/studio/StudioProjectLibrary";
 import { requireStudioEditorAccess } from "@/lib/studio/guest-access";
+import { resolveStudioHomeAuthorId } from "@/lib/studio/server/home-workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudioProjectsPage() {
   const actor = await requireStudioEditorAccess("/studio/projects");
   const accessMode = actor.kind;
-  const authorId = actor.kind === "author" ? actor.workspaces[0].id : undefined;
+  const authorId = await resolveStudioHomeAuthorId(actor);
 
   return (
     <main className="min-h-dvh bg-[#160d2d] px-5 py-6 text-white sm:px-8 sm:py-8">
