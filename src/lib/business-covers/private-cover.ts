@@ -5,16 +5,19 @@
  * storage policies). The database stores a reference, never a URL:
  *   business-private-cover:practices/<practiceId>/variants/<version>/<file>
  *   business-private-cover:practices/<practiceId>/track-covers/<audioItemId>/variants/<version>/<file>
- * Public renderers treat a reference as "no cover". Only the authorised hall/owner
- * workspace (and the album's editors) get a short-lived signed URL from the server.
+ * Public renderers treat a reference as "no cover". The authorised hall/owner
+ * player loads the image through a same-origin route (session re-checked, then
+ * the file is streamed). Album editors still get a short-lived signed URL.
  * Pure module: safe for client components.
  */
 export const BUSINESS_PRIVATE_COVERS_BUCKET = "business-private-covers";
 export const BUSINESS_PRIVATE_COVER_REF_PREFIX = "business-private-cover:";
-/** Signed URL lifetime for hall/owner covers and editor previews. */
+/** Signed URL lifetime for editor previews of private covers. */
 export const BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS = 120;
-/** Browser may reuse the redirect for less than the signed URL lifetime. */
+/** Browser may reuse a preview redirect for less than the signed URL lifetime. */
 export const BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS = 60;
+/** Private browser/MediaSession cache for the hall/owner cover proxy. Covers a long playback session. */
+export const BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS = 6 * 60 * 60;
 export const BUSINESS_WORKSPACE_COVER_ROUTE = "/api/business/workspace/cover";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";

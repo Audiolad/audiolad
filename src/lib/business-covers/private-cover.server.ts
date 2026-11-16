@@ -16,6 +16,14 @@ import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 type StorageOwner = Pick<SupabaseClient, "storage">;
 
+function coverContentType(path: string, declared: string | null | undefined): string {
+  if (declared && declared !== "application/octet-stream") return declared;
+  if (/\.webp$/i.test(path)) return "image/webp";
+  if (/\.png$/i.test(path)) return "image/png";
+  if (/\.jpe?g$/i.test(path)) return "image/jpeg";
+  return "application/octet-stream";
+}
+
 /**
  * Uploads a business-only cover into the PRIVATE bucket (service role only).
  * Nothing is written to the public practice-covers bucket.
@@ -88,4 +96,26 @@ export async function signBusinessPrivateCover(
     .createSignedUrl(parsed.path, BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) return null;
   return normalizeStorageSignedUrl(data.signedUrl);
+}
+
+/**
+ * Private cover bytes for the hall/owner player. Callers must already have
+ * authorised the session. Streams the file so playback does not depend on a
+ * short-lived signed URL.
+ */
+export async function readBusinessPrivateCover(
+  storage: StorageOwner,
+  coverRef: string | null | undefined,
+  expected: { practiceId: string; audioItemId?: string | null },
+): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const parsed = parseBusinessPrivateCoverRef(coverRef);
+  if (!parsed || parsed.practiceId !== expected.practiceId.toLowerCase()) return null;
+  if ((parsed.audioItemId ?? null) !== (expected.audioItemId?.toLowerCase() ?? null)) return null;
+  const { data, error } = await storage.storage
+    .from(BUSINESS_PRIVATE_COVERS_BUCKET)
+    .download(parsed.path);
+  if (error || !data) return null;
+  const body = new Uint8Array(await data.arrayBuffer());
+  if (body.byteLength === 0) return null;
+  return { body, contentType: coverContentType(parsed.path, data.type) };
 }

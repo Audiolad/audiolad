@@ -4,8 +4,8 @@ import { businessWorkspaceCoverUrl, isBusinessPrivateCoverRef } from "@/lib/busi
 /**
  * 39a7ef48 PR-D: cover source of a workspace (hall/owner) track.
  * Business-only albums keep a private cover reference: the player gets a token-free
- * app URL that re-checks the hall/owner session and redirects to a short-lived signed
- * URL. Ordinary albums keep their public catalog cover exactly as before.
+ * app URL that re-checks the hall/owner session and streams the private cover.
+ * Ordinary albums keep their public catalog cover exactly as before.
  */
 export function workspaceTrackCoverUrl(
   practice: {

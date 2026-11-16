@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
-  BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS,
+  BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS,
   isBusinessPrivateCoverRef,
 } from "@/lib/business-covers/private-cover";
-import { signBusinessPrivateCover } from "@/lib/business-covers/private-cover.server";
+import { readBusinessPrivateCover } from "@/lib/business-covers/private-cover.server";
 import { loadWorkspaceActor, loadWorkspaceAllowedIds } from "@/lib/business-workspace/load.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -17,11 +17,12 @@ function notFound() {
 }
 
 /**
- * 39a7ef48 PR-D: cover of a business-only album for the hall/owner player.
+ * Cover of a business-only album for the hall/owner player.
  * Same session and catalog checks as the signed stream URL (track-url): the
  * actor must have an open player and the track must be in its allowed list.
- * Redirects to a short-lived signed URL of the private bucket. Everything else
- * (ordinary albums, public covers, no session) gets 404.
+ * Returns the image bytes (not a short-lived signed URL), so MediaSession and
+ * hours-long playback keep the cover after a signature would have expired.
+ * Ordinary albums, missing covers and sessions without access get 404.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -55,10 +56,14 @@ export async function GET(request: Request) {
   if (error || !row?.practice_id || practice?.business_only !== true || !isBusinessPrivateCoverRef(practice.cover_url)) {
     return notFound();
   }
-  const signed = await signBusinessPrivateCover(db, practice.cover_url, { practiceId: row.practice_id });
-  if (!signed) return notFound();
-  return NextResponse.redirect(signed, {
-    status: 302,
-    headers: { "Cache-Control": `private, max-age=${BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS}` },
+  const file = await readBusinessPrivateCover(db, practice.cover_url, { practiceId: row.practice_id });
+  if (!file) return notFound();
+  return new NextResponse(Buffer.from(file.body), {
+    status: 200,
+    headers: {
+      "Content-Type": file.contentType,
+      "Cache-Control": `private, max-age=${BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS}`,
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
