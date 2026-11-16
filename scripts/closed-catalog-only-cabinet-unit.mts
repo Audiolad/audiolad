@@ -5,8 +5,6 @@
 import assert from 'node:assert/strict';
 import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import {
   CLOSED_CATALOG_ONLY_CREATE_BLOCKED,
   CLOSED_CATALOG_ONLY_TOGGLE_ROUTE,
@@ -121,7 +119,7 @@ try {
 
 // 6. Admin toggle route: stable JSON API, owner with admin panel access can switch the flag.
 const updates: { id: string; enabled: boolean }[] = [];
-let adminOk = true;
+const adminOk = true;
 mock('../src/lib/admin/guard.ts', {
   requireAdminPanelAccess: async () => {
     if (!adminOk) throw new Error('Нужен доступ администратора.');
@@ -187,7 +185,7 @@ assert.doesNotMatch(newPage.slice(newPage.indexOf('isClosedCatalogOnlyAuthor(ini
 const form = read('src/components/author-dashboard/AuthorProductForm.tsx');
 assert.match(form, /showWizardStep\(3\) && !hideOpenCatalogFields/);
 assert.match(form, /steps=\{visibleWizardSteps\}/);
-assert.match(form, /wizardStep === lastWizardStep/);
+assert.match(form, /wizardStepVisible === lastWizardStep/);
 assert.match(form, /!hideOpenCatalogFields/);
 assert.doesNotMatch(form, /nextProductWizardStep\(wizardStep\)/);
 

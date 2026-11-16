@@ -1467,6 +1467,10 @@ export default function AuthorProductForm({
   const hideOpenCatalogFields = shouldHideOpenCatalogAlbumFields(closedCatalogOnly);
   const visibleWizardSteps = visibleProductWizardSteps(closedCatalogOnly);
   const lastWizardStep = lastVisibleProductWizardStep(closedCatalogOnly);
+  const wizardStepVisible = clampProductWizardStep(wizardStep, closedCatalogOnly);
+  if (wizardStepVisible !== wizardStep) {
+    setWizardStep(wizardStepVisible);
+  }
   const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
   const canConfigureStudioMusic = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
@@ -1510,7 +1514,7 @@ export default function AuthorProductForm({
   const showWizardStep = (step: ProductWizardStep) =>
     shouldShowProductWizardStep({
       wizardEnabled,
-      activeStep: wizardStep,
+      activeStep: wizardStepVisible,
       step,
     });
 
@@ -1678,7 +1682,7 @@ export default function AuthorProductForm({
     if (mode === "create" && typeof window !== "undefined") {
       const nextPath = wizardEnabled
         ? buildAuthorProductEditPath(created.practice.id, {
-            step: wizardStep,
+            step: wizardStepVisible,
             preserveSearch: window.location.search,
             includeStep: true,
           })
@@ -2106,7 +2110,7 @@ export default function AuthorProductForm({
       const step = productFieldWizardStep(
         studioMusicPrice && !studioMusicPrice.ok ? "studioMusicPrice" : "price",
       );
-      if (wizardEnabled && step !== null && step !== wizardStep) {
+      if (wizardEnabled && step !== null && step !== wizardStepVisible) {
         goToWizardStep(step);
       }
       requestScrollToFirstSubmitIssue();
@@ -2143,7 +2147,7 @@ export default function AuthorProductForm({
         setFieldErrors({ formatCustom: formatCustomError });
         setBusy(false);
         const step = productFieldWizardStep("formatCustom");
-        if (wizardEnabled && step !== null && step !== wizardStep) {
+        if (wizardEnabled && step !== null && step !== wizardStepVisible) {
           goToWizardStep(step);
         }
         requestScrollToFirstSubmitIssue();
@@ -2162,7 +2166,7 @@ export default function AuthorProductForm({
       if (!promoCheck.ok) {
         setPromoError(promoCheck.message);
         setBusy(false);
-        if (wizardEnabled && wizardStep !== PROMO_RECOMMENDATION_WIZARD_STEP) {
+        if (wizardEnabled && wizardStepVisible !== PROMO_RECOMMENDATION_WIZARD_STEP) {
           goToWizardStep(PROMO_RECOMMENDATION_WIZARD_STEP);
         }
         requestScrollToFirstSubmitIssue();
@@ -2234,7 +2238,7 @@ export default function AuthorProductForm({
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             const step = productFieldWizardStep(fieldKey);
-            if (wizardEnabled && step !== null && step !== wizardStep) {
+            if (wizardEnabled && step !== null && step !== wizardStepVisible) {
               goToWizardStep(step);
             }
             requestScrollToFirstSubmitIssue();
@@ -2256,7 +2260,7 @@ export default function AuthorProductForm({
 
         if (isPromoRecommendationErrorCode(payload.error)) {
           setPromoError(saveErrorMessage);
-          if (wizardEnabled && wizardStep !== PROMO_RECOMMENDATION_WIZARD_STEP) {
+          if (wizardEnabled && wizardStepVisible !== PROMO_RECOMMENDATION_WIZARD_STEP) {
             goToWizardStep(PROMO_RECOMMENDATION_WIZARD_STEP);
           }
           requestScrollToFirstSubmitIssue();
@@ -3847,13 +3851,6 @@ export default function AuthorProductForm({
     window.history.replaceState(null, "", nextHref);
   }
 
-  useEffect(() => {
-    const clamped = clampProductWizardStep(wizardStep, closedCatalogOnly);
-    if (clamped !== wizardStep) {
-      goToWizardStep(clamped);
-    }
-  }, [closedCatalogOnly, wizardStep]);
-
   function canJumpToWizardStep(step: ProductWizardStep) {
     if (!wizardEnabled) {
       return false;
@@ -3861,11 +3858,11 @@ export default function AuthorProductForm({
     if (!visibleWizardSteps.some((item) => item.step === step)) {
       return false;
     }
-    if (step === wizardStep) {
+    if (step === wizardStepVisible) {
       return true;
     }
     // Back always; forward only after a draft id exists (saved product).
-    if (step < wizardStep) {
+    if (step < wizardStepVisible) {
       return true;
     }
     return Boolean(practiceIdRef.current || practiceId);
@@ -3927,12 +3924,12 @@ export default function AuthorProductForm({
 
   async function saveWizardStep() {
     await saveDraft();
-    if (musicProductWizard && wizardStep === 1) {
+    if (musicProductWizard && wizardStepVisible === 1) {
       if (applyMusicAuthorFieldError()) {
         requestScrollToFirstSubmitIssue();
       }
     }
-    if (musicProductWizard && wizardStep === 2) {
+    if (musicProductWizard && wizardStepVisible === 2) {
       if (applyMusicTrackTitleErrors()) {
         requestScrollToFirstSubmitIssue();
       }
@@ -3951,7 +3948,7 @@ export default function AuthorProductForm({
     setError(null);
     setMessage(null);
     const creatingPassport = jazzRelaxMusicPassport
-      && wizardStep === 2
+      && wizardStepVisible === 2
       && passportPhase !== "completed"
       && !passportActivity.continueInBackground;
     if (creatingPassport) {
@@ -3965,13 +3962,13 @@ export default function AuthorProductForm({
         return;
       }
 
-      if (musicProductWizard && wizardStep === 1) {
+      if (musicProductWizard && wizardStepVisible === 1) {
         if (applyMusicAuthorFieldError()) {
           requestScrollToFirstSubmitIssue();
           return;
         }
       }
-      if (musicProductWizard && wizardStep === 2) {
+      if (musicProductWizard && wizardStepVisible === 2) {
         if (applyMusicTrackTitleErrors()) {
           setMessage(null);
           setError(MUSIC_TRACK_TITLE_CYRILLIC_ERROR);
@@ -3984,10 +3981,10 @@ export default function AuthorProductForm({
 
       if (
         jazzRelaxMusicPassport
-        && wizardStep === 2
+        && wizardStepVisible === 2
         && (passportPhase === "completed" || passportActivity.continueInBackground)
       ) {
-        const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
+        const next = nextVisibleProductWizardStep(wizardStepVisible, closedCatalogOnly);
         if (next) {
           goToWizardStep(next);
         }
@@ -4001,7 +3998,7 @@ export default function AuthorProductForm({
         return;
       }
 
-      const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
+      const next = nextVisibleProductWizardStep(wizardStepVisible, closedCatalogOnly);
       if (next) {
         goToWizardStep(next);
       }
@@ -4012,7 +4009,7 @@ export default function AuthorProductForm({
   }
 
   function goWizardBack() {
-    const prev = previousVisibleProductWizardStep(wizardStep, closedCatalogOnly);
+    const prev = previousVisibleProductWizardStep(wizardStepVisible, closedCatalogOnly);
     if (prev) {
       goToWizardStep(prev);
     }
@@ -4026,11 +4023,11 @@ export default function AuthorProductForm({
       return;
     }
     setMessage("Черновик сохранён.");
-    if (musicProductWizard && wizardStep === 2 && applyMusicTrackTitleErrors()) {
+    if (musicProductWizard && wizardStepVisible === 2 && applyMusicTrackTitleErrors()) {
       requestScrollToFirstSubmitIssue();
       return;
     }
-    const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
+    const next = nextVisibleProductWizardStep(wizardStepVisible, closedCatalogOnly);
     if (next) {
       goToWizardStep(next);
     }
@@ -4053,7 +4050,7 @@ export default function AuthorProductForm({
 
       {wizardEnabled ? (
         <AuthorProductWizardStepper
-          activeStep={wizardStep}
+          activeStep={wizardStepVisible}
           onSelectStep={goToWizardStep}
           canJumpToStep={canJumpToWizardStep}
           steps={visibleWizardSteps}
@@ -4062,13 +4059,13 @@ export default function AuthorProductForm({
 
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {!wizardEnabled || wizardStep === 1 ? (
+          {!wizardEnabled || wizardStepVisible === 1 ? (
             <h2 className="text-[20px] font-semibold">Основная информация</h2>
           ) : (
             <h2 className="text-[20px] font-semibold">
-              {wizardStep === 2
+              {wizardStepVisible === 2
                 ? "Материалы"
-                : wizardStep === 3
+                : wizardStepVisible === 3
                   ? "Описание и продвижение"
                   : "Условия и публикация"}
             </h2>
@@ -4672,14 +4669,14 @@ export default function AuthorProductForm({
 
 <div
         className={
-          musicProductWizard && wizardStep === 4
+          musicProductWizard && wizardStepVisible === 4
             ? "flex flex-col gap-6"
             : "contents"
         }
       >
         <div
           className={
-            musicProductWizard && wizardStep === 4 ? "order-2" : undefined
+            musicProductWizard && wizardStepVisible === 4 ? "order-2" : undefined
           }
         >
 {showWizardStep(4) ? (
@@ -5090,7 +5087,7 @@ export default function AuthorProductForm({
 
         <div
           className={
-            musicProductWizard && wizardStep === 4 ? "order-1" : undefined
+            musicProductWizard && wizardStepVisible === 4 ? "order-1" : undefined
           }
         >
 {showWizardStep(4) ? (
@@ -5307,7 +5304,7 @@ export default function AuthorProductForm({
         </div>
         <div
           className={
-            musicProductWizard && wizardStep === 4 ? "order-3" : undefined
+            musicProductWizard && wizardStepVisible === 4 ? "order-3" : undefined
           }
         >
 {showWizardStep(4) ? (
@@ -6211,7 +6208,7 @@ export default function AuthorProductForm({
       ) : null}
 
       {jazzRelaxMusicPassport && practiceId ? (
-        <div className={wizardStep === 2 ? undefined : "hidden"}>
+        <div className={wizardStepVisible === 2 ? undefined : "hidden"}>
           <JazzRelaxMusicPassportPanel
             practiceId={practiceId}
             command={passportCommand}
@@ -6224,35 +6221,35 @@ export default function AuthorProductForm({
         </div>
       ) : null}
 
-      {jazzRelaxMusicPassport && wizardStep === 2 ? (
+      {jazzRelaxMusicPassport && wizardStepVisible === 2 ? (
         <JazzRelaxPassportActivityNotice activity={passportActivity} live />
       ) : null}
 
-      {jazzRelaxMusicPassport && wizardStep === 2 ? <JazzRelaxPassportHelp /> : null}
+      {jazzRelaxMusicPassport && wizardStepVisible === 2 ? <JazzRelaxPassportHelp /> : null}
 
-      {wizardEnabled && wizardStep < lastWizardStep ? (
+      {wizardEnabled && wizardStepVisible < lastWizardStep ? (
         <AuthorProductWizardStepNav
-          showBack={wizardStep > 1}
+          showBack={wizardStepVisible > 1}
           showContinue
           busy={busy}
           continueLabel={
-            jazzRelaxMusicPassport && wizardStep === 2
+            jazzRelaxMusicPassport && wizardStepVisible === 2
               ? passportActivity.buttonLabel
               : undefined
           }
           continueDisabled={
-            jazzRelaxMusicPassport && wizardStep === 2 && passportActivity.buttonDisabled
+            jazzRelaxMusicPassport && wizardStepVisible === 2 && passportActivity.buttonDisabled
           }
           continueBusy={
-            jazzRelaxMusicPassport && wizardStep === 2 && passportActivity.ariaBusy
+            jazzRelaxMusicPassport && wizardStepVisible === 2 && passportActivity.ariaBusy
           }
           secondaryContinueLabel={
-            jazzRelaxMusicPassport && wizardStep === 2
+            jazzRelaxMusicPassport && wizardStepVisible === 2
               ? "Продолжить без музыкального паспорта"
               : undefined
           }
           onSecondaryContinue={
-            jazzRelaxMusicPassport && wizardStep === 2
+            jazzRelaxMusicPassport && wizardStepVisible === 2
               ? () => void continueWithoutMusicPassport()
               : undefined
           }
@@ -6266,7 +6263,7 @@ export default function AuthorProductForm({
         />
       ) : null}
 
-      {wizardEnabled && wizardStep === lastWizardStep ? (
+      {wizardEnabled && wizardStepVisible === lastWizardStep ? (
         <div className="flex flex-col gap-3">
           <button
             type="button"
