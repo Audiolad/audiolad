@@ -6,6 +6,7 @@ import {
 } from '@/lib/business-admission/published-catalog';
 import type { Passport } from '@/lib/business-track-passports/model';
 import PassportForm from './PassportForm';
+import AlbumPassportTools, { CatalogLicensePanel } from './AlbumPassportTools';
 
 const editLinkClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]';
@@ -19,6 +20,7 @@ type ClosedAlbum = {
   cover_url?: string | null;
   cover_image?: unknown;
   updated_at?: string | null;
+  licenseRef?: string | null;
   tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport }[];
 };
 
@@ -42,7 +44,7 @@ function trackStatusClassName(status: string | undefined) {
   return 'rounded-full bg-[#f4eefe] px-2.5 py-0.5 text-xs font-semibold text-[#7042c5]';
 }
 
-function AlbumCard({ album }: { album: ClosedAlbum }) {
+function AlbumCard({ album, catalogLicenseRef }: { album: ClosedAlbum; catalogLicenseRef: string | null }) {
   const approved = album.tracks.filter((track) => track.passport?.status === 'approved').length;
   const coverUrl = publishedBusinessCoverUrl({
     id: album.id,
@@ -86,6 +88,14 @@ function AlbumCard({ album }: { album: ClosedAlbum }) {
         <Link href={publishedBusinessEditHref(album.id, true)} className={editLinkClassName}>Открыть альбом</Link>
       </div>
       {album.tracks.length > 0 ? (
+        <AlbumPassportTools
+          albumId={album.id}
+          tracks={album.tracks}
+          licenseRef={album.licenseRef ?? null}
+          catalogLicenseRef={catalogLicenseRef}
+        />
+      ) : null}
+      {album.tracks.length > 0 ? (
         <details className="rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] p-3">
           <summary className="cursor-pointer text-sm font-medium text-[#25135c]">Треки</summary>
           <div className="mt-3 space-y-3">
@@ -112,21 +122,22 @@ function AlbumCard({ album }: { album: ClosedAlbum }) {
   );
 }
 
-export default function ClosedAlbumWork({ albums }: { albums: ClosedAlbum[] }) {
+export default function ClosedAlbumWork({ albums, catalogLicenseRef = null }: { albums: ClosedAlbum[]; catalogLicenseRef?: string | null }) {
   return (
     <section className="space-y-4" data-closed-album-work="">
       <div>
         <h2 className="text-[20px] font-semibold text-[#25135c]">Работа с закрытыми альбомами</h2>
         <p className="mt-2 max-w-[760px] text-sm leading-6 text-[#5f5484]">
-          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Нужно открыть «Треки», заполнить доказательства, сохранить черновик, нажать «Проверить хеш сохранённого мастера» и затем «Допустить в Бизнес».
+          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Общие поля и образец лицензии заполняются один раз на альбом, хеши и AcoustID можно посчитать кнопкой «Заполнить автоматически», затем в каждом треке указать результат Shazam и нажать «Допустить в Бизнес».
         </p>
       </div>
+      <CatalogLicensePanel catalogLicenseRef={catalogLicenseRef} />
       {albums.length === 0 ? (
         <p className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm leading-6 text-[#7d70a2]">
           Пока нет закрытых альбомов.
         </p>
       ) : (
-        <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} />)}</div>
+        <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} catalogLicenseRef={catalogLicenseRef} />)}</div>
       )}
     </section>
   );
