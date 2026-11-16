@@ -6,7 +6,6 @@ import {
 } from '@/lib/business-admission/published-catalog';
 import type { Passport } from '@/lib/business-track-passports/model';
 import type { CatalogPassportDefaults } from '@/lib/business-track-passports/shared';
-import { DEFAULT_CATALOG_PASSPORT_DEFAULTS } from '@/lib/business-track-passports/shared';
 import PassportForm from './PassportForm';
 import AlbumPassportTools, { CatalogSettingsPanel } from './AlbumPassportTools';
 import ShazamAutoStatus, { ShazamAutoBadge } from './ShazamAutoStatus';
@@ -139,7 +138,7 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
   );
 }
 
-export default function ClosedAlbumWork({ albums, catalogLicenseRef = null, catalogDefaults = DEFAULT_CATALOG_PASSPORT_DEFAULTS }: { albums: ClosedAlbum[]; catalogLicenseRef?: string | null; catalogDefaults?: CatalogPassportDefaults }) {
+export default function ClosedAlbumWork({ albums, catalogLicenseRef = null, catalogDefaults }: { albums: ClosedAlbum[]; catalogLicenseRef?: string | null; catalogDefaults: CatalogPassportDefaults }) {
   return (
     <section className="space-y-4" data-closed-album-work="">
       <div>

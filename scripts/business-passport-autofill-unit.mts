@@ -22,7 +22,10 @@ import {
   parseFpcalcJson,
   pickAlbumSharedPassport,
   wrapCatalogDefaultsPdf,
+  albumFormPassportDefaults,
+  resolveCatalogPassportDefaults,
   DEFAULT_CATALOG_PASSPORT_DEFAULTS,
+  HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER,
 } from '../src/lib/business-track-passports/shared';
 import { passportMissing } from '../src/lib/business-track-passports/model';
 
@@ -148,11 +151,46 @@ assert.doesNotMatch(autoFill, /https:\/\/musicgpt/);
 const defaults = parseCatalogPassportDefaults({});
 assert.equal(defaults.generator_tool, 'MusicGPT');
 assert.equal(defaults.generator_plan, 'Pro');
-assert.equal(defaults.human_contribution, 'human');
+assert.equal(defaults.human_contribution, 'none');
+assert.equal(defaults.human_contribution_details, '');
+assert.equal(DEFAULT_CATALOG_PASSPORT_DEFAULTS.human_contribution, 'none');
+assert.equal(DEFAULT_CATALOG_PASSPORT_DEFAULTS.human_contribution_details, '');
+assert.doesNotMatch(DEFAULT_CATALOG_PASSPORT_DEFAULTS.human_contribution_details, /выбирает|мастерит|вклад человека/);
+assert.doesNotMatch(HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER, /выбирает|мастерит|Человек выбирает/);
+assert.match(HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER, /только если вклад человека есть/i);
+
 const wrapped = wrapCatalogDefaultsPdf(DEFAULT_CATALOG_PASSPORT_DEFAULTS);
 assert.ok(Buffer.from(wrapped).toString('utf8').startsWith('%PDF-'));
 assert.deepEqual(parseCatalogDefaultsPdf(wrapped), parseCatalogPassportDefaults(DEFAULT_CATALOG_PASSPORT_DEFAULTS));
 assert.equal(parseCatalogDefaultsPdf(new Uint8Array([1, 2, 3])), null);
+
+const savedCatalog = parseCatalogPassportDefaults({
+  generator_tool: 'MusicGPT',
+  generator_plan: 'Pro',
+  human_contribution: 'none',
+  human_contribution_details: '',
+});
+assert.deepEqual(resolveCatalogPassportDefaults(null, savedCatalog), savedCatalog);
+assert.deepEqual(albumFormPassportDefaults(null, savedCatalog), savedCatalog);
+assert.deepEqual(albumFormPassportDefaults(undefined, savedCatalog), savedCatalog);
+
+const albumOverride = parseCatalogPassportDefaults({
+  generator_tool: 'MusicGPT',
+  generator_plan: 'Pro',
+  human_contribution: 'human',
+  human_contribution_details: 'Редкий случай ручной правки.',
+});
+assert.deepEqual(albumFormPassportDefaults(albumOverride, savedCatalog), albumOverride);
+assert.equal(albumFormPassportDefaults(null, null).human_contribution, 'none');
+assert.equal(albumFormPassportDefaults(null, null).human_contribution_details, '');
+
+const savedHuman = parseCatalogPassportDefaults({
+  human_contribution: 'human',
+  human_contribution_details: 'Описанный вклад.',
+});
+assert.equal(savedHuman.human_contribution, 'human');
+assert.equal(savedHuman.human_contribution_details, 'Описанный вклад.');
+assert.equal(parseCatalogPassportDefaults({ human_contribution: 'human', human_contribution_details: '' }).human_contribution_details, '');
 assert.equal(
   generationRefForTrackTitle('  Светофор на зелёный  '),
   'История MusicGPT аккаунта ИП Петров С.С., трек «Светофор на зелёный»',
@@ -168,6 +206,23 @@ const work = read('src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx
 assert.match(work, /CatalogSettingsPanel/);
 assert.match(work, /Заполнить автоматически/);
 assert.match(work, /настройках каталога/);
+assert.match(work, /catalogDefaults=\{catalogDefaults\}/);
+assert.doesNotMatch(work, /catalogDefaults = DEFAULT_CATALOG_PASSPORT_DEFAULTS/);
+
+const page = read('src/app/(platform)/admin/business-catalog/page.tsx');
+assert.match(page, /loadClosedBusinessCatalog\(\)/);
+assert.match(page, /catalogDefaults=\{catalogDefaults\}/);
+
+const adminServer = read('src/lib/business-track-passports/admin.server.ts');
+assert.match(adminServer, /resolveCatalogPassportDefaults\(null, defaults\.catalogDefaults\)/);
+assert.match(adminServer, /defaults: defaults\.albumDefaults\[String\(album\.id\)\] \?\? null/);
+
+assert.match(tools, /albumFormPassportDefaults\(albumDefaults, catalogDefaults\)/);
+assert.match(tools, /HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER/);
+assert.match(tools, /savedOverrideKey/);
+assert.match(tools, /savedCatalogKey/);
+assert.doesNotMatch(tools, /Человек выбирает и мастерит готовый трек/);
+assert.doesNotMatch(tools, /albumDefaults \?\? catalogDefaults \?\? DEFAULT_CATALOG_PASSPORT_DEFAULTS/);
 
 const licenseServer = read('src/lib/business-track-passports/license.server.ts');
 const sharedSource = read('src/lib/business-track-passports/shared.ts');
