@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { PASSPORT_FIELDS, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
+import { PASSPORT_FIELDS, changedPassportKeys, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
 import { businessPassportLicensePreviewHrefFromRef, licenseIdFromNotes, notesWithOptionalLicenseId } from '@/lib/business-track-passports/shared';
 import { closedCatalogAction } from './actions';
 
@@ -80,7 +80,10 @@ export default function PassportForm({ audioItemId, passport, suggestedAlCode }:
   const locked = passport?.status === 'approved' || passport?.status === 'revoked';
   const payload = { ...fields, notes: notesWithOptionalLicenseId(fields.notes, licenseId) };
   const run = (command: string) => start(async () => {
-    const result = await closedCatalogAction(command, audioItemId, payload);
+    // Only fields the operator changed since the form was opened are saved. The rest keep their
+    // current server value, so a Shazam result the worker wrote meanwhile is never wiped.
+    const options = command === 'save' ? { keys: changedPassportKeys(passport, payload) } : undefined;
+    const result = await closedCatalogAction(command, audioItemId, payload, options);
     setMessage(result.message);
     setOk(result.ok);
     if (result.ok) { setDirty(false); router.refresh(); }

@@ -16,6 +16,7 @@ import {
 } from '../src/lib/business-track-passports/shazam';
 import { createBusinessShazamWorker, processShazamJob, type ShazamWorkerPort } from '../src/lib/business-track-passports/shazam-worker';
 import { parseClaimedShazamJob } from '../src/lib/business-track-passports/shazam-runtime';
+import { changedPassportKeys } from '../src/lib/business-track-passports/model';
 import * as shazamUi from '../src/app/(platform)/admin/business-catalog/ShazamAutoStatus';
 const ui = ((shazamUi as unknown as { default?: typeof shazamUi }).default?.ShazamAutoStatus ? (shazamUi as unknown as { default: typeof shazamUi }).default : shazamUi);
 const { ShazamAutoStatus, ShazamAutoBadge } = ui;
@@ -60,9 +61,11 @@ function fakePort(answers: ShazamHelperOutput[], overrides: Partial<ShazamWorker
   let clock = 1_000_000;
   const calls: Call[] = [];
   const requestTimes: number[] = [];
+  const heartbeats: number[] = [];
   const port: ShazamWorkerPort = {
     available: async () => ({ ok: true, libraryVersion: 'shazamio 0.9.0' }),
     claim: async () => null,
+    heartbeat: async () => { heartbeats.push(clock); return true; },
     loadMaster: async () => ({ storageBucket: 'music-masters', storagePath: 'm.wav', durationSeconds: 186, passportStatus: 'draft' }),
     prepare: async (_job, master, plan) => {
       calls.push({ kind: 'prepare' });
@@ -83,7 +86,7 @@ function fakePort(answers: ShazamHelperOutput[], overrides: Partial<ShazamWorker
     log: (event) => { calls.push({ kind: 'log', ...event }); },
     ...overrides,
   };
-  return { port, calls, requestTimes };
+  return { port, calls, requestTimes, heartbeats };
 }
 const none: ShazamHelperOutput = { ok: true, library_version: 'shazamio 0.9.0', matched: false, title: null, artist: null, timeskew: null, frequencyskew: null, rejected_title: null, rejected_artist: null, rejected_timeskew: null, rejected_frequencyskew: null, rate_limited: false, error: null };
 const hit: ShazamHelperOutput = { ...none, matched: true, title: 'Чужая', artist: 'Кто-то', timeskew: 0.0003, frequencyskew: 0.0001 };
@@ -169,8 +172,53 @@ const complete = (calls: Call[]) => calls.filter((c) => c.kind === 'complete');
   const stale = createBusinessShazamWorker(port, { idleIntervalMs: 10, checkRelease: async () => ({ state: 'STALE' }) });
   assert.equal(await stale.runOnce(), 'stale');
 }
+// ---- lease heartbeat (review fix 4) ----
+{
+  const { port, heartbeats, requestTimes } = fakePort([limited, none, none, none]);
+  assert.equal(await processShazamJob(port, job, { ...live }, null), 'no_match');
+  assert.equal(heartbeats.length, 1 + requestTimes.length, 'lease renewed before download and before every Shazam request, retries included');
+}
+{
+  let beats = 0;
+  const { port, calls } = fakePort([none, none, none], { heartbeat: async () => { beats += 1; return beats < 3; } });
+  assert.equal(await processShazamJob(port, job, { ...live }, null), 'lease_lost');
+  assert.equal(complete(calls).length, 0, 'a reclaimed job is never completed by the old worker');
+  assert.equal(calls.filter((c) => c.kind === 'cleanup').length, 1, 'audio deleted when the lease is lost');
+  assert.equal(calls.filter((c) => c.kind === 'log' && c.event === 'business_shazam_lease_lost').length, 1);
+}
+{
+  const { port, calls } = fakePort([none, none, none], { heartbeat: async () => { throw new Error('network'); } });
+  assert.equal(await processShazamJob(port, job, { ...live }, null), 'no_match', 'a transient heartbeat error does not drop the job');
+  assert.ok(calls.some((c) => c.kind === 'log' && c.event === 'business_shazam_heartbeat_failed'));
+}
+{
+  // Worst single step between two heartbeats stays far below the 30-minute reclaim window.
+  const runtime = read('src/lib/business-track-passports/shazam-runtime.ts');
+  assert.match(runtime, /AbortSignal\.timeout\(300_000\)/, 'download timeout 5 min');
+  assert.match(runtime, /timeout: 180_000/, 'helper timeout 3 min');
+  const prepareWorstMs = 300_000 + 60_000 + 3 * 120_000;
+  const requestWorstMs = 180_000 + 80_000 + 5_000;
+  assert.ok(Math.max(prepareWorstMs, requestWorstMs) < 30 * 60_000 / 2, 'reclaim window is at least twice the longest step');
+  assert.match(read('supabase/migrations/20270313120000_business_passport_shazam_checks.sql'), /interval '30 minutes'/);
+  assert.match(runtime, /heartbeat_business_shazam_check/);
+}
 assert.deepEqual(parseClaimedShazamJob([{ id: 'c', audio_item_id: 'a', master_asset_id: 'm', attempts: 2 }]), { id: 'c', audio_item_id: 'a', master_asset_id: 'm', attempts: 2 });
 assert.equal(parseClaimedShazamJob([]), null);
+
+// ---- passport form saves only changed keys (review fix 2) ----
+{
+  const opened = { shazam_result: null, shazam_checked_at: null, generator_tool: 'MusicGPT', notes: 'x' };
+  assert.deepEqual(changedPassportKeys(opened, { ...opened, generator_tool: 'MusicGPT', notes: 'x' }), [], 'nothing changed – nothing sent');
+  assert.deepEqual(changedPassportKeys(opened, { ...opened, generator_tool: 'Suno' }), ['generator_tool'], 'Shazam fields the worker may have written are not sent');
+  assert.deepEqual(changedPassportKeys({ shazam_result: 'not_found' }, { shazam_result: '' }), ['shazam_result'], 'a deliberate manual clear is sent');
+  assert.deepEqual(changedPassportKeys(undefined, { al_code: 'AL-T-1', shazam_result: '' }), ['al_code'], 'new passport: only filled fields');
+  const form = read('src/app/(platform)/admin/business-catalog/PassportForm.tsx');
+  assert.match(form, /changedPassportKeys\(passport, payload\)/);
+  assert.match(read('src/app/(platform)/admin/business-catalog/actions.ts'), /saveBusinessPassport\(audioItemId, fields, keys \? \{ keys \} : undefined\)/);
+  const admin = read('src/lib/business-track-passports/admin.server.ts');
+  for (const code of ['passport_shazam_pending', 'passport_shazam_match', 'passport_shazam_stale']) assert.match(admin, new RegExp(`includes\\('${code}'\\)\\) throw new Error\\('[^']*[а-я]`), `${code}: Russian message`);
+  assert.ok(!admin.includes('\u2014') && !form.includes('\u2014'), 'en dash only');
+}
 
 // ---- UI states ----
 const pending = shazamCheckView({ audio_item_id: 'a', status: 'running' }, null);
@@ -205,7 +253,16 @@ const worker = read('src/lib/business-track-passports/shazam-worker.ts') + read(
 assert.doesNotMatch(worker, /admin_approve_business_track_passport|decideBusinessPassport|approveReady/);
 assert.match(read('src/lib/business-track-passports/shazam-runtime.ts'), /'nice', \['-n', '10', 'ffmpeg'/);
 const migration = read('supabase/migrations/20270313120000_business_passport_shazam_checks.sql');
-assert.doesNotMatch(migration.replace(/--[^\n]*/g, ''), /\bALTER TABLE\b(?! public\.business_passport_shazam_checks)|\bDROP\b|status\s*=\s*'approved'|admin_approve/i, 'migration is additive and never approves');
+// The only replaced function is the approval RPC: same body plus the Shazam gate (review fix 1a).
+const approveStart = migration.indexOf('CREATE OR REPLACE FUNCTION public.admin_approve_business_track_passport');
+assert.ok(approveStart > 0, 'approval gate present');
+const approveBody = migration.slice(approveStart, migration.indexOf('END $$;', approveStart));
+for (const code of ['passport_shazam_pending', 'passport_shazam_match', 'passport_shazam_stale', 'passport_fingerprint_match', 'passport_hash_mismatch']) assert.match(approveBody, new RegExp(code));
+const withoutApprove = migration.slice(0, approveStart) + migration.slice(migration.indexOf('END $$;', approveStart));
+assert.doesNotMatch(withoutApprove.replace(/--[^\n]*/g, ''), /\bALTER TABLE\b(?! public\.business_passport_shazam_checks)|\bDROP\b|status\s*=\s*'approved'|admin_approve|CREATE OR REPLACE/i, 'migration is additive and the worker never approves');
+const rollback = read('supabase/rollback/20270313120000_business_passport_shazam_checks.down.sql');
+assert.match(rollback, /CREATE OR REPLACE FUNCTION public\.admin_approve_business_track_passport/);
+assert.doesNotMatch(rollback, /passport_shazam_(pending|match|stale)/, 'rollback restores the original approval RPC');
 assert.match(migration, /SET LOCAL lock_timeout = '5s'/);
 assert.ok(existsSync(new URL('../supabase/rollback/20270313120000_business_passport_shazam_checks.down.sql', import.meta.url)));
 const ecosystem = read('deploy/business-shazam-worker.ecosystem.config.cjs');
@@ -225,4 +282,4 @@ const helper = read('scripts/business-shazam/recognize_segment.py');
 assert.match(helper, /max_skew=max_skew/);
 assert.match(helper, /statuses=\{500, 502, 503, 504\}/, 'library does not swallow 429; the worker backs off');
 
-console.log('business-shazam-worker-unit: PASS (segments, verdict, 5 s pacing, 429 backoff, cleanup, retries, UI states, wiring, additive migration)');
+console.log('business-shazam-worker-unit: PASS (segments, verdict, 5 s pacing, 429 backoff, cleanup, retries, lease heartbeat, changed-keys save, approval gate wiring, UI states, wiring, additive migration)');

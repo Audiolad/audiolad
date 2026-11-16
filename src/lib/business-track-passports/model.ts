@@ -43,3 +43,14 @@ export function businessOnlyVisibilityConflict(row: BusinessOnlyFlagRow, body: R
   if (!('catalog_visibility' in body) && !('is_catalog_listed' in body)) return null;
   return { error: 'business_only_visibility_locked', message: 'Видимость закрытого альбома Бизнеса менять нельзя.' };
 }
+
+function normalizedPassportValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : value == null ? '' : String(value);
+}
+
+/** t1485u: passport fields whose form value differs from the value loaded with the page. The form
+ * saves only these, so a Shazam result written by the worker after the form was opened survives. */
+export function changedPassportKeys(initial: Passport | undefined, payload: Record<string, unknown>): PassportField[] {
+  const base = (initial ?? {}) as Record<string, unknown>;
+  return (Object.keys(PASSPORT_FIELDS) as PassportField[]).filter((key) => normalizedPassportValue(payload[key]) !== normalizedPassportValue(base[key]));
+}

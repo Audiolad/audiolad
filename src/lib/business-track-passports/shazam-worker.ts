@@ -40,6 +40,8 @@ export type ShazamCompleteOutcome = 'no_match' | 'match' | 'error' | 'skipped' |
 export type ShazamWorkerPort = {
   available: () => Promise<{ ok: true; libraryVersion: string | null } | { ok: false; reason: string }>;
   claim: () => Promise<ShazamClaimedJob | null>;
+  /** Renews the job lease (locked_at). false = the job is no longer owned by this worker. */
+  heartbeat: (job: ShazamClaimedJob) => Promise<boolean>;
   loadMaster: (job: ShazamClaimedJob) => Promise<ShazamMasterInfo | null>;
   /** Downloads the master to a private temp dir and cuts the planned segments with ffmpeg. */
   prepare: (job: ShazamClaimedJob, master: ShazamMasterInfo, plan: (duration: number) => ShazamSegmentPlan[]) => Promise<ShazamPreparedAudio>;
@@ -75,6 +77,25 @@ function errorText(error: unknown): string {
   return text.slice(0, 300);
 }
 
+/** Thrown when the lease of a job was lost (reclaimed by another worker). The job is dropped
+ * without complete(): the new owner finishes it. */
+export class ShazamLeaseLostError extends Error {
+  constructor() { super('shazam_lease_lost'); }
+}
+
+/** Renews the lease before every long step. A transient heartbeat failure is logged and the job
+ * continues: the 30-minute reclaim window is far longer than any single step (≈ 13 min max). */
+async function renewLease(port: ShazamWorkerPort, job: ShazamClaimedJob) {
+  let alive: boolean;
+  try {
+    alive = await port.heartbeat(job);
+  } catch (error) {
+    port.log({ event: 'business_shazam_heartbeat_failed', checkId: job.id, error: errorText(error) });
+    return;
+  }
+  if (!alive) throw new ShazamLeaseLostError();
+}
+
 async function waitForGap(port: ShazamWorkerPort, state: ShazamJobState) {
   if (state.lastRequestAt === null) return;
   const wait = state.lastRequestAt + SHAZAM_MIN_REQUEST_GAP_MS - port.now();
@@ -90,6 +111,7 @@ async function recognizeWithBackoff(
 ): Promise<{ result: ShazamSegmentResult; libraryVersion: string | null; rateLimitedOut: boolean }> {
   let retries = 0;
   for (;;) {
+    await renewLease(port, job);
     await waitForGap(port, state);
     const started = port.now();
     const output = await port.recognize(path, SHAZAM_MAX_SKEW).catch((error: unknown): ShazamHelperOutput => ({
@@ -158,6 +180,21 @@ export async function processShazamJob(
   job: ShazamClaimedJob,
   state: ShazamJobState,
   libraryVersion: string | null,
+): Promise<ShazamCompleteOutcome | 'lease_lost'> {
+  try {
+    return await processShazamJobOwned(port, job, state, libraryVersion);
+  } catch (error) {
+    if (!(error instanceof ShazamLeaseLostError)) throw error;
+    port.log({ event: 'business_shazam_lease_lost', checkId: job.id, audioItemId: job.audio_item_id });
+    return 'lease_lost';
+  }
+}
+
+async function processShazamJobOwned(
+  port: ShazamWorkerPort,
+  job: ShazamClaimedJob,
+  state: ShazamJobState,
+  libraryVersion: string | null,
 ): Promise<ShazamCompleteOutcome> {
   const startedAt = port.now();
   port.log({ event: 'business_shazam_job_start', checkId: job.id, audioItemId: job.audio_item_id, attempt: job.attempts, libraryVersion, startedAt: moscowTimestamp(startedAt) });
@@ -192,6 +229,7 @@ export async function processShazamJob(
 
   let prepared: ShazamPreparedAudio | null = null;
   try {
+    await renewLease(port, job);
     try {
       prepared = await port.prepare(job, master, planShazamSegments);
     } catch (error) {
@@ -238,7 +276,7 @@ export function createBusinessShazamWorker(port: ShazamWorkerPort, options: {
   let stopping = false;
   const state: ShazamJobState = { lastRequestAt: null, stopping: () => stopping };
   let lastUnavailable: string | null = null;
-  async function runOnce(): Promise<'stale' | 'unavailable' | 'idle' | ShazamCompleteOutcome> {
+  async function runOnce(): Promise<'stale' | 'unavailable' | 'idle' | 'lease_lost' | ShazamCompleteOutcome> {
     if (options.checkRelease) {
       const release = await options.checkRelease().catch(() => ({ state: 'UNKNOWN' as const }));
       if (release.state === 'STALE') return 'stale';

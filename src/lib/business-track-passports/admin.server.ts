@@ -17,6 +17,9 @@ function rpcError(error: { message: string } | null) {
     if (fields) throw new Error(`Заполните обязательные поля: ${fields.split(',').map((key) => PASSPORT_FIELDS[key as keyof typeof PASSPORT_FIELDS] ?? key).join(', ')}.`);
     if (error.message.includes('passport_hash_mismatch')) throw new Error('Хеш мастер-файла не совпадает.');
     if (error.message.includes('passport_fingerprint_match')) throw new Error('Найдено совпадение Shazam или AcoustID. Допуск заблокирован.');
+    if (error.message.includes('passport_shazam_pending')) throw new Error('Shazam ещё проверяет этот трек. Допустить его можно, когда проверка закончится.');
+    if (error.message.includes('passport_shazam_match')) throw new Error('Shazam нашёл совпадение у текущего мастер-файла. Допуск заблокирован. Если это ложное срабатывание, укажите вручную «Совпадений нет» и текущую дату, затем допустите трек.');
+    if (error.message.includes('passport_shazam_stale')) throw new Error('Результат Shazam относится к прежнему мастер-файлу. Дождитесь проверки нового мастера.');
     throw new Error('Операция не выполнена. Обновите страницу и проверьте поля паспорта.');
   }
 }

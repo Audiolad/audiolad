@@ -8,10 +8,15 @@ function fail(error: unknown) {
   return { ok: false as const, message: error instanceof Error ? error.message : 'Не удалось сохранить изменения.' };
 }
 
-export async function closedCatalogAction(command: string, audioItemId: string, fields: Record<string, unknown>) {
+export async function closedCatalogAction(command: string, audioItemId: string, fields: Record<string, unknown>, options?: { keys?: unknown }) {
   try {
     if (command === 'create') await createClosedBusinessAlbum(String(fields.author_id ?? ''), String(fields.title ?? ''));
-    else if (command === 'save') await saveBusinessPassport(audioItemId, fields);
+    else if (command === 'save') {
+      // t1485u: the passport form sends only the keys the operator changed (never wipes a
+      // Shazam result written by the worker after the form was opened).
+      const keys = Array.isArray(options?.keys) ? options.keys.filter((key): key is string => typeof key === 'string') : undefined;
+      await saveBusinessPassport(audioItemId, fields, keys ? { keys } : undefined);
+    }
     else if (command === 'verify') await verifyBusinessMaster(audioItemId);
     else if (command === 'approve' || command === 'revoke') await decideBusinessPassport(audioItemId, command);
     else return { ok: false, message: 'Неизвестное действие.' };

@@ -6693,7 +6693,7 @@
     {
       "file": "supabase/migrations/20270313120000_business_passport_shazam_checks.sql",
       "kind": "execute",
-      "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_business_shazam_check(uuid,text), public.claim_business_shazam_check(text), public.complete_business_shazam_check(uuid,text,text,jsonb,text,text,integer) TO service_role;"
+      "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_business_shazam_check(uuid,text), public.claim_business_shazam_check(text), public.heartbeat_business_shazam_check(uuid,text), public.complete_business_shazam_check(uuid,text,text,jsonb,text,text,integer) TO service_role;"
     }
   ]
 }

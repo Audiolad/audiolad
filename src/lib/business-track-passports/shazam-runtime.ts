@@ -177,6 +177,14 @@ export function createBusinessShazamPort(service: SupabaseClient, options?: {
         return parseShazamHelperOutput('');
       }
     },
+    async heartbeat(job) {
+      const { data, error: rpcError } = await service.rpc('heartbeat_business_shazam_check', {
+        p_check_id: job.id,
+        p_worker: workerId,
+      });
+      if (rpcError) throw new Error(`heartbeat_failed: ${rpcError.message}`);
+      return data === true;
+    },
     async complete({ job, outcome, segments, libraryVersion, error, retryAfterSeconds }) {
       const { data, error: rpcError } = await service.rpc('complete_business_shazam_check', {
         p_check_id: job.id,
