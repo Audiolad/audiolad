@@ -1,10 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import AuthorDashboardClient from "@/components/author-dashboard/AuthorDashboardClient";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { AUTHOR_PROJECT_COOKIE } from "@/lib/author-projects/constants";
+import { resolveSelectedAuthorWorkspace } from "@/lib/author-projects/selection";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +52,11 @@ function NoAuthorAccess() {
   );
 }
 
-export default async function AuthorDashboardPage() {
+export default async function AuthorDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ author?: string | string[] }>;
+}) {
   const supabase = await createClient();
 
   const {
@@ -66,12 +73,27 @@ export default async function AuthorDashboardPage() {
     return <NoAuthorAccess />;
   }
 
+  const { author } = await searchParams;
+  let cookieSlug = (await cookies()).get(AUTHOR_PROJECT_COOKIE)?.value ?? null;
+  try {
+    cookieSlug = cookieSlug ? decodeURIComponent(cookieSlug) : null;
+  } catch {
+    // keep the raw cookie value
+  }
+  const selectedAuthor = resolveSelectedAuthorWorkspace(authors, {
+    querySlug: typeof author === "string" ? author : null,
+    cookieSlug,
+  });
+  const studioHref = selectedAuthor
+    ? `/studio?author=${encodeURIComponent(selectedAuthor.slug)}`
+    : "/studio";
+
   return (
     <AuthorShell
       title="Кабинет автора"
       actions={
         <Link
-          href="/studio"
+          href={studioHref}
           className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:px-4"
         >
           <StudioMicrophoneIcon />

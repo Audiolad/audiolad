@@ -5,8 +5,20 @@ import { requireStudioAuthorAccess } from "@/lib/studio/access";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudioPage() {
-  await requireStudioAuthorAccess("/studio");
+export default async function StudioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ author?: string | string[] }>;
+}) {
+  const workspaces = await requireStudioAuthorAccess("/studio");
+  const { author } = await searchParams;
+  const selected =
+    typeof author === "string"
+      ? workspaces.find((workspace) => workspace.slug === author.trim())
+      : undefined;
+  const projectsHref = selected
+    ? `/studio/projects?author=${encodeURIComponent(selected.slug)}`
+    : "/studio/projects";
 
   return (
     <main className="min-h-dvh bg-[#160d2d] px-5 py-6 text-white sm:px-8 sm:py-8">
@@ -51,7 +63,7 @@ export default async function StudioPage() {
                   создавайте готовые аудиопродукты.
                 </p>
                 <Link
-                  href="/studio/projects"
+                  href={projectsHref}
                   className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
                 >
                   Открыть Студию
