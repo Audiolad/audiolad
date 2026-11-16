@@ -10,6 +10,8 @@ import { useEffect, useState } from "react";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
+import CreateClosedAlbumCabinet from "@/components/author-dashboard/CreateClosedAlbumCabinet";
+import { isClosedCatalogOnlyAuthor } from "@/lib/authors/closed-catalog-only";
 import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
 import { useAuthorProjectSelection } from "@/components/author-dashboard/useAuthorProjectSelection";
 import {
@@ -332,6 +334,7 @@ export default function AuthorDashboardClient({
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
   );
+  const closedCatalogOnly = isClosedCatalogOnlyAuthor(selectedAuthor.closedCatalogOnly);
 
   return (
     <div>
@@ -434,6 +437,14 @@ export default function AuthorDashboardClient({
       />
 
       <div className="mt-6 rounded-[22px] border border-[#d7c4f5] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
+        {closedCatalogOnly ? (
+          <CreateClosedAlbumCabinet
+            authorId={selectedAuthor.id}
+            authorName={selectedAuthor.name}
+            disabled={!canMutateContent}
+          />
+        ) : (
+          <>
         <p className="text-sm text-[#5f5484]">
           Продукты текущего проекта{" "}
           <span className="font-semibold text-[#25135c]">
@@ -456,6 +467,8 @@ export default function AuthorDashboardClient({
           <PlusIcon />
           Создать аудиопродукт
         </Link>
+          </>
+        )}
       </div>
 
       <section className="mt-8">
@@ -493,6 +506,7 @@ export default function AuthorDashboardClient({
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
               {FREE_AUTHOR_PRODUCTS_EMPTY_STATE.body}
             </p>
+            {closedCatalogOnly ? null : (
             <Link
               href={newProductHref}
               aria-disabled={!canMutateContent}
@@ -504,6 +518,7 @@ export default function AuthorDashboardClient({
             >
               {FREE_AUTHOR_PRODUCTS_EMPTY_STATE.ctaLabel}
             </Link>
+            )}
           </div>
         ) : null}
 

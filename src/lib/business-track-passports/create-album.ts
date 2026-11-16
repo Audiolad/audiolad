@@ -71,3 +71,24 @@ export function parseCreateClosedAlbumResponse(input: {
   if (input.status === 401 || input.status === 403) return { ok: false, message: message ?? CREATE_CLOSED_ALBUM_SESSION_ERROR };
   return { ok: false, message: message ?? CREATE_CLOSED_ALBUM_FALLBACK_ERROR };
 }
+
+/** Same row the admin RPC admin_create_business_album inserts. */
+export function closedBusinessAlbumInsertRow(authorId: string, title: string, albumId: string) {
+  return {
+    id: albumId,
+    author_id: authorId,
+    title,
+    slug: `business-${albumId}`,
+    status: 'draft',
+    price: 0,
+    is_free: true,
+    currency: 'RUB',
+    product_kind: 'music',
+    publication_class: 'release',
+    music_usage_permission: 'listen_only',
+    format: 'Музыка',
+    business_only: true,
+    catalog_visibility: 'selected_users',
+    is_catalog_listed: false,
+  };
+}

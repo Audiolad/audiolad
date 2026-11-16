@@ -9,20 +9,23 @@ type AuthorProductWizardStepperProps = {
   activeStep: ProductWizardStep;
   onSelectStep: (step: ProductWizardStep) => void;
   canJumpToStep: (step: ProductWizardStep) => boolean;
+  steps?: readonly (typeof PRODUCT_WIZARD_STEPS)[number][];
 };
 
 export default function AuthorProductWizardStepper({
   activeStep,
   onSelectStep,
   canJumpToStep,
+  steps = PRODUCT_WIZARD_STEPS,
 }: AuthorProductWizardStepperProps) {
+  const columns = steps.length <= 2 ? "sm:grid-cols-2" : "sm:grid-cols-4";
   return (
     <nav
       aria-label="Шаги создания продукта"
       className="rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5"
     >
-      <ol className="grid gap-2 sm:grid-cols-4">
-        {PRODUCT_WIZARD_STEPS.map((item) => {
+      <ol className={`grid gap-2 ${columns}`}>
+        {steps.map((item) => {
           const isActive = item.step === activeStep;
           const canJump = canJumpToStep(item.step);
           return (

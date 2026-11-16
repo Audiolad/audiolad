@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CLOSED_CATALOG_ONLY_CREATE_BLOCKED, isClosedCatalogOnlyAuthor } from "@/lib/authors/closed-catalog-only";
 
 import { catalogSectionColumnForInsert } from "@/lib/author-products/catalog-section-field";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
@@ -577,6 +578,15 @@ export async function createDraftProduct(
 
   if (!title) {
     throw new Error("missing_title");
+  }
+
+  const closedCatalogAuthor = await supabase
+    .from("authors")
+    .select("closed_catalog_only")
+    .eq("id", input.authorId)
+    .maybeSingle();
+  if (!closedCatalogAuthor.error && isClosedCatalogOnlyAuthor(closedCatalogAuthor.data?.closed_catalog_only)) {
+    throw new Error(CLOSED_CATALOG_ONLY_CREATE_BLOCKED);
   }
 
   const classification = resolveCreateClassification({

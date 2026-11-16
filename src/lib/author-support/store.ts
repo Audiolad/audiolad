@@ -33,6 +33,7 @@ export type ActingAuthorMembership = {
   authorName: string;
   authorSlug: string;
   canBypassProductModeration: boolean;
+  closedCatalogOnly: boolean;
   actingDisplayName: string;
   defaultAudioProductAuthor: string | null;
 };
@@ -159,6 +160,7 @@ export async function loadActingAuthorMembership(input: {
         slug,
         access_status,
         can_bypass_product_moderation,
+        closed_catalog_only,
         default_audio_product_author
       )
     `,
@@ -199,6 +201,7 @@ export async function loadActingAuthorMembership(input: {
     authorName: (author.name as string) || "Автор",
     authorSlug: (author.slug as string) || "",
     canBypassProductModeration: author.can_bypass_product_moderation === true,
+    closedCatalogOnly: author.closed_catalog_only === true,
     actingDisplayName: displayName,
     defaultAudioProductAuthor: rawDefault || null,
   };
