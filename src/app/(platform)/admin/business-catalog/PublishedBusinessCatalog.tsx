@@ -68,28 +68,53 @@ function AlbumCard({ album }: { album: PublishedBusinessAlbumView }) {
   );
 }
 
+function GroupHeading({ group, count }: { group: PublishedBusinessGroup; count: number }) {
+  return (
+    <>
+      {PUBLISHED_BUSINESS_GROUP_LABELS[group]}
+      <span className="ml-2 text-sm font-medium text-[#7d70a2]">– {count}</span>
+    </>
+  );
+}
+
+function GroupBody({ group, albums }: { group: PublishedBusinessGroup; albums: PublishedBusinessAlbumView[] }) {
+  if (albums.length === 0) {
+    return (
+      <p className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm leading-6 text-[#7d70a2]">
+        {group === 'closed'
+          ? 'Пока нет закрытых альбомов, опубликованных в Бизнесе.'
+          : 'Пока нет альбомов из открытого АудиоЛада, допущенных в Бизнес.'}
+      </p>
+    );
+  }
+  return <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} />)}</div>;
+}
+
 function Group({
   group,
   albums,
+  collapsed = false,
 }: {
   group: PublishedBusinessGroup;
   albums: PublishedBusinessAlbumView[];
+  collapsed?: boolean;
 }) {
+  if (collapsed) {
+    return (
+      <details className="space-y-4" data-published-group={group}>
+        <summary className="cursor-pointer text-[18px] font-semibold text-[#25135c]">
+          <GroupHeading group={group} count={albums.length} />
+        </summary>
+        <GroupBody group={group} albums={albums} />
+      </details>
+    );
+  }
   return (
     <section className="space-y-4" data-published-group={group}>
       <h3 className="text-[18px] font-semibold text-[#25135c]">
-        {PUBLISHED_BUSINESS_GROUP_LABELS[group]}
-        <span className="ml-2 text-sm font-medium text-[#7d70a2]">– {albums.length}</span>
+        <GroupHeading group={group} count={albums.length} />
       </h3>
-      {albums.length === 0 ? (
-        <p className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm leading-6 text-[#7d70a2]">
-          {group === 'closed'
-            ? 'Пока нет закрытых альбомов, опубликованных в Бизнесе.'
-            : 'Пока нет альбомов из открытого АудиоЛада, допущенных в Бизнес.'}
-        </p>
-      ) : (
-        <div className="grid gap-4">{albums.map((album) => <AlbumCard key={album.id} album={album} />)}</div>
-      )}
+      <GroupBody group={group} albums={albums} />
     </section>
   );
 }
@@ -112,7 +137,7 @@ export default function PublishedBusinessCatalog({
         <p className="mt-2 text-sm text-[#7d70a2]">Всего – {total}</p>
       </div>
       <Group group="closed" albums={closed} />
-      <Group group="open" albums={open} />
+      <Group group="open" albums={open} collapsed />
     </section>
   );
 }

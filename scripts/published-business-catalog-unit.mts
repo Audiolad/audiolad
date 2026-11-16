@@ -110,6 +110,9 @@ assert.match(html, /Только для Бизнеса/);
 assert.match(html, /Из открытого АудиоЛада/);
 assert.match(html, /Первый глоток/);
 assert.match(html, /Вечерний джаз/);
+assert.match(html, /<details[^>]*data-published-group="open"/);
+assert.doesNotMatch(html, /<details[^>]*data-published-group="closed"/);
+assert.doesNotMatch(html, /data-published-group="open"[^>]*\sopen/);
 assert.match(html, /Утро в зале/);
 assert.match(html, /<li>Утро в зале<\/li>/);
 assert.match(html, /<li>Первый<\/li>/);
@@ -120,13 +123,33 @@ assert.match(html, /Спа и массаж/);
 assert.match(html, /Открыть альбом/);
 assert.doesNotMatch(html, /business-private-cover:/);
 assert.match(html, /\/api\/admin\/business-catalog\/cover\?album=/);
-assert.match(read('src/app/(platform)/admin/business-catalog/page.tsx'), /PublishedBusinessCatalog/);
+const pageSource = read('src/app/(platform)/admin/business-catalog/page.tsx');
+assert.match(pageSource, /PublishedBusinessCatalog/);
+assert.match(pageSource, /ClosedAlbumWork/);
+const createAt = pageSource.indexOf('<CreateClosedAlbum');
+const workAt = pageSource.indexOf('<ClosedAlbumWork');
+const publishedAt = pageSource.indexOf('<PublishedBusinessCatalog');
+assert.ok(createAt >= 0 && workAt > createAt && publishedAt > workAt, 'closed work block must sit after the create form and before the published list');
+
+const workSource = read('src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx');
+assert.match(workSource, /Работа с закрытыми альбомами/);
+assert.match(workSource, /Открыть альбом/);
+assert.match(workSource, />Треки</);
+assert.match(workSource, /ruTrackCountLabel/);
+assert.match(workSource, /с допущенным паспортом/);
+assert.match(workSource, /publishedBusinessCoverUrl/);
+assert.match(workSource, /черновик/);
+assert.match(workSource, /паспорт ещё не заполнен или не допущен/);
+assert.match(workSource, /Допустить в Бизнес/);
+assert.ok(!workSource.includes('business-private-cover:'), 'closed work cards must not emit private cover refs');
+assert.match(read('src/app/(platform)/admin/business-catalog/PassportForm.tsx'), /suggestedAlCode/);
 assert.match(read('src/app/api/admin/business-catalog/cover/route.ts'), /requireAdminPanelAccess/);
 assert.match(read('src/app/api/admin/business-catalog/cover/route.ts'), /signBusinessPrivateCover/);
 for (const path of [
   'src/lib/business-admission/published-catalog.ts',
   'src/lib/business-admission/published-catalog.server.ts',
   'src/app/(platform)/admin/business-catalog/PublishedBusinessCatalog.tsx',
+  'src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx',
   'src/app/(platform)/admin/business-catalog/page.tsx',
   'src/app/api/admin/business-catalog/cover/route.ts',
 ]) {

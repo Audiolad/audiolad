@@ -2,6 +2,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { PASSPORT_FIELDS, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
+import { businessPassportLicensePreviewHrefFromRef, licenseIdFromNotes, notesWithOptionalLicenseId } from '@/lib/business-track-passports/shared';
 import { closedCatalogAction } from './actions';
 
 const fieldClassName =
@@ -59,8 +60,17 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
   </form>;
 }
 
-export default function PassportForm({ audioItemId, passport }: { audioItemId: string; passport?: Passport }) {
-  const [fields, setFields] = useState<Passport>(passport ?? {});
+export default function PassportForm({ audioItemId, passport, suggestedAlCode }: { audioItemId: string; passport?: Passport; suggestedAlCode?: string | null }) {
+  const [fields, setFields] = useState<Passport>(() => {
+    const initial = passport ?? {};
+    const code = initial.al_code?.trim() || suggestedAlCode?.trim() || '';
+    const notes = typeof initial.notes === 'string'
+      ? initial.notes.replace(/^MusicGPT License ID:.*$/m, '').trim()
+      : initial.notes;
+    const next = { ...initial, notes };
+    return code && !initial.al_code ? { ...next, al_code: code } : next;
+  });
+  const [licenseId, setLicenseId] = useState(() => licenseIdFromNotes(passport?.notes));
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -68,15 +78,25 @@ export default function PassportForm({ audioItemId, passport }: { audioItemId: s
   const router = useRouter();
   const missing = passportMissing(fields);
   const locked = passport?.status === 'approved' || passport?.status === 'revoked';
+  const payload = { ...fields, notes: notesWithOptionalLicenseId(fields.notes, licenseId) };
   const run = (command: string) => start(async () => {
-    const result = await closedCatalogAction(command, audioItemId, fields);
+    const result = await closedCatalogAction(command, audioItemId, payload);
     setMessage(result.message);
     setOk(result.ok);
     if (result.ok) { setDirty(false); router.refresh(); }
   });
   return <div className="space-y-3 pt-3">
     <p className="text-sm text-[#5f5484]">Паспорт: {passport?.status === 'approved' ? 'допущен' : passport?.status === 'revoked' ? 'отозван' : 'черновик'}</p>
-    <p className="text-sm leading-6 text-[#5f5484]">Доказательства заполняются вручную. Ссылки ведут на сохранённые материалы проверки.</p>
+    <p className="text-sm leading-6 text-[#5f5484]">После автоматического заполнения остаётся указать результат Shazam и дату, затем нажать «Допустить в Бизнес». Лицензию трека прикладывать не нужно. ID лицензии MusicGPT и ссылку на историю указывать необязательно, допуск не блокирует.</p>
+    <label className="block text-sm font-medium text-[#25135c]">ID лицензии MusicGPT (необязательно)
+      <input className={fieldClassName} value={licenseId} disabled={pending || locked} onChange={(e) => { setLicenseId(e.target.value); setDirty(true); }} />
+    </label>
+    {businessPassportLicensePreviewHrefFromRef(fields.terms_snapshot_ref) ? (
+      <p className="text-sm leading-6 text-[#5f5484]">
+        Условия тарифа заполнены образцом лицензии.{' '}
+        <a href={businessPassportLicensePreviewHrefFromRef(fields.terms_snapshot_ref) ?? '#'} target="_blank" rel="noreferrer" className="font-medium text-[#7042c5] underline-offset-2 hover:underline">открыть PDF</a>
+      </p>
+    ) : null}
     <div className="grid gap-3 sm:grid-cols-2">{Object.entries(PASSPORT_FIELDS).map(([key, label]) => {
       const field = key as PassportField;
       const choices = field === 'human_contribution' ? [['none', 'Нет'], ['human', 'Есть']]

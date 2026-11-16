@@ -5,6 +5,8 @@ import { listAuthorWorkspacesForUser } from '@/lib/author-products/auth';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { PASSPORT_FIELDS, type Passport } from './model';
+import { loadCatalogAndAlbumDefaults, loadCatalogAndAlbumLicenseRefs } from '@/lib/business-track-passports/license.server';
+import { resolveCatalogPassportDefaults } from '@/lib/business-track-passports/shared';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function id(value: string) { if (!UUID.test(value)) throw new Error('Некорректный идентификатор.'); }
@@ -21,17 +23,39 @@ export async function loadClosedBusinessCatalog() {
   const admin = await requireAdminPanelAccess();
   const authors = await listAuthorWorkspacesForUser(admin.userId);
   const db = createServiceRoleClient();
-  const albums = await db.from('practices').select('id,title,author_id,status').eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
+  const albums = await db.from('practices')
+    .select('id,title,author_id,status,cover_url,cover_image,updated_at')
+    .eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
   if (albums.error) throw new Error('Не удалось загрузить закрытый каталог.');
+  const albumIds = (albums.data ?? []).map((album) => String(album.id));
+  const licenseRefs = await loadCatalogAndAlbumLicenseRefs(albumIds);
+  const defaults = await loadCatalogAndAlbumDefaults(albumIds);
+  const catalogDefaults = resolveCatalogPassportDefaults(null, defaults.catalogDefaults);
+  const authorIds = [...new Set((albums.data ?? []).map((album) => String(album.author_id ?? '')).filter(Boolean))];
+  const names = new Map<string, string>();
+  for (let index = 0; index < authorIds.length; index += 100) {
+    const { data, error } = await db.from('authors').select('id, name').in('id', authorIds.slice(index, index + 100));
+    if (error) throw new Error('Не удалось загрузить закрытый каталог.');
+    for (const row of (data ?? []) as { id: string; name: string | null }[]) names.set(row.id, row.name?.trim() ?? '');
+  }
   const rows = [];
   for (const album of albums.data ?? []) {
-    const tracks = await db.from('audio_items').select('id,title').eq('practice_id', album.id).order('position');
+    const tracks = await db.from('audio_items').select('id,title,music_track_code').eq('practice_id', album.id).order('position');
     const passports = await db.from('business_track_passports').select('*').eq('practice_id', album.id);
     if (tracks.error || passports.error) throw new Error('Не удалось загрузить паспорта.');
-    rows.push({ ...album, tracks: (tracks.data ?? []).map((track) => ({ ...track,
-      passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined })) });
+    rows.push({
+      ...album,
+      authorName: names.get(String(album.author_id ?? '')) ?? '',
+      tracks: (tracks.data ?? []).map((track) => ({
+        ...track,
+        music_track_code: typeof track.music_track_code === 'string' ? track.music_track_code : null,
+        passport: (passports.data ?? []).find((p) => p.audio_item_id === track.id) as Passport | undefined,
+      })),
+      licenseRef: licenseRefs.albumLicenseRefs[String(album.id)] ?? null,
+      defaults: defaults.albumDefaults[String(album.id)] ?? null,
+    });
   }
-  return { authors, albums: rows };
+  return { authors, albums: rows, catalogLicenseRef: licenseRefs.catalogLicenseRef, catalogDefaults };
 }
 export async function createClosedBusinessAlbum(authorId: string, title: string) {
   const admin = await requireAdminPanelAccess();
@@ -44,11 +68,13 @@ export async function createClosedBusinessAlbum(authorId: string, title: string)
   rpcError(error);
   return data as string;
 }
-export async function saveBusinessPassport(audioItemId: string, fields: Record<string, unknown>) {
+export async function saveBusinessPassport(audioItemId: string, fields: Record<string, unknown>, options?: { keys?: readonly string[] }) {
   await requireAdminPanelAccess();
   id(audioItemId);
   // Never accept status, approvals, verified hashes or timestamps from the client.
-  const safe = Object.fromEntries(Object.keys(PASSPORT_FIELDS).map((key) => [key, typeof fields[key] === 'string' ? fields[key] : null]));
+  const allowed = new Set(Object.keys(PASSPORT_FIELDS));
+  const keys = (options?.keys ?? Object.keys(PASSPORT_FIELDS)).filter((key) => allowed.has(key));
+  const safe = Object.fromEntries(keys.map((key) => [key, typeof fields[key] === 'string' ? fields[key] : null]));
   const db = await createClient();
   const { error } = await db.rpc('admin_upsert_business_track_passport', { p_audio_item_id: audioItemId, p_fields: safe });
   rpcError(error);

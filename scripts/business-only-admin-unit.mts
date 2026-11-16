@@ -100,7 +100,7 @@ assert.equal(isWorkspaceMusicPractice({ ...listed, catalogVisibility: 'selected_
 assert.deepEqual(planPracticePublishedSearchNotifications({ authorSlug: 'author', practiceSlug: 'album', business_only: true,
   isFirstPublishOfPractice: true, publishedCountBefore: 0, catalogVisibility: 'selected_users' }), { indexNow: [], yandex: null });
 for (const path of ['src/lib/business-track-passports/model.ts', 'src/lib/business-track-passports/admin.server.ts',
-  'src/app/(platform)/admin/business-catalog/page.tsx', 'src/app/(platform)/admin/business-catalog/PassportForm.tsx']) assert.ok(!read(path).includes('\u2014'), `${path}: en dash only`);
+  'src/app/(platform)/admin/business-catalog/page.tsx', 'src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx', 'src/app/(platform)/admin/business-catalog/PassportForm.tsx']) assert.ok(!read(path).includes('\u2014'), `${path}: en dash only`);
 assert.match(BUSINESS_ONLY_BADGE, /Только для АудиоЛад Бизнес – не публикуется/);
 const form = read('src/components/author-dashboard/AuthorProductForm.tsx');
 assert.match(form, /showWizardStep\(4\) && !businessOnly \? \(\s*<fieldset/);
@@ -136,9 +136,12 @@ assert.doesNotMatch(createHtml, /Для загрузки нужен доступ
 const emptyCreate = renderToStaticMarkup(createElement(catalogForm.CreateClosedAlbum, { authors: [] }));
 assert.match(emptyCreate, /Для загрузки нужен доступ владельца или редактора к автору/);
 const pageSrc = read('src/app/(platform)/admin/business-catalog/page.tsx');
+const workSrc = read('src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx');
 assert.match(pageSrc, /href="\/admin\/business-track-review"/);
 assert.match(pageSrc, /href="\/admin\/business-admissions"/);
-assert.match(pageSrc, /author-dashboard\/products\/\$\{album\.id\}\?step=2/);
+assert.match(pageSrc, /ClosedAlbumWork/);
 assert.match(pageSrc, /rounded-\[18px\] border border-\[#e4d7f4\] bg-white/);
-assert.match(pageSrc, /Загрузить треки и мастер-файлы/);
+assert.match(workSrc, /publishedBusinessEditHref\(album\.id, true\)/);
+assert.match(workSrc, /Открыть альбом/);
+assert.match(workSrc, /Работа с закрытыми альбомами/);
 console.log('business-only-admin: PASS (guarded actions, streamed hash, forged verification, real PATCH 409, missing evidence, SQL pool mirror, publication planner, Russian UI)');
