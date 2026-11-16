@@ -397,8 +397,20 @@ assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/workspace"
   action: "rewrite_business_app",
   pathname: "/business-app/workspace",
 });
-for (const api of ["/api/business/workspace/track-url", "/api/business/workspace/state", "/api/business/workspace/queue"]) {
+for (const api of ["/api/business/workspace/track-url", "/api/business/workspace/state", "/api/business/workspace/queue", "/api/business/workspace/cover"]) {
   assert.equal(resolveBusinessProxyAction("business.audiolad.ru", api).action, "pass_through", api);
+}
+{
+  const savedFlag = process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+  process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = "1";
+  try {
+    for (const api of ["/api/business/workspace/track-url", "/api/business/workspace/state", "/api/business/workspace/queue", "/api/business/workspace/cover"]) {
+      assert.equal(resolveBusinessProxyAction("coffee.audiolad.ru", api).action, "pass_through", `coffee ${api}`);
+    }
+  } finally {
+    if (savedFlag === undefined) delete process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED;
+    else process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED = savedFlag;
+  }
 }
 
 // ---------------------------------------------------------------- player: network error, then recovery, then loop

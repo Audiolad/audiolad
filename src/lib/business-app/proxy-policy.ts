@@ -40,6 +40,8 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/workspace/track-url",
   "/api/business/workspace/state",
   "/api/business/workspace/queue",
+  // t1507u: closed-album covers for the hall/owner player (session checked in the handler).
+  "/api/business/workspace/cover",
   "/api/business/subscription/accept",
   "/api/business/subscription/checkout",
   // 8142d69a: personal partner code (link and «У меня есть подарочный код»). Checks run in the handler.

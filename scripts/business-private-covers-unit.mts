@@ -27,6 +27,8 @@ for (const bad of [PUBLIC, `business-private-cover:practices/${ALBUM}/variants/.
 }
 assert.ok(pc.BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS > 0 && pc.BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS <= 300, 'short-lived signed URL');
 assert.ok(pc.BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS < pc.BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS, 'redirect never outlives the signature');
+assert.ok(pc.BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS >= 4 * 60 * 60, 'player cover cache covers a long hall session');
+assert.ok(pc.BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS <= 24 * 60 * 60, 'player cover cache stays private and bounded');
 const routeUrl = pc.businessWorkspaceCoverUrl(TRACK, 'cafe');
 assert.equal(routeUrl, `/api/business/workspace/cover?space=cafe&track=${TRACK}`);
 assert.doesNotMatch(routeUrl, /token|sign|business-private-cover/);
@@ -58,9 +60,11 @@ type Row = Record<string, unknown> | null;
 let rows: Record<string, Row> = {};
 const updates: { table: string; patch: Record<string, unknown> }[] = [];
 const signCalls: { bucket: string; path: string; ttl: number }[] = [];
+const downloadCalls: { bucket: string; path: string }[] = [];
 const uploads: { bucket: string; profile: string }[] = [];
 const indexNow: unknown[] = [];
 let signSeq = 0;
+const COVER_BYTES = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x01, 0x02, 0x03, 0x04]);
 const fakeDb = {
   from(table: string) {
     let updating = false;
@@ -77,6 +81,10 @@ const fakeDb = {
         createSignedUrl: async (path: string, ttl: number) => {
           signCalls.push({ bucket, path, ttl }); signSeq += 1;
           return { data: { signedUrl: `https://proj.supabase.co/storage/v1/object/sign/${bucket}/${path}?token=t${signSeq}` }, error: null };
+        },
+        download: async (path: string) => {
+          downloadCalls.push({ bucket, path });
+          return { data: new Blob([COVER_BYTES], { type: 'image/webp' }), error: null };
         },
         list: async () => ({ data: [] }), remove: async () => ({ data: [] }), upload: async () => ({ error: null }),
       };
@@ -122,20 +130,24 @@ assert.equal((await wsGet()).status, 404, 'ordinary albums keep their public cov
 rows = { audio_items: { practice_id: ALBUM, practices: { business_only: true, cover_url: `business-private-cover:practices/${OTHER}/variants/v1/md.webp` } } };
 assert.equal((await wsGet()).status, 404, 'reference of another album is never signed');
 assert.equal(signCalls.length, 0);
+assert.equal(downloadCalls.length, 0);
 rows = { audio_items: { practice_id: ALBUM, practices: [{ business_only: true, cover_url: REF }] } };
 const first = await wsGet();
-assert.equal(first.status, 302);
-assert.equal(signCalls.at(-1)?.bucket, 'business-private-covers');
-assert.equal(signCalls.at(-1)?.path, `practices/${ALBUM}/variants/v1/md.webp`);
-assert.equal(signCalls.at(-1)?.ttl, pc.BUSINESS_PRIVATE_COVER_SIGNED_URL_TTL_SECONDS);
-assert.match(first.headers.get('location') ?? '', /\/object\/sign\/business-private-covers\/.*token=/);
-assert.equal(first.headers.get('cache-control'), `private, max-age=${pc.BUSINESS_PRIVATE_COVER_REDIRECT_MAX_AGE_SECONDS}`);
-// Expiry: every request signs again (nothing server-cached), so an expired URL is replaced by a fresh one.
+assert.equal(first.status, 200);
+assert.equal(first.headers.get('content-type'), 'image/webp');
+assert.equal(first.headers.get('cache-control'), `private, max-age=${pc.BUSINESS_PRIVATE_COVER_PLAYER_MAX_AGE_SECONDS}`);
+assert.equal(first.headers.get('x-content-type-options'), 'nosniff');
+assert.equal(first.headers.get('location'), null);
+assert.deepEqual(new Uint8Array(await first.arrayBuffer()), COVER_BYTES);
+assert.equal(signCalls.length, 0, 'hall player never receives a short-lived signed URL');
+assert.deepEqual(downloadCalls.at(-1), { bucket: 'business-private-covers', path: `practices/${ALBUM}/variants/v1/md.webp` });
+// Every uncached request re-checks the session and re-reads the private object.
 const second = await wsGet();
-assert.notEqual(second.headers.get('location'), first.headers.get('location'));
-assert.equal(signCalls.length, 2);
+assert.equal(second.status, 200);
+assert.deepEqual(new Uint8Array(await second.arrayBuffer()), COVER_BYTES);
+assert.equal(downloadCalls.length, 2);
 actor = { ...hall, device: false, userId: 'owner' }; // owner session
-assert.equal((await wsGet()).status, 302);
+assert.equal((await wsGet()).status, 200);
 
 // ---------- author routes ----------
 let practice: Record<string, unknown> = { id: ALBUM, business_only: true, status: 'draft', slug: 'a', author_id: 'author', use_shared_cover: false };
@@ -200,6 +212,7 @@ assert.equal((await preview.GET(new Request('https://audiolad.ru/p'), { params: 
 const load = read('src/lib/business-workspace/load.server.ts');
 assert.equal((load.match(/workspaceTrackCoverUrl\(practice, (audio|row)\.id, spaceId\)/g) ?? []).length, 2, 'both workspace pools use the private-aware cover source');
 assert.doesNotMatch(load, /cabinetAlbumCoverUrl\(/);
+assert.match(read('src/lib/business-app/proxy-policy.ts'), /"\/api\/business\/workspace\/cover"/, 'coffee/business hosts must serve the cover route');
 const migration = read('supabase/migrations/20270312120000_business_only_private_covers.sql');
 assert.match(migration, /^BEGIN;\nSET LOCAL lock_timeout = '5s';/m);
 assert.match(migration, /'business-private-covers', 'business-private-covers', false/);
@@ -207,4 +220,4 @@ assert.doesNotMatch(migration, /CREATE POLICY [a-z_]+ ON storage\.objects (?!AS 
 assert.ok(read('supabase/rollback/20270312120000_business_only_private_covers.down.sql').includes("'audiolad:internal-moderation-readiness:v8;"));
 const gallery = read('src/app/api/author/products/[id]/gallery/route.ts');
 assert.match(gallery, /assertBusinessOnlyCoverUploadAllowed\(practice\)/, 'gallery stays blocked for closed albums');
-console.log('business-private-covers-unit: PASS (refs, public renderers null, hall/owner route 404/302 + TTL + re-sign, author upload to private bucket, ordinary unchanged, editor preview, no IndexNow, wiring)');
+console.log('business-private-covers-unit: PASS (refs, public renderers null, hall/owner route 404/200 + long private cache, author upload to private bucket, ordinary unchanged, editor preview, no IndexNow, wiring)');

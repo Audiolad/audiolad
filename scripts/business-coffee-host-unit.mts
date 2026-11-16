@@ -124,7 +124,7 @@ try {
   for (const path of ["/spa", "/business-app/spa", "/catalog", "/coffee-handoff", "/business-app/coffee-handoff"]) {
     assert.equal(resolveBusinessProxyAction(COFFEE_HOSTNAME, path).action, "not_found");
   }
-  for (const path of ["/robots.txt", "/sitemap.xml", "/api/business/guest/coffee/usage", "/api/business/workspace/queue", "/api/business/subscription/checkout", "/api/business/player/report"]) {
+  for (const path of ["/robots.txt", "/sitemap.xml", "/api/business/guest/coffee/usage", "/api/business/workspace/queue", "/api/business/workspace/cover", "/api/business/subscription/checkout", "/api/business/player/report"]) {
     assert.equal(resolveBusinessProxyAction(COFFEE_HOSTNAME, path).action, "pass_through");
   }
   // MAJOR 2 regression: /spa pilot player APIs are not served on coffee; business unchanged.
