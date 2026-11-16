@@ -286,25 +286,23 @@ export type AudioSprintListingSortable = {
 };
 
 /**
- * Author-cabinet list order: free first, then the current user's own
- * in-progress and moderation bookings, then other booked or in-moderation
- * queries, then published, then topics already released to the general SEO
- * pool. Alphabetical (ru, base sensitivity) within each group.
+ * Author-cabinet list order: free and reserved queries stay together in
+ * the existing primary order (alphabetical, ru, base sensitivity). That
+ * includes the current user's bookings, reservations in another of the
+ * author's workspaces, bookings by others, and items in moderation.
+ * Only published queries sink to the bottom, then topics already released
+ * to the general SEO pool, also alphabetically within each of those groups.
  *
- * Own bookings stay near the top so "Мои запросы" remain easy to reach,
- * including a reservation held in another of the author's workspaces.
+ * After reserve, the card stays in place: available → in_progress does not
+ * change rank, and the text order is unchanged. A page refresh uses the
+ * same sort, so the row does not jump.
  */
 export function audioSprintListingSortRank(
   item: AudioSprintListingSortable,
 ): number {
-  if (item.releasedToGeneralAt) return 4;
-  if (item.lifecycle === "available") return 0;
-  const own =
-    Boolean(item.reservedByCurrentUser) || Boolean(item.reservationId);
-  if (item.lifecycle === "in_progress" || item.lifecycle === "moderation") {
-    return own ? 1 : 2;
-  }
-  return 3;
+  if (item.releasedToGeneralAt) return 2;
+  if (item.lifecycle === "published") return 1;
+  return 0;
 }
 
 export function sortAudioSprintQueriesForListing<
