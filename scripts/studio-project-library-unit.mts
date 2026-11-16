@@ -41,7 +41,8 @@ const library = await readFile(
   "utf8",
 );
 assert.match(library, /listStudioProjects\(\{ authorId, signal: controller\.signal \}\)/);
-assert.match(library, /href="\/studio\/project\/new"/);
+assert.match(library, /"\/studio\/project\/new"/);
+assert.match(library, /href=\{newProjectHref\}/);
 assert.match(library, /href=\{`\/studio\/project\/\$\{encodeURIComponent\(project\.id\)\}`\}/);
 assert.match(library, /Студия аудиопрактик/);
 assert.match(library, /\+ Новый проект/);
@@ -65,7 +66,7 @@ const studioProjectsPage = await readFile(
   "utf8",
 );
 assert.match(studioProjectsPage, /requireStudioEditorAccess\("\/studio\/projects"\)/);
-assert.match(studioProjectsPage, /<StudioProjectLibrary authorId=\{authorId\} accessMode=\{accessMode\} \/>/);
+assert.match(studioProjectsPage, /<StudioProjectLibrary\s+authorId=\{authorId\}[\s\S]*?accessMode=\{accessMode\}\s*\/>/);
 assert.match(studioProjectsPage, /showStudioLauncher/);
 const chromeNav = await readFile(
   new URL("../src/components/studio/StudioChromeNav.tsx", import.meta.url),
