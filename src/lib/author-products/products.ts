@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLOSED_CATALOG_ONLY_CREATE_BLOCKED, isClosedCatalogOnlyAuthor } from "@/lib/authors/closed-catalog-only";
+import { CLOSED_CATALOG_ONLY_CREATE_BLOCKED, closedCatalogCreateDecision } from "@/lib/authors/closed-catalog-only";
 
 import { catalogSectionColumnForInsert } from "@/lib/author-products/catalog-section-field";
 import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
@@ -585,7 +585,11 @@ export async function createDraftProduct(
     .select("closed_catalog_only")
     .eq("id", input.authorId)
     .maybeSingle();
-  if (!closedCatalogAuthor.error && isClosedCatalogOnlyAuthor(closedCatalogAuthor.data?.closed_catalog_only)) {
+  const closedCatalogDecision = closedCatalogCreateDecision(closedCatalogAuthor);
+  if (closedCatalogDecision === "unavailable") {
+    throw new Error("draft_create_failed");
+  }
+  if (closedCatalogDecision === "blocked") {
     throw new Error(CLOSED_CATALOG_ONLY_CREATE_BLOCKED);
   }
 

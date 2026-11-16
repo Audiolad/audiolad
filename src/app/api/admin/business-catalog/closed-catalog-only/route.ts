@@ -1,6 +1,8 @@
 import { unstable_rethrow } from 'next/navigation';
 import { NextResponse } from 'next/server';
 import { requireAdminPanelAccess } from '@/lib/admin/guard';
+import { listAuthorWorkspacesForUser } from '@/lib/author-products/auth';
+import { CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR } from '@/lib/authors/closed-catalog-only';
 import { isSameOriginJsonRequest } from '@/lib/business-app/spa-player-report';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
@@ -11,14 +13,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * t1505u: operator toggle for authors.closed_catalog_only.
- * Uses a stable route (not a server action). Owner with admin panel access can change it.
+ * Uses a stable route (not a server action). After the admin-panel guard, the operator
+ * must be able to manage the author (same membership check as createClosedBusinessAlbum).
  */
 export async function POST(request: Request) {
   if (!isSameOriginJsonRequest(request.headers)) {
     return NextResponse.json({ ok: false, message: 'Запрос отклонён. Обновите страницу и попробуйте ещё раз.' }, { status: 403, headers: NO_STORE });
   }
+  let admin: Awaited<ReturnType<typeof requireAdminPanelAccess>>;
   try {
-    await requireAdminPanelAccess();
+    admin = await requireAdminPanelAccess();
   } catch (error) {
     unstable_rethrow(error);
     return NextResponse.json({ ok: false, message: 'Нужен доступ администратора.' }, { status: 403, headers: NO_STORE });
@@ -33,6 +37,10 @@ export async function POST(request: Request) {
   const authorId = typeof body.author_id === 'string' ? body.author_id : '';
   if (!UUID.test(authorId)) {
     return NextResponse.json({ ok: false, message: 'Некорректный идентификатор.' }, { status: 400, headers: NO_STORE });
+  }
+  const authors = await listAuthorWorkspacesForUser(admin.userId);
+  if (!authors.some((author) => author.id === authorId)) {
+    return NextResponse.json({ ok: false, message: CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR }, { status: 403, headers: NO_STORE });
   }
   const enabled = body.enabled === true;
   const db = createServiceRoleClient();

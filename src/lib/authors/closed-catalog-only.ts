@@ -27,10 +27,26 @@ export const CREATE_CLOSED_ALBUM_CABINET_HINT =
 export const CLOSED_CATALOG_ONLY_CREATE_BLOCKED =
   'Этот автор публикует только закрытые альбомы Бизнеса. Создайте альбом кнопкой «Создать закрытый альбом».';
 
+export const CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR = 'Нет доступа к этому автору.';
+
 export function isClosedCatalogOnlyAuthor(
   flag: boolean | null | undefined,
 ): boolean {
   return flag === true;
+}
+
+export type ClosedCatalogFlagRead = {
+  error?: { message?: string } | null;
+  data?: { closed_catalog_only?: boolean | null } | null;
+};
+
+/** Fail closed when the flag cannot be read: do not create an open-catalog draft. */
+export function closedCatalogCreateDecision(
+  read: ClosedCatalogFlagRead,
+): 'allow' | 'blocked' | 'unavailable' {
+  if (read.error) return 'unavailable';
+  if (isClosedCatalogOnlyAuthor(read.data?.closed_catalog_only)) return 'blocked';
+  return 'allow';
 }
 
 /** Closed-catalog-only albums use steps 1 (title) and 2 (cover and tracks). Step 3 is dropped. */

@@ -6,11 +6,13 @@ import assert from 'node:assert/strict';
 import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import {
+  CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR,
   CLOSED_CATALOG_ONLY_CREATE_BLOCKED,
   CLOSED_CATALOG_ONLY_TOGGLE_ROUTE,
   CREATE_CLOSED_ALBUM_CABINET_BUTTON,
   CREATE_CLOSED_ALBUM_CABINET_ROUTE,
   clampProductWizardStep,
+  closedCatalogCreateDecision,
   isClosedCatalogOnlyAuthor,
   lastVisibleProductWizardStep,
   nextVisibleProductWizardStep,
@@ -37,6 +39,10 @@ assert.equal(isClosedCatalogOnlyAuthor(undefined), false);
 assert.equal(isClosedCatalogOnlyAuthor(null), false);
 assert.equal(shouldHideOpenCatalogAlbumFields(true), true);
 assert.equal(shouldHideOpenCatalogAlbumFields(false), false);
+assert.equal(closedCatalogCreateDecision({ error: null, data: { closed_catalog_only: false } }), 'allow');
+assert.equal(closedCatalogCreateDecision({ error: null, data: { closed_catalog_only: true } }), 'blocked');
+assert.equal(closedCatalogCreateDecision({ error: { message: 'permission denied' }, data: null }), 'unavailable');
+assert.equal(closedCatalogCreateDecision({ error: { message: 'column does not exist' } }), 'unavailable');
 
 // 2. Wizard: flagged author keeps steps 1–2 and drops step 3 (and open-catalog step 4).
 assert.deepEqual(visibleProductWizardSteps(false), PRODUCT_WIZARD_STEPS);
@@ -69,14 +75,27 @@ assert.match(read('supabase/migrations/20270313120000_business_passport_shazam_c
 assert.match(read('src/lib/business-track-passports/cabinet.server.ts'), /business_only music when the master is verified/);
 assert.match(read('src/lib/business-track-passports/cabinet.server.ts'), /closedBusinessAlbumInsertRow/);
 
-// 4. Additive migration: column defaults to false, no author rows are written, rollback drops only the column.
+// 4. Additive migration: column defaults to false, no author is auto-enabled, rollback drops the guard then the column.
 const migration = read('supabase/migrations/20270314120000_author_closed_catalog_only.sql');
 assert.match(migration, /ADD COLUMN IF NOT EXISTS closed_catalog_only boolean/);
 assert.match(migration, /SET DEFAULT false/);
 assert.match(migration, /SET NOT NULL/);
 assert.doesNotMatch(migration, /UPDATE public\.authors\s+SET closed_catalog_only = true/i);
 assert.doesNotMatch(migration, /UPDATE public\.authors[\s\S]{0,200}SET closed_catalog_only = true[\s\S]{0,200}(name|slug)/i);
-assert.match(read('supabase/rollback/20270314120000_author_closed_catalog_only.down.sql'), /DROP COLUMN IF EXISTS closed_catalog_only/);
+assert.match(migration, /CREATE OR REPLACE FUNCTION public\.guard_authors_closed_catalog_only\(\)/);
+assert.match(migration, /BEFORE UPDATE ON public\.authors/);
+assert.match(migration, /NEW\.closed_catalog_only IS NOT DISTINCT FROM OLD\.closed_catalog_only/);
+assert.match(migration, /auth\.uid\(\) IS NULL OR public\.is_platform_staff\(auth\.uid\(\)\)/);
+assert.match(migration, /RAISE EXCEPTION 'closed_catalog_only_staff_only'/);
+assert.match(migration, /ERRCODE = '42501'/);
+const rollback = read('supabase/rollback/20270314120000_author_closed_catalog_only.down.sql');
+assert.match(rollback, /DROP TRIGGER IF EXISTS guard_authors_closed_catalog_only_trigger/);
+assert.match(rollback, /DROP FUNCTION IF EXISTS public\.guard_authors_closed_catalog_only\(\)/);
+assert.match(rollback, /DROP COLUMN IF EXISTS closed_catalog_only/);
+assert.ok(
+  rollback.indexOf('DROP TRIGGER IF EXISTS guard_authors_closed_catalog_only_trigger')
+    < rollback.indexOf('DROP COLUMN IF EXISTS closed_catalog_only'),
+);
 
 // 5. Cabinet create route: stable JSON API, success / reuse / flag-off 403, no cross-site.
 type CreateImpl = (author: string, title: string) => Promise<{ id: string; reused: boolean }>;
@@ -87,16 +106,18 @@ mock('../src/lib/business-track-passports/cabinet.server.ts', {
     createCalls.push([author, title]);
     return createImpl(author, title);
   },
-  closedBusinessAlbumInsertRow,
 });
 const cabinetRoute = require('../src/app/api/author/closed-albums/route.ts') as typeof import('../src/app/api/author/closed-albums/route');
 const postCabinet = (body: unknown, headers: Record<string, string> = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }) =>
-  cabinetRoute.POST(new Request(`https://audiolad.ru${CREATE_CLOSED_ALBUM_CABINET_ROUTE}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }));
+  cabinetRoute.POST(new Request(`https://audiolad.ru${CREATE_CLOSED_ALBUM_CABINET_ROUTE}`, { method: 'POST', headers, body: JSON.stringify(body) }));
+
 const originalConsoleError = console.error;
 console.error = () => {};
+let response: Response;
 try {
-  let response = await postCabinet({ author_id: authorId, title: 'Утро без суеты' });
+  response = await postCabinet({ author_id: authorId, title: 'Утро без суеты' });
   assert.equal(response.status, 201);
+  assert.deepEqual(createCalls.at(-1), [authorId, 'Утро без суеты']);
   assert.deepEqual(await response.json(), { ok: true, albumId, reused: false, editHref: closedAlbumEditHref(albumId) });
 
   createImpl = async () => ({ id: albumId, reused: true });
@@ -117,13 +138,21 @@ try {
   console.error = originalConsoleError;
 }
 
-// 6. Admin toggle route: stable JSON API, owner with admin panel access can switch the flag.
+// 6. Admin toggle route: same-origin first, then admin panel, then workspace membership.
 const updates: { id: string; enabled: boolean }[] = [];
 const adminOk = true;
+const workspaces: { id: string }[] = [{ id: authorId }];
+const workspaceCalls: string[] = [];
 mock('../src/lib/admin/guard.ts', {
   requireAdminPanelAccess: async () => {
     if (!adminOk) throw new Error('Нужен доступ администратора.');
     return { userId: 'admin' };
+  },
+});
+mock('../src/lib/author-products/auth.ts', {
+  listAuthorWorkspacesForUser: async (userId: string) => {
+    workspaceCalls.push(userId);
+    return workspaces;
   },
 });
 mock('../src/lib/supabase/service-role.ts', {
@@ -158,9 +187,27 @@ response: {
   assert.deepEqual(updates.at(-1), { id: authorId, enabled: false });
 }
 {
+  const beforeWorkspaces = workspaceCalls.length;
   const response = await postToggle({ author_id: authorId, enabled: true }, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
   assert.equal(response.status, 403);
+  assert.equal(workspaceCalls.length, beforeWorkspaces, 'same-origin is checked before membership');
 }
+{
+  const foreignId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+  const before = updates.length;
+  const response = await postToggle({ author_id: foreignId, enabled: true });
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { ok: false, message: CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR });
+  assert.equal(updates.length, before);
+  assert.equal(workspaceCalls.at(-1), 'admin');
+}
+
+const toggleRouteSrc = read('src/app/api/admin/business-catalog/closed-catalog-only/route.ts');
+assert.match(toggleRouteSrc, /isSameOriginJsonRequest\(request.headers\)/);
+assert.match(toggleRouteSrc, /listAuthorWorkspacesForUser\(admin\.userId\)/);
+const togglePost = toggleRouteSrc.slice(toggleRouteSrc.indexOf('export async function POST'));
+assert.ok(togglePost.indexOf('isSameOriginJsonRequest') < togglePost.indexOf('requireAdminPanelAccess'));
+assert.ok(togglePost.indexOf('requireAdminPanelAccess') < togglePost.indexOf('listAuthorWorkspacesForUser'));
 
 // 7. UI: cabinet form and admin toggle use fixed routes, not server actions. Russian copy, en dash only.
 const cabinetForm = read('src/components/author-dashboard/CreateClosedAlbumCabinet.tsx');
@@ -204,5 +251,10 @@ assert.equal(parseCreateClosedAlbumResponse({
 assert.match(read('src/lib/author-products/products.ts'), /CLOSED_CATALOG_ONLY_CREATE_BLOCKED/);
 assert.match(read('src/lib/author-products/auth.ts'), /closed_catalog_only/);
 assert.equal(CLOSED_CATALOG_ONLY_CREATE_BLOCKED.includes('закрытые альбомы'), true);
+const productsSrc = read('src/lib/author-products/products.ts');
+assert.match(productsSrc, /closedCatalogCreateDecision\(closedCatalogAuthor\)/);
+assert.match(productsSrc, /closedCatalogDecision === "unavailable"/);
+assert.match(productsSrc, /throw new Error\("draft_create_failed"\)/);
+assert.doesNotMatch(productsSrc, /!closedCatalogAuthor\.error && isClosedCatalogOnlyAuthor/);
 
 console.log('closed-catalog-only-cabinet: PASS (flag, cabinet route, admin toggle, simplified wizard, other authors unchanged)');
