@@ -12,6 +12,7 @@ import {
   SpaOnlinePlayer,
   type OnlineSignResult,
 } from "../src/lib/business-app/spa-online-player";
+import { cabinetAlbumLabel, cabinetMiniBarTitle } from "../src/lib/business-app/cabinet-track-label";
 import { lockedAppleScreen, playerSessionState, runSessionAction, syncPlayerMediaSession } from "../src/lib/business-app/hall-media-session";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
 
@@ -249,9 +250,14 @@ function world(opts: { hidden?: boolean; order?: number[]; items?: SpaManifestIt
 // 7. Lock screen state of the cabinet player (playerSessionState / runSessionAction, used by
 //    BusinessCabinetPlayerProvider as is).
 {
-  const track = { title: "Утро", authorName: " Автор " };
+  const track = { title: "Утро", authorName: " Автор ", albumTitle: " Мягкий джаз " };
   const base = { open: true, mirror: false, track, artwork: "/c.jpg", status: "playing", pointDevice: true, pointCanEdit: true };
-  assert.deepEqual(playerSessionState(base), { title: "Утро", artist: "Автор", artwork: "/c.jpg", playing: true, canNext: true });
+  assert.deepEqual(playerSessionState(base), { title: "Утро", artist: "Мягкий джаз", artwork: "/c.jpg", playing: true, canNext: true });
+  assert.equal(playerSessionState({ ...base, track: { title: "Утро", authorName: "Автор", albumTitle: null } })?.artist, "", "missing album must not fall back to the artist");
+  assert.equal(cabinetAlbumLabel({ albumTitle: "  Фоновая музыка lo fi  " }), "Фоновая музыка lo fi");
+  assert.equal(cabinetMiniBarTitle({ title: "Пока город спит", albumTitle: "Фоновая музыка lo fi", authorName: "Чили на виниле" }), "Пока город спит – Фоновая музыка lo fi");
+  assert.equal(cabinetMiniBarTitle({ title: "Пока город спит", albumTitle: "  ", authorName: "Чили на виниле" }), "Пока город спит");
+  assert.equal(cabinetMiniBarTitle(null), null);
   assert.equal(playerSessionState({ ...base, pointCanEdit: false })?.canNext, false, "hall without the owner's permission: no next");
   assert.equal(playerSessionState({ ...base, pointDevice: false, pointCanEdit: false })?.canNext, true, "owner: next");
   assert.equal(playerSessionState({ ...base, mirror: true }), null, "owner mirror: session cleared");
@@ -271,6 +277,8 @@ function world(opts: { hidden?: boolean; order?: number[]; items?: SpaManifestIt
   const provider = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
   assert.match(provider, /backgroundAdvance: \(\) => lockedAppleScreen\(document, navigator\)/);
   assert.match(provider, /playerSessionState\(\{/);
+  assert.match(provider, /cabinetMiniBarTitle\(track\)/);
+  assert.doesNotMatch(provider, /title\} – \$\{author\}/, "mini-bar title never appends the artist");
   assert.equal(provider.match(/ctl\?\.queueChanged\(\)/g)?.length, 3, "every queue change re-signs the next track");
   assert.match(provider, /const onEnded = \(\) => void ctl\.onEnded\(\);/);
 }

@@ -1236,8 +1236,10 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   })} />);
   const nowCover = denied.slice(denied.indexOf('data-testid="biz-now-cover"'), denied.indexOf('data-testid="biz-now-progress"'));
   assert.doesNotMatch(nowCover, /<img/);
-  assert.match(groupedHtml, /Джаз Релакс/);
+  assert.doesNotMatch(groupedHtml, /Джаз Релакс/, "the now-playing card never shows the artist");
   assert.match(groupedHtml, /Мягкий джаз/);
+  assert.match(groupedHtml, /data-testid="biz-now-album"/);
+  assert.doesNotMatch(groupedHtml, /data-testid="biz-now-author"/);
   assert.match(groupedHtml, /data-testid="biz-now-queue"/);
   assert.match(groupedHtml, /Дальше в очереди/);
   assert.match(groupedHtml, /business-atmosphere-track__cover/);
@@ -1264,8 +1266,10 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
     })} />);
     const nowHtml = albumOnly.slice(albumOnly.indexOf('data-testid="biz-now-playing"'), albumOnly.indexOf('data-testid="biz-now-queue"'));
     assert.match(nowHtml, /Уют в каждой ноте/);
-    assert.match(nowHtml, /Джазманов/, "the now-playing card still shows the artist");
+    assert.doesNotMatch(nowHtml, /Джазманов/, "the now-playing card never shows the artist");
     assert.match(nowHtml, /Фоновый джаз без слов/);
+    assert.match(nowHtml, /data-testid="biz-now-album"/);
+    assert.doesNotMatch(nowHtml, /data-testid="biz-now-author"/);
     const qStart = albumOnly.indexOf('data-testid="biz-now-queue"');
     const queueOnly = albumOnly.slice(qStart, albumOnly.indexOf('data-testid="biz-workspace-player"', qStart));
     assert.match(queueOnly, /Тихий вечер/);

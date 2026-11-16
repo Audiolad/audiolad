@@ -215,7 +215,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   ]);
 
   const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
-  const author = current?.authorName?.trim() ?? "";
   const album = current?.albumTitle?.trim() ?? "";
   const nowCover = current ? cabinetAlbumCoverUrl({ coverUrl: current.coverUrl }) : null;
   const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
@@ -323,7 +322,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               </span>
               <div className="business-now__meta">
                 <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
-                {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
                 {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
               </div>
             </div>
