@@ -75,16 +75,22 @@ import { isPublishedProductSeoAttachEnabled } from "@/lib/seo-queries/published-
 import {
   buildAuthorProductEditPath,
   buildWizardStepHref,
-  nextProductWizardStep,
-  previousProductWizardStep,
   shouldShowProductWizardStep,
 } from "@/lib/author-products/product-wizard-navigation";
 import {
   PRODUCT_WIZARD_DEFAULT_STEP,
-  PRODUCT_WIZARD_STEP_COUNT,
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
+import {
+  clampProductWizardStep,
+  isClosedCatalogOnlyAuthor,
+  lastVisibleProductWizardStep,
+  nextVisibleProductWizardStep,
+  previousVisibleProductWizardStep,
+  shouldHideOpenCatalogAlbumFields,
+  visibleProductWizardSteps,
+} from "@/lib/authors/closed-catalog-only";
 import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
 import {
   describeJazzRelaxPassportActivity,
@@ -877,7 +883,7 @@ export default function AuthorProductForm({
   mode,
 }: AuthorProductFormProps) {
   const router = useRouter();
-  const [wizardStep, setWizardStep] =
+  const [wizardStepRaw, setWizardStep] =
     useState<ProductWizardStep>(initialWizardStep);
   const [promoError, setPromoError] = useState<string | null>(null);
   const lastSaveFailureReasonRef = useRef<string | null>(null);
@@ -1457,6 +1463,14 @@ export default function AuthorProductForm({
     () => authors.find((author) => author.id === form.authorId) ?? null,
     [authors, form.authorId],
   );
+  const closedCatalogOnly = isClosedCatalogOnlyAuthor(selectedAuthor?.closedCatalogOnly);
+  const hideOpenCatalogFields = shouldHideOpenCatalogAlbumFields(closedCatalogOnly);
+  const visibleWizardSteps = visibleProductWizardSteps(closedCatalogOnly);
+  const lastWizardStep = lastVisibleProductWizardStep(closedCatalogOnly);
+  const wizardStep = clampProductWizardStep(wizardStepRaw, closedCatalogOnly);
+  if (wizardStep !== wizardStepRaw) {
+    setWizardStep(wizardStep);
+  }
   const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
   const canConfigureStudioMusic = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
@@ -1494,7 +1508,8 @@ export default function AuthorProductForm({
     mode === "edit" &&
     publishedProductStatus &&
     publishedSeoAttachEnabled &&
-    !hasRelationalPrimarySeoQuery;
+    !hasRelationalPrimarySeoQuery &&
+    !hideOpenCatalogFields;
 
   const showWizardStep = (step: ProductWizardStep) =>
     shouldShowProductWizardStep({
@@ -3823,20 +3838,24 @@ export default function AuthorProductForm({
   }
 
   function goToWizardStep(nextStep: ProductWizardStep) {
-    setWizardStep(nextStep);
+    const clamped = clampProductWizardStep(nextStep, closedCatalogOnly);
+    setWizardStep(clamped);
     if (typeof window === "undefined") {
       return;
     }
     const nextHref = buildWizardStepHref(
       window.location.pathname,
       window.location.search,
-      nextStep,
+      clamped,
     );
     window.history.replaceState(null, "", nextHref);
   }
 
   function canJumpToWizardStep(step: ProductWizardStep) {
     if (!wizardEnabled) {
+      return false;
+    }
+    if (!visibleWizardSteps.some((item) => item.step === step)) {
       return false;
     }
     if (step === wizardStep) {
@@ -3965,7 +3984,7 @@ export default function AuthorProductForm({
         && wizardStep === 2
         && (passportPhase === "completed" || passportActivity.continueInBackground)
       ) {
-        const next = nextProductWizardStep(wizardStep);
+        const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
         if (next) {
           goToWizardStep(next);
         }
@@ -3979,7 +3998,7 @@ export default function AuthorProductForm({
         return;
       }
 
-      const next = nextProductWizardStep(wizardStep);
+      const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
       if (next) {
         goToWizardStep(next);
       }
@@ -3990,7 +4009,7 @@ export default function AuthorProductForm({
   }
 
   function goWizardBack() {
-    const prev = previousProductWizardStep(wizardStep);
+    const prev = previousVisibleProductWizardStep(wizardStep, closedCatalogOnly);
     if (prev) {
       goToWizardStep(prev);
     }
@@ -4008,7 +4027,7 @@ export default function AuthorProductForm({
       requestScrollToFirstSubmitIssue();
       return;
     }
-    const next = nextProductWizardStep(wizardStep);
+    const next = nextVisibleProductWizardStep(wizardStep, closedCatalogOnly);
     if (next) {
       goToWizardStep(next);
     }
@@ -4034,6 +4053,7 @@ export default function AuthorProductForm({
           activeStep={wizardStep}
           onSelectStep={goToWizardStep}
           canJumpToStep={canJumpToWizardStep}
+          steps={visibleWizardSteps}
         />
       ) : null}
 
@@ -4142,6 +4162,7 @@ export default function AuthorProductForm({
           </label>
         )}
 
+{!hideOpenCatalogFields ? (
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">Тип продукта</legend>
           {form.publicationClass ? (
@@ -4342,6 +4363,7 @@ export default function AuthorProductForm({
             </p>
           ) : null}
         </fieldset>
+        ) : null}
 
         <label
           className="block"
@@ -4438,7 +4460,7 @@ export default function AuthorProductForm({
 </>
         ) : null}
 
-{showWizardStep(3) ? (
+{showWizardStep(3) && !hideOpenCatalogFields ? (
         <label
           className="block"
           data-submit-issue={fieldErrors.description ? "" : undefined}
@@ -4917,7 +4939,7 @@ export default function AuthorProductForm({
         </div>
 
 
-{showWizardStep(3) ? (
+{showWizardStep(3) && !hideOpenCatalogFields ? (
         <div data-submit-issue={topicError ? "" : undefined}>
           <span className="mb-2 block text-sm font-medium">Темы</span>
           <TopicSelector
@@ -6088,7 +6110,7 @@ export default function AuthorProductForm({
       </section>
       ) : null}
 
-      {showWizardStep(3) ? (
+      {showWizardStep(3) && !hideOpenCatalogFields ? (
       <>
       {showPublishedSeoLinker && practiceId ? (
         <AuthorPublishedProductSeoQueryLinker
@@ -6205,7 +6227,7 @@ export default function AuthorProductForm({
 
       {jazzRelaxMusicPassport && wizardStep === 2 ? <JazzRelaxPassportHelp /> : null}
 
-      {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (
+      {wizardEnabled && wizardStep < lastWizardStep ? (
         <AuthorProductWizardStepNav
           showBack={wizardStep > 1}
           showContinue
@@ -6241,7 +6263,7 @@ export default function AuthorProductForm({
         />
       ) : null}
 
-      {wizardEnabled && wizardStep === PRODUCT_WIZARD_STEP_COUNT ? (
+      {wizardEnabled && wizardStep === lastWizardStep ? (
         <div className="flex flex-col gap-3">
           <button
             type="button"

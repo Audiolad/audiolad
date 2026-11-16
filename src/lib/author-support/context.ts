@@ -191,6 +191,7 @@ export function toSupportWorkspace(
     role: membership.role,
     accessStatus: membership.accessStatus,
     canBypassProductModeration: membership.canBypassProductModeration,
+    closedCatalogOnly: membership.closedCatalogOnly,
     defaultAudioProductAuthor: membership.defaultAudioProductAuthor,
   };
 }

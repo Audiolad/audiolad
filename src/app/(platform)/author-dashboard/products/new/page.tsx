@@ -2,10 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AuthorCreateWizard from "@/components/author-dashboard/AuthorCreateWizard";
+import CreateClosedAlbumCabinet from "@/components/author-dashboard/CreateClosedAlbumCabinet";
 import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
 import AuthorProductSeoQueryStep from "@/components/author-dashboard/AuthorProductSeoQueryStep";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { isClosedCatalogOnlyAuthor } from "@/lib/authors/closed-catalog-only";
 import {
   CABINET_BRANCH_LABELS,
   parsePublicationClass,
@@ -95,6 +97,20 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
 
   const initialAuthor =
     authors.find((item) => item.slug === params.author) ?? authors[0];
+  if (isClosedCatalogOnlyAuthor(initialAuthor.closedCatalogOnly)) {
+    return (
+      <AuthorShell
+        title="Создать закрытый альбом"
+        subtitle="Только для закрытого каталога Бизнеса"
+        internalBackHref="/author-dashboard"
+      >
+        <CreateClosedAlbumCabinet
+          authorId={initialAuthor.id}
+          authorName={initialAuthor.name}
+        />
+      </AuthorShell>
+    );
+  }
   const publicationClass = parsePublicationClass(params.class);
   const seoQueryStepEnabled = isProductCreateSeoDiscoveryEnabled({
     authorId: initialAuthor.id,

@@ -51,6 +51,8 @@ export type AuthorWorkspace = {
   role: AuthorMemberRole;
   accessStatus: AuthorAccessStatus;
   canBypassProductModeration: boolean;
+  /** When true, this author publishes only closed Business catalog albums from the cabinet. */
+  closedCatalogOnly?: boolean;
   /** Project-level default credited audio-product author (nullable). */
   defaultAudioProductAuthor: string | null;
 };

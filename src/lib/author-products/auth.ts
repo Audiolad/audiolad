@@ -1,4 +1,5 @@
 import { BUSINESS_ONLY_COVER_UPLOAD_BLOCKED_MESSAGE } from "@/lib/business-track-passports/model";
+import { CLOSED_CATALOG_ONLY_CREATE_BLOCKED } from "@/lib/authors/closed-catalog-only";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -124,6 +125,7 @@ export async function listAuthorWorkspacesForUser(
         role: membership.role,
         accessStatus: membership.accessStatus,
         canBypassProductModeration: membership.canBypassProductModeration,
+        closedCatalogOnly: membership.closedCatalogOnly,
         defaultAudioProductAuthor: membership.defaultAudioProductAuthor,
       },
     ];
@@ -142,6 +144,7 @@ export async function listAuthorWorkspacesForUser(
         slug,
         access_status,
         can_bypass_product_moderation,
+        closed_catalog_only,
         default_audio_product_author
       )
     `,
@@ -185,6 +188,7 @@ export async function listAuthorWorkspacesForUser(
       accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
       canBypassProductModeration:
         author.can_bypass_product_moderation === true || actorCanBypass,
+      closedCatalogOnly: author.closed_catalog_only === true,
       defaultAudioProductAuthor: rawDefault || null,
     });
   }
@@ -606,6 +610,13 @@ export function handleAuthorRouteError(error: unknown) {
   if (error instanceof Error && error.message === "author_support_proof_missing") {
     console.error("author_route_error", "author_support_proof_missing", 403);
     return jsonError("author_support_proof_missing", 403);
+  }
+
+  if (error instanceof Error && error.message === CLOSED_CATALOG_ONLY_CREATE_BLOCKED) {
+    return NextResponse.json(
+      { error: "closed_catalog_only", message: CLOSED_CATALOG_ONLY_CREATE_BLOCKED },
+      { status: 403 },
+    );
   }
 
   console.error("author_route_unhandled_error", error);
