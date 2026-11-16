@@ -44,6 +44,7 @@ jobs:
           echo "PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)" >> "$GITHUB_ENV"
       - run: npm run test:business-track-passports
       - run: npm run test:business-only-admin
+      - run: npm run test:business-catalog-admission-ui
       - run: npm run test:business-shazam
       - run: npm run test:business-manual-admissions
       - run: npm run test:business-track-sound-review
@@ -55,6 +56,7 @@ jobs:
           scripts/business-only-admin-unit.mts
           scripts/published-business-catalog-unit.mts
           scripts/business-passport-autofill-unit.mts
+          scripts/business-catalog-admission-ui-unit.mts
           scripts/business-shazam-worker-unit.mts
           scripts/run-business-shazam-worker.mts
           src/lib/business-admission/published-catalog.ts

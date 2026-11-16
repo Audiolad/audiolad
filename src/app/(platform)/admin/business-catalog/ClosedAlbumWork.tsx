@@ -51,6 +51,8 @@ function trackStatusClassName(status: string | undefined) {
 
 function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: ClosedAlbum; catalogLicenseRef: string | null; catalogDefaults: CatalogPassportDefaults }) {
   const approved = album.tracks.filter((track) => track.passport?.status === 'approved').length;
+  // t1490u: every track admitted – the counter turns green, the bulk button becomes a badge.
+  const allApproved = album.tracks.length > 0 && approved === album.tracks.length;
   const coverUrl = publishedBusinessCoverUrl({
     id: album.id,
     coverUrl: album.cover_url ?? null,
@@ -81,7 +83,10 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
           {album.authorName ? (
             <p className="mt-1 text-sm text-[#7d70a2]">{album.authorName}</p>
           ) : null}
-          <p className="mt-2 text-sm text-[#5f5484]">
+          <p
+            className={allApproved ? 'mt-2 text-sm font-semibold text-[#1f7a46]' : 'mt-2 text-sm text-[#5f5484]'}
+            data-album-approved-count={allApproved ? 'complete' : undefined}
+          >
             {ruTrackCountLabel(album.tracks.length)}
             {album.tracks.length > 0
               ? ` – ${approved} из ${album.tracks.length} с допущенным паспортом`
@@ -95,6 +100,7 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
       {album.tracks.length > 0 ? (
         <AlbumPassportTools
           albumId={album.id}
+          albumStatus={album.status}
           tracks={album.tracks}
           licenseRef={album.licenseRef ?? null}
           catalogLicenseRef={catalogLicenseRef}

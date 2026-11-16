@@ -14,6 +14,13 @@ import {
   uploadPassportLicenseAction,
   saveCatalogDefaultsAction,
 } from './actions';
+import {
+  albumAdmissionState,
+  summarizeAutoFill,
+  type AutoFillSummary,
+  type AutoFillTrackView,
+} from '@/lib/business-track-passports/admission-ui';
+import type { ShazamCheckRow } from '@/lib/business-track-passports/shazam';
 
 const fieldClassName =
   'block w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#fbf8ff] disabled:text-[#7d70a2]';
@@ -22,7 +29,7 @@ const primaryButtonClassName =
 const secondaryButtonClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60';
 
-type Track = { id: string; title: string; music_track_code?: string | null; passport?: Passport };
+type Track = { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null };
 type AlbumTools = {
   id: string;
   tracks: Track[];
@@ -127,19 +134,81 @@ function DefaultsFields({
   );
 }
 
-async function fillTracks(tracks: Track[], reportLine: (line: string) => void): Promise<boolean> {
-  let allOk = true;
+async function fillTracks(tracks: Track[]): Promise<AutoFillTrackView[]> {
+  const results: AutoFillTrackView[] = [];
   for (const track of tracks) {
     if (track.passport?.status === 'approved' || track.passport?.status === 'revoked') {
-      reportLine(`${track.title}: пропущен, паспорт уже допущен или отозван.`);
+      results.push({ title: track.title, ok: true, errors: [], skipped: [], message: '', alreadyDecided: true });
       continue;
     }
     const result = await autoFillPassportTrackAction(track.id);
-    allOk = allOk && result.ok;
-    const extra = [...result.errors, ...result.skipped].filter(Boolean);
-    reportLine(`${result.title || track.title}: ${result.message}${extra.length ? ` ${extra.join(' ')}` : ''}`);
+    results.push({
+      title: result.title || track.title,
+      ok: result.ok,
+      errors: result.errors,
+      skipped: result.skipped,
+      message: result.message,
+      alreadyDecided: result.skipped.some((item) => item.startsWith('Паспорт уже допущен или отозван')),
+    });
   }
-  return allOk;
+  return results;
+}
+
+const noticeClassName: Record<AutoFillSummary['tone'], string> = {
+  ok: 'rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm text-[#5f5484]',
+  notice: 'rounded-[18px] border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-sm text-[#8a5a00]',
+  error: 'rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]',
+};
+
+function AutoFillResult({ summary }: { summary: AutoFillSummary | null }) {
+  if (!summary) return null;
+  return (
+    <div className="space-y-2" data-autofill-result={summary.tone}>
+      <p role="status" className={noticeClassName[summary.tone]}>{summary.message}</p>
+      {summary.notes.length > 0 ? (
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-[#7d70a2]">
+          {summary.notes.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      ) : null}
+      {summary.lines.length > 0 ? (
+        <details className="text-sm text-[#5f5484]">
+          <summary className="cursor-pointer">По трекам ({summary.lines.length})</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {summary.lines.map((line, index) => <li key={`${index}:${line}`}>{line}</li>)}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+type ApprovalView = { approvedLine: string; refusedLine: string | null; errorLines: string[]; approvedAny: boolean } | { failure: string };
+
+function ApprovalResult({ view }: { view: ApprovalView | null }) {
+  if (!view) return null;
+  if ('failure' in view) {
+    return <p role="status" className={noticeClassName.error} data-approval-result="error">{view.failure}</p>;
+  }
+  return (
+    <div role="status" className="space-y-2" data-approval-result="">
+      <p
+        className={view.approvedAny
+          ? 'rounded-[18px] border border-[#bfe5cd] bg-[#eefaf2] px-4 py-3 text-sm font-semibold text-[#1f7a46]'
+          : 'rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm font-semibold text-[#5f5484]'}
+        data-approval-approved=""
+      >
+        {view.approvedLine}
+      </p>
+      {view.refusedLine ? (
+        <p className={noticeClassName.notice} data-approval-refused="">{view.refusedLine}</p>
+      ) : null}
+      {view.errorLines.length > 0 ? (
+        <ul className="list-disc space-y-1 pl-5 text-sm text-[#5f5484]">
+          {view.errorLines.map((line, index) => <li key={`${index}:${line}`}>{line}</li>)}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 export function CatalogSettingsPanel({
@@ -155,7 +224,7 @@ export function CatalogSettingsPanel({
   const [pending, start] = useTransition();
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [fillSummary, setFillSummary] = useState<AutoFillSummary | null>(null);
   const [fields, setFields] = useState(catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS);
   const trackCount = albums.reduce((sum, album) => sum + album.tracks.length, 0);
 
@@ -201,28 +270,18 @@ export function CatalogSettingsPanel({
               setMessage(saved.message);
               return;
             }
-            const lines: string[] = [];
-            let allOk = true;
-            for (const album of albums) {
-              const albumOk = await fillTracks(album.tracks, (line) => lines.push(line));
-              allOk = allOk && albumOk;
-            }
-            setOk(allOk);
-            setLogs(lines);
-            setMessage(allOk
-              ? 'Автоматическое заполнение всех закрытых альбомов завершено. Shazam проверит треки в фоне, допуск паспортов – вручную.'
-              : 'Автоматическое заполнение завершено с ошибками.');
+            setMessage('');
+            setOk(null);
+            const results: AutoFillTrackView[] = [];
+            for (const album of albums) results.push(...await fillTracks(album.tracks));
+            setFillSummary(summarizeAutoFill(results));
             router.refresh();
           })}
         >
           Заполнить автоматически все закрытые альбомы
         </button>
       </div>
-      {logs.length > 0 ? (
-        <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-[#5f5484]">
-          {logs.map((line) => <li key={line}>{line}</li>)}
-        </ul>
-      ) : null}
+      {fillSummary ? <div className="mt-4"><AutoFillResult summary={fillSummary} /></div> : null}
       <p
         role="status"
         className={message
@@ -239,6 +298,7 @@ export function CatalogSettingsPanel({
 
 export default function AlbumPassportTools({
   albumId,
+  albumStatus,
   tracks,
   licenseRef,
   catalogLicenseRef,
@@ -246,6 +306,7 @@ export default function AlbumPassportTools({
   albumDefaults,
 }: {
   albumId: string;
+  albumStatus?: string;
   tracks: Track[];
   licenseRef: string | null;
   catalogLicenseRef: string | null;
@@ -258,14 +319,18 @@ export default function AlbumPassportTools({
   const [pending, start] = useTransition();
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [fillSummary, setFillSummary] = useState<AutoFillSummary | null>(null);
+  const [approval, setApproval] = useState<ApprovalView | null>(null);
   const [confirmBulk, setConfirmBulk] = useState(false);
-  const draftCount = tracks.filter((track) => track.passport?.status !== 'approved' && track.passport?.status !== 'revoked').length;
+  const admission = useMemo(() => albumAdmissionState(tracks.map((track) => ({
+    passport: track.passport ?? null,
+    shazamActive: track.shazamCheck?.status === 'pending' || track.shazamCheck?.status === 'running',
+  }))), [tracks]);
+  const nothingReady = admission.ready === 0;
 
-  const report = (nextOk: boolean, nextMessage: string, extra: string[] = []) => {
+  const report = (nextOk: boolean, nextMessage: string) => {
     setOk(nextOk);
     setMessage(nextMessage);
-    if (extra.length) setLogs(extra);
   };
 
   return (
@@ -273,41 +338,74 @@ export default function AlbumPassportTools({
       <p className="text-sm leading-6 text-[#5f5484]">
         Общие поля подставляются из настроек каталога, дата генерации – из даты загрузки мастера, ссылка на историю не нужна. Нажмите «Заполнить автоматически»: хеши и AcoustID посчитаются сразу, а Shazam проверит каждый трек в фоне и сам запишет «совпадений нет» с датой. Если Shazam что-то найдёт, это будет показано у трека. Затем нажмите «Допустить в Бизнес». Автоматического допуска нет.
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={pending || tracks.length === 0}
           className={secondaryButtonClassName}
           onClick={() => start(async () => {
-            const lines: string[] = [];
-            const allOk = await fillTracks(tracks, (line) => lines.push(line));
-            report(allOk, allOk ? 'Автоматическое заполнение завершено. Shazam проверит треки в фоне, допуск – вручную.' : 'Автоматическое заполнение завершено с ошибками.', lines);
+            report(true, '');
+            const results = await fillTracks(tracks);
+            setFillSummary(summarizeAutoFill(results));
             router.refresh();
           })}
         >
           Заполнить автоматически
         </button>
-        <button
-          type="button"
-          disabled={pending || draftCount === 0}
-          className={primaryButtonClassName}
-          onClick={() => {
-            if (!confirmBulk) {
-              setConfirmBulk(true);
-              report(true, 'Будут допущены только треки, которые уже проходят обычную проверку паспорта. Нажмите ещё раз, чтобы подтвердить.');
-              return;
-            }
-            start(async () => {
-              const result = await approveReadyPassportsAction(albumId);
-              setConfirmBulk(false);
-              report(result.ok, result.message);
-              if (result.ok || ('approved' in result && result.approved > 0)) router.refresh();
-            });
-          }}
-        >
-          {confirmBulk ? 'Подтвердить допуск готовых' : 'Допустить все готовые'}
-        </button>
+        {admission.complete ? (
+          <span
+            className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#e8f6ee] px-6 text-sm font-semibold text-[#1f7a46]"
+            data-album-admitted=""
+          >
+            {albumStatus === 'published' ? 'Альбом в каталоге Бизнеса ✓' : 'Все треки допущены ✓ – осталось опубликовать альбом'}
+          </span>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled={pending || nothingReady}
+              className={primaryButtonClassName}
+              data-approve-ready=""
+              onClick={() => {
+                if (!confirmBulk) {
+                  setConfirmBulk(true);
+                  report(true, `Будут допущены только треки, которые уже проходят обычную проверку паспорта (готово: ${admission.ready}). Нажмите ещё раз, чтобы подтвердить.`);
+                  return;
+                }
+                start(async () => {
+                  const result = await approveReadyPassportsAction(albumId);
+                  setConfirmBulk(false);
+                  report(true, '');
+                  if ('approvedLine' in result) {
+                    setApproval({
+                      approvedLine: result.approvedLine,
+                      refusedLine: result.refusedLine,
+                      errorLines: result.errorLines,
+                      approvedAny: result.summary.approvedTotal > 0,
+                    });
+                  } else {
+                    setApproval({ failure: result.message });
+                  }
+                  // Always reload the album so the counters and the badge follow the result.
+                  router.refresh();
+                });
+              }}
+            >
+              {confirmBulk && !nothingReady ? 'Подтвердить допуск готовых' : 'Допустить все готовые'}
+            </button>
+            {admission.approved > 0 ? (
+              <span className="text-sm font-semibold text-[#1f7a46]" data-album-partial="">
+                Допущено {admission.approved} из {admission.total}
+              </span>
+            ) : null}
+          </>
+        )}
       </div>
+      {!admission.complete && admission.hint ? (
+        <p className={noticeClassName.notice} data-album-hint="">{admission.hint}</p>
+      ) : null}
+      <ApprovalResult view={approval} />
+      <AutoFillResult summary={fillSummary} />
       <details className="rounded-[18px] border border-[#e4d7f4] bg-white p-3">
         <summary className="cursor-pointer text-sm font-medium text-[#25135c]">Изменить для этого альбома</summary>
         <div className="mt-3 space-y-4">
@@ -337,11 +435,6 @@ export default function AlbumPassportTools({
       </details>
       {isBusinessPassportLicenseRef(licenseRef) || isBusinessPassportLicenseRef(catalogLicenseRef) ? (
         <p className="text-sm leading-6 text-[#5f5484]">Условия тарифа заполняются закрытым образцом лицензии.</p>
-      ) : null}
-      {logs.length > 0 ? (
-        <ul className="list-disc space-y-1 pl-5 text-sm text-[#5f5484]">
-          {logs.map((line) => <li key={line}>{line}</li>)}
-        </ul>
       ) : null}
       <p
         role="status"
