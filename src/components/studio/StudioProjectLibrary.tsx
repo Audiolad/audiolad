@@ -25,11 +25,16 @@ function formatUpdatedAt(value: string): string {
 
 export function StudioProjectLibrary({
   authorId,
+  authorSlug,
   accessMode = "author",
 }: {
   authorId?: string;
+  authorSlug?: string;
   accessMode?: "author" | "guest";
 }) {
+  const newProjectHref = authorSlug
+    ? `/studio/project/new?author=${encodeURIComponent(authorSlug)}`
+    : "/studio/project/new";
   const router = useRouter();
   const [projects, setProjects] = useState<StudioProjectListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +130,7 @@ export function StudioProjectLibrary({
           </div>
           {accessMode === "guest" && (projects?.length ?? 0) >= STUDIO_GUEST_MAX_PROJECTS ? null : (
             <Link
-              href="/studio/project/new"
+              href={newProjectHref}
               className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
             >
               + Новый проект
@@ -170,7 +175,7 @@ export function StudioProjectLibrary({
                 Создайте первый проект — в нём уже будут дорожки для голоса и музыки.
               </p>
               <Link
-                href="/studio/project/new"
+                href={newProjectHref}
                 className="mt-5 inline-flex min-h-10 items-center justify-center rounded-lg border border-[#9bdab5]/65 px-4 text-sm font-semibold text-[#9bdab5]"
               >
                 Создать первый проект
