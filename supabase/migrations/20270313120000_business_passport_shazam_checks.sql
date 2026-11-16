@@ -6,7 +6,7 @@
 -- audiolad-business-shazam-worker claims jobs, cuts 3 x 15 s segments and calls shazamio
 -- with max_skew=1e-3. This file never approves a passport. A finished job writes
 -- shazam_result='not_found' + shazam_checked_at only when exactly 3 segments returned no
--- track and none errored. A match never touches passport fields.
+-- track and none errored. A match never sets passport fields; it only clears a «not_found».
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 
@@ -180,6 +180,26 @@ BEGIN
      SELECT 1 FROM jsonb_array_elements(v_segments) s WHERE (s->'matched') = 'true'::jsonb) THEN
    RAISE EXCEPTION 'shazam_match_requires_matched_segment' USING ERRCODE='22023'; END IF;
 
+ -- A match is recorded only for the current verified master. In the same transaction it clears
+ -- any «not_found» (manual or automatic) with its date from the draft passport, so a «not_found»
+ -- present after a match can only have been entered after it. No typed date is ever compared.
+ IF p_outcome='match' THEN
+   SELECT a.desired_music_master_asset_id INTO v_current
+     FROM public.audio_items a JOIN public.music_audio_assets m ON m.id=a.desired_music_master_asset_id
+    WHERE a.id=c.audio_item_id AND m.audio_item_id=a.id AND m.asset_role='master' AND m.lifecycle_state='verified'
+    FOR UPDATE OF a;
+   IF v_current IS DISTINCT FROM c.master_asset_id THEN
+     UPDATE public.business_passport_shazam_checks SET status='skipped', error='master_replaced',
+       segments=v_segments, library_version=p_library_version, locked_at=NULL, locked_by=NULL,
+       finished_at=now(), updated_at=now() WHERE id=c.id;
+     PERFORM public.enqueue_business_shazam_check(c.audio_item_id, 'master_verified');
+     RETURN jsonb_build_object('status','skipped','passport_written',false,'note','master_replaced');
+   END IF;
+   UPDATE public.business_track_passports SET shazam_result=NULL, shazam_checked_at=NULL
+    WHERE audio_item_id=c.audio_item_id AND status='draft' AND shazam_result='not_found';
+   IF FOUND THEN v_note := 'passport_not_found_cleared'; END IF;
+ END IF;
+
  IF p_outcome='no_match' THEN
    SELECT a.desired_music_master_asset_id, a.practice_id, a.music_track_code INTO v_current, v_practice, v_code
      FROM public.audio_items a JOIN public.music_audio_assets m ON m.id=a.desired_music_master_asset_id
@@ -252,11 +272,11 @@ CREATE TRIGGER reset_business_passport_shazam_on_master_change
 
 -- Same body as 20270311120000 plus the Shazam queue gate. Approval is refused:
 --  * while a check for this track is queued or running;
---  * when the latest FINAL check (match | no_match) of the current master found a match, unless
---    the operator entered «not_found» manually dated on or after the day of that match in
---    Europe/Moscow (the documented false-positive fallback; a date-only value counts; an
---    automatic «not_found» never counts as that decision). A later error/skipped check of the
---    same master never hides an earlier match;
+--  * when the latest FINAL check (match | no_match) of the current master found a match and the
+--    passport «not_found» is not a manual entry. A match clears every «not_found» when it is
+--    recorded, so a manual «not_found» present now was entered after the match: that is the
+--    documented false-positive fallback. An automatic «not_found» never counts. A later
+--    error/skipped check of the same master never hides the match. No dates are compared;
 --  * when the passport «not_found» was written automatically for another master.
 CREATE OR REPLACE FUNCTION public.admin_approve_business_track_passport(p_audio_item_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
@@ -286,9 +306,7 @@ BEGIN
     AND c.status IN ('match','no_match')
   ORDER BY c.created_at DESC LIMIT 1;
  v_auto_master := public.business_passport_auto_shazam_master(p_audio_item_id);
- IF v_last.id IS NOT NULL AND v_last.status='match' AND NOT (v_auto_master IS NULL
-    AND (b.shazam_checked_at AT TIME ZONE 'Europe/Moscow')::date
-        >= (coalesce(v_last.finished_at, v_last.updated_at) AT TIME ZONE 'Europe/Moscow')::date) THEN
+ IF v_last.id IS NOT NULL AND v_last.status='match' AND NOT (v_auto_master IS NULL AND b.shazam_result='not_found') THEN
    RAISE EXCEPTION 'passport_shazam_match' USING ERRCODE='23514'; END IF;
  IF v_auto_master IS NOT NULL AND v_auto_master IS DISTINCT FROM v_current THEN
    RAISE EXCEPTION 'passport_shazam_stale' USING ERRCODE='55000'; END IF;

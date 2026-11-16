@@ -166,10 +166,6 @@ const MOSCOW_DATE = new Intl.DateTimeFormat('ru-RU', {
   timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric',
 });
 
-const MOSCOW_DAY = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit',
-});
-
 export function formatMoscowDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const parsed = Date.parse(value);
@@ -210,38 +206,42 @@ export function shazamMatchesFromSegments(segments: unknown): ShazamMatchView[] 
  * The passport is the source of truth for «совпадений нет»: a manual entry shows the same way.
  * The latest automatic check adds «проверяется» and «найдено» states for the operator.
  */
-/** Calendar day in Europe/Moscow (YYYY-MM-DD) or null. A date-only value counts as that day. */
-export function moscowDay(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return null;
-  return MOSCOW_DAY.format(new Date(parsed));
-}
-
 export function isFinalShazamCheck(check: ShazamCheckRow | null | undefined): check is ShazamCheckRow {
   return check?.status === 'match' || check?.status === 'no_match';
 }
 
+/** Facts the approval RPC uses besides the checks themselves. */
+export type ShazamGateFacts = {
+  /** Master of an automatically written passport «not_found»; null = manual or empty. */
+  autoMaster?: string | null;
+  /** Current desired master of the track. */
+  currentMaster?: string | null;
+};
+
 /**
- * `check` is the latest check of the track (any status), `finalCheck` the latest FINAL check
- * (match | no_match) of the current master. Mirrors admin_approve_business_track_passport: a later
- * error/skipped check never hides an earlier match, and a manual «совпадений нет» lifts a match
- * only when dated on or after the day of the match in Europe/Moscow.
+ * Mirrors admin_approve_business_track_passport exactly. `check` is the latest check of the track
+ * (any status), `finalCheck` the latest FINAL check (match | no_match) of the current master.
+ * A match clears every «not_found» when it is recorded, so only a manual «not_found» present
+ * now (entered after the match) lifts it; an automatic one never does. No dates are compared.
+ * A later error/skipped check never hides a match.
  */
 export function shazamCheckView(
   check: ShazamCheckRow | null | undefined,
   passport?: { shazam_result?: string | null; shazam_checked_at?: string | null } | null,
   finalCheck?: ShazamCheckRow | null,
+  gate: ShazamGateFacts = {},
 ): ShazamCheckView {
   if (check && (check.status === 'pending' || check.status === 'running')) {
     return { state: 'pending', label: 'Shazam: проверяется автоматически' };
   }
   const decisive = finalCheck !== undefined ? finalCheck : (isFinalShazamCheck(check) ? check : null);
-  const manualDay = passport?.shazam_result === 'not_found' ? moscowDay(passport.shazam_checked_at) : null;
-  const matchDay = decisive?.status === 'match' ? moscowDay(decisive.finished_at ?? decisive.created_at) : null;
-  const manualAfterCheck = decisive?.status === 'match' && manualDay !== null && matchDay !== null && manualDay >= matchDay;
-  if (decisive?.status === 'match' && !manualAfterCheck) {
+  const autoMaster = gate.autoMaster ?? null;
+  const manualNotFound = passport?.shazam_result === 'not_found' && autoMaster === null;
+  if (decisive?.status === 'match' && !manualNotFound) {
     return { state: 'match', label: 'Shazam нашёл совпадение – проверьте вручную, допуск не выполнен', matches: shazamMatchesFromSegments(decisive.segments) };
+  }
+  if (passport?.shazam_result === 'not_found' && autoMaster !== null && gate.currentMaster !== undefined && autoMaster !== gate.currentMaster) {
+    return { state: 'error', label: 'Shazam: результат относится к прежнему мастер-файлу – дождитесь новой проверки' };
   }
   if (passport?.shazam_result === 'not_found') {
     const date = formatMoscowDate(passport.shazam_checked_at);

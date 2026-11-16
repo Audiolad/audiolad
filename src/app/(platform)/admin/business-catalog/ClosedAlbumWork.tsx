@@ -10,7 +10,7 @@ import { DEFAULT_CATALOG_PASSPORT_DEFAULTS } from '@/lib/business-track-passport
 import PassportForm from './PassportForm';
 import AlbumPassportTools, { CatalogSettingsPanel } from './AlbumPassportTools';
 import ShazamAutoStatus, { ShazamAutoBadge } from './ShazamAutoStatus';
-import type { ShazamCheckRow } from '@/lib/business-track-passports/shazam';
+import type { ShazamCheckRow, ShazamGateFacts } from '@/lib/business-track-passports/shazam';
 
 const editLinkClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]';
@@ -26,7 +26,7 @@ type ClosedAlbum = {
   updated_at?: string | null;
   licenseRef?: string | null;
   defaults?: CatalogPassportDefaults | null;
-  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null; shazamFinalCheck?: ShazamCheckRow | null }[];
+  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null; shazamFinalCheck?: ShazamCheckRow | null; shazamGate?: ShazamGateFacts }[];
 };
 
 function albumStatusLabel(status: string) {
@@ -111,10 +111,10 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
                 <summary className="cursor-pointer text-sm font-medium text-[#25135c]">
                   <span>{track.title}</span>{' '}
                   <span className={trackStatusClassName(track.passport?.status)}>{trackStatusLabel(track.passport?.status)}</span>{' '}
-                  <ShazamAutoBadge check={track.shazamCheck} finalCheck={track.shazamFinalCheck} passport={track.passport} />
+                  <ShazamAutoBadge check={track.shazamCheck} finalCheck={track.shazamFinalCheck} gate={track.shazamGate} passport={track.passport} />
                 </summary>
                 <div className="mt-3">
-                  <ShazamAutoStatus check={track.shazamCheck} finalCheck={track.shazamFinalCheck} passport={track.passport} />
+                  <ShazamAutoStatus check={track.shazamCheck} finalCheck={track.shazamFinalCheck} gate={track.shazamGate} passport={track.passport} />
                 </div>
                 <PassportForm
                   key={`${track.id}:${JSON.stringify(track.passport)}`}

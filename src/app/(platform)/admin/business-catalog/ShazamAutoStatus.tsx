@@ -1,5 +1,5 @@
 import type { Passport } from '@/lib/business-track-passports/model';
-import { shazamCheckView, type ShazamCheckRow } from '@/lib/business-track-passports/shazam';
+import { shazamCheckView, type ShazamCheckRow, type ShazamGateFacts } from '@/lib/business-track-passports/shazam';
 
 // t1485u: state of the automatic Shazam check in a closed-catalog track row.
 // Shows the operator what Shazam found (title, artist, skew). Never admits a track.
@@ -17,10 +17,10 @@ const shortLabel: Record<string, string> = {
   error: 'Shazam: проверьте вручную',
 };
 
-type ShazamAutoProps = { check?: ShazamCheckRow | null; finalCheck?: ShazamCheckRow | null; passport?: Passport };
+type ShazamAutoProps = { check?: ShazamCheckRow | null; finalCheck?: ShazamCheckRow | null; gate?: ShazamGateFacts; passport?: Passport };
 
-export function ShazamAutoBadge({ check, finalCheck, passport }: ShazamAutoProps) {
-  const view = shazamCheckView(check, passport, finalCheck);
+export function ShazamAutoBadge({ check, finalCheck, gate, passport }: ShazamAutoProps) {
+  const view = shazamCheckView(check, passport, finalCheck, gate);
   if (view.state === 'none') return null;
   return (
     <span className={badgeClassName[view.state]} data-shazam-auto={view.state}>
@@ -29,8 +29,8 @@ export function ShazamAutoBadge({ check, finalCheck, passport }: ShazamAutoProps
   );
 }
 
-export function ShazamAutoStatus({ check, finalCheck, passport }: ShazamAutoProps) {
-  const view = shazamCheckView(check, passport, finalCheck);
+export function ShazamAutoStatus({ check, finalCheck, gate, passport }: ShazamAutoProps) {
+  const view = shazamCheckView(check, passport, finalCheck, gate);
   if (view.state === 'none') {
     return (
       <p className="text-sm leading-6 text-[#7d70a2]" data-shazam-auto="none">
