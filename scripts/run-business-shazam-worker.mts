@@ -8,13 +8,16 @@
  * Never runs inside a Next.js request. Never approves a passport.
  */
 import { createClient } from "@supabase/supabase-js";
-import { loadEnvConfig } from "@next/env";
+// @next/env is CommonJS: a named ESM import fails at runtime in this .mts entrypoint.
+import nextEnv from "@next/env";
 import { createBusinessShazamWorker } from "../src/lib/business-track-passports/shazam-worker";
 import { businessShazamWorkerId, createBusinessShazamPort } from "../src/lib/business-track-passports/shazam-runtime";
 import {
   captureStudioRenderBootRelease,
   compareStudioRenderRelease,
 } from "../src/lib/studio/render/worker-release";
+
+const { loadEnvConfig } = nextEnv;
 
 function envNumber(name: string, fallback: number): number {
   const value = Number(process.env[name]);
