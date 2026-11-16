@@ -185,7 +185,7 @@ assert.doesNotMatch(newPage.slice(newPage.indexOf('isClosedCatalogOnlyAuthor(ini
 const form = read('src/components/author-dashboard/AuthorProductForm.tsx');
 assert.match(form, /showWizardStep\(3\) && !hideOpenCatalogFields/);
 assert.match(form, /steps=\{visibleWizardSteps\}/);
-assert.match(form, /wizardStepVisible === lastWizardStep/);
+assert.match(form, /wizardStep === lastWizardStep/);
 assert.match(form, /!hideOpenCatalogFields/);
 assert.doesNotMatch(form, /nextProductWizardStep\(wizardStep\)/);
 
