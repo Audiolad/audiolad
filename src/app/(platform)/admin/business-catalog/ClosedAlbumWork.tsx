@@ -9,6 +9,8 @@ import type { CatalogPassportDefaults } from '@/lib/business-track-passports/sha
 import { DEFAULT_CATALOG_PASSPORT_DEFAULTS } from '@/lib/business-track-passports/shared';
 import PassportForm from './PassportForm';
 import AlbumPassportTools, { CatalogSettingsPanel } from './AlbumPassportTools';
+import ShazamAutoStatus, { ShazamAutoBadge } from './ShazamAutoStatus';
+import type { ShazamCheckRow } from '@/lib/business-track-passports/shazam';
 
 const editLinkClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition hover:bg-[#f8f4ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]';
@@ -24,7 +26,7 @@ type ClosedAlbum = {
   updated_at?: string | null;
   licenseRef?: string | null;
   defaults?: CatalogPassportDefaults | null;
-  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport }[];
+  tracks: { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null }[];
 };
 
 function albumStatusLabel(status: string) {
@@ -108,8 +110,12 @@ function AlbumCard({ album, catalogLicenseRef, catalogDefaults }: { album: Close
               <details key={track.id} className="rounded-[18px] border border-[#e4d7f4] bg-white p-3">
                 <summary className="cursor-pointer text-sm font-medium text-[#25135c]">
                   <span>{track.title}</span>{' '}
-                  <span className={trackStatusClassName(track.passport?.status)}>{trackStatusLabel(track.passport?.status)}</span>
+                  <span className={trackStatusClassName(track.passport?.status)}>{trackStatusLabel(track.passport?.status)}</span>{' '}
+                  <ShazamAutoBadge check={track.shazamCheck} passport={track.passport} />
                 </summary>
+                <div className="mt-3">
+                  <ShazamAutoStatus check={track.shazamCheck} passport={track.passport} />
+                </div>
                 <PassportForm
                   key={`${track.id}:${JSON.stringify(track.passport)}`}
                   audioItemId={track.id}
@@ -133,7 +139,7 @@ export default function ClosedAlbumWork({ albums, catalogLicenseRef = null, cata
       <div>
         <h2 className="text-[20px] font-semibold text-[#25135c]">Работа с закрытыми альбомами</h2>
         <p className="mt-2 max-w-[760px] text-sm leading-6 text-[#5f5484]">
-          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Инструмент и тариф задаются один раз в настройках каталога, дата берётся из файла мастера, затем кнопка «Заполнить автоматически» считает хеши и AcoustID. После этого в каждом треке остаётся указать результат Shazam и нажать «Допустить в Бизнес».
+          Музыка может быть уже загружена, но в каталог Бизнеса альбом попадает только после допуска паспорта каждого трека. Метка «черновик» у трека означает, что паспорт ещё не заполнен или не допущен, а не то, что файл не загружен. Инструмент и тариф задаются один раз в настройках каталога, дата берётся из файла мастера, затем кнопка «Заполнить автоматически» считает хеши и AcoustID. Shazam проверяет каждый трек в фоне и сам записывает «совпадений нет». Если Shazam что-то найдёт, это видно у трека, и результат указывается вручную. Затем нажмите «Допустить в Бизнес» – допуск всегда вручную.
         </p>
       </div>
       <CatalogSettingsPanel catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} albums={albums} />

@@ -2847,3 +2847,39 @@ Storage API; 3) откат PR-D – возвращает v8 проверки г�
 удаляются, только если бакет пуст, иначе остаются (файлы остаются закрытыми);
 4) затем, при необходимости, откаты PR-C и PR-A. После отката закрытые альбомы
 снова без обложек и не публикуются.
+
+### Автоматическая проверка Shazam для паспортов закрытых альбомов (t1485u)
+
+Миграция `20270313120000_business_passport_shazam_checks.sql` (с `SET LOCAL
+lock_timeout = '5s'`) только добавляет объекты, существующие таблицы и RPC
+паспортов не меняются.
+
+- Таблица `business_passport_shazam_checks` – очередь и журнал проверок:
+  трек, мастер, причина (`master_verified` | `autofill`), статус (`pending`,
+  `running`, `no_match`, `match`, `error`, `skipped`), попытки, `segments`
+  (смещения, время, совпадение, название, исполнитель, перекос), версия
+  библиотеки, ошибка, `passport_written`. RLS включён, клиентских прав нет,
+  service role только читает; пишут только RPC ниже.
+- `enqueue_business_shazam_check(трек, причина)` ставит задачу для текущего
+  проверенного мастера трека закрытого альбома (одна активная на трек).
+  Вызывается триггерами при проверке мастера (`music_audio_assets.lifecycle_state`
+  → `verified`, смена `audio_items.desired_music_master_asset_id`; ошибки
+  глушатся с WARNING, загрузку мастера очередь не ломает) и кнопкой «Заполнить
+  автоматически». Повторное нажатие не перепроверяет мастер, у которого уже есть
+  итог (`match` или `no_match`, отражённый в паспорте).
+- `claim_business_shazam_check(worker)` – одна задача, `SKIP LOCKED`, задачи
+  упавшего воркера возвращаются через 30 минут.
+- `complete_business_shazam_check(...)` записывает итог. Только при `no_match`
+  ровно с тремя чистыми отрывками, том же мастере и черновике паспорта пишет
+  `shazam_result = 'not_found'` и `shazam_checked_at`. Ручной `match` в паспорте
+  не перезаписывается. Совпадение никогда не пишет поля паспорта. Допуск
+  (`status = 'approved'`) эта миграция не выполняет никогда.
+
+Воркер: PM2 `audiolad-business-shazam-worker`
+(`scripts/run-business-shazam-worker.mts`), shazamio в отдельном venv
+`/var/lib/audiolad/business-shazam/.venv` (`deploy/scripts/setup-business-shazam-venv.sh`).
+Три отрывка по 15 секунд (0:30, середина, конец − 30 с), не меньше 5 секунд между
+запросами, экспоненциальная пауза при 429, `max_skew = 1e-3`; аудио удаляется
+после задачи. Откат: `supabase/rollback/20270313120000_business_passport_shazam_checks.down.sql`
+(сначала `pm2 delete audiolad-business-shazam-worker`, затем код, затем файл).
+Уже записанные поля Shazam в паспортах остаются.

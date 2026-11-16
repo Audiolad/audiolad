@@ -1,0 +1,4 @@
+# t1485u: pinned venv for audiolad-business-shazam-worker.
+# Install once on prod: deploy/scripts/setup-business-shazam-venv.sh
+shazamio==0.9.0
+shazamio-core==2.0.0

@@ -642,6 +642,18 @@ main() {
     exit 1
   fi
 
+  # t1485u: automatic Shazam check for closed Business passports. Non-fatal by design:
+  # the web cutover is done and passports keep the manual Shazam fallback.
+  BUSINESS_SHAZAM_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-business-shazam-worker.sh"
+  if [[ -x "$BUSINESS_SHAZAM_WORKER_ENSURE" ]]; then
+    if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$BUSINESS_SHAZAM_WORKER_ENSURE"; then
+      log_warn "business_shazam_worker_ensure_failed_non_fatal"
+      send_deploy_alert "deploy_warning" "Business Shazam worker ensure failed for $RELEASE_NAME (manual Shazam still works)"
+    fi
+  else
+    log_warn "business_shazam_worker_ensure_missing_non_fatal"
+  fi
+
   # Articles are static files, so they go live here. Queue new and changed
   # article URLs for the recrawl worker (Yandex Webmaster + IndexNow).
   # Best effort: a failure is logged and never fails or rolls back the deploy.
