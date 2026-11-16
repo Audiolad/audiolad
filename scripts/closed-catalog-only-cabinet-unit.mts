@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import Module, { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import {
+  CLOSED_CATALOG_HOUSE_AUTHOR_ID,
+  CLOSED_CATALOG_HOUSE_AUTHOR_SLUG,
   CLOSED_CATALOG_ONLY_AUTHOR_ACCESS_ERROR,
   CLOSED_CATALOG_ONLY_CREATE_BLOCKED,
   CLOSED_CATALOG_ONLY_TOGGLE_ROUTE,
@@ -13,12 +15,15 @@ import {
   CREATE_CLOSED_ALBUM_CABINET_ROUTE,
   clampProductWizardStep,
   closedCatalogCreateDecision,
+  isClosedCatalogHouseAuthor,
   isClosedCatalogOnlyAuthor,
+  isListedInClosedCatalogOnlySettings,
   lastVisibleProductWizardStep,
   nextVisibleProductWizardStep,
   previousVisibleProductWizardStep,
   shouldHideOpenCatalogAlbumFields,
   shouldShowPassportCreateOnLastWizardStep,
+  visibleClosedCatalogOnlySettingsAuthors,
   visibleProductWizardSteps,
 } from '../src/lib/authors/closed-catalog-only';
 import { closedAlbumEditHref, closedBusinessAlbumInsertRow, parseCreateClosedAlbumResponse } from '../src/lib/business-track-passports/create-album';
@@ -32,6 +37,9 @@ const mock = (path: string, exports: unknown) => {
 
 const albumId = '7b0d1c55-8f3a-4c7e-9a51-2d6f0e9b4a11';
 const authorId = 'b7ddb68b-8569-4987-a734-6c6e5502529e';
+assert.equal(authorId, CLOSED_CATALOG_HOUSE_AUTHOR_ID);
+assert.equal(CLOSED_CATALOG_HOUSE_AUTHOR_SLUG, 'audiolad');
+
 
 // 1. Flag is explicit; never inferred.
 assert.equal(isClosedCatalogOnlyAuthor(true), true);
@@ -222,6 +230,38 @@ const togglePost = toggleRouteSrc.slice(toggleRouteSrc.indexOf('export async fun
 assert.ok(togglePost.indexOf('isSameOriginJsonRequest') < togglePost.indexOf('requireAdminPanelAccess'));
 assert.ok(togglePost.indexOf('requireAdminPanelAccess') < togglePost.indexOf('listAuthorWorkspacesForUser'));
 
+// t1513u: the admin block lists only closed-catalog authors plus the house artist.
+// Flags are not changed. Identification is by id or slug, never by display name.
+const otherOff = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', slug: 'aurafon', name: 'Аурафон', closedCatalogOnly: false };
+const otherOn = { id: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', slug: 'oriy', name: 'Орий', closedCatalogOnly: true };
+const houseOn = { id: CLOSED_CATALOG_HOUSE_AUTHOR_ID, slug: CLOSED_CATALOG_HOUSE_AUTHOR_SLUG, name: 'АудиоЛад', closedCatalogOnly: true };
+const houseOff = { id: CLOSED_CATALOG_HOUSE_AUTHOR_ID, slug: CLOSED_CATALOG_HOUSE_AUTHOR_SLUG, name: 'АудиоЛад', closedCatalogOnly: false };
+const nameOnly = { id: 'cccccccc-dddd-eeee-ffff-000000000000', slug: 'not-audiolad', name: 'АудиоЛад', closedCatalogOnly: false };
+const slugOnly = { id: 'dddddddd-eeee-ffff-0000-111111111111', slug: CLOSED_CATALOG_HOUSE_AUTHOR_SLUG, name: 'Другое имя', closedCatalogOnly: false };
+
+assert.equal(isClosedCatalogHouseAuthor(houseOn), true);
+assert.equal(isClosedCatalogHouseAuthor(houseOff), true);
+assert.equal(isClosedCatalogHouseAuthor({ id: CLOSED_CATALOG_HOUSE_AUTHOR_ID, slug: 'renamed' }), true);
+assert.equal(isClosedCatalogHouseAuthor(slugOnly), true);
+assert.equal(isClosedCatalogHouseAuthor(otherOff), false);
+assert.equal(isClosedCatalogHouseAuthor(nameOnly), false, 'never match by display name');
+
+assert.equal(isListedInClosedCatalogOnlySettings(houseOn), true);
+assert.equal(isListedInClosedCatalogOnlySettings(houseOff), true, 'house artist stays visible if the flag is off');
+assert.equal(isListedInClosedCatalogOnlySettings(otherOn), true);
+assert.equal(isListedInClosedCatalogOnlySettings(otherOff), false);
+assert.equal(isListedInClosedCatalogOnlySettings(nameOnly), false);
+assert.equal(isListedInClosedCatalogOnlySettings(slugOnly), true);
+
+const clutter = [otherOff, houseOn, otherOn, nameOnly];
+const visible = visibleClosedCatalogOnlySettingsAuthors(clutter);
+assert.deepEqual(visible.map((item) => item.id), [houseOn.id, otherOn.id]);
+assert.equal(clutter.length, 4, 'input list is not mutated');
+assert.equal(otherOff.closedCatalogOnly, false);
+assert.equal(houseOn.closedCatalogOnly, true);
+assert.deepEqual(visibleClosedCatalogOnlySettingsAuthors([otherOff, nameOnly]).map((item) => item.id), []);
+assert.deepEqual(visibleClosedCatalogOnlySettingsAuthors([houseOff]).map((item) => item.id), [houseOff.id]);
+
 // 7. UI: cabinet form and admin toggle use fixed routes, not server actions. Russian copy, en dash only.
 const cabinetForm = read('src/components/author-dashboard/CreateClosedAlbumCabinet.tsx');
 assert.match(cabinetForm, /fetch\(CREATE_CLOSED_ALBUM_CABINET_ROUTE/);
@@ -266,7 +306,16 @@ const toggleSrc = read('src/app/(platform)/admin/business-catalog/ClosedCatalogO
 assert.match(toggleSrc, /fetch\(CLOSED_CATALOG_ONLY_TOGGLE_ROUTE/);
 assert.doesNotMatch(toggleSrc, /use server/);
 assert.doesNotMatch(toggleSrc, /—/);
-assert.match(read('src/app/(platform)/admin/business-catalog/page.tsx'), /ClosedCatalogOnlySettings authors=\{authors\}/);
+const catalogPage = read('src/app/(platform)/admin/business-catalog/page.tsx');
+assert.match(catalogPage, /ClosedCatalogOnlySettings authors=\{visibleClosedCatalogOnlySettingsAuthors\(authors\)\}/);
+assert.match(catalogPage, /CreateClosedAlbum authors=\{authors\}/);
+assert.match(toggleSrc, /visibleClosedCatalogOnlySettingsAuthors\(authors\)/);
+assert.match(toggleSrc, /visibleAuthors\.map\(/);
+assert.doesNotMatch(toggleSrc, /authors\.map\(/);
+assert.doesNotMatch(catalogPage, /—/);
+assert.doesNotMatch(read('src/lib/authors/closed-catalog-only.ts'), /—/);
+assert.match(read('src/lib/authors/closed-catalog-only.ts'), /CLOSED_CATALOG_HOUSE_AUTHOR_ID/);
+assert.doesNotMatch(toggleRouteSrc, /visibleClosedCatalogOnlySettingsAuthors/);
 
 assert.equal(parseCreateClosedAlbumResponse({
   status: 201,
@@ -283,4 +332,4 @@ assert.match(productsSrc, /closedCatalogDecision === "unavailable"/);
 assert.match(productsSrc, /throw new Error\("draft_create_failed"\)/);
 assert.doesNotMatch(productsSrc, /!closedCatalogAuthor\.error && isClosedCatalogOnlyAuthor/);
 
-console.log('closed-catalog-only-cabinet: PASS (flag, cabinet route, admin toggle, simplified wizard, last-step passport CTA, other authors unchanged)');
+console.log('closed-catalog-only-cabinet: PASS (flag, cabinet route, admin toggle, simplified wizard, last-step passport CTA, settings list only house/closed authors, other authors unchanged)');

@@ -4,6 +4,7 @@ import { BUSINESS_ONLY_BADGE } from '@/lib/business-track-passports/model';
 import { loadPublishedBusinessCatalog } from '@/lib/business-admission/published-catalog.server';
 import { CreateClosedAlbum } from './PassportForm';
 import ClosedCatalogOnlySettings from './ClosedCatalogOnlySettings';
+import { visibleClosedCatalogOnlySettingsAuthors } from '@/lib/authors/closed-catalog-only';
 import ClosedAlbumWork from './ClosedAlbumWork';
 import PublishedBusinessCatalog from './PublishedBusinessCatalog';
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export default async function ClosedBusinessCatalogPage() {
       <p className="mt-3 max-w-[760px] text-sm leading-6 text-[#5f5484]">Человек вручную создаёт, выбирает и мастерит музыку. Администратор загружает мастер и заполняет паспорт. Допуск не публикует альбом автоматически. Права, направления для заведений и качество звука проверяются отдельно.</p>
     </div>
     <CreateClosedAlbum authors={authors} />
-    <ClosedCatalogOnlySettings authors={authors} />
+    <ClosedCatalogOnlySettings authors={visibleClosedCatalogOnlySettingsAuthors(authors)} />
     <ClosedAlbumWork albums={albums} catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} />
     <div className="grid gap-3 sm:grid-cols-2">
       <Link href="/admin/business-track-review" className={linkCardClassName}>

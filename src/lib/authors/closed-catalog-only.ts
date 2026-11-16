@@ -123,3 +123,43 @@ export function shouldShowPassportCreateOnLastWizardStep(activity: {
 }): boolean {
   return activity.kind !== "completed" && !activity.continueInBackground;
 }
+
+/**
+ * House artist of the closed Business catalog, created 15.11.2026.
+ * Identified only by this stable id and unique slug, never by display name.
+ * Always shown in the admin block «Публикация из кабинета автора»,
+ * even if the flag is later turned off, so it can be turned back on.
+ */
+export const CLOSED_CATALOG_HOUSE_AUTHOR_ID =
+  'b7ddb68b-8569-4987-a734-6c6e5502529e' as const;
+export const CLOSED_CATALOG_HOUSE_AUTHOR_SLUG = 'audiolad' as const;
+
+export type ClosedCatalogSettingsAuthorRef = {
+  id?: string | null;
+  slug?: string | null;
+  closedCatalogOnly?: boolean | null;
+};
+
+export function isClosedCatalogHouseAuthor(
+  author: ClosedCatalogSettingsAuthorRef,
+): boolean {
+  return author.id === CLOSED_CATALOG_HOUSE_AUTHOR_ID
+    || author.slug === CLOSED_CATALOG_HOUSE_AUTHOR_SLUG;
+}
+
+/**
+ * The admin list shows only authors that already publish to the closed
+ * catalog, plus the house artist. Other projects are hidden, not changed.
+ */
+export function isListedInClosedCatalogOnlySettings(
+  author: ClosedCatalogSettingsAuthorRef,
+): boolean {
+  return isClosedCatalogOnlyAuthor(author.closedCatalogOnly)
+    || isClosedCatalogHouseAuthor(author);
+}
+
+export function visibleClosedCatalogOnlySettingsAuthors<T extends ClosedCatalogSettingsAuthorRef>(
+  authors: readonly T[],
+): T[] {
+  return authors.filter(isListedInClosedCatalogOnlySettings);
+}

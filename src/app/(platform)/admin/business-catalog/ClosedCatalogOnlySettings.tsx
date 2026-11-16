@@ -8,11 +8,13 @@ import {
   CLOSED_CATALOG_ONLY_TOGGLE_ROUTE,
   CLOSED_CATALOG_ONLY_TOGGLE_TITLE,
   isClosedCatalogOnlyAuthor,
+  visibleClosedCatalogOnlySettingsAuthors,
 } from '@/lib/authors/closed-catalog-only';
 
 export type ClosedCatalogOnlyAuthor = {
   id: string;
   name: string;
+  slug?: string;
   closedCatalogOnly?: boolean;
 };
 
@@ -21,6 +23,7 @@ export default function ClosedCatalogOnlySettings({
 }: {
   authors: ClosedCatalogOnlyAuthor[];
 }) {
+  const visibleAuthors = visibleClosedCatalogOnlySettingsAuthors(authors);
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -71,11 +74,11 @@ export default function ClosedCatalogOnlySettings({
         <h2 className="text-[18px] font-semibold text-[#25135c]">{CLOSED_CATALOG_ONLY_TOGGLE_TITLE}</h2>
         <p className="mt-2 text-sm leading-6 text-[#5f5484]">{CLOSED_CATALOG_ONLY_TOGGLE_HINT}</p>
       </div>
-      {authors.length === 0 ? (
-        <p className="text-sm leading-6 text-[#7d70a2]">Для настройки нужен доступ владельца или редактора к автору.</p>
+      {visibleAuthors.length === 0 ? (
+        <p className="text-sm leading-6 text-[#7d70a2]">Здесь показываются только авторы закрытого каталога, к которым есть доступ владельца или редактора.</p>
       ) : (
         <ul className="space-y-3">
-          {authors.map((author) => {
+          {visibleAuthors.map((author) => {
             const enabled = isClosedCatalogOnlyAuthor(author.closedCatalogOnly);
             const busy = pending && pendingId === author.id;
             return (
