@@ -184,9 +184,11 @@ export type CatalogPassportDefaults = {
 export const DEFAULT_CATALOG_PASSPORT_DEFAULTS: CatalogPassportDefaults = {
   generator_tool: 'MusicGPT',
   generator_plan: 'Pro',
-  human_contribution: 'human',
-  human_contribution_details: 'Человек выбирает и мастерит готовый трек.',
+  human_contribution: 'none',
+  human_contribution_details: '',
 };
+
+export const HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER = 'Заполняется только если вклад человека есть';
 
 export const CATALOG_PASSPORT_DEFAULTS_MARKER = 'AUDIOLAD_PASSPORT_DEFAULTS\n';
 
@@ -217,6 +219,14 @@ export function resolveCatalogPassportDefaults(album: CatalogPassportDefaults | 
     ...(catalog ?? {}),
     ...(album ?? {}),
   });
+}
+
+/** Values for the album override form: saved album defaults, otherwise saved catalog defaults. */
+export function albumFormPassportDefaults(
+  albumDefaults: CatalogPassportDefaults | null | undefined,
+  catalogDefaults: CatalogPassportDefaults | null | undefined,
+): CatalogPassportDefaults {
+  return resolveCatalogPassportDefaults(albumDefaults, catalogDefaults);
 }
 
 export function generationRefForTrackTitle(title: string): string {

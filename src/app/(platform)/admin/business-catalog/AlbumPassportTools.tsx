@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation';
 import type { Passport } from '@/lib/business-track-passports/model';
 import {
   DEFAULT_CATALOG_PASSPORT_DEFAULTS,
+  HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER,
   adminPassportLicensePreviewHref,
+  albumFormPassportDefaults,
   isBusinessPassportLicenseRef,
   type CatalogPassportDefaults,
 } from '@/lib/business-track-passports/shared';
@@ -128,7 +130,13 @@ function DefaultsFields({
       </label>
       <label className="block text-sm font-medium text-[#25135c]">
         Описание вклада человека
-        <input className={`${fieldClassName} mt-2`} value={value.human_contribution_details} disabled={pending || value.human_contribution !== 'human'} onChange={(event) => onChange({ ...value, human_contribution_details: event.target.value })} />
+        <input
+          className={`${fieldClassName} mt-2`}
+          value={value.human_contribution_details}
+          placeholder={HUMAN_CONTRIBUTION_DETAILS_PLACEHOLDER}
+          disabled={pending || value.human_contribution !== 'human'}
+          onChange={(event) => onChange({ ...value, human_contribution_details: event.target.value })}
+        />
       </label>
     </div>
   );
@@ -225,7 +233,15 @@ export function CatalogSettingsPanel({
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
   const [fillSummary, setFillSummary] = useState<AutoFillSummary | null>(null);
-  const [fields, setFields] = useState(catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS);
+  const savedCatalogFields = catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS;
+  const [fields, setFields] = useState(savedCatalogFields);
+  const [savedCatalogKey, setSavedCatalogKey] = useState(() => JSON.stringify(savedCatalogFields));
+  const nextCatalogKey = JSON.stringify(savedCatalogFields);
+  if (nextCatalogKey !== savedCatalogKey) {
+    const dirty = JSON.stringify(fields) !== savedCatalogKey;
+    setSavedCatalogKey(nextCatalogKey);
+    if (!dirty) setFields(savedCatalogFields);
+  }
   const trackCount = albums.reduce((sum, album) => sum + album.tracks.length, 0);
 
   return (
@@ -314,8 +330,15 @@ export default function AlbumPassportTools({
   albumDefaults?: CatalogPassportDefaults | null;
 }) {
   const router = useRouter();
-  const initialOverride = useMemo(() => albumDefaults ?? catalogDefaults ?? DEFAULT_CATALOG_PASSPORT_DEFAULTS, [albumDefaults, catalogDefaults]);
+  const initialOverride = useMemo(() => albumFormPassportDefaults(albumDefaults, catalogDefaults), [albumDefaults, catalogDefaults]);
   const [fields, setFields] = useState(initialOverride);
+  const [savedOverrideKey, setSavedOverrideKey] = useState(() => JSON.stringify(initialOverride));
+  const nextOverrideKey = JSON.stringify(initialOverride);
+  if (nextOverrideKey !== savedOverrideKey) {
+    const dirty = JSON.stringify(fields) !== savedOverrideKey;
+    setSavedOverrideKey(nextOverrideKey);
+    if (!dirty) setFields(initialOverride);
+  }
   const [pending, start] = useTransition();
   const [message, setMessage] = useState('');
   const [ok, setOk] = useState<boolean | null>(null);
