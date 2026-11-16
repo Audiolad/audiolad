@@ -125,12 +125,12 @@ assert.deepEqual(
   listingSorted.map((item) => item.queryText),
   [
     "Банан",
-    "Яблоко",
     "Вишня",
-    "Ежевика",
-    "Ирис",
     "Груша",
     "Дыня",
+    "Ежевика",
+    "Ирис",
+    "Яблоко",
     "Абрикос",
     "Жасмин",
     "Арбуз",
@@ -146,8 +146,51 @@ const searched = sortAudioSprintQueriesForListing(
 );
 assert.deepEqual(
   searched.map((item) => item.queryText),
-  ["Банан", "Яблоко", "Вишня", "Груша", "Абрикос"],
+  ["Банан", "Вишня", "Груша", "Яблоко", "Абрикос"],
 );
+
+const reserveInPlace = [
+  listingCard("Банан"),
+  listingCard("Вишня"),
+  listingCard("Груша"),
+  listingCard("Яблоко"),
+];
+const beforeReserve = sortAudioSprintQueriesForListing(reserveInPlace).map(
+  (item) => item.queryText,
+);
+const afterOwnReserve = sortAudioSprintQueriesForListing(
+  reserveInPlace.map((item) =>
+    item.queryText === "Вишня"
+      ? {
+          ...item,
+          lifecycle: "in_progress",
+          reservedByCurrentUser: true,
+          reservationId: "r-own",
+        }
+      : item,
+  ),
+).map((item) => item.queryText);
+const afterOtherReserve = sortAudioSprintQueriesForListing(
+  reserveInPlace.map((item) =>
+    item.queryText === "Груша"
+      ? { ...item, lifecycle: "in_progress", reservedByCurrentUser: false }
+      : item,
+  ),
+).map((item) => item.queryText);
+const afterRefresh = sortAudioSprintQueriesForListing([
+  listingCard("Банан"),
+  listingCard("Вишня", {
+    lifecycle: "in_progress",
+    reservedByCurrentUser: true,
+    reservationId: "r-own",
+  }),
+  listingCard("Груша", { lifecycle: "in_progress" }),
+  listingCard("Яблоко"),
+]).map((item) => item.queryText);
+assert.deepEqual(beforeReserve, ["Банан", "Вишня", "Груша", "Яблоко"]);
+assert.deepEqual(afterOwnReserve, beforeReserve);
+assert.deepEqual(afterOtherReserve, beforeReserve);
+assert.deepEqual(afterRefresh, beforeReserve);
 
 
 assert.equal(audioSprintPublicationClass("music"), "release");
