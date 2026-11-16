@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { PASSPORT_FIELDS, changedPassportKeys, passportMissing, type Passport, type PassportField } from '@/lib/business-track-passports/model';
 import { businessPassportLicensePreviewHrefFromRef, licenseIdFromNotes, notesWithOptionalLicenseId } from '@/lib/business-track-passports/shared';
 import { closedCatalogAction } from './actions';
+import { CREATE_CLOSED_ALBUM_ROUTE, parseCreateClosedAlbumResponse, type CreateClosedAlbumResult } from '@/lib/business-track-passports/create-album';
 
 const fieldClassName =
   'block w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#fbf8ff] disabled:text-[#7d70a2]';
@@ -19,14 +20,45 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
   const [ok, setOk] = useState<boolean | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  return <form action={(form) => start(async () => {
-    const result = await closedCatalogAction('create', '', Object.fromEntries(form));
-    setMessage(result.message); setOk(result.ok); if (result.ok) router.refresh();
-  })} className="space-y-5">
+  // t1504u: a stable route instead of a server action – a tab opened before a deploy no longer
+  // reloads silently. Success opens the album edit page; any failure stays on the form in red.
+  return <form onSubmit={(event) => {
+    event.preventDefault();
+    if (pending) return;
+    const form = new FormData(event.currentTarget);
+    setMessage(''); setOk(null);
+    start(async () => {
+      let result: CreateClosedAlbumResult;
+      try {
+        const response = await fetch(CREATE_CLOSED_ALBUM_ROUTE, {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ author_id: String(form.get('author_id') ?? ''), title: String(form.get('title') ?? '') }),
+        });
+        result = parseCreateClosedAlbumResponse({
+          status: response.status,
+          redirected: response.redirected,
+          contentType: response.headers.get('content-type'),
+          body: await response.text(),
+        });
+      } catch {
+        result = { ok: false, message: 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' };
+      }
+      if (result.ok) {
+        setOk(true);
+        setMessage(result.reused ? 'Такой альбом уже создан – открываю его.' : 'Альбом создан – открываю его.');
+        router.push(result.editHref);
+        return;
+      }
+      setOk(false); setMessage(result.message);
+    });
+  }} className="space-y-5">
     <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
       <h2 className="text-[18px] font-semibold text-[#25135c]">Новый закрытый альбом</h2>
       <p className="mt-2 text-sm leading-6 text-[#5f5484]">
-        Выберите автора и название. После создания можно загрузить треки, мастер-файлы и обложку.
+        Выберите автора и название. После создания откроется альбом в кабинете автора – там можно загрузить треки, мастер-файлы и обложку.
       </p>
       <label className="mt-5 block">
         <span className="mb-2 block text-sm font-medium text-[#25135c]">Автор</span>
@@ -43,11 +75,11 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
       )}
       <div className="mt-5">
         <button type="submit" disabled={pending || !authors.length} className={primaryButtonClassName}>
-          Создать закрытый альбом
+          {pending ? 'Создаю альбом…' : 'Создать закрытый альбом'}
         </button>
       </div>
       <p
-        role="status"
+        role={ok === false ? 'alert' : 'status'}
         className={message
           ? ok
             ? 'mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]'

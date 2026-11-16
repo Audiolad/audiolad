@@ -1,6 +1,6 @@
 'use server';
 import { revalidatePath } from 'next/cache';
-import { createClosedBusinessAlbum, saveBusinessPassport, verifyBusinessMaster, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
+import { saveBusinessPassport, verifyBusinessMaster, decideBusinessPassport } from '@/lib/business-track-passports/admin.server';
 import { applyAlbumSharedPassportFields, autoFillBusinessPassportTrack, approveReadyBusinessPassports } from '@/lib/business-track-passports/auto-fill.server';
 import { saveCatalogPassportDefaults, uploadBusinessPassportLicense } from '@/lib/business-track-passports/license.server';
 import { formatApprovalSummary, summarizeApproval } from '@/lib/business-track-passports/admission-ui';
@@ -11,8 +11,8 @@ function fail(error: unknown) {
 
 export async function closedCatalogAction(command: string, audioItemId: string, fields: Record<string, unknown>, options?: { keys?: unknown }) {
   try {
-    if (command === 'create') await createClosedBusinessAlbum(String(fields.author_id ?? ''), String(fields.title ?? ''));
-    else if (command === 'save') {
+    // t1504u: album creation moved to the stable route POST /api/admin/business-catalog/albums.
+    if (command === 'save') {
       // t1485u: the passport form sends only the keys the operator changed (never wipes a
       // Shazam result written by the worker after the form was opened).
       const keys = Array.isArray(options?.keys) ? options.keys.filter((key): key is string => typeof key === 'string') : undefined;

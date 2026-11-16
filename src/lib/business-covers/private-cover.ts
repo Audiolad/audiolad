@@ -72,3 +72,14 @@ export function businessPrivateCoverPreviewUrl(practiceId: string, coverRef: str
   params.set("v", coverRef.slice(-48));
   return `/api/author/products/${practiceId}/cover/private-preview?${params.toString()}`;
 }
+
+/**
+ * t1504u: cover of a closed album in the author cabinet product list. The list only carries the
+ * private reference; the browser gets the editor preview route (album edit access is re-checked
+ * server-side, then a short-lived signed URL). A reference of another album is never used.
+ */
+export function authorProductListPrivateCoverSrc(product: { id: string; cover_url: string | null }): string | null {
+  const parsed = parseBusinessPrivateCoverRef(product.cover_url);
+  if (!parsed || parsed.audioItemId || parsed.practiceId !== product.id.toLowerCase()) return null;
+  return businessPrivateCoverPreviewUrl(product.id, String(product.cover_url).trim());
+}

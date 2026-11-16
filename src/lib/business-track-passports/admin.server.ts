@@ -8,6 +8,7 @@ import { PASSPORT_FIELDS, type Passport } from './model';
 import { loadCatalogAndAlbumDefaults, loadCatalogAndAlbumLicenseRefs } from '@/lib/business-track-passports/license.server';
 import { resolveCatalogPassportDefaults } from '@/lib/business-track-passports/shared';
 import type { ShazamCheckRow, ShazamGateFacts } from '@/lib/business-track-passports/shazam';
+import { CLOSED_ALBUM_DUPLICATE_WINDOW_MS, findRecentClosedAlbumDuplicate, type RecentClosedAlbumRow } from '@/lib/business-track-passports/create-album';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function id(value: string) { if (!UUID.test(value)) throw new Error('Некорректный идентификатор.'); }
@@ -119,16 +120,36 @@ export async function loadClosedBusinessCatalog() {
   }
   return { authors, albums: rows, catalogLicenseRef: licenseRefs.catalogLicenseRef, catalogDefaults };
 }
-export async function createClosedBusinessAlbum(authorId: string, title: string) {
+function createAlbumRpcError(error: { message: string } | null) {
+  if (!error) return;
+  if (error.message.includes('author_not_manageable')) throw new Error('Нет доступа к автору для загрузки музыки.');
+  if (error.message.includes('invalid_title')) throw new Error('Введите название до 300 символов.');
+  if (error.message.includes('permission_denied')) throw new Error('Нужен доступ администратора к закрытому каталогу.');
+  throw new Error('Не удалось создать альбом. Обновите страницу и попробуйте ещё раз.');
+}
+/**
+ * t1504u: returns the new album id, or the id of the same author's album with the same title
+ * created in the last minutes (repeated click / repeated submit after a reload – no duplicate).
+ */
+export async function createClosedBusinessAlbum(authorId: string, title: string): Promise<{ id: string; reused: boolean }> {
   const admin = await requireAdminPanelAccess();
   id(authorId);
   const authors = await listAuthorWorkspacesForUser(admin.userId);
   if (!authors.some((author) => author.id === authorId)) throw new Error('Нет доступа к автору для загрузки музыки.');
   if (!title.trim() || title.length > 300) throw new Error('Введите название до 300 символов.');
+  const service = createServiceRoleClient();
+  const since = new Date(Date.now() - CLOSED_ALBUM_DUPLICATE_WINDOW_MS).toISOString();
+  const recent = await service.from('practices').select('id,title,created_at')
+    .eq('author_id', authorId).eq('business_only', true).is('deleted_at', null)
+    .gte('created_at', since).order('created_at', { ascending: false }).limit(50);
+  if (recent.error) throw new Error('Не удалось создать альбом. Обновите страницу и попробуйте ещё раз.');
+  const existing = findRecentClosedAlbumDuplicate((recent.data ?? []) as RecentClosedAlbumRow[], title);
+  if (existing) return { id: existing, reused: true };
   const db = await createClient();
   const { data, error } = await db.rpc('admin_create_business_album', { p_author_id: authorId, p_title: title.trim() });
-  rpcError(error);
-  return data as string;
+  createAlbumRpcError(error);
+  if (typeof data !== 'string' || !UUID.test(data)) throw new Error('Не удалось создать альбом. Обновите страницу и попробуйте ещё раз.');
+  return { id: data, reused: false };
 }
 export async function saveBusinessPassport(audioItemId: string, fields: Record<string, unknown>, options?: { keys?: readonly string[] }) {
   await requireAdminPanelAccess();
