@@ -111,6 +111,7 @@ assert.equal(albumAdmissionState([]).complete, false, 'empty album is never «в
   assert.deepEqual(passportRefusalCodes(matchDraft, true, true), ['shazam_pending'], 'a new queued check still wins');
   assert.deepEqual(passportRefusalCodes(matchDraft, false, false), ['shazam_missing']);
   assert.deepEqual(passportRefusalCodes(complete, false, true), [], 'filled passport: rules unchanged');
+  assert.deepEqual(passportRefusalCodes({ ...matchDraft, shazam_result: 'not_found' }, false, true), ['shazam_missing'], 'manual «совпадений нет» without a date is not shown as a match');
   const album = albumAdmissionState([
     ...Array.from({ length: 9 }, () => approvedTrack),
     { passport: matchDraft, shazamMatch: true },
@@ -170,6 +171,9 @@ assert.ok(autoFill.includes('Ключ AcoustID не задан'));
 assert.match(autoFill, /const missing = passportMissing\(passport\);\n\s+if \(missing\.length > 0\) \{\n\s+skipped \+= 1;/, 'local precheck unchanged');
 assert.match(autoFill, /await decideBusinessPassport\(track\.id, 'approve'\)/);
 assert.equal((autoFill.match(/decideBusinessPassport\(/g) ?? []).length, 1, 'approval only from the bulk action');
+// t1522u: the approve result names a match only for a check of the CURRENT master, read-only.
+assert.match(autoFill, /row\.master_asset_id !== currentMaster\.get\(trackId\)/, 'match of a previous master is ignored');
+assert.match(autoFill, /passportRefusalCodes\(passport, shazamActive\.has\(trackId\), shazamMatched\.has\(trackId\)\)/);
 const tools = read('src/app/(platform)/admin/business-catalog/AlbumPassportTools.tsx');
 assert.match(tools, /Альбом в каталоге Бизнеса ✓/);
 assert.match(tools, /disabled=\{pending \|\| nothingReady\}/);

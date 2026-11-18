@@ -392,7 +392,7 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
   const db = createServiceRoleClient();
   const { data: album, error: albumError } = await db.from('practices').select('id, business_only').eq('id', albumId).maybeSingle();
   if (albumError || !album || album.business_only !== true) throw new Error('Нужен закрытый альбом Бизнеса.');
-  const { data: tracks, error: tracksError } = await db.from('audio_items').select('id, title').eq('practice_id', albumId).order('position');
+  const { data: tracks, error: tracksError } = await db.from('audio_items').select('id, title, desired_music_master_asset_id').eq('practice_id', albumId).order('position');
   if (tracksError) throw new Error('Не удалось загрузить треки альбома.');
   const { data: passports, error: passportsError } = await db.from('business_track_passports').select('*').eq('practice_id', albumId);
   if (passportsError) throw new Error('Не удалось загрузить паспорта.');
@@ -405,18 +405,24 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
       .select('audio_item_id').in('audio_item_id', trackIds).in('status', ['pending', 'running']);
     if (!activeError) for (const row of active ?? []) shazamActive.add(String(row.audio_item_id));
   }
-  // t1522u, read-only: tracks whose latest decisive check found a match. Only names the reason
+  // t1522u, read-only: tracks whose latest decisive check OF THE CURRENT MASTER found a match (same
+  // choice as the closed-catalog card, admin.server loadTrackShazamState). Only names the reason
   // («Shazam нашёл совпадение» instead of «нет результата Shazam»); the rules are unchanged.
+  const currentMaster = new Map<string, string>();
+  for (const track of tracks ?? []) {
+    const master = (track as { desired_music_master_asset_id?: unknown }).desired_music_master_asset_id;
+    if (typeof master === 'string' && master) currentMaster.set(String(track.id), master);
+  }
   const shazamMatched = new Set<string>();
-  if (trackIds.length > 0) {
+  if (currentMaster.size > 0) {
     const { data: finals, error: finalsError } = await db.from('business_passport_shazam_checks')
-      .select('audio_item_id, status, created_at').in('audio_item_id', trackIds).in('status', ['match', 'no_match'])
-      .order('created_at', { ascending: false });
+      .select('audio_item_id, master_asset_id, status, created_at').in('audio_item_id', [...currentMaster.keys()])
+      .in('status', ['match', 'no_match']).order('created_at', { ascending: false });
     if (!finalsError) {
       const seen = new Set<string>();
       for (const row of finals ?? []) {
         const trackId = String(row.audio_item_id);
-        if (seen.has(trackId)) continue;
+        if (seen.has(trackId) || row.master_asset_id !== currentMaster.get(trackId)) continue;
         seen.add(trackId);
         if (row.status === 'match') shazamMatched.add(trackId);
       }

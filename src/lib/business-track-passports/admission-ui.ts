@@ -72,7 +72,9 @@ export function passportRefusalCodes(passport: Passport | undefined | null, shaz
   if ((filled('shazam_result') && passport.shazam_result !== 'not_found')
     || (filled('acoustid_result') && passport.acoustid_result !== 'not_found')) codes.add('match');
   if ([...SHAZAM_FIELDS].some((key) => !filled(key))) {
-    codes.add(shazamActive ? 'shazam_pending' : shazamMatch ? 'shazam_match' : 'shazam_missing');
+    // A result the operator already entered (e.g. manual «совпадений нет») is never shown as a match.
+    const matchUnresolved = shazamMatch && !filled('shazam_result');
+    codes.add(shazamActive ? 'shazam_pending' : matchUnresolved ? 'shazam_match' : 'shazam_missing');
   }
   else if (shazamActive) codes.add('shazam_pending');
   if ([...FINGERPRINT_FIELDS].some((key) => !filled(key))) codes.add('fingerprint_missing');
