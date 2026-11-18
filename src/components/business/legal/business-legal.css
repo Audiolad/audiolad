@@ -21,6 +21,7 @@
   --legal-radius: 18px;
   --legal-radius-sm: 12px;
   --legal-font-display: "Playfair Display", Georgia, "Noto Serif", "Liberation Serif", "Times New Roman", serif;
+  --font-legal-serif: var(--font-guide-serif);
   min-height: 100dvh;
   background: var(--legal-bg);
   color: var(--legal-text);

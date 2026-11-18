@@ -17,6 +17,8 @@ export const legalSubcardClass = "business-legal__subcard";
 export const legalButtonClass = "business-legal__button";
 export const legalBadgeClass = "business-legal__badge";
 export const legalSampleClass = "business-legal__sample";
+/** Content and footer document links open in a new tab. Not for header/nav or tel:/mailto:. */
+export const legalDocLinkProps = { target: "_blank" as const, rel: "noopener" as const };
 
 type Props = {
   kicker: string;
@@ -66,10 +68,10 @@ export default function BusinessLegalShell({ kicker, title, lead, breadcrumb, ch
         <footer className="business-legal__footer">
           <p>
             Этот раздел объясняет, как работает сервис, и сам по себе договором не является. Условия – в
-            договоре-оферте «АудиоЛад Бизнес» и приложениях к нему.
+            договоре-оферте «АудиоЛад Кофейня» и приложениях к нему.
           </p>
           <p>
-            Оператор сервисов «АудиоЛад Бизнес» и «АудиоЛад Кофейня» – {BUSINESS_LEGAL_OPERATOR.name}, ИНН{" "}
+            Оператор сервиса «АудиоЛад Кофейня» – {BUSINESS_LEGAL_OPERATOR.name}, ИНН{" "}
             {BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП {BUSINESS_LEGAL_OPERATOR.ogrnip}.
           </p>
         </footer>

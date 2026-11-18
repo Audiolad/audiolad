@@ -8,6 +8,7 @@ import BusinessLegalShell, {
   legalCardClass,
   legalBadgeClass,
   legalH2Class,
+  legalDocLinkProps,
   legalLinkClass,
 } from "@/components/business/legal/BusinessLegalShell";
 import {
@@ -20,7 +21,7 @@ import {
 type Props = { params: Promise<{ number: string }> };
 
 export const metadata: Metadata = {
-  title: "Проверка сертификата – АудиоЛад Бизнес",
+  title: "Проверка сертификата – АудиоЛад Кофейня",
   robots: BUSINESS_LEGAL_ROBOTS,
 };
 
@@ -62,13 +63,13 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
       <section className={legalCardClass}>
         <h2 className={legalH2Class}>Что это значит</h2>
         <p className={"mt-4 " + legalBodyClass}>
-          Точка подключена к «АудиоЛад Бизнес» и имеет право включать музыку каталога через плеер сервиса до
+          Точка подключена к «АудиоЛад Кофейня» и имеет право включать музыку каталога через плеер сервиса до
           указанной даты. Как устроены права – в разделе{" "}
-          <Link href={BUSINESS_LEGAL_RIGHTS_HREF} className={legalLinkClass}>
+          <Link href={BUSINESS_LEGAL_RIGHTS_HREF} className={legalLinkClass} {...legalDocLinkProps}>
             «Как устроены права на музыку»
           </Link>
           , о сертификате –{" "}
-          <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass}>
+          <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass} {...legalDocLinkProps}>
             «Сертификат на точку»
           </Link>
           .
