@@ -12,6 +12,13 @@
  * go away like any replaced audio, and the sealed features stay in the DB.
  * Anything that is not clearly a redundant copy is kept (lab uploads without a
  * passport link, unfinished or failed runs, changed or missing source, errors).
+ *
+ * No DB lock spans "verify source" and "remove copy" (that would need a
+ * migration). To close that window, after removal the track's current source
+ * is resolved again; if it moved or vanished, the copy is put back from the
+ * verified bytes held in memory (3 attempts). The residual risk is the same
+ * as the author replacing audio right after a clean removal, which the
+ * invariant accepts.
  */
 
 export type AnalyzerRunCopyOutcome =
@@ -22,6 +29,8 @@ export type AnalyzerRunCopyOutcome =
   | "not_product_run"
   | "source_missing"
   | "source_changed"
+  | "restored_after_race"
+  | "restore_failed"
   | "lookup_failed";
 
 export type AnalyzerRunCopyRun = {
@@ -34,7 +43,12 @@ export type AnalyzerRunCopyRun = {
 };
 
 export type AnalyzerRunSource =
-  | { outcome: "ok"; bytes: Uint8Array }
+  | {
+      outcome: "ok";
+      bytes: Uint8Array;
+      /** Re-resolves the track: true only if the same source object is still current and present. */
+      stillCurrent: () => Promise<boolean | null>;
+    }
   | { outcome: "not_product_run" | "source_missing" | "source_changed" | "lookup_failed" };
 
 export type AnalyzerRunCopyDeps = {
@@ -45,6 +59,7 @@ export type AnalyzerRunCopyDeps = {
   /** Exact bytes from the track's current analysis audio, SHA256-verified. */
   loadSource: (runId: string, expectedSha256: string) => Promise<AnalyzerRunSource>;
   removeCopy: (path: string) => Promise<boolean>;
+  restoreCopy: (path: string, bytes: Uint8Array, mimeType: string) => Promise<boolean>;
   log?: (event: string, runId: string, detail?: string) => void;
 };
 
@@ -65,6 +80,26 @@ export async function discardAnalyzerRunCopy(
     if (source.outcome !== "ok") return source.outcome;
     if (options.dryRun) return "would_remove";
     if (!(await deps.removeCopy(run.storage_path))) return "lookup_failed";
+    let current: boolean | null = null;
+    try {
+      current = await source.stillCurrent();
+    } catch {
+      current = null;
+    }
+    if (current !== true) {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          if (await deps.restoreCopy(run.storage_path, source.bytes, run.mime_type)) {
+            log("analyzer_run_copy_restored_after_race", run.id);
+            return "restored_after_race";
+          }
+        } catch {
+          // retry below
+        }
+      }
+      log("analyzer_run_copy_restore_failed", run.id);
+      return "restore_failed";
+    }
     log("analyzer_run_copy_removed", run.id);
     return "removed";
   } catch (error) {

@@ -45,6 +45,8 @@ script writes. Missing taxonomy or prompt version stays empty.
    From then on the analysed bytes follow the track audio's own lifecycle;
    sealed features stay in the DB. Lab uploads with no link, unfinished or
    failed runs, changed or missing sources and any error keep the copy.
+   After removal the track source is resolved again; if it moved or vanished
+   in between, the copy is re-uploaded from the verified bytes in memory.
    A missed cleanup only leaves a copy; reconcile with
    `scripts/music-analyzer-run-copy-reconcile.mts` (dry run by default).
    Selective reanalysis of a run whose copy is gone re-materialises the exact

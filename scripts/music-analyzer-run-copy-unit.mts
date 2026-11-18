@@ -19,6 +19,8 @@ function harness(overrides: {
   copy?: boolean | null;
   source?: AnalyzerRunSource;
   removeOk?: boolean;
+  stillCurrent?: boolean | null | "throw";
+  restoreResults?: boolean[];
 } = {}) {
   const calls: string[] = [];
   const deps: AnalyzerRunCopyDeps = {
@@ -27,9 +29,22 @@ function harness(overrides: {
     copyExists: async () => (overrides.copy === undefined ? true : overrides.copy),
     loadSource: async (runId, sha) => {
       calls.push(`source:${runId}:${sha.slice(0, 4)}`);
-      return overrides.source ?? { outcome: "ok", bytes: new Uint8Array([1, 2, 3]) };
+      return overrides.source ?? {
+        outcome: "ok",
+        bytes: new Uint8Array([1, 2, 3]),
+        stillCurrent: async () => {
+          calls.push("recheck");
+          if (overrides.stillCurrent === "throw") throw new Error("lookup");
+          return overrides.stillCurrent === undefined ? true : overrides.stillCurrent;
+        },
+      };
     },
     removeCopy: async (path) => { calls.push(`remove:${path}`); return overrides.removeOk ?? true; },
+    restoreCopy: async (path, bytes, mime) => {
+      calls.push(`restore:${path}:${bytes.byteLength}:${mime}`);
+      const results = overrides.restoreResults ?? [true];
+      return results.length ? results.shift()! : false;
+    },
   };
   return { deps, calls };
 }
@@ -37,7 +52,7 @@ function harness(overrides: {
 {
   const { deps, calls } = harness();
   assert.equal(await discardAnalyzerRunCopy("run-1", deps), "removed");
-  assert.deepEqual(calls, ["source:run-1:aaaa", "remove:runs/run-1/track.wav"], "verifies source sha before removal");
+  assert.deepEqual(calls, ["source:run-1:aaaa", "remove:runs/run-1/track.wav", "recheck"], "verifies source sha before removal, re-checks after");
 }
 {
   const { deps, calls } = harness();
@@ -76,6 +91,22 @@ for (const outcome of ["not_product_run", "source_missing", "source_changed", "l
 {
   const { deps } = harness({ removeOk: false });
   assert.equal(await discardAnalyzerRunCopy("run-1", deps), "lookup_failed");
+}
+for (const stillCurrent of [false, null, "throw"] as const) {
+  const { deps, calls } = harness({ stillCurrent });
+  assert.equal(await discardAnalyzerRunCopy("run-1", deps), "restored_after_race", String(stillCurrent));
+  assert.deepEqual(calls, ["source:run-1:aaaa", "remove:runs/run-1/track.wav", "recheck", "restore:runs/run-1/track.wav:3:audio/wav"],
+    "source moved/vanished during removal: verified bytes are put back");
+}
+{
+  const { deps, calls } = harness({ stillCurrent: false, restoreResults: [false, false, true] });
+  assert.equal(await discardAnalyzerRunCopy("run-1", deps), "restored_after_race");
+  assert.equal(calls.filter((c) => c.startsWith("restore:")).length, 3, "restore retried");
+}
+{
+  const { deps, calls } = harness({ stillCurrent: false, restoreResults: [false, false, false] });
+  assert.equal(await discardAnalyzerRunCopy("run-1", deps), "restore_failed", "never reported as success");
+  assert.equal(calls.filter((c) => c.startsWith("restore:")).length, 3);
 }
 {
   const { deps } = harness();
