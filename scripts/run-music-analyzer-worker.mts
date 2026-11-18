@@ -25,6 +25,7 @@ import { createMusicAnalyzerWorkerPort } from "../src/lib/music-analyzer-runs/wo
 import {
   discardJazzRelaxAnalyzerRunCopy,
   settleJazzRelaxPassportForAnalyzerRun,
+  sweepJazzRelaxAnalyzerRunCopies,
 } from "../src/lib/music-passport/jazz-relax-pilot";
 
 function envNumber(name: string, fallback: number): number {
@@ -52,6 +53,7 @@ async function main() {
     onRunSettled: async (runId) => {
       await settleJazzRelaxPassportForAnalyzerRun(runId);
       await discardJazzRelaxAnalyzerRunCopy(runId);
+      await sweepJazzRelaxAnalyzerRunCopies();
     },
   });
   const boot = await captureMusicAnalyzerBootRelease();

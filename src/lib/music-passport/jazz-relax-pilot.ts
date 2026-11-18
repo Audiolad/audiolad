@@ -42,6 +42,13 @@ import {
   type JazzRelaxPassportView,
 } from "@/lib/music-passport/jazz-relax-status";
 import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
+import {
+  discardAnalyzerRunCopy,
+  type AnalyzerRunCopyDeps,
+  type AnalyzerRunCopyOutcome,
+  type AnalyzerRunCopyRun,
+  type AnalyzerRunSource,
+} from "@/lib/music-passport/analyzer-run-copy";
 
 export class JazzRelaxPassportError extends Error {
   constructor(
@@ -661,41 +668,86 @@ async function enqueueTrack(input: {
   if (linkError) throw new JazzRelaxPassportError("passport_storage_failed", 500);
 }
 
-export type JazzRelaxRunCopyOutcome =
-  | "removed"
-  | "not_succeeded"
-  | "not_product_run"
-  | "source_missing"
-  | "source_changed"
-  | "lookup_failed";
+/**
+ * t1523u: wiring for analyzer-run-copy.ts. After a product passport run
+ * succeeds, drop its byte copy of the track audio from music-analyzer-runs
+ * when the track's current audio still holds the exact analysed bytes.
+ */
+function analyzerRunCopyDeps(): AnalyzerRunCopyDeps {
+  const runs = () => service().storage.from(MUSIC_ANALYZER_RUNS_BUCKET);
+  return {
+    runsBucket: MUSIC_ANALYZER_RUNS_BUCKET,
+    async loadRun(runId) {
+      const { data, error } = await service()
+        .from("music_analyzer_runs")
+        .select("id, status, storage_bucket, storage_path, sha256, mime_type")
+        .eq("id", runId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data as AnalyzerRunCopyRun;
+    },
+    async copyExists(path) {
+      if (!path) return null;
+      // storage-js: missing object -> { data: false }; other failures throw.
+      try {
+        const { data } = await runs().exists(path);
+        return data === true;
+      } catch {
+        return null;
+      }
+    },
+    loadSource: (runId, sha) => jazzRelaxRunSourceBytes(runId, sha),
+    async removeCopy(path) {
+      const { error } = await runs().remove([path]);
+      return !error;
+    },
+    async restoreCopy(path, bytes, mimeType) {
+      const { error } = await runs().upload(path, bytes, { contentType: mimeType, upsert: false });
+      return !error;
+    },
+    log: (event, runId, detail) => console.info(event, runId, detail ?? ""),
+  };
+}
+
+export function discardJazzRelaxAnalyzerRunCopy(runId: string): Promise<AnalyzerRunCopyOutcome> {
+  return discardAnalyzerRunCopy(runId, analyzerRunCopyDeps());
+}
+
+const ANALYZER_COPY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const ANALYZER_COPY_SWEEP_LIMIT = 20;
+let lastAnalyzerCopySweepAt = 0;
 
 /**
- * t1523u: a product passport run gets its own byte copy of the track audio in
- * music-analyzer-runs only so the worker can read it. Once the run succeeded
- * the features live in the DB and the copy duplicates the track's master
- * (≈30 MB WAV per run). Remove the copy only when the track's current analysis
- * audio still exists and hashes to the run's sha256, so the exact analysed
- * bytes stay recoverable (selective reanalysis re-materialises from there).
- * Lab uploads (no passport link) are the only copy and are never touched.
+ * Reconciliation (late passport link, transient failure): at most every 10
+ * minutes, re-check up to 20 recent linked runs that finished over 5 minutes
+ * ago. Runs without a copy return "already_gone" after one exists() call.
  */
-export async function discardJazzRelaxAnalyzerRunCopy(runId: string): Promise<JazzRelaxRunCopyOutcome> {
+export async function sweepJazzRelaxAnalyzerRunCopies(now = Date.now()): Promise<void> {
+  if (now - lastAnalyzerCopySweepAt < ANALYZER_COPY_SWEEP_INTERVAL_MS) return;
+  lastAnalyzerCopySweepAt = now;
   try {
-    const { data: run, error: runError } = await service()
-      .from("music_analyzer_runs")
-      .select("id, status, storage_bucket, storage_path, sha256")
-      .eq("id", runId)
-      .maybeSingle();
-    if (runError || !run) return "lookup_failed";
-    if (run.status !== "succeeded" || run.storage_bucket !== MUSIC_ANALYZER_RUNS_BUCKET) return "not_succeeded";
-    const source = await jazzRelaxRunSourceBytes(runId, run.sha256 as string);
-    if (source.outcome !== "ok") return source.outcome;
-    const removed = await service().storage.from(MUSIC_ANALYZER_RUNS_BUCKET).remove([run.storage_path as string]);
-    if (removed.error) return "lookup_failed";
-    console.info("jazz_relax_analyzer_copy_removed", runId);
-    return "removed";
+    const { data: links, error } = await service()
+      .from("music_passport_analysis_links")
+      .select("analyzer_run_id, created_at")
+      .gte("created_at", new Date(now - 2 * 24 * 3600 * 1000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error || !links?.length) return;
+    const runs = await loadRuns(links.map((link) => link.analyzer_run_id as string));
+    const cutoff = now - 5 * 60 * 1000;
+    const candidates = [...runs.values()]
+      .filter((run) => run.status === "succeeded" && run.finished_at && Date.parse(run.finished_at) < cutoff)
+      .map((run) => run.id);
+    const deps = analyzerRunCopyDeps();
+    let checked = 0;
+    for (const id of candidates) {
+      if (checked >= ANALYZER_COPY_SWEEP_LIMIT) break;
+      if ((await deps.copyExists((await deps.loadRun(id))?.storage_path ?? "")) !== true) continue;
+      checked += 1;
+      await discardAnalyzerRunCopy(id, deps);
+    }
   } catch (error) {
-    console.error("jazz_relax_analyzer_copy_check_failed", runId, error instanceof Error ? error.message : "unknown");
-    return "lookup_failed";
+    console.error("jazz_relax_analyzer_copy_sweep_failed", error instanceof Error ? error.message : "unknown");
   }
 }
 
@@ -704,10 +756,7 @@ export async function discardJazzRelaxAnalyzerRunCopy(runId: string): Promise<Ja
  * current analysis audio (master or practice audio). Returns them only when
  * the sha256 still matches the run.
  */
-export async function jazzRelaxRunSourceBytes(
-  runId: string,
-  expectedSha256: string,
-): Promise<{ outcome: "ok"; bytes: Uint8Array } | { outcome: Exclude<JazzRelaxRunCopyOutcome, "removed" | "not_succeeded"> }> {
+export async function jazzRelaxRunSourceBytes(runId: string, expectedSha256: string): Promise<AnalyzerRunSource> {
   const { data: link, error: linkError } = await service()
     .from("music_passport_analysis_links")
     .select("audio_item_id, source_sha256")
@@ -727,11 +776,23 @@ export async function jazzRelaxRunSourceBytes(
   const audio = analysisForTrack(track as AudioRow, masters);
   if (audio.kind === "missing_audio") return { outcome: "source_missing" };
   const target = jazzRelaxAnalysisStorageTarget(audio);
-  const { data, error } = await service().storage.from(target.bucket).download(target.path);
+  const bucket = () => service().storage.from(target.bucket);
+  const { data, error } = await bucket().download(target.path);
   if (error || !data) return { outcome: "source_missing" };
   const bytes = new Uint8Array(await data.arrayBuffer());
   if (bytes.byteLength === 0 || sha256Hex(bytes) !== expectedSha256) return { outcome: "source_changed" };
-  return { outcome: "ok", bytes };
+  return {
+    outcome: "ok",
+    bytes,
+    async sourceExists() {
+      try {
+        const { data: present } = await bucket().exists(target.path);
+        return present === true;
+      } catch {
+        return null;
+      }
+    },
+  };
 }
 
 export type JazzRelaxBackfillEnqueueResult =
