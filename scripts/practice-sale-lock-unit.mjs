@@ -254,6 +254,7 @@ function testSourceWiring() {
     "supabase/migrations/20270316120000_replace_track_audio_after_sale.sql",
   );
   assert.match(replaceMigration, /guard_audio_items_content_sale_lock/);
+  assert.match(replaceMigration, /v_practice_id := OLD\.practice_id;/);
   assert.match(replaceMigration, /audio_item_has_delivered_music_audio\(\s*OLD\.audio_path/);
   assert.match(replaceMigration, /IF TG_OP = 'DELETE' THEN\s*RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'/);
   assert.match(audioRoute, /assertPracticeContentMutable/);

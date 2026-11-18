@@ -80,6 +80,7 @@ assert(/D revoked studio entitlement alone must not lock/.test(smoke));
 assert(/A replacement under user_practices lock must succeed/.test(smoke));
 assert(/A2 clearing audio under lock was not rejected/.test(smoke));
 assert(/A2 teardown under lock was not rejected/.test(smoke));
+assert(/A2 moving a track out of a purchased product was not rejected/.test(smoke));
 assert(/E replacement under paid lock must succeed/.test(smoke));
 assert(/F finalize under paid lock must verify the new master/.test(smoke));
 assert(/H first-ever MP3 under lock must succeed/.test(smoke));

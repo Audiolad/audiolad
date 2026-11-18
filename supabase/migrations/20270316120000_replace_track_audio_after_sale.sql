@@ -9,7 +9,9 @@ BEGIN;
 --   * guard_audio_items_content_sale_lock: under the lock a track that had
 --     playable audio (audio_path or active stream) must still have playable
 --     audio after the update. DELETE, practice_id change, blank path and
---     published -> other status stay blocked exactly as before.
+--     published -> other status stay blocked. The lock is now looked up by
+--     OLD.practice_id (was NEW), so a track cannot be moved out of a
+--     purchased product either.
 --   * finalize_music_master_asset / activate_music_direct_mp3_delivery /
 --     promote_music_item_delivery: the sale-lock refusal is removed, the rest of
 --     each body is copied unchanged from the live definition
@@ -29,7 +31,10 @@ DECLARE
   v_practice_id uuid;
   v_locked boolean;
 BEGIN
-  v_practice_id := COALESCE(NEW.practice_id, OLD.practice_id);
+  -- The trigger fires only BEFORE UPDATE OR DELETE, so OLD always exists.
+  -- Lock by the product the track belongs to now (OLD), so moving a track out
+  -- of a purchased product is caught below.
+  v_practice_id := OLD.practice_id;
   v_locked := public.practice_is_content_locked_after_sale(v_practice_id);
 
   IF NOT v_locked THEN

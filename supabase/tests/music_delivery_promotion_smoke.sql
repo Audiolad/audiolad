@@ -367,6 +367,17 @@ BEGIN
         RAISE EXCEPTION 'A2 teardown expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
       END IF;
   END;
+  BEGIN
+    UPDATE public.audio_items
+    SET practice_id = gen_random_uuid()
+    WHERE id = v_audio;
+    RAISE EXCEPTION 'A2 moving a track out of a purchased product was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'A2 move expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
   SELECT audio_path INTO v_path FROM public.audio_items WHERE id = v_audio;
   IF v_path IS DISTINCT FROM 'legacy/locked-a.mp3' THEN
     RAISE EXCEPTION 'A2 blocked removal must leave the path unchanged';
