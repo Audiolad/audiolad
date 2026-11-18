@@ -400,7 +400,7 @@ assert.equal(recorded.failed.length, 0);
 const workerRuntimeSource = read("src/lib/music-analyzer-runs/worker-runtime.ts");
 assert.match(workerRuntimeSource, /onRunSettled\?: \(runId: string\) => Promise<void>/);
 const workerRunner = read("scripts/run-music-analyzer-worker.mts");
-assert.match(workerRunner, /onRunSettled: settleJazzRelaxPassportForAnalyzerRun/);
+assert.match(workerRunner, /onRunSettled: async \(runId\) => \{\n\s+await settleJazzRelaxPassportForAnalyzerRun\(runId\);\n\s+await discardJazzRelaxAnalyzerRunCopy\(runId\);/);
 
 const workspace = read("src/components/music-analyzer-runs/RunsWorkspace.tsx");
 assert.match(workspace, /fileForSignedUpload\(file, file\.name, mime\)/);
