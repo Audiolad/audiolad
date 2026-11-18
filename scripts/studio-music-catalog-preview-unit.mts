@@ -8,7 +8,10 @@ import type { StudioMusicCatalogPublication } from "../src/lib/studio-music/cata
 import {
   authorizeStudioMusicPreview,
   handleStudioMusicPreview,
+  resolveStudioMusicPreviewSource,
   studioMusicPreviewJsonContainsForbiddenFields,
+  type StudioMusicPreviewAudioItem,
+  type StudioMusicPreviewSource,
   type StudioMusicPreviewStore,
 } from "../src/lib/studio-music/preview";
 
@@ -113,6 +116,8 @@ function createStore(input: {
   practice: StudioMusicCatalogPublication | null;
   audioItemPracticeId?: string;
   canUse?: boolean;
+  audioItem?: Partial<StudioMusicPreviewAudioItem>;
+  seen?: { clip?: StudioMusicPreviewSource; full?: StudioMusicPreviewSource };
 }): StudioMusicPreviewStore {
   return {
     async loadPractice() {
@@ -125,19 +130,22 @@ function createStore(input: {
         audio_path: "hidden/path.mp3",
         status: "published",
         duration_seconds: 120,
+        ...input.audioItem,
       };
     },
     async loadCanUse() {
       return input.canUse === true;
     },
-    async buildClip() {
+    async buildClip({ source }) {
+      if (input.seen) input.seen.clip = source;
       return {
         bytes: new Uint8Array([0xff, 0xfb, 0x90, 0x00]),
         startMs: 30000,
         endMs: 90000,
       };
     },
-    async streamFullAudio({ rangeHeader }) {
+    async streamFullAudio({ rangeHeader, source }) {
+      if (input.seen) input.seen.full = source;
       assert.equal(rangeHeader, "bytes=0-");
       return new Response(new Uint8Array([0xff, 0xfb, 0x90, 0x00]), {
         status: 206,
@@ -249,7 +257,130 @@ assert.equal(
   true,
 );
 
+// t1540u: album tracks from the music pipeline have no legacy audio_path and
+// play only through a verified music-streams delivery asset. The Studio
+// catalog used to answer 404 audio_missing for them, so the bottom player
+// flashed and disappeared.
+const verifiedStream = {
+  audioItemId,
+  assetRole: "stream",
+  lifecycleState: "verified",
+  storageBucket: "music-streams",
+  storagePath: `${audioItemId}/master/mp3-256.mp3`,
+};
+const freePublicPractice: StudioMusicCatalogPublication = {
+  ...publicPractice,
+  is_free: true,
+  price: 0,
+  studio_music_pricing_mode: "free",
+};
+
+{
+  const seen: { clip?: StudioMusicPreviewSource; full?: StudioMusicPreviewSource } = {};
+  const albumTrackFree = await handleStudioMusicPreview({
+    publicationId,
+    audioItemId,
+    userId: "listener-1",
+    store: createStore({
+      practice: freePublicPractice,
+      audioItem: { audio_path: null, active_stream: verifiedStream },
+      seen,
+    }),
+  });
+  assert.equal(albumTrackFree.type, "full");
+  if (albumTrackFree.type === "full") {
+    assert.equal(albumTrackFree.response.status, 206);
+  }
+  assert.deepEqual(seen.full, {
+    bucket: "music-streams",
+    path: verifiedStream.storagePath,
+  });
+}
+
+{
+  const seen: { clip?: StudioMusicPreviewSource; full?: StudioMusicPreviewSource } = {};
+  const albumTrackPaidGuest = await handleStudioMusicPreview({
+    publicationId,
+    audioItemId,
+    userId: null,
+    store: createStore({
+      practice: publicPractice,
+      audioItem: { audio_path: "", active_stream: verifiedStream },
+      seen,
+    }),
+  });
+  assert.equal(albumTrackPaidGuest.type, "clip");
+  assert.deepEqual(seen.clip, {
+    bucket: "music-streams",
+    path: verifiedStream.storagePath,
+  });
+}
+
+{
+  const seen: { clip?: StudioMusicPreviewSource; full?: StudioMusicPreviewSource } = {};
+  await handleStudioMusicPreview({
+    publicationId,
+    audioItemId,
+    userId: null,
+    store: createStore({ practice: freePublicPractice, seen }),
+  });
+  assert.deepEqual(seen.full, {
+    bucket: "practice-audio",
+    path: "hidden/path.mp3",
+  });
+}
+
+for (const badStream of [
+  null,
+  { ...verifiedStream, lifecycleState: "processing" },
+  { ...verifiedStream, assetRole: "master" },
+  { ...verifiedStream, storageBucket: "practice-audio" },
+  { ...verifiedStream, audioItemId: otherAudioId },
+]) {
+  const missing = await handleStudioMusicPreview({
+    publicationId,
+    audioItemId,
+    userId: null,
+    store: createStore({
+      practice: freePublicPractice,
+      audioItem: { audio_path: null, active_stream: badStream },
+    }),
+  });
+  assert.deepEqual(missing, {
+    type: "json",
+    status: 404,
+    body: { error: "audio_missing" },
+  });
+}
+
+assert.equal(
+  resolveStudioMusicPreviewSource({
+    productKind: "practice",
+    audioItem: { id: audioItemId, audio_path: null, status: "published", active_stream: verifiedStream },
+    access: "full",
+  }),
+  null,
+);
+assert.deepEqual(
+  resolveStudioMusicPreviewSource({
+    productKind: "music",
+    audioItem: { id: audioItemId, audio_path: "legacy.mp3", status: "published", active_stream: verifiedStream },
+    access: "preview",
+  }),
+  { bucket: "practice-audio", path: "legacy.mp3" },
+);
+assert.deepEqual(
+  resolveStudioMusicPreviewSource({
+    productKind: "music",
+    audioItem: { id: audioItemId, audio_path: "legacy.mp3", status: "published", active_stream: verifiedStream },
+    access: "full",
+  }),
+  { bucket: "music-streams", path: verifiedStream.storagePath },
+);
+
 const previewSource = read("src/lib/studio-music/preview.ts");
+assert.match(previewSource, /active_music_delivery_asset_id/);
+assert.match(previewSource, /music_audio_assets/);
 assert.match(previewSource, /buildPracticePreviewClip/);
 assert.match(previewSource, /maxDurationMs: 60_000/);
 assert.match(previewSource, /isFreePublicStudioMusicInventory/);
