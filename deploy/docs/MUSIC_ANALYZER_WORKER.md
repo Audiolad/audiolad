@@ -37,6 +37,20 @@ script writes. Missing taxonomy or prompt version stays empty.
    `932c4ce`, and `3750f3b` is an ancestor.
    The checkpoint file must be `music_audioset_epoch_15_esc_90.14.pt`.
    Ordered rollout: `deploy/docs/MUSIC_ANALYZER_VOICE_RU.md`.
+5. Product passport runs (row has a `music_passport_analysis_links` link) get
+   a byte copy of the track audio in `music-analyzer-runs` only for the worker.
+   After such a run succeeds, the worker hook re-reads the track's current
+   analysis audio (verified master or practice audio) and removes the run copy
+   only when that source exists and its SHA256 equals the run's (t1523u).
+   From then on the analysed bytes follow the track audio's own lifecycle;
+   sealed features stay in the DB. Lab uploads with no link, unfinished or
+   failed runs, changed or missing sources and any error keep the copy.
+   After removal the track source is resolved again; if it moved or vanished
+   in between, the copy is re-uploaded from the verified bytes in memory.
+   A missed cleanup only leaves a copy; reconcile with
+   `scripts/music-analyzer-run-copy-reconcile.mts` (dry run by default).
+   Selective reanalysis of a run whose copy is gone re-materialises the exact
+   bytes from the track audio (SHA256-checked).
 
 ## Ops bootstrap (on the audiolad.ru VPS)
 

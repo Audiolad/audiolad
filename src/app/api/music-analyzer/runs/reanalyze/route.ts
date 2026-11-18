@@ -2,7 +2,8 @@ import { requireMusicLabApiAccess } from "@/lib/music-lab/guard";
 import { musicLabJson, musicLabErrorResponse } from "@/lib/music-lab/http";
 import { reanalysisId, reanalysisSelection } from "@/lib/music-analyzer-runs/selective-reanalysis.mjs";
 import { record } from "@/lib/music-analyzer-runs/features.mjs";
-import { enqueueMusicAnalyzerRun, getMusicAnalyzerRun, copyMusicAnalyzerObject, MusicAnalyzerStorageError } from "@/lib/music-analyzer-runs/repository";
+import { enqueueMusicAnalyzerRun, getMusicAnalyzerRun, copyMusicAnalyzerObject, uploadMusicAnalyzerObject, MusicAnalyzerStorageError } from "@/lib/music-analyzer-runs/repository";
+import { jazzRelaxRunSourceBytes } from "@/lib/music-passport/jazz-relax-pilot";
 import { buildRunStoragePath } from "@/lib/music-analyzer-runs/audio-file";
 import { toClientRun } from "@/lib/music-analyzer-runs/contract";
 
@@ -30,7 +31,16 @@ export async function POST(request: Request) {
         let run = await getMusicAnalyzerRun(id);
         if (!run) {
           const path = buildRunStoragePath(id, source.source_filename);
-          await copyMusicAnalyzerObject(source.storage_path, path);
+          try {
+            await copyMusicAnalyzerObject(source.storage_path, path);
+          } catch (copyError) {
+            // t1523u: a succeeded product passport run no longer keeps its own
+            // copy; re-materialise the exact bytes from the track's audio.
+            if (!(copyError instanceof MusicAnalyzerStorageError)) throw copyError;
+            const restored = await jazzRelaxRunSourceBytes(source.id, source.sha256);
+            if (restored.outcome !== "ok") throw copyError;
+            await uploadMusicAnalyzerObject(path, restored.bytes, source.mime_type);
+          }
           run = await enqueueMusicAnalyzerRun({ deduplicate: true, id, createdBy: guard.actor.userId, sourceFilename: source.source_filename, sha256: source.sha256, byteSize: Number(source.byte_size), mimeType: source.mime_type, storagePath: path });
         }
         results.push({ sourceId: source.id, run: toClientRun(run) });
