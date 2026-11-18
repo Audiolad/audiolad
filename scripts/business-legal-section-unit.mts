@@ -81,8 +81,18 @@ for (const f of [...sectionFiles, ...componentFiles]) {
   assert.doesNotMatch(readFileSync(f, "utf8"), PURPLE, `${f}: фиолетовая палитра`);
 }
 const shell = readFileSync(join(COMPONENT_DIR, "BusinessLegalShell.tsx"), "utf8");
-assert.match(shell, /data-biz-theme="jazz-coffee"/, "тема jazz-coffee");
+const css = readFileSync(join(COMPONENT_DIR, "business-legal.css"), "utf8");
+assert.match(css, /--legal-bg: #f7f1e8/, "кремовый фон кофейни");
+assert.match(css, /--legal-accent: #6f4326/, "коричневый акцент кофейни");
+assert.match(css, /--legal-text: #2b1d14/, "espresso текст");
+assert.doesNotMatch(css, /business-app\/theme\/business-theme\.css/, "тема кабинета не импортируется в CSS раздела");
+assert.doesNotMatch(
+  readFileSync(join(SECTION_DIR, "layout.tsx"), "utf8"),
+  /business-app\/theme\/business-theme\.css/,
+  "тема кабинета не импортируется в layout раздела",
+);
 assert.match(shell, /COFFEE_BRAND_NAME/, "шапка АудиоЛад Кофейня");
+assert.doesNotMatch(shell, /data-biz-theme/, "без data-biz-theme на audiolad.ru");
 assert.ok(BUSINESS_LEGAL_CONTACT.maxHref.startsWith("https://max.ru/u/"), "МАКС – прямая ссылка Сергея");
 assert.equal(BUSINESS_LEGAL_CONTACT.phoneHref, "tel:+79264111381");
 assert.equal(BUSINESS_LEGAL_CONTACT.email, "1@audiolad.ru");

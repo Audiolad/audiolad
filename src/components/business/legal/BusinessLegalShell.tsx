@@ -28,7 +28,7 @@ type Props = {
 
 export default function BusinessLegalShell({ kicker, title, lead, breadcrumb, children }: Props) {
   return (
-    <div className="business-app-root business-legal" data-biz-theme="jazz-coffee">
+    <div className="business-legal">
       <header className="business-legal__header">
         <div className="business-legal__header-bar">
           <Link href={BUSINESS_LEGAL_HREF} className="business-legal__brand" aria-label={COFFEE_BRAND_NAME}>

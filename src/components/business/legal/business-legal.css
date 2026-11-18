@@ -1,8 +1,29 @@
-/* Visual style of coffee.audiolad.ru (jazz-coffee tokens from business-theme.css). */
+/* Visual style of coffee.audiolad.ru.
+ * Colour values match the jazz-coffee tokens in business-theme.css, but are
+ * local --legal-* properties: the Business theme layer must not be imported
+ * from src/app/(platform) (business-app-theme-unit scope guard). */
 .business-legal {
+  --legal-bg: #f7f1e8;
+  --legal-surface: #fffaf3;
+  --legal-surface-soft: #f2e8da;
+  --legal-surface-glass: rgba(255, 250, 243, 0.96);
+  --legal-border: #e5d6c1;
+  --legal-text: #2b1d14;
+  --legal-text-muted: #6b5848;
+  --legal-eyebrow: #7d5c24;
+  --legal-accent: #6f4326;
+  --legal-accent-hover: #573219;
+  --legal-on-accent: #fff8ef;
+  --legal-focus: #6f4326;
+  --legal-yellow-bg: #fbf0d8;
+  --legal-yellow-border: #ecd59f;
+  --legal-yellow-ink: #6b4508;
+  --legal-radius: 18px;
+  --legal-radius-sm: 12px;
+  --legal-font-display: "Playfair Display", Georgia, "Noto Serif", "Liberation Serif", "Times New Roman", serif;
   min-height: 100dvh;
-  background: var(--biz-bg);
-  color: var(--biz-text);
+  background: var(--legal-bg);
+  color: var(--legal-text);
   overflow-x: clip;
 }
 
@@ -10,8 +31,8 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: var(--biz-surface-glass);
-  border-bottom: 1px solid var(--biz-border);
+  background: var(--legal-surface-glass);
+  border-bottom: 1px solid var(--legal-border);
 }
 
 .business-legal__header-bar,
@@ -33,11 +54,11 @@
   gap: 0.6rem;
   color: inherit;
   text-decoration: none;
-  border-radius: var(--biz-radius-sm);
+  border-radius: var(--legal-radius-sm);
 }
 
 .business-legal__brand:focus-visible {
-  outline: 2px solid var(--biz-focus);
+  outline: 2px solid var(--legal-focus);
   outline-offset: 3px;
 }
 
@@ -47,14 +68,14 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--biz-surface-soft);
+  background: var(--legal-surface-soft);
 }
 
 .business-legal__brand-name {
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.15;
-  color: var(--biz-text);
+  color: var(--legal-text);
 }
 
 .business-legal__main {
@@ -63,13 +84,13 @@
 
 .business-legal__crumbs {
   margin: 0 0 16px;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 14px;
   line-height: 1.5;
 }
 
 .business-legal__crumbs a {
-  color: var(--biz-accent);
+  color: var(--legal-accent);
   text-decoration: none;
 }
 
@@ -80,9 +101,9 @@
 
 .business-legal__hero {
   padding: 28px 28px 30px;
-  border-radius: var(--biz-radius);
-  background: var(--biz-surface-soft);
-  border: 1px solid var(--biz-border);
+  border-radius: var(--legal-radius);
+  background: var(--legal-surface-soft);
+  border: 1px solid var(--legal-border);
 }
 
 @media (min-width: 1024px) {
@@ -93,7 +114,7 @@
 
 .business-legal__kicker {
   margin: 0;
-  color: var(--biz-eyebrow);
+  color: var(--legal-eyebrow);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -102,17 +123,17 @@
 
 .business-legal__title {
   margin: 10px 0 0;
-  font-family: var(--font-legal-serif), var(--biz-font-display);
+  font-family: var(--font-legal-serif), var(--legal-font-display);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.15;
   font-size: clamp(32px, 6vw, 46px);
-  color: var(--biz-text);
+  color: var(--legal-text);
 }
 
 .business-legal__lead {
   margin: 16px 0 0;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 19px;
   line-height: 1.55;
 }
@@ -133,9 +154,9 @@
 .business-legal__card {
   min-width: 0;
   overflow-wrap: break-word;
-  border-radius: var(--biz-radius);
-  background: var(--biz-surface);
-  border: 1px solid var(--biz-border);
+  border-radius: var(--legal-radius);
+  background: var(--legal-surface);
+  border: 1px solid var(--legal-border);
   box-shadow: 0 10px 28px rgba(43, 29, 20, 0.05);
   padding: 22px;
 }
@@ -148,12 +169,12 @@
 
 .business-legal__h2 {
   margin: 0;
-  font-family: var(--font-legal-serif), var(--biz-font-display);
+  font-family: var(--font-legal-serif), var(--legal-font-display);
   font-size: clamp(24px, 4vw, 30px);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
-  color: var(--biz-text);
+  color: var(--legal-text);
 }
 
 .business-legal__h3 {
@@ -161,27 +182,27 @@
   font-size: 18px;
   font-weight: 700;
   line-height: 1.3;
-  color: var(--biz-text);
+  color: var(--legal-text);
 }
 
 .business-legal__body {
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 18px;
   line-height: 1.6;
 }
 
 .business-legal__body b {
-  color: var(--biz-text);
+  color: var(--legal-text);
   font-weight: 700;
 }
 
 .business-legal__note {
   margin-top: 20px;
-  border-radius: var(--biz-radius);
-  background: var(--biz-surface-soft);
-  border: 1px solid var(--biz-border);
+  border-radius: var(--legal-radius);
+  background: var(--legal-surface-soft);
+  border: 1px solid var(--legal-border);
   padding: 18px 20px;
-  color: var(--biz-text);
+  color: var(--legal-text);
   font-size: 18px;
   font-weight: 600;
   line-height: 1.55;
@@ -191,7 +212,7 @@
   margin: 16px 0 0;
   padding-left: 1.35em;
   list-style: disc;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 18px;
   line-height: 1.6;
 }
@@ -201,18 +222,18 @@
 }
 
 .business-legal__list ::marker {
-  color: var(--biz-accent);
+  color: var(--legal-accent);
 }
 
 .business-legal__link {
-  color: var(--biz-accent);
+  color: var(--legal-accent);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .business-legal__link:hover {
-  color: var(--biz-accent-hover);
+  color: var(--legal-accent-hover);
 }
 
 .business-legal__steps {
@@ -236,8 +257,8 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--biz-accent);
-  color: var(--biz-on-accent);
+  background: var(--legal-accent);
+  color: var(--legal-on-accent);
   font-size: 15px;
   font-weight: 700;
 }
@@ -263,13 +284,13 @@
   text-align: left;
   font-size: 16px;
   line-height: 1.5;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
 }
 
 .business-legal__table th {
-  border-bottom: 1px solid var(--biz-border);
+  border-bottom: 1px solid var(--legal-border);
   padding: 8px 10px;
-  color: var(--biz-eyebrow);
+  color: var(--legal-eyebrow);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -277,7 +298,7 @@
 }
 
 .business-legal__table td {
-  border-bottom: 1px solid var(--biz-border);
+  border-bottom: 1px solid var(--legal-border);
   padding: 12px 10px;
   vertical-align: top;
 }
@@ -287,7 +308,7 @@
 }
 
 .business-legal__table td:first-child {
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
 }
 
 .business-legal__table--kv td:first-child {
@@ -309,18 +330,18 @@
 }
 
 .business-legal__mobile-card {
-  border-radius: var(--biz-radius-sm);
-  background: var(--biz-surface-soft);
-  border: 1px solid var(--biz-border);
+  border-radius: var(--legal-radius-sm);
+  background: var(--legal-surface-soft);
+  border: 1px solid var(--legal-border);
   padding: 16px;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 16px;
   line-height: 1.5;
 }
 
 .business-legal__mobile-card > b {
   display: block;
-  color: var(--biz-text);
+  color: var(--legal-text);
   font-size: 17px;
 }
 
@@ -330,7 +351,7 @@
 }
 
 .business-legal__mobile-card-label {
-  color: var(--biz-eyebrow);
+  color: var(--legal-eyebrow);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -343,8 +364,8 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--biz-border);
-  color: var(--biz-text);
+  border-bottom: 1px solid var(--legal-border);
+  color: var(--legal-text);
   text-decoration: none;
 }
 
@@ -353,7 +374,7 @@
 }
 
 .business-legal__nav-item:hover .business-legal__nav-title {
-  color: var(--biz-accent);
+  color: var(--legal-accent);
 }
 
 .business-legal__nav-title {
@@ -366,29 +387,29 @@
 .business-legal__nav-text {
   display: block;
   margin-top: 2px;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 15px;
   font-weight: 400;
 }
 
 .business-legal__nav-arrow {
-  color: var(--biz-accent);
+  color: var(--legal-accent);
   font-size: 20px;
 }
 
 .business-legal__subcard {
-  border-radius: var(--biz-radius);
-  background: var(--biz-surface-soft);
-  border: 1px solid var(--biz-border);
+  border-radius: var(--legal-radius);
+  background: var(--legal-surface-soft);
+  border: 1px solid var(--legal-border);
   padding: 20px;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 17px;
   line-height: 1.55;
 }
 
 .business-legal__subcard > b {
   display: block;
-  color: var(--biz-text);
+  color: var(--legal-text);
 }
 
 .business-legal__button {
@@ -399,29 +420,29 @@
   min-height: 48px;
   padding: 12px 24px;
   border-radius: 999px;
-  background: var(--biz-accent);
-  color: var(--biz-on-accent);
+  background: var(--legal-accent);
+  color: var(--legal-on-accent);
   font-size: 16px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .business-legal__button:hover {
-  background: var(--biz-accent-hover);
+  background: var(--legal-accent-hover);
 }
 
 .business-legal__button:focus-visible {
-  outline: 2px solid var(--biz-focus);
+  outline: 2px solid var(--legal-focus);
   outline-offset: 3px;
 }
 
 .business-legal__badge {
   display: inline-flex;
   border-radius: 999px;
-  background: var(--biz-yellow-bg);
-  border: 1px solid var(--biz-yellow-border);
+  background: var(--legal-yellow-bg);
+  border: 1px solid var(--legal-yellow-border);
   padding: 6px 16px;
-  color: var(--biz-yellow-ink);
+  color: var(--legal-yellow-ink);
   font-size: 15px;
   font-weight: 700;
 }
@@ -432,15 +453,15 @@
   height: auto;
   margin-top: 16px;
   border-radius: 16px;
-  border: 1px solid var(--biz-border);
-  background: var(--biz-surface);
+  border: 1px solid var(--legal-border);
+  background: var(--legal-surface);
 }
 
 .business-legal__footer {
   margin-top: 40px;
-  border-top: 1px solid var(--biz-border);
+  border-top: 1px solid var(--legal-border);
   padding-top: 24px;
-  color: var(--biz-text-muted);
+  color: var(--legal-text-muted);
   font-size: 15px;
   line-height: 1.6;
 }

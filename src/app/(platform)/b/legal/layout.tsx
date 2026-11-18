@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Playfair_Display } from "next/font/google";
 
-import "@/components/business-app/theme/business-theme.css";
 import "@/components/business/legal/business-legal.css";
 
 const legalSerif = Playfair_Display({
