@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { StudioMusicCatalogPublication } from "../src/lib/studio-music/catalog";
 import {
   authorizeStudioMusicPreview,
+  createSupabaseStudioMusicPreviewStore,
   handleStudioMusicPreview,
   resolveStudioMusicPreviewSource,
   studioMusicPreviewJsonContainsForbiddenFields,
@@ -377,6 +378,97 @@ assert.deepEqual(
   }),
   { bucket: "music-streams", path: verifiedStream.storagePath },
 );
+
+// t1540u (part 2): the real store must load the source author's status,
+// otherwise listeners who have not added the music get 403 before «Добавить».
+function createFakePracticeClient(row: Record<string, unknown> | null) {
+  const seen: { selects: string[] } = { selects: [] };
+  const chain = {
+    select(columns: string) {
+      seen.selects.push(columns);
+      return chain;
+    },
+    eq() {
+      return chain;
+    },
+    async maybeSingle() {
+      return { data: row, error: null };
+    },
+  };
+  const client = { from: () => chain } as unknown as Parameters<
+    typeof createSupabaseStudioMusicPreviewStore
+  >[0];
+  return { client, seen };
+}
+
+async function previewWithRealPracticeLoader(
+  row: Record<string, unknown> | null,
+  userId: string | null = null,
+) {
+  const fake = createFakePracticeClient(row);
+  const real = createSupabaseStudioMusicPreviewStore(fake.client);
+  const mock = createStore({ practice: null });
+  const result = await handleStudioMusicPreview({
+    publicationId,
+    audioItemId,
+    userId,
+    store: { ...mock, loadPractice: real.loadPractice, loadCanUse: async () => false },
+  });
+  return { result, selects: fake.seen.selects };
+}
+
+const dbFreeRow = {
+  ...freePublicPractice,
+  business_only: false,
+  published_at: "2026-09-01T00:00:00Z",
+  scheduled_publish_at: null,
+  authors: { access_status: "commercial_active" },
+};
+
+{
+  const { result, selects } = await previewWithRealPracticeLoader(dbFreeRow);
+  assert.equal(result.type, "full", "guest preview of free studio music");
+  assert.match(selects[0] ?? "", /authors!practices_author_id_fkey\s*\(\s*access_status\s*\)/);
+  assert.match(selects[0] ?? "", /published_at/);
+  assert.match(selects[0] ?? "", /scheduled_publish_at/);
+  assert.match(selects[0] ?? "", /music_usage_permission/);
+}
+{
+  const { result } = await previewWithRealPracticeLoader(dbFreeRow, "listener-without-entitlement");
+  assert.equal(result.type, "full", "logged-in listener before «Добавить»");
+}
+{
+  const { result } = await previewWithRealPracticeLoader({
+    ...dbFreeRow,
+    authors: [{ access_status: "commercial" }],
+  });
+  assert.equal(result.type, "full", "legacy commercial status, array join shape");
+}
+{
+  const { result } = await previewWithRealPracticeLoader({
+    ...publicPractice,
+    published_at: "2026-09-01T00:00:00Z",
+    authors: { access_status: "commercial_active" },
+  });
+  assert.equal(result.type, "clip", "paid studio music keeps the 60-second clip");
+}
+for (const denied of [
+  { ...dbFreeRow, authors: { access_status: "basic" } },
+  { ...dbFreeRow, authors: null },
+  { ...dbFreeRow, music_usage_permission: "listen_only" },
+  { ...dbFreeRow, status: "unpublished" },
+  { ...dbFreeRow, published_at: null, scheduled_publish_at: "2099-01-01T00:00:00Z" },
+  { ...dbFreeRow, product_kind: "practice", publication_class: "practice" },
+  { ...dbFreeRow, catalog_visibility: "hidden", is_catalog_listed: false },
+  { ...dbFreeRow, deleted_at: "2026-10-01T00:00:00Z" },
+]) {
+  const { result } = await previewWithRealPracticeLoader(denied);
+  assert.deepEqual(
+    result,
+    { type: "json", status: 403, body: { error: "forbidden" } },
+    JSON.stringify(denied),
+  );
+}
 
 const previewSource = read("src/lib/studio-music/preview.ts");
 assert.match(previewSource, /active_music_delivery_asset_id/);

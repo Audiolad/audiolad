@@ -238,6 +238,13 @@ export function studioMusicPreviewJsonContainsForbiddenFields(
   );
 }
 
+/*
+ * loadPractice must return the source author's access_status (and the
+ * publication dates): isPublicStudioMusicInventory gates the pre-acquire
+ * preview on a commercial source author. Without the join every listener who
+ * had not added the music yet got 403 and the Studio player closed at once
+ * (t1540u, owner decision 18.11.2026: listening before «Добавить» is allowed).
+ */
 export function createSupabaseStudioMusicPreviewStore(
   supabase: SupabaseClient,
 ): StudioMusicPreviewStore {
@@ -260,7 +267,12 @@ export function createSupabaseStudioMusicPreviewStore(
           studio_music_pricing_mode,
           studio_music_price_minor,
           catalog_visibility,
-          is_catalog_listed
+          is_catalog_listed,
+          published_at,
+          scheduled_publish_at,
+          authors!practices_author_id_fkey (
+            access_status
+          )
         `,
         )
         .eq(BUSINESS_ONLY_COLUMN, false)
