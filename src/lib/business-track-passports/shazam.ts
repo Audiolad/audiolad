@@ -153,13 +153,14 @@ export type ShazamCheckRow = {
   finished_at?: string | null;
 };
 
-export type ShazamMatchView = { title: string; artist: string; skew: string; offset: string };
+/** `range` = the 15-second window Shazam listened to, «1:20–1:35», to re-check it by hand. */
+export type ShazamMatchView = { title: string; artist: string; skew: string; offset: string; range: string };
 
 export type ShazamCheckView =
   | { state: 'none' }
   | { state: 'pending'; label: string }
   | { state: 'no_match'; label: string; date: string | null }
-  | { state: 'match'; label: string; matches: ShazamMatchView[] }
+  | { state: 'match'; label: string; matches: ShazamMatchView[]; date?: string | null }
   | { state: 'error'; label: string };
 
 const MOSCOW_DATE = new Intl.DateTimeFormat('ru-RU', {
@@ -192,11 +193,16 @@ export function shazamMatchesFromSegments(segments: unknown): ShazamMatchView[] 
     if (!segment || typeof segment !== 'object') continue;
     const row = segment as Record<string, unknown>;
     if (row.matched !== true) continue;
+    const start = typeof row.offset_seconds === 'number' && Number.isFinite(row.offset_seconds) ? Math.max(0, Math.floor(row.offset_seconds)) : 0;
+    const length = typeof row.duration_seconds === 'number' && Number.isFinite(row.duration_seconds) && row.duration_seconds > 0
+      ? Math.floor(row.duration_seconds)
+      : SHAZAM_SEGMENT_SECONDS;
     out.push({
       title: str(row.title) ?? 'без названия',
       artist: str(row.artist) ?? 'исполнитель не указан',
       skew: formatSkew(row.timeskew, row.frequencyskew),
-      offset: formatOffset(row.offset_seconds),
+      offset: formatOffset(start),
+      range: `${formatOffset(start)}–${formatOffset(start + length)}`,
     });
   }
   return out;
@@ -238,7 +244,12 @@ export function shazamCheckView(
   const autoMaster = gate.autoMaster ?? null;
   const manualNotFound = passport?.shazam_result === 'not_found' && autoMaster === null;
   if (decisive?.status === 'match' && !manualNotFound) {
-    return { state: 'match', label: 'Shazam нашёл совпадение – проверьте вручную, допуск не выполнен', matches: shazamMatchesFromSegments(decisive.segments) };
+    return {
+      state: 'match',
+      label: 'Shazam нашёл совпадение – проверьте вручную, допуск не выполнен',
+      matches: shazamMatchesFromSegments(decisive.segments),
+      date: formatMoscowDate(decisive.finished_at ?? decisive.created_at ?? null),
+    };
   }
   if (passport?.shazam_result === 'not_found' && autoMaster !== null && gate.currentMaster !== undefined && autoMaster !== gate.currentMaster) {
     return { state: 'error', label: 'Shazam: результат относится к прежнему мастер-файлу – дождитесь новой проверки' };
@@ -248,7 +259,7 @@ export function shazamCheckView(
     return { state: 'no_match', label: date ? `Shazam: совпадений нет – ${date}` : 'Shazam: совпадений нет', date };
   }
   if (passport?.shazam_result === 'match') {
-    return { state: 'match', label: 'Shazam: в паспорте указано совпадение', matches: [] };
+    return { state: 'match', label: 'Shazam: в паспорте указано совпадение', matches: [], date: formatMoscowDate(passport.shazam_checked_at) };
   }
   if (check?.status === 'no_match' && check.error === 'passport_not_draft') {
     return { state: 'error', label: 'Shazam совпадений не нашёл, но паспорт уже не черновик – поле не изменено' };
@@ -257,4 +268,24 @@ export function shazamCheckView(
     return { state: 'error', label: 'Shazam: автоматическая проверка не удалась – укажите результат вручную' };
   }
   return { state: 'none' };
+}
+
+export type UnresolvedShazamMatch = Extract<ShazamCheckView, { state: 'match' }>;
+
+/**
+ * t1522u: the latest decisive Shazam check found a match and the passport Shazam fields are still
+ * empty (the worker writes the passport only on «совпадений нет»). Used only to NAME the reason
+ * («Shazam нашёл совпадение» instead of «нет результата Shazam») and to list what was found –
+ * admission rules are unchanged.
+ */
+export function unresolvedShazamMatch(
+  check: ShazamCheckRow | null | undefined,
+  passport?: { shazam_result?: string | null; shazam_checked_at?: string | null } | null,
+  finalCheck?: ShazamCheckRow | null,
+  gate: ShazamGateFacts = {},
+): UnresolvedShazamMatch | null {
+  const result = passport?.shazam_result;
+  if (typeof result === 'string' && result.trim() !== '') return null;
+  const view = shazamCheckView(check, passport, finalCheck, gate);
+  return view.state === 'match' ? view : null;
 }

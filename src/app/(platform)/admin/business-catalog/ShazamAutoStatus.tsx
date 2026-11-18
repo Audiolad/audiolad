@@ -50,13 +50,16 @@ export function ShazamAutoStatus({ check, finalCheck, gate, passport }: ShazamAu
         <ul className="space-y-1 text-sm text-[#5f5484]">
           {view.matches.map((match, index) => (
             <li key={`${match.offset}-${index}`}>
-              Отрывок с {match.offset}: «{match.title}» – {match.artist}, перекос {match.skew}
+              Отрывок {match.range}: «{match.title}» – {match.artist}, перекос {match.skew}
             </li>
           ))}
         </ul>
       ) : null}
+      {view.state === 'match' && view.date ? (
+        <p className="text-sm text-[#5f5484]">Проверка Shazam: {view.date}</p>
+      ) : null}
       {view.state === 'match' ? (
-        <p className="text-sm leading-6 text-[#5f5484]">Поля Shazam в паспорте не заполнены. Если это ложное срабатывание, укажите результат вручную ниже.</p>
+        <p className="text-sm leading-6 text-[#5f5484]">Поля Shazam в паспорте не заполнены. Включите этот отрывок и проверьте его в Shazam вручную. Если это ложное срабатывание, укажите результат вручную ниже.</p>
       ) : null}
       {view.state === 'no_match' && check?.passport_written ? (
         <p className="text-sm leading-6 text-[#5f5484]">Записано в паспорт автоматически по трём отрывкам: 0:30, середина и конец трека.</p>
