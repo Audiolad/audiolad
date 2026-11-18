@@ -10,6 +10,7 @@ import BusinessLegalShell, {
   legalH2Class,
   legalH3Class,
   legalLinkClass,
+  legalNavClass,
   legalNoteClass,
 } from "@/components/business/legal/BusinessLegalShell";
 import {
@@ -136,16 +137,12 @@ export default function BusinessLegalPage() {
         <h2 className={legalH2Class}>Разделы</h2>
         <div className="mt-3">
           {sections.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="flex items-center justify-between gap-4 border-b border-[#eee3f8] py-4 text-[#25135c] last:border-b-0"
-            >
+            <Link key={s.href} href={s.href} className={legalNavClass}>
               <span>
-                <span className="block text-[19px] font-semibold">{s.title}</span>
-                <span className="block text-[15px] text-[#6d5a9e]">{s.text}</span>
+                <span className="business-legal__nav-title">{s.title}</span>
+                <span className="business-legal__nav-text">{s.text}</span>
               </span>
-              <span aria-hidden className="text-[#7042c5]">
+              <span aria-hidden className="business-legal__nav-arrow">
                 →
               </span>
             </Link>

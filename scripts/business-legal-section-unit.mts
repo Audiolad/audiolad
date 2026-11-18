@@ -19,9 +19,9 @@ import {
 
 const ROOT = process.cwd();
 const SECTION_DIR = join(ROOT, "src/app/(platform)/b/legal");
+const COMPONENT_DIR = join(ROOT, "src/components/business/legal");
 const OWN_FILES = new Set([
   join(ROOT, "src/lib/business/legal/section.ts"),
-  join(ROOT, "src/components/business/legal/BusinessLegalShell.tsx"),
 ]);
 
 function walk(dir: string): string[] {
@@ -32,9 +32,12 @@ function walk(dir: string): string[] {
 }
 
 const sectionFiles = walk(SECTION_DIR);
+const componentFiles = walk(COMPONENT_DIR);
 const pages = sectionFiles.filter((f) => f.endsWith("page.tsx"));
 assert.equal(pages.length, 5, "5 страниц раздела");
-for (const f of sectionFiles) OWN_FILES.add(f);
+assert.ok(sectionFiles.some((f) => f.endsWith(`${join("legal", "layout.tsx")}`)), "layout раздела");
+assert.ok(componentFiles.some((f) => f.endsWith("business-legal.css")), "coffee CSS");
+for (const f of [...sectionFiles, ...componentFiles]) OWN_FILES.add(f);
 
 // robots
 assert.deepEqual(BUSINESS_LEGAL_ROBOTS && typeof BUSINESS_LEGAL_ROBOTS === "object" && {
@@ -70,6 +73,16 @@ for (const f of [...sectionFiles, ...OWN_FILES]) {
   assert.deepEqual(external, [], `${f}: внешние ссылки в тексте`);
   assert.doesNotMatch(text, /Suno|уточнить|\[ЮРИСТ|\[СЕРГЕЙ/i, `${f}: черновые пометки`);
 }
+
+// стиль кофейни: в разделе не осталось фиолетовой палитры /b/prava
+const PURPLE = /#7042c5|#fbf9ff|#f4e9ff|#eadff8|#faf6ff|#eee3f8|#6d5a9e|#4c3d78|#25135c/i;
+for (const f of [...sectionFiles, ...componentFiles]) {
+  if (f.endsWith(".png") || f.endsWith(".pdf")) continue;
+  assert.doesNotMatch(readFileSync(f, "utf8"), PURPLE, `${f}: фиолетовая палитра`);
+}
+const shell = readFileSync(join(COMPONENT_DIR, "BusinessLegalShell.tsx"), "utf8");
+assert.match(shell, /data-biz-theme="jazz-coffee"/, "тема jazz-coffee");
+assert.match(shell, /COFFEE_BRAND_NAME/, "шапка АудиоЛад Кофейня");
 assert.ok(BUSINESS_LEGAL_CONTACT.maxHref.startsWith("https://max.ru/u/"), "МАКС – прямая ссылка Сергея");
 assert.equal(BUSINESS_LEGAL_CONTACT.phoneHref, "tel:+79264111381");
 assert.equal(BUSINESS_LEGAL_CONTACT.email, "1@audiolad.ru");
