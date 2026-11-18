@@ -7,6 +7,7 @@ import { passportMissing, type Passport } from './model';
 
 export type AdmissionRefusalCode =
   | 'shazam_pending'
+  | 'shazam_match'
   | 'shazam_missing'
   | 'match'
   | 'fingerprint_missing'
@@ -19,6 +20,7 @@ export type AdmissionRefusalCode =
 /** Order in which reasons are listed to the operator. */
 export const ADMISSION_REFUSAL_ORDER: AdmissionRefusalCode[] = [
   'shazam_pending',
+  'shazam_match',
   'shazam_missing',
   'fingerprint_missing',
   'match',
@@ -31,6 +33,7 @@ export const ADMISSION_REFUSAL_ORDER: AdmissionRefusalCode[] = [
 
 export const ADMISSION_REFUSAL_LABELS: Record<AdmissionRefusalCode, string> = {
   shazam_pending: 'Shazam ещё проверяет',
+  shazam_match: 'Shazam нашёл совпадение',
   shazam_missing: 'нет результата Shazam',
   match: 'найдено совпадение Shazam или AcoustID',
   fingerprint_missing: 'нет отпечатка и AcoustID – нужна настройка сервера',
@@ -56,9 +59,11 @@ function blank(value: unknown) {
 /**
  * Every reason (not just one) why a track is not admissible right now, or [] when the local
  * checks pass. `shazamActive` = a Shazam queue job of this track is pending/running.
+ * `shazamMatch` = the latest decisive automatic check found a match while the passport Shazam
+ * fields are still empty (t1522u): the reason is named «Shazam нашёл совпадение», not «нет результата».
  * A track that is already approved returns [].
  */
-export function passportRefusalCodes(passport: Passport | undefined | null, shazamActive = false): AdmissionRefusalCode[] {
+export function passportRefusalCodes(passport: Passport | undefined | null, shazamActive = false, shazamMatch = false): AdmissionRefusalCode[] {
   if (!passport || !passport.status) return ['no_passport'];
   if (passport.status === 'approved') return [];
   if (passport.status === 'revoked') return ['revoked'];
@@ -66,7 +71,11 @@ export function passportRefusalCodes(passport: Passport | undefined | null, shaz
   const filled = (key: string) => !blank((passport as Record<string, unknown>)[key]);
   if ((filled('shazam_result') && passport.shazam_result !== 'not_found')
     || (filled('acoustid_result') && passport.acoustid_result !== 'not_found')) codes.add('match');
-  if ([...SHAZAM_FIELDS].some((key) => !filled(key))) codes.add(shazamActive ? 'shazam_pending' : 'shazam_missing');
+  if ([...SHAZAM_FIELDS].some((key) => !filled(key))) {
+    // A result the operator already entered (e.g. manual «совпадений нет») is never shown as a match.
+    const matchUnresolved = shazamMatch && !filled('shazam_result');
+    codes.add(shazamActive ? 'shazam_pending' : matchUnresolved ? 'shazam_match' : 'shazam_missing');
+  }
   else if (shazamActive) codes.add('shazam_pending');
   if ([...FINGERPRINT_FIELDS].some((key) => !filled(key))) codes.add('fingerprint_missing');
   if ([...MASTER_FIELDS].some((key) => !filled(key))
@@ -152,7 +161,7 @@ export function formatApprovalSummary(summary: ApprovalSummary): { approvedLine:
   return { approvedLine, refusedLine: `Не допущены ${summary.refused}${reasons ? `: ${reasons}` : ''}.` };
 }
 
-export type AlbumAdmissionTrack = { passport?: Passport | null; shazamActive?: boolean };
+export type AlbumAdmissionTrack = { passport?: Passport | null; shazamActive?: boolean; shazamMatch?: boolean };
 export type AlbumAdmissionState = {
   total: number;
   approved: number;
@@ -169,7 +178,7 @@ export function albumAdmissionState(tracks: AlbumAdmissionTrack[]): AlbumAdmissi
   const reasonCounts: Partial<Record<AdmissionRefusalCode, number>> = {};
   for (const track of tracks) {
     if (track.passport?.status === 'approved') { approved += 1; continue; }
-    const codes = passportRefusalCodes(track.passport ?? undefined, track.shazamActive === true);
+    const codes = passportRefusalCodes(track.passport ?? undefined, track.shazamActive === true, track.shazamMatch === true);
     if (codes.length === 0) { ready += 1; continue; }
     for (const code of codes) reasonCounts[code] = (reasonCounts[code] ?? 0) + 1;
   }

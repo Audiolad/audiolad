@@ -392,7 +392,7 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
   const db = createServiceRoleClient();
   const { data: album, error: albumError } = await db.from('practices').select('id, business_only').eq('id', albumId).maybeSingle();
   if (albumError || !album || album.business_only !== true) throw new Error('Нужен закрытый альбом Бизнеса.');
-  const { data: tracks, error: tracksError } = await db.from('audio_items').select('id, title').eq('practice_id', albumId).order('position');
+  const { data: tracks, error: tracksError } = await db.from('audio_items').select('id, title, desired_music_master_asset_id').eq('practice_id', albumId).order('position');
   if (tracksError) throw new Error('Не удалось загрузить треки альбома.');
   const { data: passports, error: passportsError } = await db.from('business_track_passports').select('*').eq('practice_id', albumId);
   if (passportsError) throw new Error('Не удалось загрузить паспорта.');
@@ -405,6 +405,28 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
       .select('audio_item_id').in('audio_item_id', trackIds).in('status', ['pending', 'running']);
     if (!activeError) for (const row of active ?? []) shazamActive.add(String(row.audio_item_id));
   }
+  // t1522u, read-only: tracks whose latest decisive check OF THE CURRENT MASTER found a match (same
+  // choice as the closed-catalog card, admin.server loadTrackShazamState). Only names the reason
+  // («Shazam нашёл совпадение» instead of «нет результата Shazam»); the rules are unchanged.
+  const currentMaster = new Map<string, string>();
+  for (const track of tracks ?? []) {
+    const master = (track as { desired_music_master_asset_id?: unknown }).desired_music_master_asset_id;
+    if (typeof master === 'string' && master) currentMaster.set(String(track.id), master);
+  }
+  const shazamMatched = new Set<string>();
+  // Per track LIMIT 1, never one album-wide list (no row cap can hide the latest check).
+  const needsCheck = [...currentMaster.entries()].filter(([trackId]) => {
+    const passport = byTrack.get(trackId);
+    const result = passport?.shazam_result;
+    return passport?.status !== 'approved' && passport?.status !== 'revoked' && !(typeof result === 'string' && result.trim() !== '');
+  });
+  const latestFinals = await Promise.all(needsCheck.map(async ([trackId, master]) => {
+    const { data, error } = await db.from('business_passport_shazam_checks').select('status')
+      .eq('audio_item_id', trackId).eq('master_asset_id', master).in('status', ['match', 'no_match'])
+      .order('created_at', { ascending: false }).limit(1);
+    return error ? null : (data ?? [])[0]?.status === 'match' ? trackId : null;
+  }));
+  for (const trackId of latestFinals) if (trackId) shazamMatched.add(trackId);
   let approved = 0;
   let skipped = 0;
   const errors: { title: string; message: string }[] = [];
@@ -420,13 +442,13 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
     }
     if (!passport || passport.status === 'revoked') {
       skipped += 1;
-      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: passportRefusalCodes(passport, shazamActive.has(trackId)) });
+      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: passportRefusalCodes(passport, shazamActive.has(trackId), shazamMatched.has(trackId)) });
       continue;
     }
     const missing = passportMissing(passport);
     if (missing.length > 0) {
       skipped += 1;
-      const reasons = passportRefusalCodes(passport, shazamActive.has(trackId));
+      const reasons = passportRefusalCodes(passport, shazamActive.has(trackId), shazamMatched.has(trackId));
       outcomes.push({ id: trackId, title, outcome: 'refused', reasons: reasons.length ? reasons : ['fields'] });
       continue;
     }
