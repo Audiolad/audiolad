@@ -1,0 +1,86 @@
+/**
+ * t1544u: скрытый правовой раздел /b/legal.
+ * - каждая страница noindex/nofollow, X-Robots-Tag в next.config;
+ * - нет в sitemap и нет ссылок на /b/legal из остального кода;
+ * - только «–», внешних ссылок нет, кроме МАКС-контакта Сергея;
+ * - проверка сертификата: образец находится, неизвестный номер – не найден.
+ */
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  BUSINESS_LEGAL_CONTACT,
+  BUSINESS_LEGAL_ROBOTS,
+  BUSINESS_LEGAL_SAMPLE_CERTIFICATE,
+  findBusinessLegalCertificate,
+  normalizeBusinessLegalCertificateNumber,
+} from "../src/lib/business/legal/section";
+
+const ROOT = process.cwd();
+const SECTION_DIR = join(ROOT, "src/app/(platform)/b/legal");
+const OWN_FILES = new Set([
+  join(ROOT, "src/lib/business/legal/section.ts"),
+  join(ROOT, "src/components/business/legal/BusinessLegalShell.tsx"),
+]);
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const p = join(dir, name);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
+}
+
+const sectionFiles = walk(SECTION_DIR);
+const pages = sectionFiles.filter((f) => f.endsWith("page.tsx"));
+assert.equal(pages.length, 5, "5 страниц раздела");
+for (const f of sectionFiles) OWN_FILES.add(f);
+
+// robots
+assert.deepEqual(BUSINESS_LEGAL_ROBOTS && typeof BUSINESS_LEGAL_ROBOTS === "object" && {
+  index: (BUSINESS_LEGAL_ROBOTS as { index?: boolean }).index,
+  follow: (BUSINESS_LEGAL_ROBOTS as { follow?: boolean }).follow,
+}, { index: false, follow: false });
+for (const f of pages) {
+  assert.match(readFileSync(f, "utf8"), /robots: BUSINESS_LEGAL_ROBOTS/, `${f}: robots noindex`);
+}
+const nextConfig = readFileSync(join(ROOT, "next.config.ts"), "utf8");
+for (const src of ["/b/legal", "/b/legal/:path*", "/b-legal/:path*"]) {
+  assert.ok(
+    new RegExp(`source: "${src.replace(/[*/]/g, "\\$&")}",\\s*headers: \\[\\{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" \\}\\]`).test(nextConfig),
+    `X-Robots-Tag для ${src}`,
+  );
+}
+
+// sitemap
+const sitemapData = readFileSync(join(ROOT, "src/lib/seo/sitemap-data.ts"), "utf8");
+assert.doesNotMatch(sitemapData, /\/b\/legal/, "раздела нет в sitemap");
+
+// ссылки на раздел только изнутри раздела
+const offenders = walk(join(ROOT, "src"))
+  .filter((f) => /\.(tsx?|mts|md|mdx|json)$/.test(f) && !OWN_FILES.has(f))
+  .filter((f) => /["'`(]\/b\/legal|audiolad\.ru\/b\/legal|business\/legal\/section|business\/legal\/BusinessLegalShell/.test(readFileSync(f, "utf8")));
+assert.deepEqual(offenders, [], "на /b/legal никто не ссылается");
+
+// тексты
+for (const f of [...sectionFiles, ...OWN_FILES]) {
+  const text = readFileSync(f, "utf8");
+  assert.doesNotMatch(text, /—/, `${f}: длинное тире`);
+  const external = [...text.matchAll(/https?:\/\/[^\s"'`)]+/g)].map((m) => m[0]);
+  assert.deepEqual(external, [], `${f}: внешние ссылки в тексте`);
+  assert.doesNotMatch(text, /Suno|уточнить|\[ЮРИСТ|\[СЕРГЕЙ/i, `${f}: черновые пометки`);
+}
+assert.ok(BUSINESS_LEGAL_CONTACT.maxHref.startsWith("https://max.ru/u/"), "МАКС – прямая ссылка Сергея");
+assert.equal(BUSINESS_LEGAL_CONTACT.phoneHref, "tel:+79264111381");
+assert.equal(BUSINESS_LEGAL_CONTACT.email, "1@audiolad.ru");
+
+// номера сертификатов
+assert.equal(normalizeBusinessLegalCertificateNumber("alk-2026-000001"), "ALK-2026-000001");
+assert.equal(normalizeBusinessLegalCertificateNumber(encodeURIComponent("АЛК-2026-000001")), "ALK-2026-000001");
+assert.equal(normalizeBusinessLegalCertificateNumber("ALK-2026-1"), null);
+assert.equal(normalizeBusinessLegalCertificateNumber("%E0%A4%A"), null);
+assert.equal(findBusinessLegalCertificate("ALK-2026-000001"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
+assert.equal(findBusinessLegalCertificate("ALK-2026-000002"), null);
+assert.equal(findBusinessLegalCertificate("../../etc"), null);
+
+console.log("business-legal-section-unit: PASS");

@@ -26,6 +26,7 @@
     "test:business-manual-admissions": "node --import tsx scripts/business-manual-admissions-unit.mts && node --import tsx scripts/business-manual-admissions-admin-unit.mjs && python3 scripts/business-manual-admissions-isolated.py",
     "test:school-graduates": "node --import tsx scripts/school-graduates-unit.tsx && node scripts/school-graduates-sql-unit.mjs",
     "test:business-ru-copy": "npx tsx scripts/business-ru-copy-unit.mts",
+    "test:business-legal-section": "npx tsx scripts/business-legal-section-unit.mts",
     "dev": "node scripts/lib/guard-dev.mjs && next dev",
     "build": "next build",
     "start": "node scripts/lib/guard-production-start.mjs && next start",

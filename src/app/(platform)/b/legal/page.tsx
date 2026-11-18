@@ -1,0 +1,189 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import BusinessLegalShell, {
+  LegalContacts,
+  LegalSteps,
+  LegalTable,
+  legalBodyClass,
+  legalCardClass,
+  legalH2Class,
+  legalH3Class,
+  legalLinkClass,
+  legalNoteClass,
+} from "@/components/business/legal/BusinessLegalShell";
+import {
+  BUSINESS_LEGAL_CERTIFICATE_HREF,
+  BUSINESS_LEGAL_OFFER_EDITION,
+  BUSINESS_LEGAL_OPERATOR,
+  BUSINESS_LEGAL_PROTECTION_HREF,
+  BUSINESS_LEGAL_RESPONSE_DAYS,
+  BUSINESS_LEGAL_RIGHTS_HREF,
+  BUSINESS_LEGAL_ROBOTS,
+} from "@/lib/business/legal/section";
+
+export const metadata: Metadata = {
+  title: "Правовая информация – АудиоЛад Бизнес",
+  description: "Как устроены права на музыку «АудиоЛад Бизнес», что получает заведение и как мы его защищаем.",
+  robots: BUSINESS_LEGAL_ROBOTS,
+};
+
+const sections = [
+  {
+    href: BUSINESS_LEGAL_RIGHTS_HREF,
+    title: "Как устроены права на музыку",
+    text: "Произведение и фонограмма, кому принадлежат права, РАО и ВОИС",
+  },
+  {
+    href: BUSINESS_LEGAL_PROTECTION_HREF,
+    title: "Ответственность и защита заведения",
+    text: "Помощь с обращениями, защита в суде, возмещение",
+  },
+  {
+    href: BUSINESS_LEGAL_CERTIFICATE_HREF,
+    title: "Сертификат на точку",
+    text: "Что в нём указано и как проверить подлинность",
+  },
+];
+
+export default function BusinessLegalPage() {
+  return (
+    <BusinessLegalShell
+      kicker="Для заведений и проверяющих"
+      title="Музыка АудиоЛад в заведениях: правовая информация"
+      lead="Как устроены права на музыку «АудиоЛад Бизнес», что получает заведение, какие документы у него есть и как мы защищаем заведение. Раздел общий для всех направлений – первым работает «АудиоЛад Кофейня»."
+    >
+      <section className={legalCardClass}>
+        <LegalTable
+          rows={[
+            ["Документ", "Правовая информация «АудиоЛад Бизнес»"],
+            ["Редакция", `от ${BUSINESS_LEGAL_OFFER_EDITION}`],
+            ["Где действует", "Российская Федерация"],
+            [
+              "Оператор",
+              `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip}`,
+            ],
+            [
+              "Ответ на запросы",
+              `На запросы о правах отвечаем и даём документы в течение ${BUSINESS_LEGAL_RESPONSE_DAYS} рабочих дней.`,
+            ],
+          ]}
+        />
+      </section>
+
+      <section className={legalCardClass}>
+        <h2 className={legalH2Class}>Кратко</h2>
+        <h3 className={legalH3Class}>Владельцу заведения</h3>
+        <div className={"mt-3 space-y-4 " + legalBodyClass}>
+          <p>
+            Вся музыка специализированного каталога создаётся с помощью генеративного искусственного интеллекта.
+            Композиторы, авторы текстов и музыканты-исполнители в её создании не участвуют, и мы открыто об этом
+            говорим.
+          </p>
+          <p>
+            Права изготовителя на эти записи (фонограммы) принадлежат ИП Петрову Сергею Сергеевичу. Он напрямую
+            даёт вашему заведению разрешение включать эту музыку в зале – по договору, который владелец принимает
+            один раз в личном кабинете.
+          </p>
+          <p>
+            Мы берём на себя защиту этой правовой модели. Если вступившим в силу решением суда с заведения
+            взысканы суммы за использование только нашего каталога, мы возмещаем их в порядке, предусмотренном
+            договором, – подробно в разделе{" "}
+            <Link href={BUSINESS_LEGAL_PROTECTION_HREF} className={legalLinkClass}>
+              «Ответственность и защита заведения»
+            </Link>
+            .
+          </p>
+        </div>
+        <h3 className={legalH3Class}>Представителю РАО или ВОИС</h3>
+        <p className={"mt-3 " + legalBodyClass}>
+          Музыка каталога полностью сгенерирована искусственным интеллектом: автора-человека и исполнителя у неё
+          нет. Изготовитель и правообладатель фонограмм – ИП Петров Сергей Сергеевич. Заведение получило право на
+          их использование напрямую от правообладателя. На каждую точку выдаётся сертификат, его подлинность
+          проверяется по QR-коду.
+        </p>
+        <p className={legalNoteClass}>
+          Всё сказанное относится только к музыке, которая звучит через плеер «АудиоЛад Бизнес» в подключённой
+          точке.
+        </p>
+      </section>
+
+      <section className={legalCardClass}>
+        <h2 className={legalH2Class}>Как это устроено – в четырёх шагах</h2>
+        <LegalSteps
+          items={[
+            {
+              title: "Музыку создаёт искусственный интеллект.",
+              text: "Человек организует производство: задаёт направление и параметры, отбирает записи и готовит их к выпуску. Музыку он не сочиняет и не исполняет.",
+            },
+            {
+              title: "Права на записи – у АудиоЛад.",
+              text: "Изготовитель фонограммы – тот, кто взял на себя инициативу и ответственность за первую запись звуков (ст. 1322 ГК РФ). Для каталога это ИП Петров Сергей Сергеевич.",
+            },
+            {
+              title: "Заведение получает разрешение напрямую.",
+              text: "Владелец принимает договор-оферту в кабинете, и все его точки получают право включать музыку каталога через плеер.",
+            },
+            {
+              title: "У каждой точки – свой сертификат.",
+              text: "В нём название и адрес точки, срок и основание. QR-код на сертификате открывает страницу на audiolad.ru, где видно, что документ подлинный и действует.",
+            },
+          ]}
+        />
+      </section>
+
+      <section className={legalCardClass}>
+        <h2 className={legalH2Class}>Разделы</h2>
+        <div className="mt-3">
+          {sections.map((s) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              className="flex items-center justify-between gap-4 border-b border-[#eee3f8] py-4 text-[#25135c] last:border-b-0"
+            >
+              <span>
+                <span className="block text-[19px] font-semibold">{s.title}</span>
+                <span className="block text-[15px] text-[#6d5a9e]">{s.text}</span>
+              </span>
+              <span aria-hidden className="text-[#7042c5]">
+                →
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className={legalCardClass}>
+        <h2 className={legalH2Class}>Документы заведения</h2>
+        <LegalTable
+          head={["Документ", "Что в нём", "Где взять"]}
+          rows={[
+            [
+              "Договор-оферта «АудиоЛад Бизнес» и приложения",
+              "Условия лицензии, порядок защиты заведения",
+              `Кабинет → «Документы», редакция от ${BUSINESS_LEGAL_OFFER_EDITION}`,
+            ],
+            [
+              "Сертификат на точку",
+              "Лицензиат, точка и адрес, срок, основание, QR-код",
+              "Кабинет → «Документы», отдельно для каждой точки",
+            ],
+            ["Страница проверки сертификата", "Подлинный ли документ и действует ли он сейчас", "По QR-коду на сертификате"],
+            ["Перечень разрешённых фонограмм", "Какие записи входят в каталог", `По запросу, в течение ${BUSINESS_LEGAL_RESPONSE_DAYS} рабочих дней`],
+            ["Отчёт «Что играло в заведении»", "Какие треки звучали в точке в выбранное время", "Кабинет → «Документы»"],
+            [
+              "Подтверждение происхождения записей",
+              "Сервис генерации, тариф, даты создания, технические идентификаторы",
+              `По запросу, в течение ${BUSINESS_LEGAL_RESPONSE_DAYS} рабочих дней`,
+            ],
+          ]}
+        />
+      </section>
+
+      <section className={legalCardClass}>
+        <h2 className={legalH2Class}>Связь</h2>
+        <LegalContacts />
+      </section>
+    </BusinessLegalShell>
+  );
+}
