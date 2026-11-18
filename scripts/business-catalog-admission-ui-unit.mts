@@ -172,7 +172,7 @@ assert.match(autoFill, /const missing = passportMissing\(passport\);\n\s+if \(mi
 assert.match(autoFill, /await decideBusinessPassport\(track\.id, 'approve'\)/);
 assert.equal((autoFill.match(/decideBusinessPassport\(/g) ?? []).length, 1, 'approval only from the bulk action');
 // t1522u: the approve result names a match only for a check of the CURRENT master, read-only.
-assert.match(autoFill, /row\.master_asset_id !== currentMaster\.get\(trackId\)/, 'match of a previous master is ignored');
+assert.match(autoFill, /\.eq\('audio_item_id', trackId\)\.eq\('master_asset_id', master\)\.in\('status', \['match', 'no_match'\]\)\s*\.order\('created_at', \{ ascending: false \}\)\.limit\(1\)/, 'per-track latest decisive check of the current master');
 assert.match(autoFill, /passportRefusalCodes\(passport, shazamActive\.has\(trackId\), shazamMatched\.has\(trackId\)\)/);
 const tools = read('src/app/(platform)/admin/business-catalog/AlbumPassportTools.tsx');
 assert.match(tools, /Альбом в каталоге Бизнеса ✓/);

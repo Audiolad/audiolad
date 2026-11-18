@@ -414,20 +414,19 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
     if (typeof master === 'string' && master) currentMaster.set(String(track.id), master);
   }
   const shazamMatched = new Set<string>();
-  if (currentMaster.size > 0) {
-    const { data: finals, error: finalsError } = await db.from('business_passport_shazam_checks')
-      .select('audio_item_id, master_asset_id, status, created_at').in('audio_item_id', [...currentMaster.keys()])
-      .in('status', ['match', 'no_match']).order('created_at', { ascending: false });
-    if (!finalsError) {
-      const seen = new Set<string>();
-      for (const row of finals ?? []) {
-        const trackId = String(row.audio_item_id);
-        if (seen.has(trackId) || row.master_asset_id !== currentMaster.get(trackId)) continue;
-        seen.add(trackId);
-        if (row.status === 'match') shazamMatched.add(trackId);
-      }
-    }
-  }
+  // Per track LIMIT 1, never one album-wide list (no row cap can hide the latest check).
+  const needsCheck = [...currentMaster.entries()].filter(([trackId]) => {
+    const passport = byTrack.get(trackId);
+    const result = passport?.shazam_result;
+    return passport?.status !== 'approved' && passport?.status !== 'revoked' && !(typeof result === 'string' && result.trim() !== '');
+  });
+  const latestFinals = await Promise.all(needsCheck.map(async ([trackId, master]) => {
+    const { data, error } = await db.from('business_passport_shazam_checks').select('status')
+      .eq('audio_item_id', trackId).eq('master_asset_id', master).in('status', ['match', 'no_match'])
+      .order('created_at', { ascending: false }).limit(1);
+    return error ? null : (data ?? [])[0]?.status === 'match' ? trackId : null;
+  }));
+  for (const trackId of latestFinals) if (trackId) shazamMatched.add(trackId);
   let approved = 0;
   let skipped = 0;
   const errors: { title: string; message: string }[] = [];
