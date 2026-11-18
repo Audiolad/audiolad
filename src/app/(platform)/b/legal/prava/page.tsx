@@ -10,6 +10,7 @@ import BusinessLegalShell, {
   legalLinkClass,
   legalListClass,
   legalNoteClass,
+  legalSubcardClass,
 } from "@/components/business/legal/BusinessLegalShell";
 import { BUSINESS_LEGAL_PROTECTION_HREF, BUSINESS_LEGAL_ROBOTS } from "@/lib/business/legal/section";
 
@@ -46,13 +47,13 @@ export default function BusinessLegalRightsPage() {
       <section className={legalCardClass}>
         <h2 className={legalH2Class}>Произведение и фонограмма – в чём разница</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-[20px] bg-[#faf6ff] p-5 text-[17px] leading-7 text-[#4c3d78]">
-            <b className="block text-[#25135c]">Музыкальное произведение</b>
+          <div className={legalSubcardClass}>
+            <b>Музыкальное произведение</b>
             Сама музыка: мелодия, гармония, ритм. Автором закон признаёт только человека, создавшего произведение
             своим творческим трудом (ст. 1228 и 1257 ГК РФ).
           </div>
-          <div className="rounded-[20px] bg-[#faf6ff] p-5 text-[17px] leading-7 text-[#4c3d78]">
-            <b className="block text-[#25135c]">Фонограмма</b>
+          <div className={legalSubcardClass}>
+            <b>Фонограмма</b>
             Конкретная звуковая запись – то, что звучит из колонок. Права её изготовителя – самостоятельные смежные
             права (ст. 1322 и 1323 ГК РФ), они не зависят от авторских прав на музыку.
           </div>

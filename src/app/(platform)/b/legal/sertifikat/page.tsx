@@ -7,8 +7,10 @@ import BusinessLegalShell, {
   legalBodyClass,
   legalCardClass,
   legalH2Class,
+  legalButtonClass,
   legalH3Class,
   legalLinkClass,
+  legalSampleClass,
 } from "@/components/business/legal/BusinessLegalShell";
 import {
   BUSINESS_LEGAL_OFFER_EDITION,
@@ -68,11 +70,11 @@ export default function BusinessLegalCertificatePage() {
           width={1191}
           height={1685}
           loading="lazy"
-          className="mt-4 h-auto w-full rounded-[16px] border border-[#eadff8]"
+          className={legalSampleClass}
         />
         <a
           href={BUSINESS_LEGAL_SAMPLE_PDF}
-          className="mt-5 inline-flex rounded-full bg-[#7042c5] px-6 py-3 font-semibold text-white"
+          className={legalButtonClass}
         >
           Открыть образец PDF
         </a>

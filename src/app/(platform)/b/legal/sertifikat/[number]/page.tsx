@@ -6,6 +6,7 @@ import BusinessLegalShell, {
   LegalTable,
   legalBodyClass,
   legalCardClass,
+  legalBadgeClass,
   legalH2Class,
   legalLinkClass,
 } from "@/components/business/legal/BusinessLegalShell";
@@ -37,7 +38,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
     >
       <section className={legalCardClass}>
         <p>
-          <span className="inline-flex rounded-full bg-[#fff6de] px-4 py-1 text-[15px] font-bold text-[#5c4715]">
+          <span className={legalBadgeClass}>
             Образец – данные вымышлены
           </span>
         </p>
