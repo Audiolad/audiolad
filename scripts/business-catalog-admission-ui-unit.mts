@@ -16,6 +16,7 @@ import {
   SHAZAM_WAIT_HINT,
 } from '../src/lib/business-track-passports/admission-ui';
 import { passportMissing, type Passport } from '../src/lib/business-track-passports/model';
+import { unresolvedShazamMatch } from '../src/lib/business-track-passports/shazam';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
@@ -103,6 +104,32 @@ const prod = albumAdmissionState(Array.from({ length: 10 }, () => ({ passport: p
 assert.equal(prod.hint, 'Сейчас нет треков, готовых к допуску: Shazam ещё проверяет (10), нет отпечатка и AcoustID – нужна настройка сервера (10). Ждём проверку Shazam – обычно несколько минут.');
 assert.equal(albumAdmissionState([{ passport: { ...complete, generator_plan: '' } }]).hint, 'Сейчас нет треков, готовых к допуску: не заполнены поля паспорта (1).');
 assert.equal(albumAdmissionState([]).complete, false, 'empty album is never «в каталоге»');
+// t1522u: a Shazam match with empty passport Shazam fields is named, not «нет результата Shazam».
+{
+  const matchDraft: Passport = { ...complete, shazam_result: null, shazam_checked_at: null };
+  assert.deepEqual(passportRefusalCodes(matchDraft, false, true), ['shazam_match']);
+  assert.deepEqual(passportRefusalCodes(matchDraft, true, true), ['shazam_pending'], 'a new queued check still wins');
+  assert.deepEqual(passportRefusalCodes(matchDraft, false, false), ['shazam_missing']);
+  assert.deepEqual(passportRefusalCodes(complete, false, true), [], 'filled passport: rules unchanged');
+  const album = albumAdmissionState([
+    ...Array.from({ length: 9 }, () => approvedTrack),
+    { passport: matchDraft, shazamMatch: true },
+  ]);
+  assert.equal(album.ready, 0);
+  assert.equal(album.hint, 'Сейчас нет треков, готовых к допуску: Shazam нашёл совпадение (1).');
+  assert.ok(!album.hint?.includes('нет результата Shazam'));
+  const row = { audio_item_id: 'f5', status: 'match' as const, finished_at: '2026-11-18T05:51:12Z', segments: [
+    { label: 't30', matched: false, offset_seconds: 30, duration_seconds: 15 },
+    { label: 'mid', matched: true, title: '夏風君の髪をさらって', artist: 'つぶあん', timeskew: -0.0007792115, frequencyskew: -0.0006441474, offset_seconds: 80, duration_seconds: 15 },
+    { label: 'end30', matched: false, offset_seconds: 146, duration_seconds: 15 },
+  ] };
+  const found = unresolvedShazamMatch(row, matchDraft, row);
+  assert.deepEqual(found?.matches.map((m) => [m.title, m.artist, m.range]), [['夏風君の髪をさらって', 'つぶあん', '1:20–1:35']]);
+  assert.equal(found?.date, '18.11.2026');
+  assert.equal(unresolvedShazamMatch(row, { ...matchDraft, shazam_result: 'match' }, row), null, 'passport already filled');
+  assert.equal(unresolvedShazamMatch({ ...row, status: 'running' }, matchDraft, row), null, 'new check running');
+  assert.equal(unresolvedShazamMatch({ ...row, status: 'no_match', segments: [] }, matchDraft, null), null);
+}
 assert.equal(albumAdmissionState([{ passport: { ...complete, status: 'revoked' } }]).complete, false);
 
 // «Заполнить автоматически»: fpcalc/AcoustID gaps are an amber notice, deduplicated.
@@ -159,6 +186,9 @@ for (const path of [
   'src/app/(platform)/admin/business-catalog/AlbumPassportTools.tsx',
   'src/app/(platform)/admin/business-catalog/ClosedAlbumWork.tsx',
   'src/app/(platform)/admin/business-catalog/actions.ts',
+  'src/app/(platform)/admin/business-catalog/ShazamMatchList.tsx',
+  'src/app/(platform)/admin/business-catalog/ShazamAutoStatus.tsx',
+  'src/lib/business-track-passports/shazam.ts',
 ]) assert.ok(!read(path).includes('\u2014'), `${path}: en dash only`);
 
 console.log('business-catalog-admission-ui-unit: ok');

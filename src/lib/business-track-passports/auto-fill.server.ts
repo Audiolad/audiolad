@@ -405,6 +405,23 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
       .select('audio_item_id').in('audio_item_id', trackIds).in('status', ['pending', 'running']);
     if (!activeError) for (const row of active ?? []) shazamActive.add(String(row.audio_item_id));
   }
+  // t1522u, read-only: tracks whose latest decisive check found a match. Only names the reason
+  // («Shazam нашёл совпадение» instead of «нет результата Shazam»); the rules are unchanged.
+  const shazamMatched = new Set<string>();
+  if (trackIds.length > 0) {
+    const { data: finals, error: finalsError } = await db.from('business_passport_shazam_checks')
+      .select('audio_item_id, status, created_at').in('audio_item_id', trackIds).in('status', ['match', 'no_match'])
+      .order('created_at', { ascending: false });
+    if (!finalsError) {
+      const seen = new Set<string>();
+      for (const row of finals ?? []) {
+        const trackId = String(row.audio_item_id);
+        if (seen.has(trackId)) continue;
+        seen.add(trackId);
+        if (row.status === 'match') shazamMatched.add(trackId);
+      }
+    }
+  }
   let approved = 0;
   let skipped = 0;
   const errors: { title: string; message: string }[] = [];
@@ -420,13 +437,13 @@ export async function approveReadyBusinessPassports(albumId: string): Promise<Ap
     }
     if (!passport || passport.status === 'revoked') {
       skipped += 1;
-      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: passportRefusalCodes(passport, shazamActive.has(trackId)) });
+      outcomes.push({ id: trackId, title, outcome: 'refused', reasons: passportRefusalCodes(passport, shazamActive.has(trackId), shazamMatched.has(trackId)) });
       continue;
     }
     const missing = passportMissing(passport);
     if (missing.length > 0) {
       skipped += 1;
-      const reasons = passportRefusalCodes(passport, shazamActive.has(trackId));
+      const reasons = passportRefusalCodes(passport, shazamActive.has(trackId), shazamMatched.has(trackId));
       outcomes.push({ id: trackId, title, outcome: 'refused', reasons: reasons.length ? reasons : ['fields'] });
       continue;
     }
