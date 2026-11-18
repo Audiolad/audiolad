@@ -1,3 +1,4 @@
+import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -97,7 +98,11 @@ export function authorizeStudioMusicPreview(input: {
     return { ok: false, status: 404, code: "wrong_relation" };
   }
 
-  const publicInventory = isPublicStudioMusicInventory(input.practice);
+  // Test-fixture publications are hidden from the public Studio listing
+  // (filterPublicPracticeRows), so the pre-acquire preview excludes them too.
+  const publicInventory =
+    isPublicStudioMusicInventory(input.practice) &&
+    !isFixtureMarkedPractice(input.practice);
   const publishedAudio =
     !input.audioItem.status || input.audioItem.status === "published";
 
@@ -238,6 +243,13 @@ export function studioMusicPreviewJsonContainsForbiddenFields(
   );
 }
 
+/*
+ * loadPractice must return the source author's access_status (and the
+ * publication dates): isPublicStudioMusicInventory gates the pre-acquire
+ * preview on a commercial source author. Without the join every listener who
+ * had not added the music yet got 403 and the Studio player closed at once
+ * (t1540u, owner decision 18.11.2026: listening before «Добавить» is allowed).
+ */
 export function createSupabaseStudioMusicPreviewStore(
   supabase: SupabaseClient,
 ): StudioMusicPreviewStore {
@@ -260,7 +272,13 @@ export function createSupabaseStudioMusicPreviewStore(
           studio_music_pricing_mode,
           studio_music_price_minor,
           catalog_visibility,
-          is_catalog_listed
+          is_catalog_listed,
+          published_at,
+          scheduled_publish_at,
+          cover_image,
+          authors!practices_author_id_fkey (
+            access_status
+          )
         `,
         )
         .eq(BUSINESS_ONLY_COLUMN, false)
