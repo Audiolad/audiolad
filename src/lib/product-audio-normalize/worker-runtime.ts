@@ -6,7 +6,10 @@ import { randomUUID } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
+import {
+  PRACTICE_AUDIO_BUCKET,
+  resolveAudioItemStatusAfterUpload,
+} from "@/lib/author-products/product-audio-upload-contract";
 
 import {
   PRODUCT_AUDIO_NORMALIZE_LEASE_SECONDS,
@@ -93,16 +96,25 @@ export async function uploadDeliveryIfLeaseOwned(args: {
   return "uploaded";
 }
 
-async function loadPracticeStatus(
+async function loadTrackStatusAfterUpload(
   service: SupabaseClient,
   practiceId: string,
+  audioItemId: string,
 ): Promise<"draft" | "published"> {
-  const { data } = await service
-    .from("practices")
-    .select("status")
-    .eq("id", practiceId)
-    .maybeSingle();
-  return data?.status === "published" ? "published" : "draft";
+  const [{ data: practice }, { data: track }] = await Promise.all([
+    service.from("practices").select("status").eq("id", practiceId).maybeSingle(),
+    service
+      .from("audio_items")
+      .select("status")
+      .eq("id", audioItemId)
+      .eq("practice_id", practiceId)
+      .maybeSingle(),
+  ]);
+  // t1529u: a published track stays published when its audio is replaced.
+  return resolveAudioItemStatusAfterUpload({
+    practiceStatus: practice?.status,
+    trackStatus: track?.status,
+  });
 }
 
 async function downloadPracticeObject(
@@ -209,7 +221,11 @@ export async function executeClaimedProductNormalizeJob(
     });
     cleanupPaths.push(job.target_storage_path);
 
-    const productStatus = await loadPracticeStatus(service, job.practice_id);
+    const productStatus = await loadTrackStatusAfterUpload(
+      service,
+      job.practice_id,
+      job.audio_item_id,
+    );
     return {
       targetStoragePath: job.target_storage_path,
       sizeBytes: validated.sizeBytes,

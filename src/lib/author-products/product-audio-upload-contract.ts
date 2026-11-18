@@ -290,18 +290,29 @@ export function hasExistingMusicCurrentAudio(
   );
 }
 
-export function shouldBlockProductAudioReplacement(
-  locked: boolean,
-  existingAudioPath: string | null | undefined,
-): boolean {
-  return Boolean(locked && existingAudioPath);
-}
+/**
+ * t1529u: the author may replace the audio of a track in a product that was
+ * already bought. Buyers keep the track and hear the new file after processing.
+ * Uploads never remove audio, so the sale lock does not block them; removing
+ * audio or a track of a bought product stays forbidden (routes + DB trigger
+ * guard_audio_items_content_sale_lock).
+ */
+export const PRODUCT_AUDIO_REPLACE_ALLOWED_AFTER_SALE = true as const;
 
-export function shouldBlockMusicAudioReplacement(
-  locked: boolean,
-  pointers: MusicCurrentAudioPointers,
-): boolean {
-  return Boolean(locked && hasExistingMusicCurrentAudio(pointers));
+/**
+ * Status written to the track when new audio becomes current. A track that is
+ * already published stays published (buyers of an unpublished product keep
+ * access; the sale lock forbids demoting it). Otherwise the track follows the
+ * product: published product -> published, anything else -> draft.
+ */
+export function resolveAudioItemStatusAfterUpload(input: {
+  practiceStatus: string | null | undefined;
+  trackStatus: string | null | undefined;
+}): "draft" | "published" {
+  return input.practiceStatus === "published" ||
+    input.trackStatus === "published"
+    ? "published"
+    : "draft";
 }
 
 export function canAbandonProductAudioUploadPath(input: {

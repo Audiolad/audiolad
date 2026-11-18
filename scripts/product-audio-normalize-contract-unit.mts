@@ -14,6 +14,7 @@ import {
   canAbandonProductAudioUploadPath,
   parseProductAudioSourcePath,
   PRODUCT_OGG_MIME_TYPES,
+  resolveAudioItemStatusAfterUpload,
   canonicalProductAudioUploadMime,
   detectProductAudioSourceFormat,
   isAllowedProductAudioSourceType,
@@ -217,6 +218,20 @@ for (const codec of ["opus", "vorbis"]) {
   assert.equal(validateProductSourceProbe("ogg", { ...probe, hasVideoStream: true }), "has_video");
   assert.equal(validateProductSourceProbe("ogg", { ...probe, formatNames: ["mp3"] }), "container_mismatch");
   assert.equal(validateProductSourceProbe("ogg", { ...probe, audioCodecNames: ["aac"] }), "codec_mismatch");
+}
+
+// t1529u: replacing audio never demotes a published track.
+assert.equal(resolveAudioItemStatusAfterUpload({ practiceStatus: "published", trackStatus: "draft" }), "published");
+assert.equal(resolveAudioItemStatusAfterUpload({ practiceStatus: "unpublished", trackStatus: "published" }), "published");
+assert.equal(resolveAudioItemStatusAfterUpload({ practiceStatus: "draft", trackStatus: "published" }), "published");
+assert.equal(resolveAudioItemStatusAfterUpload({ practiceStatus: "unpublished", trackStatus: "draft" }), "draft");
+assert.equal(resolveAudioItemStatusAfterUpload({ practiceStatus: "draft", trackStatus: null }), "draft");
+{
+  const worker = readFileSync(path.join(root, "src/lib/product-audio-normalize/worker-runtime.ts"), "utf8");
+  assert.match(worker, /resolveAudioItemStatusAfterUpload/);
+  assert.doesNotMatch(worker, /loadPracticeStatus/);
+  const direct = readFileSync(path.join(root, "src/lib/author-products/server/direct-audio-upload.ts"), "utf8");
+  assert.match(direct, /resolveAudioItemStatusAfterUpload\(\{\s*practiceStatus: practice\.status,\s*trackStatus: audioItem\.status/);
 }
 
 console.log("product-audio-normalize-contract-unit: ok");

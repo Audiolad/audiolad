@@ -57,8 +57,8 @@ assert.doesNotMatch(migration, /CREATE POLICY[\s\S]*music-masters/);
 
 assert.match(server, /practice\.product_kind/);
 assert.match(server, /productKind !== "music"/);
-assert.match(server, /getPracticeSaleLock/);
-assert.match(server, /shouldBlockMusicAudioReplacement/);
+// t1529u: a sold music track may get a new master; the DB keeps removal locked.
+assert.doesNotMatch(server, /getPracticeSaleLock|shouldBlockMusicAudioReplacement/);
 assert.match(server, /active_music_delivery_asset_id, desired_music_master_asset_id/);
 assert.match(server, /isProductContentLockedDbError/);
 assert.match(server, /createSignedUploadUrl\(storagePath, \{ upsert: false \}\)/);

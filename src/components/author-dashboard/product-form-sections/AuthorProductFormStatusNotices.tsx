@@ -20,7 +20,8 @@ export default function AuthorProductFormStatusNotices({
       {contentLockedAfterSale ? (
         <p className="rounded-[18px] border border-[#e4d7f4] bg-[#f8f4ff] px-4 py-3 text-sm text-[#5f5484]">
           Этот продукт уже приобретён слушателями. Его можно снять с публикации,
-          но удалить продукт или аудиоматериалы нельзя.
+          но удалить продукт или аудиоматериалы нельзя. Заменить аудио в треке
+          можно – слушатели услышат новую версию после обработки.
         </p>
       ) : null}
 

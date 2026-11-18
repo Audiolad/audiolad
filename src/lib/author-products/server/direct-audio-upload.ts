@@ -17,18 +17,15 @@ import {
   isOwnedVersionedProductAudioPath,
   isOwnedVersionedProductAudioSourcePath,
   parseProductAudioSourcePath,
-  shouldBlockMusicAudioReplacement,
-  shouldBlockProductAudioReplacement,
+  resolveAudioItemStatusAfterUpload,
   validateProductAudioSourceDescriptor,
   validateProductMp3Descriptor,
-  type MusicCurrentAudioPointers,
 } from "@/lib/author-products/product-audio-upload-contract";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
   PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-  getPracticeSaleLock,
   isProductContentLockedDbError,
 } from "@/lib/author-products/sale-lock";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
@@ -64,6 +61,7 @@ export class ProductAudioUploadError extends Error {
 type OwnedAudioItem = {
   id: string;
   audio_path: string | null;
+  status: string | null;
   active_music_delivery_asset_id: string | null;
   desired_music_master_asset_id: string | null;
 };
@@ -80,7 +78,7 @@ async function loadOwnedAudioItem(
   const { data, error } = await supabase
     .from("audio_items")
     .select(
-      "id, audio_path, active_music_delivery_asset_id, desired_music_master_asset_id",
+      "id, audio_path, status, active_music_delivery_asset_id, desired_music_master_asset_id",
     )
     .eq("id", audioId)
     .eq("practice_id", practiceId)
@@ -96,34 +94,6 @@ async function loadOwnedAudioItem(
   }
 
   return data;
-}
-
-function musicPointersFromAudioItem(item: OwnedAudioItem): MusicCurrentAudioPointers {
-  return {
-    audioPath: item.audio_path,
-    activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
-    desiredMusicMasterAssetId: item.desired_music_master_asset_id,
-  };
-}
-
-async function assertSaleLockAllowsMutation(
-  practiceId: string,
-  audioItem: OwnedAudioItem,
-  productKind: string | null | undefined,
-): Promise<void> {
-  const service = createServiceRoleClient();
-  const saleLock = await getPracticeSaleLock(service, practiceId);
-  const blocked =
-    productKind === "music"
-      ? shouldBlockMusicAudioReplacement(saleLock.locked, musicPointersFromAudioItem(audioItem))
-      : shouldBlockProductAudioReplacement(saleLock.locked, audioItem.audio_path);
-  if (blocked) {
-    throw new ProductAudioUploadError(
-      PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-      409,
-      PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
-    );
-  }
 }
 
 function requireOwnedDeliveryPath(
@@ -348,13 +318,9 @@ export async function startProductAudioDirectUpload(input: {
   mimeType: string;
 }): Promise<{ upload_path: string; signedUpload: ProductSignedUpload }> {
   const { supabase, practice } = await requirePracticeMutationAccess(input.practiceId);
-  const audioItem = await loadOwnedAudioItem(
-    supabase,
-    input.practiceId,
-    input.audioId,
-  );
-  await assertSaleLockAllowsMutation(input.practiceId, audioItem, practice.product_kind);
-
+  // Ownership check. t1529u: a sold product may get new audio (replace, not
+  // remove), so the sale lock does not block uploads.
+  await loadOwnedAudioItem(supabase, input.practiceId, input.audioId);
   const isMusic = practice.product_kind === "music";
   const descriptor = {
     name: input.fileName,
@@ -459,17 +425,6 @@ export async function finalizeProductAudioDirectUpload(input: {
     throw new ProductAudioUploadError("invalid_file_size", 400);
   }
 
-  try {
-    await assertSaleLockAllowsMutation(
-      input.practiceId,
-      audioItem,
-      practice.product_kind,
-    );
-  } catch (error) {
-    await deletePracticeAudioPaths([uploadPath]);
-    throw error;
-  }
-
   let inspected: { sizeBytes: number; durationSeconds: number };
   try {
     inspected = await inspectUploadedProductMp3({
@@ -482,7 +437,10 @@ export async function finalizeProductAudioDirectUpload(input: {
   }
 
   const previousPath = audioItem.audio_path;
-  const nextStatus = practice.status === "published" ? "published" : "draft";
+  const nextStatus = resolveAudioItemStatusAfterUpload({
+    practiceStatus: practice.status,
+    trackStatus: audioItem.status,
+  });
   const isMusicProduct = practice.product_kind === "music";
 
   if (isMusicProduct) {
@@ -639,17 +597,6 @@ async function finalizeOrdinarySourceNormalize(input: {
   if (validation === "invalid_file_size") {
     await deletePracticeAudioPaths([input.uploadPath]);
     throw new ProductAudioUploadError("invalid_file_size", 400);
-  }
-
-  try {
-    await assertSaleLockAllowsMutation(
-      input.practiceId,
-      input.audioItem,
-      input.productKind,
-    );
-  } catch (error) {
-    await deletePracticeAudioPaths([input.uploadPath]);
-    throw error;
   }
 
   const object = await readPracticeAudioObjectInfo(input.uploadPath);

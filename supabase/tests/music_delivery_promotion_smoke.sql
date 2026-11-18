@@ -317,48 +317,84 @@ BEGIN
       active_music_delivery_asset_id = v_stream_a
   WHERE id = v_audio;
 
-  -- A. user_practices locks replacement.
+  -- t1529u: after sale the audio of a track may be replaced, not removed.
+  -- A. user_practices lock: MP3 replacement of delivered WAV succeeds.
   INSERT INTO public.user_practices (user_id, practice_id, access_source)
   VALUES (v_buyer, v_practice, 'purchase');
   IF NOT public.practice_is_content_locked_after_sale(v_practice) THEN
     RAISE EXCEPTION 'A user_practices must lock practice';
   END IF;
-  BEGIN
-    PERFORM public.activate_music_direct_mp3_delivery(
-      v_audio, 'legacy/locked-a.mp3', 41, 'a.mp3', 2222, 'draft'
-    );
-    RAISE EXCEPTION 'A activate must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
-  EXCEPTION
-    WHEN others THEN
-      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
-        RAISE EXCEPTION 'A expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
-      END IF;
-  END;
+  IF public.activate_music_direct_mp3_delivery(
+    v_audio, 'legacy/locked-a.mp3', 41, 'a.mp3', 2222, 'draft'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'A replacement under user_practices lock must succeed';
+  END IF;
   SELECT active_music_delivery_asset_id, desired_music_master_asset_id, audio_path
     INTO v_active, v_desired, v_path
   FROM public.audio_items WHERE id = v_audio;
-  IF v_active IS DISTINCT FROM v_stream_a OR v_desired IS DISTINCT FROM v_master_a OR v_path IS NOT NULL THEN
-    RAISE EXCEPTION 'A blocked activate must leave pointers/path unchanged';
+  IF v_path IS DISTINCT FROM 'legacy/locked-a.mp3' OR v_active IS NOT NULL OR v_desired IS NOT NULL THEN
+    RAISE EXCEPTION 'A replacement must set the new path and clear WAV pointers';
+  END IF;
+  -- A2. removing the audio under the lock is still forbidden.
+  BEGIN
+    UPDATE public.audio_items
+    SET audio_path = NULL
+    WHERE id = v_audio;
+    RAISE EXCEPTION 'A2 clearing audio under lock was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'A2 expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
+  BEGIN
+    UPDATE public.audio_items
+    SET audio_path = '   '
+    WHERE id = v_audio;
+    RAISE EXCEPTION 'A2 blank path under lock was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'A2 blank path expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
+  BEGIN
+    PERFORM public.teardown_music_track_delivery(v_audio, v_practice, false);
+    RAISE EXCEPTION 'A2 teardown under lock was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'A2 teardown expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
+  BEGIN
+    UPDATE public.audio_items
+    SET practice_id = gen_random_uuid()
+    WHERE id = v_audio;
+    RAISE EXCEPTION 'A2 moving a track out of a purchased product was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'A2 move expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
+  SELECT audio_path INTO v_path FROM public.audio_items WHERE id = v_audio;
+  IF v_path IS DISTINCT FROM 'legacy/locked-a.mp3' THEN
+    RAISE EXCEPTION 'A2 blocked removal must leave the path unchanged';
   END IF;
   DELETE FROM public.user_practices WHERE practice_id = v_practice;
 
-  -- B. active studio_music_entitlements locks replacement.
+  -- B. active studio_music_entitlements lock: replacement succeeds.
   INSERT INTO public.studio_music_entitlements (id, user_id, practice_id, grant_source)
   VALUES (v_entitlement, v_buyer, v_practice, 'free');
   IF NOT public.practice_is_content_locked_after_sale(v_practice) THEN
     RAISE EXCEPTION 'B studio entitlement must lock practice';
   END IF;
-  BEGIN
-    PERFORM public.activate_music_direct_mp3_delivery(
-      v_audio, 'legacy/locked-b.mp3', 41, 'b.mp3', 2223, 'draft'
-    );
-    RAISE EXCEPTION 'B activate must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
-  EXCEPTION
-    WHEN others THEN
-      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
-        RAISE EXCEPTION 'B expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
-      END IF;
-  END;
+  IF public.activate_music_direct_mp3_delivery(
+    v_audio, 'legacy/locked-b.mp3', 41, 'b.mp3', 2223, 'draft'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'B replacement under studio entitlement lock must succeed';
+  END IF;
   -- C path: paid order also locks (revoke studio first so only order remains).
   UPDATE public.studio_music_entitlements
   SET revoked_at = now(), revoke_reason = 'test'
@@ -380,19 +416,14 @@ BEGIN
     RAISE EXCEPTION 'C paid order must lock practice';
   END IF;
 
-  -- E/F/G. service-role RPCs cannot bypass; pointers unchanged; no new job.
+  -- E/F/G. paid lock: MP3 replacement and WAV master replacement both work;
+  -- the old path stays playable until the new stream is promoted.
+  IF public.activate_music_direct_mp3_delivery(
+    v_audio, 'legacy/locked-e.mp3', 41, 'e.mp3', 2224, 'draft'
+  ) IS NOT TRUE THEN
+    RAISE EXCEPTION 'E replacement under paid lock must succeed';
+  END IF;
   SELECT count(*)::integer INTO v_jobs_before FROM public.music_transcode_jobs;
-  BEGIN
-    PERFORM public.activate_music_direct_mp3_delivery(
-      v_audio, 'legacy/locked-e.mp3', 41, 'e.mp3', 2224, 'draft'
-    );
-    RAISE EXCEPTION 'E activate must raise under paid lock';
-  EXCEPTION
-    WHEN others THEN
-      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
-        RAISE EXCEPTION 'E expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
-      END IF;
-  END;
   INSERT INTO public.music_audio_assets (
     id, audio_item_id, source_asset_id, asset_role, lifecycle_state, storage_bucket, storage_path,
     original_file_name, accepted_mime_type, size_bytes, duration_seconds, verified_at
@@ -401,30 +432,22 @@ BEGIN
     'practices/'||v_practice||'/audio/'||v_audio||'/masters/'||v_master_e||'.wav',
     'e.wav', 'audio/wav', NULL, NULL, NULL
   );
-  BEGIN
-    PERFORM public.finalize_music_master_asset(v_master_e, 3000, 20);
-    RAISE EXCEPTION 'F finalize must raise under paid lock';
-  EXCEPTION
-    WHEN others THEN
-      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
-        RAISE EXCEPTION 'F expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
-      END IF;
-  END;
-  SELECT active_music_delivery_asset_id, desired_music_master_asset_id, audio_path
-    INTO v_active, v_desired, v_path
-  FROM public.audio_items WHERE id = v_audio;
-  IF v_active IS DISTINCT FROM v_stream_a OR v_desired IS DISTINCT FROM v_master_a OR v_path IS NOT NULL THEN
-    RAISE EXCEPTION 'G blocked RPCs must leave path/active/desired unchanged';
-  END IF;
-  SELECT count(*)::integer INTO v_jobs_after FROM public.music_transcode_jobs;
-  IF v_jobs_after <> v_jobs_before THEN
-    RAISE EXCEPTION 'G blocked finalize must not create a transcode job';
-  END IF;
-  IF EXISTS (
+  PERFORM public.finalize_music_master_asset(v_master_e, 3000, 20);
+  IF NOT EXISTS (
     SELECT 1 FROM public.music_audio_assets
     WHERE id = v_master_e AND lifecycle_state = 'verified'
   ) THEN
-    RAISE EXCEPTION 'F blocked finalize must leave master uploading/unverified';
+    RAISE EXCEPTION 'F finalize under paid lock must verify the new master';
+  END IF;
+  SELECT active_music_delivery_asset_id, desired_music_master_asset_id, audio_path
+    INTO v_active, v_desired, v_path
+  FROM public.audio_items WHERE id = v_audio;
+  IF v_desired IS DISTINCT FROM v_master_e OR v_path IS DISTINCT FROM 'legacy/locked-e.mp3' OR v_active IS NOT NULL THEN
+    RAISE EXCEPTION 'G new master must be desired while the old path stays current';
+  END IF;
+  SELECT count(*)::integer INTO v_jobs_after FROM public.music_transcode_jobs;
+  IF v_jobs_after <> v_jobs_before + 1 THEN
+    RAISE EXCEPTION 'G finalize under paid lock must queue one transcode job';
   END IF;
 
   -- H. first-ever audio under lock is still allowed.
@@ -456,9 +479,8 @@ BEGIN
     RAISE EXCEPTION 'H first-ever must set path and keep pointers null';
   END IF;
 
-  -- I/J. sale-lock appears while replacement WAV is processing: late stream must not replace.
-  -- Temporarily drop the paid lock so the fixture can reset to an active-WAV
-  -- delivered state, then re-apply the lock before late promote.
+  -- I/J. sale lock appears while replacement WAV is processing: the new stream
+  -- is promoted once ready (t1529u: replacement after sale is allowed).
   DELETE FROM public.orders WHERE id = v_order;
   UPDATE public.audio_items
   SET audio_path = NULL,
@@ -474,21 +496,33 @@ BEGIN
     'Slice3 Delivery', 'slice3-music-delivery-smoke', 10000,
     10000, v_author, 'slice3-sale-lock-order-i', 'product_purchase', now()
   );
-  IF public.promote_music_item_delivery(v_audio, v_stream_b) IS NOT FALSE THEN
-    RAISE EXCEPTION 'I locked promote must not replace delivered stream A';
+  IF public.promote_music_item_delivery(v_audio, v_stream_b) IS NOT TRUE THEN
+    RAISE EXCEPTION 'I promote under lock must replace delivered stream A with B';
   END IF;
   SELECT active_music_delivery_asset_id, desired_music_master_asset_id, audio_path
     INTO v_active, v_desired, v_path
   FROM public.audio_items WHERE id = v_audio;
-  IF v_active IS DISTINCT FROM v_stream_a THEN
-    RAISE EXCEPTION 'J active delivery must remain stream A';
+  IF v_active IS DISTINCT FROM v_stream_b THEN
+    RAISE EXCEPTION 'J active delivery must become stream B';
   END IF;
-  IF v_desired IS NOT NULL THEN
-    RAISE EXCEPTION 'J blocked promote should clear stale desired';
+  IF v_desired IS DISTINCT FROM v_master_b THEN
+    RAISE EXCEPTION 'J desired must stay master B';
   END IF;
   IF v_path IS NOT NULL THEN
     RAISE EXCEPTION 'J path must remain null';
   END IF;
+  -- J2. clearing the active stream under lock is still forbidden.
+  BEGIN
+    UPDATE public.audio_items
+    SET active_music_delivery_asset_id = NULL
+    WHERE id = v_audio;
+    RAISE EXCEPTION 'J2 clearing active stream under lock was not rejected';
+  EXCEPTION
+    WHEN others THEN
+      IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
+        RAISE EXCEPTION 'J2 expected PRODUCT_CONTENT_LOCKED_AFTER_SALE, got %', SQLERRM;
+      END IF;
+  END;
 END
 $$;
 

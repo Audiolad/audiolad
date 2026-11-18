@@ -41,7 +41,7 @@ export function getAudioUploadErrorMessage(
     case "stale_music_upload":
       return "Не удалось загрузить аудио. Попробуйте ещё раз.";
     case "upload_token_expired":
-      return "Загрузка заняла слишком много времени. Попробуйте ещё раз — лучше по одному треку.";
+      return "Загрузка заняла слишком много времени. Попробуйте ещё раз – лучше по одному треку.";
     case "upload_failed":
       return "Не удалось загрузить аудио в хранилище. Попробуйте ещё раз.";
     case "invalid_audio_duration":
@@ -49,7 +49,7 @@ export function getAudioUploadErrorMessage(
     case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":
       return (
         message?.trim() ||
-        "Аудиоматериалы этого продукта нельзя удалить или заменить, потому что продукт уже приобретён слушателями."
+        "Аудиоматериалы этого продукта нельзя удалить, потому что продукт уже приобретён слушателями. Заменить аудио в треке можно кнопкой «Заменить аудио»."
       );
     default:
       if (status === 413) {

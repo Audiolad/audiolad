@@ -76,11 +76,17 @@ assert(/A user_practices must lock practice/.test(smoke));
 assert(/B studio entitlement must lock practice/.test(smoke));
 assert(/C paid order must lock practice/.test(smoke));
 assert(/D revoked studio entitlement alone must not lock/.test(smoke));
-assert(/E activate must raise under paid lock/.test(smoke));
-assert(/F finalize must raise under paid lock/.test(smoke));
+// t1529u: after sale audio may be replaced, not removed.
+assert(/A replacement under user_practices lock must succeed/.test(smoke));
+assert(/A2 clearing audio under lock was not rejected/.test(smoke));
+assert(/A2 teardown under lock was not rejected/.test(smoke));
+assert(/A2 moving a track out of a purchased product was not rejected/.test(smoke));
+assert(/E replacement under paid lock must succeed/.test(smoke));
+assert(/F finalize under paid lock must verify the new master/.test(smoke));
 assert(/H first-ever MP3 under lock must succeed/.test(smoke));
-assert(/I locked promote must not replace delivered stream A/.test(smoke));
-assert(/J blocked promote should clear stale desired/.test(smoke));
+assert(/I promote under lock must replace delivered stream A with B/.test(smoke));
+assert(/J2 clearing active stream under lock was not rejected/.test(smoke));
+assert(!/'[A-Z]\d? [^']*must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE'/.test(smoke), "control RAISE must not contain the expected error code");
 
 
 const publishMigName = "20261007180000_music_publish_playable_audio.sql";

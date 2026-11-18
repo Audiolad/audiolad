@@ -20,8 +20,7 @@ import {
   isAllowedProductMp3Type,
   isOwnedVersionedProductAudioPath,
   hasExistingMusicCurrentAudio,
-  shouldBlockMusicAudioReplacement,
-  shouldBlockProductAudioReplacement,
+  PRODUCT_AUDIO_REPLACE_ALLOWED_AFTER_SALE,
   validateProductMp3Descriptor,
   validateProductMp3FileClient,
 } from "../src/lib/author-products/mp3-upload-contract";
@@ -234,19 +233,11 @@ assert.equal(
   false,
 );
 
-assert.equal(shouldBlockProductAudioReplacement(true, livePath), true);
-assert.equal(
-  shouldBlockProductAudioReplacement(true, null),
-  false,
-);
-assert.equal(shouldBlockProductAudioReplacement(false, livePath), false);
+// t1529u: replacing audio after sale is allowed; removing stays locked.
+assert.equal(PRODUCT_AUDIO_REPLACE_ALLOWED_AFTER_SALE, true);
 assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: "a", desiredMusicMasterAssetId: null }), true);
 assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: "d" }), true);
 assert.equal(hasExistingMusicCurrentAudio({ audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: null }), false);
-assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, activeMusicDeliveryAssetId: "a" }), true);
-assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, desiredMusicMasterAssetId: "d" }), true);
-assert.equal(shouldBlockMusicAudioReplacement(true, { audioPath: null, activeMusicDeliveryAssetId: null, desiredMusicMasterAssetId: null }), false);
-assert.equal(shouldBlockMusicAudioReplacement(false, { audioPath: null, activeMusicDeliveryAssetId: "a" }), false);
 assert.equal(
   canAbandonProductAudioUploadPath({
     uploadPath: ownedPath,
@@ -292,7 +283,7 @@ const legacyRoute = read(
   "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
 );
 const server = read("src/lib/author-products/server/direct-audio-upload.ts");
-assert.match(server, /shouldBlockMusicAudioReplacement/);
+assert.doesNotMatch(server, /shouldBlock(Music|Product)AudioReplacement|getPracticeSaleLock/);
 assert.match(server, /active_music_delivery_asset_id, desired_music_master_asset_id/);
 const inventory = read("src/lib/author-support/mutation-inventory.ts");
 const migration = read(
@@ -388,7 +379,8 @@ assert.ok(
   failedInspectCleanup >= 0 && failedInspectCleanup < productActivate,
   "failed finalize deletes only the new upload object",
 );
-assert.match(finalizeBlock, /shouldBlockProductAudioReplacement|assertSaleLockAllowsMutation/);
+assert.doesNotMatch(finalizeBlock, /assertSaleLockAllowsMutation/);
+assert.match(finalizeBlock, /isProductContentLockedDbError/);
 assert.match(finalizeBlock, /isOwnedVersionedProductAudioPath|requireOwnedDeliveryPath|requireOwnedVersionedPath/);
 assert.match(finalizeBlock, /enqueue_product_audio_normalize_job/);
 assert.match(finalizeBlock, /cleanup_source_paths|collectNormalizeCleanupPaths/);
