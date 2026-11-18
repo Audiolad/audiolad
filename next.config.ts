@@ -29,13 +29,22 @@ const nextConfig: NextConfig = {
         source,
         headers: [{ key: "Cache-Control", value: "private, no-store" }],
       })),
-      // t1544u: правовой раздел /b/legal скрыт до решения Сергея.
+      // t1544u / t1567u: правовой раздел скрыт. Живой путь – /b/coffee/legal;
+      // старый /b/legal остаётся с тем же заголовком и уходит 301.
       {
         source: "/b/legal",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
       },
       {
         source: "/b/legal/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+      },
+      {
+        source: "/b/coffee/legal",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+      },
+      {
+        source: "/b/coffee/legal/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
       },
       {
@@ -144,8 +153,12 @@ const nextConfig: NextConfig = {
     ];
   },
   async redirects() {
-    // Retired vertical guide URLs (301, see legacy-redirects.ts).
-    return buildVerticalGuideRedirects();
+    // Retired vertical guide URLs and the moved legal section (301).
+    return [
+      { source: "/b/legal", destination: "/b/coffee/legal", statusCode: 301 as const },
+      { source: "/b/legal/:path*", destination: "/b/coffee/legal/:path*", statusCode: 301 as const },
+      ...buildVerticalGuideRedirects(),
+    ];
   },
   async rewrites() {
     // beforeFiles: afterFiles rewrite to ?key=:key did not apply for /{key}.txt

@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { SERGEY_CONTACT } from "@/lib/business-app/sergey-contact";
 
 /**
- * Правовой раздел «АудиоЛад Бизнес» – audiolad.ru/b/legal (t1544u).
+ * Правовой раздел «АудиоЛад Кофейня» – audiolad.ru/b/coffee/legal (t1544u, t1567u).
  * Пока раздел скрыт: noindex, nofollow, нет в sitemap, нет ссылок из меню,
  * подвала и других страниц. Открывает только Сергей.
  */
-export const BUSINESS_LEGAL_HREF = "/b/legal";
-export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/legal/prava";
-export const BUSINESS_LEGAL_PROTECTION_HREF = "/b/legal/zashchita";
-export const BUSINESS_LEGAL_CERTIFICATE_HREF = "/b/legal/sertifikat";
+export const BUSINESS_LEGAL_HREF = "/b/coffee/legal";
+export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/coffee/legal/prava";
+export const BUSINESS_LEGAL_PROTECTION_HREF = "/b/coffee/legal/zashchita";
+export const BUSINESS_LEGAL_CERTIFICATE_HREF = "/b/coffee/legal/sertifikat";
 
 export const BUSINESS_LEGAL_PATHS = [
   BUSINESS_LEGAL_HREF,

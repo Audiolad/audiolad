@@ -9,6 +9,7 @@ import BusinessLegalShell, {
   legalH2Class,
   legalButtonClass,
   legalH3Class,
+  legalDocLinkProps,
   legalLinkClass,
   legalSampleClass,
 } from "@/components/business/legal/BusinessLegalShell";
@@ -22,7 +23,7 @@ import {
 } from "@/lib/business/legal/section";
 
 export const metadata: Metadata = {
-  title: "Сертификат на точку – АудиоЛад Бизнес",
+  title: "Сертификат на точку – АудиоЛад Кофейня",
   description: "Сертификат на каждую точку: что в нём указано и как проверить подлинность по QR-коду.",
   robots: BUSINESS_LEGAL_ROBOTS,
 };
@@ -49,7 +50,7 @@ export default function BusinessLegalCertificatePage() {
             ["Срок", "Период доступа: подарочный или оплаченный"],
             [
               "Основание",
-              `Договор-оферта «АудиоЛад Бизнес» в редакции от ${BUSINESS_LEGAL_OFFER_EDITION} и дата её принятия владельцем`,
+              `Договор-оферта «АудиоЛад Кофейня» в редакции от ${BUSINESS_LEGAL_OFFER_EDITION} и дата её принятия владельцем`,
             ],
             ["Проверка", "QR-код со ссылкой на страницу проверки на audiolad.ru"],
           ]}
@@ -75,6 +76,7 @@ export default function BusinessLegalCertificatePage() {
         <a
           href={BUSINESS_LEGAL_SAMPLE_PDF}
           className={legalButtonClass}
+          {...legalDocLinkProps}
         >
           Открыть образец PDF
         </a>
@@ -110,7 +112,7 @@ export default function BusinessLegalCertificatePage() {
           ]}
         />
         <p className={"mt-5 " + legalBodyClass}>
-          <Link href={businessLegalCertificateHref(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber)} className={legalLinkClass}>
+          <Link href={businessLegalCertificateHref(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber)} className={legalLinkClass} {...legalDocLinkProps}>
             Как выглядит страница проверки
           </Link>
         </p>

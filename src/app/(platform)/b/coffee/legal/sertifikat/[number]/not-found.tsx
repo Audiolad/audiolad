@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import BusinessLegalShell, { legalBodyClass, legalCardClass, legalLinkClass } from "@/components/business/legal/BusinessLegalShell";
+import BusinessLegalShell, { legalBodyClass, legalCardClass, legalDocLinkProps, legalLinkClass } from "@/components/business/legal/BusinessLegalShell";
 import { BUSINESS_LEGAL_CERTIFICATE_HREF } from "@/lib/business/legal/section";
 
 export default function BusinessLegalCertificateNotFound() {
@@ -15,7 +15,7 @@ export default function BusinessLegalCertificateNotFound() {
         <p className={legalBodyClass}>
           Проверьте номер: он указан в сертификате рядом с датой выдачи. Удобнее всего открыть эту страницу по
           QR-коду. Как устроен сертификат – на странице{" "}
-          <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass}>
+          <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass} {...legalDocLinkProps}>
             «Сертификат на точку»
           </Link>
           .

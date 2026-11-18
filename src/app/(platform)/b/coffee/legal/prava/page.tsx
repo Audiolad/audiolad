@@ -7,6 +7,7 @@ import BusinessLegalShell, {
   legalCardClass,
   legalH2Class,
   legalH3Class,
+  legalDocLinkProps,
   legalLinkClass,
   legalListClass,
   legalNoteClass,
@@ -15,8 +16,8 @@ import BusinessLegalShell, {
 import { BUSINESS_LEGAL_PROTECTION_HREF, BUSINESS_LEGAL_ROBOTS } from "@/lib/business/legal/section";
 
 export const metadata: Metadata = {
-  title: "Как устроены права на музыку – АудиоЛад Бизнес",
-  description: "Произведение и фонограмма, кому принадлежат права на музыку «АудиоЛад Бизнес», позиция по РАО и ВОИС.",
+  title: "Как устроены права на музыку – АудиоЛад Кофейня",
+  description: "Произведение и фонограмма, кому принадлежат права на музыку «АудиоЛад Кофейня», позиция по РАО и ВОИС.",
   robots: BUSINESS_LEGAL_ROBOTS,
 };
 
@@ -78,7 +79,7 @@ export default function BusinessLegalRightsPage() {
             },
             {
               title: "Заведение.",
-              text: "Получает право использовать фонограммы по договору с сервисом – в своих точках и через плеер «АудиоЛад Бизнес».",
+              text: "Получает право использовать фонограммы по договору с сервисом – в своих точках и через плеер «АудиоЛад Кофейня».",
             },
           ]}
         />
@@ -104,7 +105,7 @@ export default function BusinessLegalRightsPage() {
           <p>
             Применение ст. 1326 к полностью генеративным фонограммам остаётся предметом правовой оценки. Этот вопрос
             мы берём на себя – см.{" "}
-            <Link href={BUSINESS_LEGAL_PROTECTION_HREF} className={legalLinkClass}>
+            <Link href={BUSINESS_LEGAL_PROTECTION_HREF} className={legalLinkClass} {...legalDocLinkProps}>
               «Ответственность и защита заведения»
             </Link>
             .
@@ -116,12 +117,16 @@ export default function BusinessLegalRightsPage() {
           организацией (п. 4 ст. 1244 ГК РФ). Мы рассматриваем этот механизм как один из инструментов
           самостоятельного управления правами на фонограммы.
         </p>
+        <p className={"mt-3 " + legalBodyClass}>
+          18.11.2026 ИП Петров Сергей Сергеевич направил в РАО и ВОИС уведомления об отказе от управления его правами
+          на коллективной основе.
+        </p>
       </section>
 
       <section className={legalCardClass}>
         <h2 className={legalH2Class}>На какую музыку это распространяется</h2>
         <p className={"mt-4 " + legalBodyClass}>
-          Только на специализированный каталог, который звучит через плеер «АудиоЛад Бизнес» в подключённой точке.
+          Только на специализированный каталог, который звучит через плеер «АудиоЛад Кофейня» в подключённой точке.
           Для другой музыки в зале нужны свои разрешения:
         </p>
         <ul className={legalListClass}>
@@ -131,7 +136,7 @@ export default function BusinessLegalRightsPage() {
         </ul>
         <p className={legalNoteClass}>
           Обычный сайт и приложение АудиоЛад – для личного прослушивания. Для зала нужна подключённая точка в
-          «АудиоЛад Бизнес», даже если та же композиция есть в обоих каталогах.
+          «АудиоЛад Кофейня», даже если та же композиция есть в обоих каталогах.
         </p>
       </section>
 

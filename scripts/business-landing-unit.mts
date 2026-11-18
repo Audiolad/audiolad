@@ -126,10 +126,12 @@ assert.equal(
 assert.equal(toAbsoluteSitemapUrl("/b", PRODUCTION_APP_ORIGIN), "https://audiolad.ru/b");
 
 const nextConfig = read("next.config.ts");
-// /b и его страницы индексируются; исключение – скрытый правовой раздел /b/legal (t1544u).
-assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/(?!legal["'/])|["'])/);
+// /b и его страницы индексируются; исключение – скрытый правовой раздел /b/coffee/legal
+// (и 301 со старого /b/legal). Не индексируем только эти пути, не весь /b/coffee.
+assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/(?!legal["'/]|coffee\/legal["'/])|["'])/);
+assert.match(nextConfig, /source:\s*"\/b\/coffee\/legal",\s*headers: \[\{ key: "X-Robots-Tag"/);
 assert.match(nextConfig, /source:\s*"\/b\/legal",\s*headers: \[\{ key: "X-Robots-Tag"/);
-assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 11);
+assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 13);
 assert.match(nextConfig, /source:\s*"\/embed\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/auth\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/classica\/production"[\s\S]*X-Robots-Tag/);
