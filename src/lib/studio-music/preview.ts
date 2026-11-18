@@ -1,3 +1,4 @@
+import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -97,7 +98,11 @@ export function authorizeStudioMusicPreview(input: {
     return { ok: false, status: 404, code: "wrong_relation" };
   }
 
-  const publicInventory = isPublicStudioMusicInventory(input.practice);
+  // Test-fixture publications are hidden from the public Studio listing
+  // (filterPublicPracticeRows), so the pre-acquire preview excludes them too.
+  const publicInventory =
+    isPublicStudioMusicInventory(input.practice) &&
+    !isFixtureMarkedPractice(input.practice);
   const publishedAudio =
     !input.audioItem.status || input.audioItem.status === "published";
 
@@ -270,6 +275,7 @@ export function createSupabaseStudioMusicPreviewStore(
           is_catalog_listed,
           published_at,
           scheduled_publish_at,
+          cover_image,
           authors!practices_author_id_fkey (
             access_status
           )

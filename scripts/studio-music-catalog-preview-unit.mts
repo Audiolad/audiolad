@@ -432,6 +432,7 @@ const dbFreeRow = {
   assert.match(selects[0] ?? "", /published_at/);
   assert.match(selects[0] ?? "", /scheduled_publish_at/);
   assert.match(selects[0] ?? "", /music_usage_permission/);
+  assert.match(selects[0] ?? "", /cover_image/);
 }
 {
   const { result } = await previewWithRealPracticeLoader(dbFreeRow, "listener-without-entitlement");
@@ -461,12 +462,41 @@ for (const denied of [
   { ...dbFreeRow, product_kind: "practice", publication_class: "practice" },
   { ...dbFreeRow, catalog_visibility: "hidden", is_catalog_listed: false },
   { ...dbFreeRow, deleted_at: "2026-10-01T00:00:00Z" },
+  {
+    ...dbFreeRow,
+    cover_image: {
+      _audiolad_fixture: { test_fixture: true, namespace: "t", run_id: "r" },
+    },
+  },
 ]) {
   const { result } = await previewWithRealPracticeLoader(denied);
   assert.deepEqual(
     result,
     { type: "json", status: 403, body: { error: "forbidden" } },
     JSON.stringify(denied),
+  );
+}
+
+{
+  const fixtureRow = {
+    ...dbFreeRow,
+    cover_image: {
+      _audiolad_fixture: { test_fixture: true, namespace: "t", run_id: "r" },
+    },
+  } as StudioMusicCatalogPublication;
+  const base = {
+    practice: fixtureRow,
+    audioItem: { id: audioItemId, practice_id: publicationId, audio_path: "x.mp3", status: "published" },
+    publicationId,
+  };
+  assert.deepEqual(
+    authorizeStudioMusicPreview({ ...base, userId: "owner", canUse: true }),
+    { ok: true, access: "full" },
+    "entitled user keeps access to a fixture-marked publication",
+  );
+  assert.deepEqual(
+    authorizeStudioMusicPreview({ ...base, userId: null, canUse: false }),
+    { ok: false, status: 403, code: "forbidden" },
   );
 }
 
