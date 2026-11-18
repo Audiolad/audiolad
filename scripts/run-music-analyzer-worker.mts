@@ -25,7 +25,6 @@ import { createMusicAnalyzerWorkerPort } from "../src/lib/music-analyzer-runs/wo
 import {
   discardJazzRelaxAnalyzerRunCopy,
   settleJazzRelaxPassportForAnalyzerRun,
-  sweepJazzRelaxAnalyzerRunCopies,
 } from "../src/lib/music-passport/jazz-relax-pilot";
 
 function envNumber(name: string, fallback: number): number {
@@ -48,12 +47,12 @@ async function main() {
   });
   const port = createMusicAnalyzerWorkerPort(service, {
     // 1313c2b7: assemble + register the album passport when its last run finishes.
-    // t1523u: then drop the run's byte copy of the track audio (kept only if
-    // the source is gone or changed); features stay in the DB.
+    // t1523u: then drop the run's byte copy of the track audio when the
+    // track still holds the exact bytes; features stay in the DB. A missed
+    // cleanup only leaves a copy (reconcile: music-analyzer-run-copy-reconcile.mts).
     onRunSettled: async (runId) => {
       await settleJazzRelaxPassportForAnalyzerRun(runId);
       await discardJazzRelaxAnalyzerRunCopy(runId);
-      await sweepJazzRelaxAnalyzerRunCopies();
     },
   });
   const boot = await captureMusicAnalyzerBootRelease();

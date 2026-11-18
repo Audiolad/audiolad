@@ -39,11 +39,16 @@ script writes. Missing taxonomy or prompt version stays empty.
    Ordered rollout: `deploy/docs/MUSIC_ANALYZER_VOICE_RU.md`.
 5. Product passport runs (row has a `music_passport_analysis_links` link) get
    a byte copy of the track audio in `music-analyzer-runs` only for the worker.
-   After such a run succeeds, the worker re-reads the track's current analysis
-   audio (master or practice audio) and removes the run copy only when that
-   source exists and its SHA256 equals the run's (t1523u). Lab uploads with no
-   link keep their object. Selective reanalysis of a run whose copy is gone
-   re-materialises the exact bytes from the track audio.
+   After such a run succeeds, the worker hook re-reads the track's current
+   analysis audio (verified master or practice audio) and removes the run copy
+   only when that source exists and its SHA256 equals the run's (t1523u).
+   From then on the analysed bytes follow the track audio's own lifecycle;
+   sealed features stay in the DB. Lab uploads with no link, unfinished or
+   failed runs, changed or missing sources and any error keep the copy.
+   A missed cleanup only leaves a copy; reconcile with
+   `scripts/music-analyzer-run-copy-reconcile.mts` (dry run by default).
+   Selective reanalysis of a run whose copy is gone re-materialises the exact
+   bytes from the track audio (SHA256-checked).
 
 ## Ops bootstrap (on the audiolad.ru VPS)
 
