@@ -5,6 +5,7 @@ import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 import { requireAuthenticatedUser } from "@/lib/author-products/auth";
 import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
+import { MUSIC_USAGE_PERMISSION } from "@/lib/author-products/product-kind";
 import { isStudioMusicPublication } from "@/lib/studio-music/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -12,6 +13,7 @@ import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 import {
   authorizeStudioCatalogAttachRefs,
   authorizeGuestStudioCatalogUse,
+  canAttachStudioCatalogMusic,
   authorizeStudioCatalogUse,
   parseHttpByteRange,
   resolveStudioCatalogAssetTitle,
@@ -32,6 +34,7 @@ type CatalogPracticeRow = {
   product_kind: string | null;
   publication_class: string | null;
   author_id: string | null;
+  music_usage_permission?: string | null;
 };
 
 type CatalogAudioItemRow = {
@@ -92,6 +95,41 @@ async function canUseCatalogMusic(
   return data === true;
 }
 
+async function hasActiveStudioMusicEntitlement(
+  service: ReturnType<typeof createServiceRoleClient>,
+  userId: string,
+  practiceId: string,
+): Promise<boolean> {
+  const { data, error } = await service
+    .from("studio_music_entitlements")
+    .select("practice_id")
+    .eq("user_id", userId)
+    .eq("practice_id", practiceId)
+    .is("revoked_at", null)
+    .limit(1);
+  if (error) throw new StudioApiError("internal_error", 500);
+  return (data ?? []).length > 0;
+}
+
+async function canAttachCatalogMusic(
+  service: ReturnType<typeof createServiceRoleClient>,
+  userId: string,
+  practice: CatalogPracticeRow,
+): Promise<boolean> {
+  const canUse = await canUseCatalogMusic(service, userId, practice.id);
+  const allowed =
+    practice.music_usage_permission ===
+    MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED;
+  return canAttachStudioCatalogMusic({
+    canUseMusicInStudio: canUse,
+    musicUsagePermission: practice.music_usage_permission,
+    hasActiveEntitlement:
+      canUse && !allowed
+        ? await hasActiveStudioMusicEntitlement(service, userId, practice.id)
+        : false,
+  });
+}
+
 async function isGloballyFreeStudioMusic(
   service: ReturnType<typeof createServiceRoleClient>,
   practiceId: string,
@@ -114,7 +152,7 @@ async function loadCatalogRefs(
   const [practiceResult, audioResult] = await Promise.all([
     service
       .from("practices")
-      .select("business_only, id, deleted_at, product_kind, publication_class, author_id")
+      .select("business_only, id, deleted_at, product_kind, publication_class, author_id, music_usage_permission")
         .eq(BUSINESS_ONLY_COLUMN, false)
       .eq("id", practiceId)
       .maybeSingle(),
@@ -163,7 +201,7 @@ export async function attachStudioCatalogAsset(input: {
     projectAccess.ownerKind === "author"
       ? authorizeStudioCatalogUse({
           userId,
-          isAuthorMember: await canUseCatalogMusic(service, userId!, input.practiceId),
+          isAuthorMember: await canAttachCatalogMusic(service, userId!, practice!),
         })
       : authorizeGuestStudioCatalogUse({
           isGuestProject: true,

@@ -293,9 +293,26 @@ assert.equal(
   }),
   true,
 );
+// t1541u: own «Только для прослушивания» music never appears in Studio «Моя».
 assert.equal(
   isMineStudioMusicPublication({
     practice: publication({ music_usage_permission: "listen_only" }),
+    isAuthorMember: true,
+    authorAccessStatus: "commercial_active",
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({ music_usage_permission: null }),
+    isAuthorMember: true,
+    authorAccessStatus: "commercial_active",
+  }),
+  false,
+);
+assert.equal(
+  isMineStudioMusicPublication({
+    practice: publication({ music_usage_permission: "platform_reuse_allowed" }),
     isAuthorMember: true,
     authorAccessStatus: "commercial_active",
   }),
@@ -1263,7 +1280,7 @@ const authorMine = await handleStudioMusicCatalog({
   userId: "user-1",
   store: createStore({
     mine: {
-      practices: [publication({ music_usage_permission: "listen_only" })],
+      practices: [publication({ music_usage_permission: "platform_reuse_allowed" })],
       entitlements: [],
       authorMemberAuthorIds: ["author-1"],
     },
@@ -1273,6 +1290,26 @@ assert.equal(authorMine.status, 200);
 assert.equal(
   "items" in authorMine.body && authorMine.body.items[0]?.display_label,
   "Ваша музыка",
+);
+
+// t1541u: own listen_only music is filtered out of «Моя» even if the store returns it.
+const authorMineListenOnly = await handleStudioMusicCatalog({
+  filter: "mine",
+  cursor: null,
+  limit: "20",
+  userId: "user-1",
+  store: createStore({
+    mine: {
+      practices: [publication({ music_usage_permission: "listen_only" })],
+      entitlements: [],
+      authorMemberAuthorIds: ["author-1"],
+    },
+  }),
+});
+assert.equal(authorMineListenOnly.status, 200);
+assert.equal(
+  "items" in authorMineListenOnly.body && authorMineListenOnly.body.items.length,
+  0,
 );
 
 const revoked = await handleStudioMusicCatalog({

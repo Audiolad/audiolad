@@ -22,6 +22,7 @@ import {
   authorizeStudioCatalogUse,
   authorizeGuestStudioCatalogUse,
   canAdoptCatalogAccessPrincipal,
+  canAttachStudioCatalogMusic,
   evaluateLiveCatalogRenderAccess,
   getAttachedCatalogMusicSelectionKeys,
   isCatalogSelectionAttached,
@@ -678,5 +679,28 @@ assert.match(client, /"storage_path" in record/);
 const preview = read("src/lib/studio-music/preview.ts");
 assert.match(preview, /preview/);
 assert.doesNotMatch(preview, /studioCatalogStreamPath/);
+
+// t1541u: new attach of own «Только для прослушивания» music is refused;
+// an active entitlement still attaches; no access → never.
+assert.equal(
+  canAttachStudioCatalogMusic({ canUseMusicInStudio: true, musicUsagePermission: "listen_only", hasActiveEntitlement: false }),
+  false,
+);
+assert.equal(
+  canAttachStudioCatalogMusic({ canUseMusicInStudio: true, musicUsagePermission: null, hasActiveEntitlement: false }),
+  false,
+);
+assert.equal(
+  canAttachStudioCatalogMusic({ canUseMusicInStudio: true, musicUsagePermission: "listen_only", hasActiveEntitlement: true }),
+  true,
+);
+assert.equal(
+  canAttachStudioCatalogMusic({ canUseMusicInStudio: true, musicUsagePermission: "platform_reuse_allowed", hasActiveEntitlement: false }),
+  true,
+);
+assert.equal(
+  canAttachStudioCatalogMusic({ canUseMusicInStudio: false, musicUsagePermission: "platform_reuse_allowed", hasActiveEntitlement: true }),
+  false,
+);
 
 console.log("studio-catalog-attach-unit: ok");
