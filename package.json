@@ -490,6 +490,7 @@
     "test:business-rightsholder-onboarding": "node scripts/business-rightsholder-onboarding-sql-unit.mjs",
     "test:business-owner-self-moderation": "node scripts/business-owner-self-moderation-sql-unit.mjs",
     "test:business-catalog-admission-ui": "node --import tsx scripts/business-catalog-admission-ui-unit.mts",
+    "preview:business-shazam-match": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-shazam-match-preview.mts",
     "test:business-catalog-approved-email": "node --import tsx scripts/business-catalog-approved-email-unit.mts",
     "test:admin-business-verification": "npx tsx scripts/admin-business-verification-unit.mts",
     "test:admin-business-case-collapsible": "npx tsx scripts/admin-business-case-collapsible-unit.tsx",

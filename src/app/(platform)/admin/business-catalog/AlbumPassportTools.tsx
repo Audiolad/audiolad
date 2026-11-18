@@ -22,7 +22,8 @@ import {
   type AutoFillSummary,
   type AutoFillTrackView,
 } from '@/lib/business-track-passports/admission-ui';
-import type { ShazamCheckRow } from '@/lib/business-track-passports/shazam';
+import { unresolvedShazamMatch, type ShazamCheckRow, type ShazamGateFacts } from '@/lib/business-track-passports/shazam';
+import { AlbumShazamMatches, type AlbumShazamMatchTrack } from './ShazamMatchList';
 
 const fieldClassName =
   'block w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#fbf8ff] disabled:text-[#7d70a2]';
@@ -31,7 +32,15 @@ const primaryButtonClassName =
 const secondaryButtonClassName =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60';
 
-type Track = { id: string; title: string; music_track_code?: string | null; passport?: Passport; shazamCheck?: ShazamCheckRow | null };
+type Track = {
+  id: string;
+  title: string;
+  music_track_code?: string | null;
+  passport?: Passport;
+  shazamCheck?: ShazamCheckRow | null;
+  shazamFinalCheck?: ShazamCheckRow | null;
+  shazamGate?: ShazamGateFacts;
+};
 type AlbumTools = {
   id: string;
   tracks: Track[];
@@ -345,10 +354,21 @@ export default function AlbumPassportTools({
   const [fillSummary, setFillSummary] = useState<AutoFillSummary | null>(null);
   const [approval, setApproval] = useState<ApprovalView | null>(null);
   const [confirmBulk, setConfirmBulk] = useState(false);
-  const admission = useMemo(() => albumAdmissionState(tracks.map((track) => ({
-    passport: track.passport ?? null,
-    shazamActive: track.shazamCheck?.status === 'pending' || track.shazamCheck?.status === 'running',
-  }))), [tracks]);
+  // t1522u: same view as the track row – a match with empty passport Shazam fields is named
+  // «Shazam нашёл совпадение» and listed in full, instead of «нет результата Shazam».
+  const shazamMatches = useMemo(() => tracks.flatMap((track): AlbumShazamMatchTrack[] => {
+    if (track.passport?.status === 'approved' || track.passport?.status === 'revoked') return [];
+    const match = unresolvedShazamMatch(track.shazamCheck, track.passport, track.shazamFinalCheck, track.shazamGate);
+    return match ? [{ id: track.id, title: track.title, matches: match.matches, date: match.date ?? null }] : [];
+  }), [tracks]);
+  const admission = useMemo(() => {
+    const matched = new Set(shazamMatches.map((track) => track.id));
+    return albumAdmissionState(tracks.map((track) => ({
+      passport: track.passport ?? null,
+      shazamActive: track.shazamCheck?.status === 'pending' || track.shazamCheck?.status === 'running',
+      shazamMatch: matched.has(track.id),
+    })));
+  }, [tracks, shazamMatches]);
   const nothingReady = admission.ready === 0;
 
   const report = (nextOk: boolean, nextMessage: string) => {
@@ -427,6 +447,7 @@ export default function AlbumPassportTools({
       {!admission.complete && admission.hint ? (
         <p className={noticeClassName.notice} data-album-hint="">{admission.hint}</p>
       ) : null}
+      {!admission.complete ? <AlbumShazamMatches tracks={shazamMatches} /> : null}
       <ApprovalResult view={approval} />
       <AutoFillResult summary={fillSummary} />
       <details className="rounded-[18px] border border-[#e4d7f4] bg-white p-3">
