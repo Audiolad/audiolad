@@ -133,6 +133,14 @@ export async function removeMusicAnalyzerObject(path: string): Promise<void> {
   await client().storage.from(MUSIC_ANALYZER_RUNS_BUCKET).remove([path]);
 }
 
+/** Idempotent upload of exact source bytes to a deterministic run path. */
+export async function uploadMusicAnalyzerObject(path: string, bytes: Uint8Array, mimeType: string): Promise<void> {
+  const { error } = await client().storage.from(MUSIC_ANALYZER_RUNS_BUCKET).upload(path, bytes, { contentType: mimeType, upsert: false });
+  if (error && error.message !== "The resource already exists" && String((error as { statusCode?: unknown }).statusCode) !== "409") {
+    throw new MusicAnalyzerStorageError("source_copy_failed");
+  }
+}
+
 export async function copyMusicAnalyzerObject(source: string, target: string): Promise<void> {
   const storage = client().storage.from(MUSIC_ANALYZER_RUNS_BUCKET);
   // Не перезаписываем объект при повторе запроса. Уже скопированный путь имеет
