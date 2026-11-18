@@ -340,7 +340,7 @@ BEGIN
     UPDATE public.audio_items
     SET audio_path = NULL
     WHERE id = v_audio;
-    RAISE EXCEPTION 'A2 clearing audio must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
+    RAISE EXCEPTION 'A2 clearing audio under lock was not rejected';
   EXCEPTION
     WHEN others THEN
       IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
@@ -351,7 +351,7 @@ BEGIN
     UPDATE public.audio_items
     SET audio_path = '   '
     WHERE id = v_audio;
-    RAISE EXCEPTION 'A2 blank path must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
+    RAISE EXCEPTION 'A2 blank path under lock was not rejected';
   EXCEPTION
     WHEN others THEN
       IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
@@ -360,7 +360,7 @@ BEGIN
   END;
   BEGIN
     PERFORM public.teardown_music_track_delivery(v_audio, v_practice, false);
-    RAISE EXCEPTION 'A2 teardown must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
+    RAISE EXCEPTION 'A2 teardown under lock was not rejected';
   EXCEPTION
     WHEN others THEN
       IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN
@@ -505,7 +505,7 @@ BEGIN
     UPDATE public.audio_items
     SET active_music_delivery_asset_id = NULL
     WHERE id = v_audio;
-    RAISE EXCEPTION 'J2 clearing active stream must raise PRODUCT_CONTENT_LOCKED_AFTER_SALE';
+    RAISE EXCEPTION 'J2 clearing active stream under lock was not rejected';
   EXCEPTION
     WHEN others THEN
       IF SQLERRM NOT LIKE '%PRODUCT_CONTENT_LOCKED_AFTER_SALE%' THEN

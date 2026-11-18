@@ -17,6 +17,7 @@ import {
   isOwnedVersionedProductAudioPath,
   isOwnedVersionedProductAudioSourcePath,
   parseProductAudioSourcePath,
+  resolveAudioItemStatusAfterUpload,
   validateProductAudioSourceDescriptor,
   validateProductMp3Descriptor,
 } from "@/lib/author-products/product-audio-upload-contract";
@@ -60,6 +61,7 @@ export class ProductAudioUploadError extends Error {
 type OwnedAudioItem = {
   id: string;
   audio_path: string | null;
+  status: string | null;
   active_music_delivery_asset_id: string | null;
   desired_music_master_asset_id: string | null;
 };
@@ -76,7 +78,7 @@ async function loadOwnedAudioItem(
   const { data, error } = await supabase
     .from("audio_items")
     .select(
-      "id, audio_path, active_music_delivery_asset_id, desired_music_master_asset_id",
+      "id, audio_path, status, active_music_delivery_asset_id, desired_music_master_asset_id",
     )
     .eq("id", audioId)
     .eq("practice_id", practiceId)
@@ -435,7 +437,10 @@ export async function finalizeProductAudioDirectUpload(input: {
   }
 
   const previousPath = audioItem.audio_path;
-  const nextStatus = practice.status === "published" ? "published" : "draft";
+  const nextStatus = resolveAudioItemStatusAfterUpload({
+    practiceStatus: practice.status,
+    trackStatus: audioItem.status,
+  });
   const isMusicProduct = practice.product_kind === "music";
 
   if (isMusicProduct) {

@@ -299,6 +299,22 @@ export function hasExistingMusicCurrentAudio(
  */
 export const PRODUCT_AUDIO_REPLACE_ALLOWED_AFTER_SALE = true as const;
 
+/**
+ * Status written to the track when new audio becomes current. A track that is
+ * already published stays published (buyers of an unpublished product keep
+ * access; the sale lock forbids demoting it). Otherwise the track follows the
+ * product: published product -> published, anything else -> draft.
+ */
+export function resolveAudioItemStatusAfterUpload(input: {
+  practiceStatus: string | null | undefined;
+  trackStatus: string | null | undefined;
+}): "draft" | "published" {
+  return input.practiceStatus === "published" ||
+    input.trackStatus === "published"
+    ? "published"
+    : "draft";
+}
+
 export function canAbandonProductAudioUploadPath(input: {
   uploadPath: string;
   practiceId: string;
