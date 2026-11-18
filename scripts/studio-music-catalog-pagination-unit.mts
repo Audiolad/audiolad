@@ -1080,4 +1080,53 @@ assert.match(catalogSource, /applyStudioMusicCatalogSearch/);
   );
 }
 
+// t1541u: own-author «Моя» excludes listen_only in the query (before limit),
+// for both the members-only and the entitlements+members query shapes.
+for (const withEntitlement of [false, true]) {
+  const commercialAuthor = { name: "Автор", slug: "author", access_status: "commercial_active" };
+  const listenOnly = Array.from({ length: 30 }, (_, index) =>
+    publication(index + 900, {
+      title: `listen-only-${index}`,
+      music_usage_permission: "listen_only",
+      authors: commercialAuthor,
+    }),
+  );
+  const allowed = Array.from({ length: 3 }, (_, index) =>
+    publication(index + 950, {
+      title: `allowed-${index}`,
+      published_at: new Date(Date.UTC(2020, 0, 1, 0, 0, index)).toISOString(),
+      created_at: new Date(Date.UTC(2020, 0, 1, 0, 0, index)).toISOString(),
+      authors: commercialAuthor,
+    }),
+  );
+  const entitledOther = publication(990, {
+    title: "entitled-other",
+    author_id: "author-2",
+    music_usage_permission: "platform_reuse_allowed",
+  });
+  const recording = createRecordingSupabase({
+    practices: [...listenOnly, ...allowed, ...(withEntitlement ? [entitledOther] : [])],
+    entitlements: withEntitlement
+      ? [{ practice_id: String(entitledOther.id), grant_source: "purchase", revoked_at: null, user_id: "user-1" }]
+      : [],
+    authorMembers: [{ author_id: "author-1", user_id: "user-1" }],
+  });
+  const store = createSupabaseStudioMusicCatalogStore(recording.client);
+  const result = await handleStudioMusicCatalog({
+    filter: "mine",
+    cursor: null,
+    limit: "20",
+    userId: "user-1",
+    store,
+  });
+  assert.equal(result.status, 200);
+  assert.ok("items" in result.body);
+  const titles = result.body.items.map((item) => item.title).sort();
+  assert.deepEqual(
+    titles,
+    [...allowed.map((p) => String(p.title)), ...(withEntitlement ? ["entitled-other"] : [])].sort(),
+    `t1541u mine excludes listen_only (withEntitlement=${withEntitlement})`,
+  );
+}
+
 console.log("studio-music-catalog-pagination-unit: ok");

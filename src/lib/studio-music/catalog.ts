@@ -518,15 +518,21 @@ export function isPaidPublicStudioMusicInventory(
 
 /**
  * Mine: active entitlement (any source-author status) OR live author member
- * only when source author is commercial_active / legacy commercial.
- * Never consults user_practices. Does not re-check listed/permission.
+ * only when source author is commercial_active / legacy commercial AND the
+ * author allowed Studio use (music_usage_permission = platform_reuse_allowed).
+ * An author's own «Только для прослушивания» music never appears in Studio
+ * (owner decision 18.11.2026, t1541u). A stored entitlement (purchase / free
+ * grant) was only ever issued for allowed music and stays visible.
+ * Never consults user_practices. Does not re-check listed.
  */
 export function isMineStudioMusicPublication(input: {
   practice: Pick<
     StudioMusicCatalogPublication,
     "id" | "deleted_at" | "product_kind" | "publication_class"
   > &
-    Partial<Pick<StudioMusicCatalogPublication, "authors">>;
+    Partial<
+      Pick<StudioMusicCatalogPublication, "authors" | "music_usage_permission">
+    >;
   entitlement?: StudioMusicCatalogEntitlement | null;
   isAuthorMember?: boolean;
   authorAccessStatus?: string | null;
@@ -541,6 +547,12 @@ export function isMineStudioMusicPublication(input: {
     return true;
   }
   if (input.isAuthorMember !== true) {
+    return false;
+  }
+  if (
+    input.practice.music_usage_permission !==
+    MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED
+  ) {
     return false;
   }
   const access =
@@ -1304,14 +1316,18 @@ export function createSupabaseStudioMusicCatalogStore(
         .is("deleted_at", null)
         .or("product_kind.eq.music,publication_class.eq.release");
 
+      // Own-author rows only when the author allowed Studio use (t1541u).
+      const allowed = MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED;
       if (entitledIds.length > 0 && authorMemberAuthorIds.length > 0) {
         query = query.or(
-          `id.in.(${entitledIds.join(",")}),author_id.in.(${authorMemberAuthorIds.join(",")})`,
+          `id.in.(${entitledIds.join(",")}),and(author_id.in.(${authorMemberAuthorIds.join(",")}),music_usage_permission.eq.${allowed})`,
         );
       } else if (entitledIds.length > 0) {
         query = query.in("id", entitledIds);
       } else {
-        query = query.in("author_id", authorMemberAuthorIds);
+        query = query
+          .in("author_id", authorMemberAuthorIds)
+          .eq("music_usage_permission", allowed);
       }
 
       query = applyStudioMusicCatalogSearch(query, q);

@@ -54,6 +54,26 @@ export function studioCatalogStreamPath(
   return `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/stream`;
 }
 
+/**
+ * New attach only (t1541u, owner decision 18.11.2026): music whose author chose
+ * «Только для прослушивания» is not attachable through author membership.
+ * A stored active entitlement (granted while the music was allowed) still
+ * attaches. Playback/render of already attached assets does not use this.
+ */
+export function canAttachStudioCatalogMusic(input: {
+  canUseMusicInStudio: boolean;
+  musicUsagePermission: string | null | undefined;
+  hasActiveEntitlement: boolean;
+}): boolean {
+  if (!input.canUseMusicInStudio) {
+    return false;
+  }
+  if (input.musicUsagePermission === "platform_reuse_allowed") {
+    return true;
+  }
+  return input.hasActiveEntitlement;
+}
+
 export function authorizeStudioCatalogUse(input: {
   userId?: string | null;
   entitlement?: { revoked_at?: string | null } | null;
