@@ -182,13 +182,22 @@ export async function buildPracticePreviewClip(input: {
    * clip; the globally configured storefront window remains untouched.
    */
   maxDurationMs?: number;
+  /**
+   * Optional server-resolved storage source (for example a verified
+   * music-streams delivery asset when the track has no legacy audio_path).
+   * Defaults to the legacy practice-audio object at audio_path.
+   */
+  source?: { bucket: string; path: string };
 }): Promise<{
   bytes: Uint8Array;
   startMs: number;
   endMs: number;
   expiresIn: number;
 }> {
-  const audioPath = input.audioItem.audio_path?.trim() ?? "";
+  const sourceBucket = input.source ? input.source.bucket : "practice-audio";
+  const audioPath = input.source
+    ? input.source.path.trim()
+    : input.audioItem.audio_path?.trim() ?? "";
 
   if (!audioPath) {
     throw new Error("audio_missing");
@@ -227,13 +236,13 @@ export async function buildPracticePreviewClip(input: {
   const key = clipCacheKey(
     input.practiceId,
     input.audioItem.id,
-    audioPath,
+    `${sourceBucket}/${audioPath}`,
     window.startMs,
     endMs,
   );
   const bytes = await buildPreviewClipFromStorageSource({
     storageClient: input.storageClient,
-    bucket: "practice-audio",
+    bucket: sourceBucket,
     path: audioPath,
     startMs: window.startMs,
     endMs,

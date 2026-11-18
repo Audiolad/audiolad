@@ -5,6 +5,11 @@ import {
   buildPracticePreviewClip,
   type PreviewAudioItemRow,
 } from "@/lib/listen/serve-preview-clip";
+import {
+  resolveMusicCatalogPreviewMode,
+  resolveMusicListenSource,
+  type MusicStreamCandidate,
+} from "@/lib/listen/music-delivery";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 import { canUseMusicInStudio } from "./access";
@@ -18,7 +23,46 @@ import {
 
 export type StudioMusicPreviewAudioItem = PreviewAudioItemRow & {
   practice_id?: string | null;
+  /**
+   * Server-only: the track's active music-streams delivery asset, when any.
+   * Album tracks uploaded through the music pipeline often have no legacy
+   * audio_path and are playable only through this asset.
+   */
+  active_stream?: MusicStreamCandidate | null;
 };
+
+export type StudioMusicPreviewSource = { bucket: string; path: string };
+
+/**
+ * Pick the storage object the Studio catalog may serve for a track.
+ * Full listening follows the public listen rule (verified stream first,
+ * then legacy audio_path); a short clip prefers the legacy original and
+ * falls back to the verified stream, like the public catalog preview.
+ */
+export function resolveStudioMusicPreviewSource(input: {
+  productKind: string | null | undefined;
+  audioItem: StudioMusicPreviewAudioItem;
+  access: "preview" | "full";
+}): StudioMusicPreviewSource | null {
+  const args = {
+    productKind: input.productKind ?? "",
+    audioItemId: String(input.audioItem.id),
+    audioPath: input.audioItem.audio_path,
+    activeStream: input.audioItem.active_stream ?? null,
+  };
+  const mode =
+    input.access === "full"
+      ? resolveMusicListenSource(args)
+      : resolveMusicCatalogPreviewMode(args);
+  if (mode === "clip") {
+    const path = input.audioItem.audio_path?.trim() ?? "";
+    return path ? { bucket: "practice-audio", path } : null;
+  }
+  if (mode.kind === "missing") {
+    return null;
+  }
+  return { bucket: mode.bucket, path: mode.path };
+}
 
 export type StudioMusicPreviewDecision =
   | { ok: true; access: "preview" | "full" }
@@ -89,9 +133,11 @@ export type StudioMusicPreviewStore = {
   buildClip(input: {
     practiceId: string;
     audioItem: PreviewAudioItemRow;
+    source: StudioMusicPreviewSource;
   }): Promise<{ bytes: Uint8Array; startMs: number; endMs: number }>;
   streamFullAudio(input: {
     audioItem: StudioMusicPreviewAudioItem;
+    source: StudioMusicPreviewSource;
     rangeHeader: string;
   }): Promise<Response>;
 };
@@ -140,11 +186,21 @@ export async function handleStudioMusicPreview(input: {
     return { type: "json", status: 404, body: { error: "not_found" } };
   }
 
+  const source = resolveStudioMusicPreviewSource({
+    productKind: practice?.product_kind,
+    audioItem,
+    access: decision.access,
+  });
+  if (!source) {
+    return { type: "json", status: 404, body: { error: "audio_missing" } };
+  }
+
   if (decision.access === "full") {
     return {
       type: "full",
       response: await input.store.streamFullAudio({
         audioItem,
+        source,
         // Explicit Range makes catalog seeking reliable even when the media
         // element's initial metadata request omits it.
         rangeHeader: input.rangeHeader || "bytes=0-",
@@ -155,6 +211,7 @@ export async function handleStudioMusicPreview(input: {
   const clip = await input.store.buildClip({
     practiceId: input.publicationId,
     audioItem,
+    source,
   });
 
   return {
@@ -221,7 +278,7 @@ export function createSupabaseStudioMusicPreviewStore(
       const { data, error } = await supabase
         .from("audio_items")
         .select(
-          "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms",
+          "id, practice_id, audio_path, status, duration_seconds, preview_start_ms, preview_end_ms, active_music_delivery_asset_id",
         )
         .eq("id", audioItemId)
         .maybeSingle();
@@ -230,7 +287,38 @@ export function createSupabaseStudioMusicPreviewStore(
         throw new Error("studio_music_preview_audio_lookup_failed");
       }
 
-      return (data as StudioMusicPreviewAudioItem | null) ?? null;
+      if (!data) {
+        return null;
+      }
+
+      const { active_music_delivery_asset_id: activeAssetId, ...row } =
+        data as StudioMusicPreviewAudioItem & {
+          active_music_delivery_asset_id?: string | null;
+        };
+      let activeStream: MusicStreamCandidate | null = null;
+      if (activeAssetId) {
+        const { data: asset, error: assetError } = await supabase
+          .from("music_audio_assets")
+          .select(
+            "audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path",
+          )
+          .eq("id", activeAssetId)
+          .maybeSingle();
+        if (assetError) {
+          throw new Error("studio_music_preview_audio_lookup_failed");
+        }
+        if (asset) {
+          activeStream = {
+            audioItemId: String(asset.audio_item_id ?? ""),
+            assetRole: String(asset.asset_role ?? ""),
+            lifecycleState: String(asset.lifecycle_state ?? ""),
+            storageBucket: String(asset.storage_bucket ?? ""),
+            storagePath: String(asset.storage_path ?? ""),
+          };
+        }
+      }
+
+      return { ...row, active_stream: activeStream };
     },
 
     async loadCanUse(userId, publicationId) {
@@ -273,22 +361,23 @@ export function createSupabaseStudioMusicPreviewStore(
       });
     },
 
-    buildClip({ practiceId, audioItem }) {
+    buildClip({ practiceId, audioItem, source }) {
       return buildPracticePreviewClip({
         storageClient: supabase,
         practiceId,
         audioItem,
         maxDurationMs: 60_000,
+        source,
       });
     },
 
-    async streamFullAudio({ audioItem, rangeHeader }) {
-      const audioPath = audioItem.audio_path?.trim() ?? "";
+    async streamFullAudio({ source, rangeHeader }) {
+      const audioPath = source.path.trim();
       if (!audioPath) {
         throw new Error("audio_missing");
       }
       const { data, error } = await supabase.storage
-        .from("practice-audio")
+        .from(source.bucket)
         .createSignedUrl(audioPath, 60);
       const signedUrl = data?.signedUrl
         ? normalizeStorageSignedUrl(data.signedUrl)
