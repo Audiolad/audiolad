@@ -244,10 +244,18 @@ function testSourceWiring() {
   assert.match(uploadRoute, /getPracticeSaleLock/);
   assert.match(uploadStartRoute, /startProductAudioDirectUpload/);
   assert.match(uploadFinalizeRoute, /finalizeProductAudioDirectUpload/);
-  assert.match(
+  // t1529u: the cabinet upload may replace audio of a sold product; the DB
+  // trigger still forbids removing it.
+  assert.doesNotMatch(
     read("src/lib/author-products/server/direct-audio-upload.ts"),
     /getPracticeSaleLock/,
   );
+  const replaceMigration = read(
+    "supabase/migrations/20270316120000_replace_track_audio_after_sale.sql",
+  );
+  assert.match(replaceMigration, /guard_audio_items_content_sale_lock/);
+  assert.match(replaceMigration, /audio_item_has_delivered_music_audio\(\s*OLD\.audio_path/);
+  assert.match(replaceMigration, /IF TG_OP = 'DELETE' THEN\s*RAISE EXCEPTION 'PRODUCT_CONTENT_LOCKED_AFTER_SALE'/);
   assert.match(audioRoute, /assertPracticeContentMutable/);
   assert.match(migration, /ON DELETE RESTRICT/);
   assert.match(migration, /guard_audio_items_content_sale_lock/);

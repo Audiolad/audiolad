@@ -17,13 +17,8 @@ import {
   validateMusicMasterDescriptor,
 } from "@/lib/author-products/music-master-upload-contract";
 import {
-  shouldBlockMusicAudioReplacement,
-  type MusicCurrentAudioPointers,
-} from "@/lib/author-products/mp3-upload-contract";
-import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
   PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-  getPracticeSaleLock,
   isProductContentLockedDbError,
 } from "@/lib/author-products/sale-lock";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
@@ -103,33 +98,9 @@ function readMusicAssetLifecycle(data: unknown): string | null {
   return typeof lifecycle === "string" ? lifecycle : null;
 }
 
-function musicPointersFromItem(item: OwnedMusicAudioItem): MusicCurrentAudioPointers {
-  return {
-    audioPath: item.audio_path,
-    activeMusicDeliveryAssetId: item.active_music_delivery_asset_id,
-    desiredMusicMasterAssetId: item.desired_music_master_asset_id,
-  };
-}
-
 function assertMusicProduct(productKind: string | null | undefined) {
   if (productKind !== "music") {
     throw new MusicMasterUploadError("music_master_not_available", 400);
-  }
-}
-
-async function assertMusicProductAndSaleLock(
-  practiceId: string,
-  productKind: string | null | undefined,
-  audioItem: OwnedMusicAudioItem,
-) {
-  assertMusicProduct(productKind);
-  const saleLock = await getPracticeSaleLock(createServiceRoleClient(), practiceId);
-  if (shouldBlockMusicAudioReplacement(saleLock.locked, musicPointersFromItem(audioItem))) {
-    throw new MusicMasterUploadError(
-      PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-      409,
-      PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
-    );
   }
 }
 
@@ -185,8 +156,9 @@ export async function startMusicMasterDirectUpload(input: {
   mimeType: string;
 }) {
   const { supabase, practice } = await requirePracticeMutationAccess(input.practiceId);
-  const audioItem = await loadMusicAudioItem(supabase, input.practiceId, input.audioId);
-  await assertMusicProductAndSaleLock(input.practiceId, practice.product_kind, audioItem);
+  await loadMusicAudioItem(supabase, input.practiceId, input.audioId);
+  // t1529u: a sold product may get a new master (replace, not remove).
+  assertMusicProduct(practice.product_kind);
   const validation = validateMusicMasterDescriptor({
     name: input.fileName,
     type: input.mimeType,
@@ -237,8 +209,9 @@ export async function finalizeMusicMasterDirectUpload(input: {
   fileSize: number;
 }) {
   const { supabase, practice } = await requirePracticeMutationAccess(input.practiceId);
-  const audioItem = await loadMusicAudioItem(supabase, input.practiceId, input.audioId);
-  await assertMusicProductAndSaleLock(input.practiceId, practice.product_kind, audioItem);
+  await loadMusicAudioItem(supabase, input.practiceId, input.audioId);
+  // t1529u: a sold product may get a new master (replace, not remove).
+  assertMusicProduct(practice.product_kind);
   if (!isOwnedMusicMasterStoragePath(input.uploadPath, input.practiceId, input.audioId, input.assetId)) {
     throw new MusicMasterUploadError("invalid_request", 400);
   }

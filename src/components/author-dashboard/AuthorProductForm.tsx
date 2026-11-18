@@ -189,6 +189,7 @@ import {
 import {
   AUDIO_PREPARE_FAILED_MESSAGE,
   AUDIO_PREPARE_PROCESSING_HINT,
+  AUDIO_REPLACE_PROCESSING_HINT,
   AUDIO_PREPARE_PROCESSING_STATUS,
   isAudioPrepareInFlight,
 } from "@/lib/author-products/audio-prepare-status";
@@ -3340,8 +3341,10 @@ export default function AuthorProductForm({
       }
       const slotNumber =
         audioItemsRef.current.findIndex((item) => item.id === audioId) + 1;
-      const currentTitle =
-        audioItemsRef.current.find((item) => item.id === audioId)?.title ?? "";
+      const currentItem = audioItemsRef.current.find((item) => item.id === audioId);
+      const currentTitle = currentItem?.title ?? "";
+      // t1529u: replacing audio keeps the track title as it is.
+      const isReplacingAudio = musicTrackHasServerAudio(currentItem);
       const result =
         kind === "master"
           ? await uploadMusicMasterDirect({
@@ -3380,7 +3383,7 @@ export default function AuthorProductForm({
         setDeleteLockedAfterPaidPurchase(
           result.product.deleteLockedAfterPaidPurchase === true,
         );
-        setMessage("Аудио загружено.");
+        setMessage(isReplacingAudio ? "Аудио заменено." : "Аудио загружено.");
       } else if (result.assetId) {
         setAudioItems((current) =>
           patchAudioItemAfterMusicMasterFinalize(current, audioId, {
@@ -3403,7 +3406,9 @@ export default function AuthorProductForm({
       if (!step.ignored) {
         commitMusicQueue(step.snapshot);
         launchMusicQueueIds(step.launchIds);
-        void autofillAudioTitleFromFile(audioId, file, currentTitle, slotNumber);
+        if (!isReplacingAudio) {
+          void autofillAudioTitleFromFile(audioId, file, currentTitle, slotNumber);
+        }
       }
     } catch {
       if (!controller.signal.aborted) {
@@ -3635,7 +3640,15 @@ export default function AuthorProductForm({
     });
 
     const slotNumber = audioItems.findIndex((item) => item.id === audioId) + 1;
-    const currentTitle = audioItems.find((item) => item.id === audioId)?.title ?? "";
+    const currentItem = audioItems.find((item) => item.id === audioId);
+    const currentTitle = currentItem?.title ?? "";
+    // t1529u: replacing audio keeps the track title as it is.
+    const isReplacingAudio = Boolean(
+      currentItem &&
+        (currentItem.audio_path ||
+          musicTrackHasServerAudio(currentItem) ||
+          isAudioPrepareInFlight(currentItem.audio_prepare_status)),
+    );
     const localItemsBeforeCreate = audioItems;
 
     try {
@@ -3687,13 +3700,15 @@ export default function AuthorProductForm({
         setMessage(result.message);
       } else {
         applyServerProductPreservingDraft(result.product);
-        setMessage("Аудио загружено.");
-        await autofillAudioTitleFromFile(
-          targetAudioId,
-          file,
-          currentTitle,
-          slotNumber,
-        );
+        setMessage(isReplacingAudio ? "Аудио заменено." : "Аудио загружено.");
+        if (!isReplacingAudio) {
+          await autofillAudioTitleFromFile(
+            targetAudioId,
+            file,
+            currentTitle,
+            slotNumber,
+          );
+        }
       }
     } catch {
       setAudioUploadErrors((current) => ({
@@ -5894,7 +5909,11 @@ export default function AuthorProductForm({
                           : "Аудио ещё не загружено"}
                   </p>
                   {isAudioPrepareInFlight(audioItem.audio_prepare_status) ? (
-                    <p className="mt-2">{AUDIO_PREPARE_PROCESSING_HINT}</p>
+                    <p className="mt-2">
+                      {audioItem.audio_path
+                        ? AUDIO_REPLACE_PROCESSING_HINT
+                        : AUDIO_PREPARE_PROCESSING_HINT}
+                    </p>
                   ) : null}
                   {form.productKind === PRODUCT_KIND.MUSIC &&
                   musicQueueEntry(musicQueue, audioItem.id)?.fileName &&
@@ -5948,7 +5967,7 @@ export default function AuthorProductForm({
 
                 <div className="flex flex-wrap gap-2">
                   {form.productKind === PRODUCT_KIND.MUSIC ? (
-                    musicTrackHasServerAudio(audioItem) && !contentLockedAfterSale ? (
+                    musicTrackHasServerAudio(audioItem) ? (
                       <label
                         className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
                           uploadingAudioId === audioItem.id ||
@@ -5981,7 +6000,7 @@ export default function AuthorProductForm({
                         />
                       </label>
                     ) : null
-                  ) : contentLockedAfterSale && audioItem.audio_path ? null : (
+                  ) : (
                     <label
                       className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
                         uploadingAudioId === audioItem.id ||
