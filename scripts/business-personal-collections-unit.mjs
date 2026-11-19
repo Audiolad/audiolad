@@ -80,6 +80,8 @@ const start = source('src/app/api/business/guest-start/route.ts');
 assert.match(start, /if \(result.body.ok\)\s*\{\s*try \{ await rememberPersonalCollection\(\)/);
 const layout = source('src/app/business-app/layout.tsx');
 assert.doesNotMatch(layout, /rememberPersonalCollection/, 'opening any coffee page must not bind the collection');
+const returned = source('src/app/(platform)/auth/business-return/page.tsx');
+assert.match(returned, /await activateBusinessTrial\([\s\S]*?await rememberPersonalCollection\(\)/);
 assert.match(layout, /loadCollectionPermission\(\)/);
 assert.equal((start.match(/rememberPersonalCollection/g) || []).length, 2);
 
