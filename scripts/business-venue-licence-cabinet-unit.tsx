@@ -72,7 +72,7 @@ async function main() {
     if (res.status !== 200) throw new Error("unreachable");
     assert.match(res.svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
     assert.match(res.svg, format === "a6" ? /width="111mm" height="154mm"/ : /width="86mm" height="86mm"/);
-    assert.match(res.svg, /Страница лицензии кофейни/);
+    assert.match(res.svg, /Страница лицензии заведения/);
     assert.match(res.filename, format === "a6" ? /^audiolad-tent-a6\.svg$/ : /^audiolad-sticker-80x80\.svg$/);
 }
   const withLogo = await handleVenueStickerDownload({

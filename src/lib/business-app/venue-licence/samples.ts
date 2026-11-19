@@ -10,7 +10,7 @@ import { presentVenueLicence, type VenueLicenceView, type VenuePlaceFields } fro
 const NOW = new Date("2026-10-28T09:00:00.000Z");
 
 const PLACE: VenuePlaceFields = {
-  locationName: "Образец кофейни",
+  locationName: "Образец заведения",
   city: "г. Образец",
   addressLine1: "ул. Примерная, д. 1",
 };

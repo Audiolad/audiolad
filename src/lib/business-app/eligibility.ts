@@ -101,7 +101,7 @@ export function venueAirplayEmptyStateCopy(input: {
 }): { title: string; description: string } {
   if (!input.hasLocation) {
     return {
-      title: "Нет кофейни для проверки прав",
+      title: "Нет заведения для проверки прав",
       description:
         "Проверка доступна после подключения заведения.",
     };

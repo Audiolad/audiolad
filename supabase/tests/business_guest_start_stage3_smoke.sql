@@ -72,7 +72,7 @@ BEGIN
   IF v_first.created IS DISTINCT FROM true THEN RAISE EXCEPTION 'bootstrap not created'; END IF;
   PERFORM set_config('test.guest_start.org', v_first.organization_id::text, true);
   PERFORM set_config('test.guest_start.loc', v_first.location_id::text, true);
-  IF NOT EXISTS (SELECT 1 FROM public.business_organizations WHERE id = v_first.organization_id AND name = 'Моя кофейня' AND status = 'active')
+  IF NOT EXISTS (SELECT 1 FROM public.business_organizations WHERE id = v_first.organization_id AND name = 'Моё заведение' AND status = 'active')
     OR NOT EXISTS (SELECT 1 FROM public.business_organization_members WHERE organization_id = v_first.organization_id AND user_id = '253821e0-0000-4000-8000-000000000031' AND role = 'owner')
     OR NOT EXISTS (SELECT 1 FROM public.business_locations WHERE id = v_first.location_id AND organization_id = v_first.organization_id AND business_category = 'cafe' AND country_code = 'RU' AND timezone = 'Europe/Moscow')
     OR (SELECT count(*) FROM public.business_zones WHERE location_id = v_first.location_id AND is_default AND status = 'active') <> 1 THEN

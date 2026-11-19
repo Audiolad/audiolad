@@ -10,7 +10,7 @@ export const BUSINESS_OWNER_NAME_PLACEHOLDER = "Ваше имя";
 /** Profile link that opens the form with the owner name field focused. */
 export const BUSINESS_PROFILE_NAME_HREF = "/profile?edit=name";
 /** Auto name of a new organization and its first venue (guest start, first signup). */
-export const DEFAULT_BUSINESS_ORGANIZATION = "Моя кофейня";
+export const DEFAULT_BUSINESS_ORGANIZATION = "Моё заведение";
 /** Empty-field placeholder for the account-level cafe / organization name. */
 export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моё заведение";
 /** Under the organization name field: not a hall name (Sergey, t1316u). */

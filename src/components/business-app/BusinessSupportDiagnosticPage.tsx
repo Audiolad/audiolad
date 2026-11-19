@@ -37,7 +37,7 @@ function countryLabelRu(code: string | null | undefined): string {
 
 function timezoneLabelRu(zone: string | null | undefined): string {
   if (!zone) return "–";
-  return zone === "Europe/Moscow" ? "Московское время" : "Местное время кофейни";
+  return zone === "Europe/Moscow" ? "Московское время" : "Местное время заведения";
 }
 
 export default function BusinessSupportDiagnosticPage({
@@ -80,23 +80,23 @@ export default function BusinessSupportDiagnosticPage({
           id="support-org-loc"
           className="text-[1.1rem] font-bold text-[var(--biz-text)]"
         >
-          Заведение и кофейня
+          Организация и заведение
         </h2>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field
-            label="Заведение"
+            label="Организация"
             value={diagnostics.organizationName ?? "–"}
           />
           <Field
-            label="Код заведения"
+            label="Код организации"
             value={diagnostics.organizationId ?? "–"}
             mono
           />
-          <Field label="Кофейня" value={location?.name ?? "–"} />
-          <Field label="Код кофейни" value={location?.id ?? "–"} mono />
+          <Field label="Заведение" value={location?.name ?? "–"} />
+          <Field label="Код заведения" value={location?.id ?? "–"} mono />
           <Field label="Страна" value={countryLabelRu(location?.countryCode)} />
           <Field label="Часовой пояс" value={timezoneLabelRu(location?.timezone)} />
-          <Field label="Статус кофейни" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
+          <Field label="Статус заведения" value={location?.status === "active" ? "Активно" : "Нет подтверждённых данных"} />
           <Field
             label="Основной зал"
             value={location?.defaultZoneId ?? "–"}
@@ -118,7 +118,7 @@ export default function BusinessSupportDiagnosticPage({
             <Link href="/music" className="font-semibold text-[var(--biz-accent)]">
               музыку
             </Link>
-            , чтобы включить плеер кофейни.
+            , чтобы включить плеер заведения.
           </p>
         ) : (
           <ul className="mt-3 flex flex-col gap-3">
