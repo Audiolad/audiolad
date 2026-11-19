@@ -76,6 +76,10 @@ assert.match(page, /business-app-btn business-app-btn-cta/);
 assert.match(page, /formatBusinessMonthlyPrice\(\)/);
 assert.match(page, /ИНН и адрес/);
 assert.doesNotMatch(page, /activateBusinessTrial|bootstrap|recordAccessActivity/);
+assert.match(page, /publicHostnameFromHeaders/);
+assert.match(page, /coffeeHostEnabled\(\)/);
+assert.doesNotMatch(page, /isCoffeeHostRequest/,
+  'rewritten /collection must not use isCoffeeHostRequest (Host becomes localhost)');
 const start = source('src/app/api/business/guest-start/route.ts');
 assert.match(start, /if \(result.body.ok\)\s*\{\s*try \{ await rememberPersonalCollection\(\)/);
 const layout = source('src/app/business-app/layout.tsx');

@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import BusinessGuestStartCta from "@/components/business-app/BusinessGuestStartCta";
 import { loadPersonalCollection } from "@/lib/business-collections/load.server";
 import { businessAuthHref } from "@/lib/access-grants/paths";
-import { COFFEE_HOSTNAME, isCoffeeHostRequest } from "@/lib/business-app/host";
+import { COFFEE_HOSTNAME, coffeeHostEnabled } from "@/lib/business-app/host";
+import { publicHostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 import { BUSINESS_GIFT_DAYS, BUSINESS_PLAN_PERIOD_LABEL, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import CollectionPlayer from "./CollectionPlayer";
 
@@ -15,7 +16,9 @@ export const metadata: Metadata = {
   referrer: "no-referrer",
 };
 export default async function PersonalCollectionPage() {
-  if (!isCoffeeHostRequest(await headers())) notFound();
+  // After Next rewrite /collection → /business-app/collection, Host is localhost:
+  // use the public host (X-Forwarded-Host), not hostnameFromHeaders().
+  if (!(coffeeHostEnabled() && publicHostnameFromHeaders(await headers()) === COFFEE_HOSTNAME)) notFound();
   const collection = await loadPersonalCollection();
   if (!collection) return <section className="business-app-card space-y-3">
     <h1>Подборка недоступна</h1>
