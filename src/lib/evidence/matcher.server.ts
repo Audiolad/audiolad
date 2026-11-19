@@ -129,6 +129,34 @@ async function dirSize(dir: string): Promise<number> {
   return total;
 }
 
+/**
+ * t1578u M4: exact bytes of index.json of one index version (or of the active one) for the
+ * registry, with the size of the version folder. Null when the version is not on disk.
+ */
+export async function readIndexVersionFile(version: string | null): Promise<{ buf: Buffer; dir: string; sizeBytes: number | null } | null> {
+  const p = paths();
+  if (version !== null && !/^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}$/.test(version)) return null;
+  try {
+    const dir = await realpath(version === null ? p.current : join(p.versions, version));
+    const buf = await readFile(join(dir, "index.json"));
+    const sizeBytes = await dirSize(dir).catch(() => null);
+    return { buf, dir, sizeBytes };
+  } catch {
+    return null;
+  }
+}
+
+/** t1578u M4: the copy of index.json the engine saved next to a job's result (the version it used). */
+export async function readJobIndexFile(id: string): Promise<{ buf: Buffer; dir: string; sizeBytes: number | null } | null> {
+  if (!EVIDENCE_JOB_ID_RE.test(id)) return null;
+  const dir = join(paths().jobs, id);
+  try {
+    return { buf: await readFile(join(dir, "index.json")), dir, sizeBytes: null };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadEngineState(): Promise<EngineState> {
   const p = paths();
   const pythonOk = await exists(evidencePythonBin(), fsConstants.X_OK);

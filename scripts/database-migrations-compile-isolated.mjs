@@ -316,6 +316,12 @@ if (pending.has("20270304120000")) {
     resolve(root, "supabase/tests/business_partner_code_window_once_real_smoke.sql"),
   );
 }
+if (pending.has("20270330120000")) {
+  applyFile(
+    "post-apply playback log protection smoke",
+    resolve(root, "supabase/tests/playback_log_protection_smoke.sql"),
+  );
+}
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);

@@ -2,7 +2,8 @@
 // Reads playback_usage_facts of one venue for a window (all pages, never a silent cut),
 // writes plays.csv + facts.csv + extract.pdf + manifest.json (SHA-256 of every file) and
 // manifest.sig: an Ed25519 «техническая печать сервиса» over the exact manifest bytes.
-// Read-only towards the database. Never touches the hall player.
+// Reads the facts; the only write is topping up the hourly seals (M3, append-only). Never
+// touches the hall player.
 import "server-only";
 
 import { execFile } from "node:child_process";
@@ -11,9 +12,10 @@ import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "no
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { fetchAllPlaybackFacts } from "@/lib/business-app/playback-facts-query";
+import { fetchEvidenceFacts } from "@/lib/evidence/facts.server";
+import type { ManifestLedger } from "@/lib/evidence/ledger";
+import { loadLedgerForExtract } from "@/lib/evidence/ledger.server";
 import {
-  EVIDENCE_FACT_COLUMNS,
   factsCsv,
   formatLocal,
   playsCsv,
@@ -102,7 +104,7 @@ export async function loadEvidenceLocation(id: string, db: Db = createServiceRol
 export type ExtractFile = { name: string; sha256: string; bytes: number };
 
 export type ExtractManifest = {
-  schema: "audiolad.evidence.play-log-extract/1";
+  schema: "audiolad.evidence.play-log-extract/2";
   extract_id: string;
   created_at_utc: string;
   created_by: { user_id: string; email: string | null };
@@ -129,6 +131,8 @@ export type ExtractManifest = {
   files: ExtractFile[];
   seal: { algorithm: "Ed25519"; public_key_sha256: string; public_key_file: "seal-public.pem"; note: string };
   pdf_rendered: boolean;
+  /** t1578u M3: hourly seals (hash chain) of the journal rows behind this extract. */
+  ledger: ManifestLedger;
 };
 
 export type ExtractResult =
@@ -223,13 +227,13 @@ export async function createPlayLogExtract(input: {
 
   const fromIso = new Date(from).toISOString();
   const toIso = new Date(to).toISOString();
-  const paged = await fetchAllPlaybackFacts(db, {
+  // With the M2 offline marker columns once migration 20270330120000 is applied.
+  const paged = await fetchEvidenceFacts(db, {
     organizationId: location.organizationId,
     locationId: location.id,
     from: fromIso,
     to: toIso,
     maxRows: EXTRACT_MAX_FACTS,
-    columns: EVIDENCE_FACT_COLUMNS,
   });
   if (paged.error) return { ok: false, error: "db_error" };
   // Evidence must be complete: an incomplete extract is refused, never produced.
@@ -258,6 +262,7 @@ export async function createPlayLogExtract(input: {
   const playerCodes = new Map(players.filter((p) => p.code).map((p) => [p.id, p.code as string]));
   const plays = reconstructPlays(facts);
   const tz = location.timezone;
+  const ledger = await loadLedgerForExtract(db, facts.map((f) => f.created_at));
 
   const now = new Date();
   const id = newExtractId(now);
@@ -278,7 +283,7 @@ export async function createPlayLogExtract(input: {
     await put("facts.csv", "\ufeff" + factsCsv(facts, labels, tz));
     await put("seal-public.pem", seal.publicPem);
     // Written before the manifest so its hash is sealed too (no manifest hash inside: no cycle).
-    await put("VERIFY.txt", verifyText(seal.fingerprint));
+    await put("VERIFY.txt", verifyText(seal.fingerprint, ledger));
 
     const window = {
       from_utc: fromIso, to_utc: toIso, from_local: formatLocal(fromIso, tz), to_local: formatLocal(toIso, tz), timezone: tz,
@@ -315,7 +320,7 @@ export async function createPlayLogExtract(input: {
     }
 
     const manifest: ExtractManifest = {
-      schema: "audiolad.evidence.play-log-extract/1",
+      schema: "audiolad.evidence.play-log-extract/2",
       extract_id: id,
       created_at_utc: now.toISOString(),
       created_by: { user_id: input.actor.userId, email: input.actor.email },
@@ -324,7 +329,7 @@ export async function createPlayLogExtract(input: {
       source: {
         table: "public.playback_usage_facts",
         filters: "usage_kind = 'business' AND organization_id = location.organization_id AND location_id = location.id AND listened_ms > 0 AND occurred_at BETWEEN window.from_utc AND window.to_utc",
-        time_basis: "occurred_at – время сервера в момент приёма отметки плеера (NTP); position_ms – позиция в треке по данным плеера",
+        time_basis: "occurred_at – время сервера в момент приёма отметки плеера (NTP); для отметок, отправленных позже из буфера зала (client_offline = 1), – время устройства, если оно правдоподобно (не в будущем, не старше 26 ч, после предыдущей отметки), иначе время приёма; device_occurred_at – время устройства как оно пришло; server_created_at_utc – момент записи в журнал; position_ms – позиция в треке по данным плеера",
         rows_read: facts.length,
         pages: paged.pages,
         complete: true,
@@ -340,6 +345,7 @@ export async function createPlayLogExtract(input: {
         note: "Техническая печать сервиса АудиоЛад (не квалифицированная электронная подпись). Подпись в manifest.sig покрывает точные байты manifest.json.",
       },
       pdf_rendered: pdf,
+      ledger,
     };
     const manifestBuf = Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8");
     await writeFile(join(tmpDir, "manifest.json"), manifestBuf, { mode: 0o600 });
@@ -354,7 +360,15 @@ export async function createPlayLogExtract(input: {
   }
 }
 
-function verifyText(fingerprint: string): string {
+function verifyText(fingerprint: string, ledger: ManifestLedger): string {
+  const chain = ledger.available
+    ? [
+        `4. Печати часов журнала: запечатано ${ledger.hours_sealed} из ${ledger.hours_touched} ч, строк в ещё не запечатанных часах – ${ledger.facts_in_unsealed_hours}.`,
+        `   Все запечатанные часы перепроверены базой при выписке: ${ledger.all_sealed_hours_verified ? "да" : "НЕТ"}.`,
+        `   Голова цепочки: ${ledger.chain_head ? `${ledger.chain_head.period_start} ${ledger.chain_head.chain_sha256}` : "нет"}.`,
+        "   Сверка: select * from verify_playback_usage_fact_seal('<period_start>') в базе АудиоЛад; chain_sha256 часа должен совпасть с manifest.json → ledger.seals.",
+      ]
+    : ["4. Печати часов журнала в этой выписке недоступны."];
   return [
     "Проверка выписки журнала воспроизведения АудиоЛад",
     "",
@@ -364,6 +378,7 @@ function verifyText(fingerprint: string): string {
     "2. Печать: openssl pkeyutl -verify -pubin -inkey seal-public.pem -rawin -in manifest.json -sigfile manifest.sig",
     "   Ожидаемый ответ: Signature Verified Successfully.",
     "3. Любое изменение manifest.json или файлов делает проверку неуспешной.",
+    ...chain,
     "",
   ].join("\n");
 }

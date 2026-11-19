@@ -587,6 +587,11 @@ def _match(args) -> int:
     started = time.time()
     args.index = os.path.realpath(args.index)  # pin the version even if `current` is swapped meanwhile
     index, ht = load_index(args.index)
+    # t1578u M4: exact copy of the index.json this match used, next to result.json, so the index
+    # registry can record this version later even if a rebuild has pruned it from disk.
+    used_index = os.path.join(os.path.dirname(os.path.abspath(args.out)), "index.json")
+    shutil.copyfile(os.path.join(args.index, "index.json"), used_index)
+    used_index_sha256 = sha256_file(used_index)
     kinds = {t["code"]: t["kind"] for t in index.get("tracks", []) if t.get("status") == "ok"}
     olaf = olaf_bin(args.olaf) if index.get("olaf", {}).get("available") else None
     olaf_home = os.path.join(args.index, "olaf")
@@ -661,6 +666,7 @@ def _match(args) -> int:
                   "decoded_duration_s": round(dur, 3), "probe": meta},
         "index": {"version": index.get("version"), "built_at": index.get("built_at"),
                   "audfprint_sha256": index.get("audfprint", {}).get("file_sha256"),
+                  "index_json_sha256": used_index_sha256,
                   "counts": index.get("counts"), "olaf": index.get("olaf")},
         "params": {"window_s": window, "hop_s": hop, "audfprint_min_aligned": AUDFPRINT_MIN_ALIGNED,
                    "olaf_min_count": OLAF_MIN_COUNT, "offset_tolerance_s": OFFSET_TOLERANCE_S},

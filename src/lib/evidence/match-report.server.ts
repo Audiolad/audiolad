@@ -7,11 +7,13 @@ import { chmod, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile }
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { fetchAllPlaybackFacts } from "@/lib/business-app/playback-facts-query";
 import { concordance, type Concordance, type LogPlay, type MatchSegment } from "@/lib/evidence/concordance";
 import { evidencePython, loadEvidenceLocation, loadTrackLabels, type EvidenceLocation } from "@/lib/evidence/extract.server";
 import { REPORT_CURRENT_DIR, readJob, readJobResult, type MatchJob } from "@/lib/evidence/matcher.server";
-import { EVIDENCE_FACT_COLUMNS, formatLocal, localInputToUtc, reconstructPlays, type EvidenceFact } from "@/lib/evidence/play-log";
+import { fetchEvidenceFacts } from "@/lib/evidence/facts.server";
+import type { IndexRegistryEntry } from "@/lib/evidence/index-registry";
+import { ensureIndexRegisteredSafe } from "@/lib/evidence/index-registry.server";
+import { formatLocal, localInputToUtc, reconstructPlays, type EvidenceFact } from "@/lib/evidence/play-log";
 import { evidenceRoot, loadOrCreateSealKey, sealBytes, sha256Hex } from "@/lib/evidence/storage.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -26,7 +28,7 @@ export type MatchResult = {
   engine_version: string;
   created_at: string;
   input: { name: string; sha256: string; size_bytes: number; decoded_duration_s: number; probe: { tags?: Record<string, string> } };
-  index: { version: string; built_at: string; audfprint_sha256: string; counts: Record<string, number>; olaf: { available: boolean; version: string | null } };
+  index: { version: string; built_at: string; audfprint_sha256: string; index_json_sha256?: string; counts: Record<string, number>; olaf: { available: boolean; version: string | null } };
   params: Record<string, number>;
   claimed_refs: Array<{ code: string; title: string; sha256: string; duration_s: number }>;
   windows: Array<{ rec_from_s: number; rec_to_s: number; verdict: { status: string; code?: string; kind?: string }; claimed_verdict?: { status: string } }>;
@@ -70,9 +72,9 @@ export async function computeJobConcordance(job: MatchJob, result: MatchResult, 
   const durMs = Math.round((result.input.decoded_duration_s || 0) * 1000);
   const from = new Date(claim.at.getTime() - CONCORDANCE_MARGIN_MS - durMs);
   const to = new Date(claim.at.getTime() + CONCORDANCE_MARGIN_MS + durMs);
-  const paged = await fetchAllPlaybackFacts(db, {
+  const paged = await fetchEvidenceFacts(db, {
     organizationId: location.organizationId, locationId: location.id,
-    from: from.toISOString(), to: to.toISOString(), maxRows: CONCORDANCE_MAX_FACTS, columns: EVIDENCE_FACT_COLUMNS,
+    from: from.toISOString(), to: to.toISOString(), maxRows: CONCORDANCE_MAX_FACTS,
   });
   if (paged.error || paged.truncated) throw new Error("evidence_concordance_facts_failed");
   const facts = paged.rows as EvidenceFact[];
@@ -103,6 +105,8 @@ export async function loadJobView(id: string) {
   const job = await readJob(id);
   if (!job) return null;
   const result = job.state === "done" ? ((await readJobResult(id)) as MatchResult | null) : null;
+  // M4: a finished match registers the index version it ran on (from its own copy of index.json).
+  if (result?.index?.version) await ensureIndexRegisteredSafe(String(result.index.version), undefined, { jobId: id });
   let conc: JobConcordance | null = null;
   let concError = false;
   if (result) {
@@ -139,6 +143,17 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
   const reportId = `${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`;
   const dir = join(jobDirPath, "reports", reportId);
   const titles = await titlesByCodes(result.segments.map((s) => s.code)).catch(() => ({} as Record<string, string | null>));
+  // M4: what the append-only registry holds for the index version this match used.
+  const registry: IndexRegistryEntry | null = result.index?.version
+    ? await ensureIndexRegisteredSafe(String(result.index.version), undefined, { jobId: id })
+    : null;
+  const indexRegistry = registry && {
+    ...registry,
+    audfprint_matches_result: registry.audfprint_sha256 && result.index.audfprint_sha256
+      ? registry.audfprint_sha256 === result.index.audfprint_sha256 : null,
+    index_json_matches_result: registry.index_json_sha256 && result.index.index_json_sha256
+      ? registry.index_json_sha256 === result.index.index_json_sha256 : null,
+  };
   try {
     await mkdir(dir, { recursive: true, mode: 0o700 });
     const seal = await loadOrCreateSealKey();
@@ -155,6 +170,7 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
       claim: job.claim,
       note: job.note,
       index: result.index,
+      index_registry: indexRegistry,
       engine_version: result.engine_version,
       summary: result.summary,
       segments: result.segments.map((s) => ({ ...s, title: titles[s.code] ?? conc?.titles[s.code] ?? null })),
@@ -210,7 +226,7 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
         decoded_duration_s: result.input.decoded_duration_s },
       claim: job.claim,
       note: job.note,
-      engine: { version: result.engine_version, params: result.params, index: result.index },
+      engine: { version: result.engine_version, params: result.params, index: result.index, index_registry: indexRegistry },
       summary: result.summary,
       segments: pdfInput.segments,
       claimed_refs: result.claimed_refs,

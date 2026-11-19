@@ -14,7 +14,7 @@ import {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Owner only. Read-only towards the database; writes the extract files on the server. */
+/** Owner only. Writes the extract files on the server; in the database only the hourly seals are topped up. */
 export async function createPlayLogExtractAction(input: {
   locationId: string;
   fromLocal: string;

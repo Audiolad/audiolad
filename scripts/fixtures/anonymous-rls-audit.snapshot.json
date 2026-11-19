@@ -6704,6 +6704,26 @@
       "file": "supabase/migrations/20270317120000_business_coffee_legal_kit.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.issue_business_venue_certificate(uuid, uuid, text, jsonb, timestamptz, timestamptz, text, text, timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.seal_playback_usage_facts(integer) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.verify_playback_usage_fact_seal(timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.playback_usage_fact_period_digest(timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_point_usage_sample_offline(text, uuid, uuid, bigint, uuid, bigint, timestamptz) TO anon, authenticated, service_role;"
     }
   ]
 }
