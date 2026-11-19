@@ -24,7 +24,7 @@ export default function BusinessVenuePlaceForm({
   const [pending, startTransition] = useTransition();
 
   return (
-    <section className="business-app-card space-y-3" id="venue" data-testid="biz-venue-place">
+    <section className="business-app-card business-cert-anchor space-y-3" id="venue" data-testid="biz-venue-place">
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Заведение</h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">{BUSINESS_LICENCE_PLACE_RULE}</p>
       {canEdit ? (

@@ -39,7 +39,7 @@ export default function BusinessTimezoneForm({ timezone, currentLabel }: { timez
   };
 
   return (
-    <form onSubmit={save} className="business-profile-form space-y-3" aria-label="Часовой пояс кофейни" data-testid="biz-profile-timezone-form">
+    <form onSubmit={save} className="business-profile-form space-y-3" aria-label="Часовой пояс заведения" data-testid="biz-profile-timezone-form">
       <label htmlFor="business-venue-timezone">Часовой пояс</label>
       {known ? null : (
         <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-profile-timezone-legacy">Сейчас: {currentLabel}</p>
@@ -50,7 +50,7 @@ export default function BusinessTimezoneForm({ timezone, currentLabel }: { timez
         {VENUE_TIMEZONES.map((zone) => <option key={zone.id} value={zone.id}>{zone.label}</option>)}
       </select>
       <p id="business-venue-timezone-hint" className="text-sm text-[var(--biz-text-muted)]">
-        По нему музыка меняется утром, днём и вечером – по часам кофейни.
+        По нему музыка меняется утром, днём и вечером – по часам заведения.
       </p>
       <button type="submit" disabled={busy || value === saved} className="business-app-btn business-app-btn-cta business-app-focus-ring"
         data-testid="biz-profile-timezone-save">

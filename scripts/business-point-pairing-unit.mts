@@ -52,7 +52,7 @@ assert.equal(pointDeviceLink("https://business.audiolad.ru", "business.audiolad.
 assert.ok(!new URL(pointDeviceLink("https://business.audiolad.ru", "business.audiolad.ru", "4719")).search.includes("4719"));
 const link = pointDeviceLink("https://business.audiolad.ru", "business.audiolad.ru", "4719");
 const text = pointShareText("4719");
-assert.match(text, /кофейне/);
+assert.match(text, /заведении/);
 assert.match(text, /действует 20 минут/);
 assert.doesNotMatch(text, /точк/i);
 assert.doesNotMatch(text, /\u2014/);

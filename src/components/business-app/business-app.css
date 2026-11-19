@@ -1745,6 +1745,12 @@
   scroll-margin-top: 5.5rem;
 }
 
+/* t1604u: блоки, куда ведут красные пункты сертификата (#legal-inn, #offer-reaccept, #venue, #sertifikat), не прячутся под шапкой. */
+.business-cert-anchor,
+#sertifikat {
+  scroll-margin-top: 6rem;
+}
+
 .business-atmosphere-empty {
   border-style: dashed;
   background: var(--biz-surface-soft);

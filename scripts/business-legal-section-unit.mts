@@ -198,4 +198,34 @@ for (const f of [...sectionFiles, ...componentFiles]) {
 }
 assert.match(shell, /rel="nofollow noopener" target="_blank"/, "МАКС – новая вкладка");
 
+// t1604u: красные пункты сертификата ведут прямо туда, где их исправляют; в кабинете – «заведение», не «кофейня».
+{
+  const setup = readFileSync(join(ROOT, "src/components/business-app/legal/BusinessCertificateSetup.tsx"), "utf8");
+  assert.match(setup, /inn: `\/documents#\$\{BUSINESS_CERTIFICATE_INN_ANCHOR_ID\}`/, "ИНН → блок ИНН");
+  assert.match(setup, /address: "\/preferences#venue"/, "адрес → форма заведения");
+  assert.match(setup, /offer: `\/documents#\$\{BUSINESS_OFFER_REACCEPT_ANCHOR_ID\}`/, "редакция → карточка принятия");
+  assert.match(setup, /id=\{BUSINESS_CERTIFICATE_INN_ANCHOR_ID\}/, "якорь блока ИНН");
+  const reaccept = readFileSync(join(ROOT, "src/components/business-app/legal/BusinessOfferReacceptPrompt.tsx"), "utf8");
+  assert.match(reaccept, /id="offer-reaccept"/, "якорь карточки принятия");
+  const certPage = readFileSync(join(ROOT, "src/app/business-app/documents/sertifikat/page.tsx"), "utf8");
+  assert.match(certPage, /<BusinessCertificateMissingItem\s/, "страница сертификата – те же пункты-ссылки");
+  assert.match(setup, /const allowed = missing === "offer" \? canAcceptOffer : canEditIdentity;/, "ссылка только когда цель есть на странице");
+  for (const src of [setup, certPage]) {
+    assert.match(src, /canEditIdentity=\{context\.canEditIdentity\}/, "ИНН/адрес – ссылка только у владельца");
+    assert.match(src, /canAcceptOffer=\{Boolean\(context\.offerPrompt\)\}/, "редакция – ссылка только при карточке принятия");
+  }
+  for (const f of [
+    "src/app/business-app/documents/page.tsx",
+    "src/app/business-app/documents/sertifikat/page.tsx",
+    "src/lib/business-app/licensing-copy.ts",
+    "src/lib/business-app/greeting.ts",
+    "src/lib/business-app/home-checklist.ts",
+    "src/app/business-app/settings/page.tsx",
+    "src/components/business-app/profile/BusinessTimezoneForm.tsx",
+  ]) {
+    const text = readFileSync(join(ROOT, f), "utf8").replace(/«АудиоЛад Кофейня»|АудиоЛад Кофейня/g, "");
+    assert.doesNotMatch(text, /[Кк]офейн/, `${f}: в кабинете – «заведение»`);
+  }
+}
+
 console.log("business-legal-section-unit: PASS");

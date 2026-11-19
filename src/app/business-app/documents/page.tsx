@@ -235,16 +235,16 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Отчёт строится по сообщениям плеера АудиоЛад о воспроизведении, которые принял
-          сервер: сервер проверяет плеер и кофейню и фиксирует время получения, время начала
-          и длительность сообщает плеер. Время – по часовому поясу кофейни.
+          сервер: сервер проверяет плеер и заведение и фиксирует время получения, время начала
+          и длительность сообщает плеер. Время – по часовому поясу заведения.
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm"><a href={businessAuthHref(hostname, "sign-in")} className="underline">Войдите</a>, чтобы построить отчёт.</p>
         ) : result.kind === "no_location" ? (
           venueSide ? (
-            <p className="mt-3 text-sm">Отчёт появится, когда устройство будет связано с кофейней.</p>
+            <p className="mt-3 text-sm">Отчёт появится, когда устройство будет связано с заведением.</p>
           ) : (
-            <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте кофейню</Link>.</p>
+            <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте заведение</Link>.</p>
           )
         ) : (
           <>
@@ -296,7 +296,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 ) : null}
                 {result.report.tracks.length === 0 ? (
                   <p className="mt-3 text-sm">
-                    В этом интервале сервер не получал данных о воспроизведении в кофейне.
+                    В этом интервале сервер не получал данных о воспроизведении в заведении.
                   </p>
                 ) : (
                   <table className="mt-3 w-full text-sm">
@@ -330,7 +330,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 )}
                 <p className="mt-3 text-xs text-[var(--biz-text-muted)]">
                   Отчёт подтверждает работу плеера АудиоЛад, но не доказывает, что
-                  музыка была слышна в помещении и что в кофейне не звучала другая
+                  музыка была слышна в помещении и что в заведении не звучала другая
                   музыка. Если связь прерывалась, часть воспроизведений может
                   отсутствовать. Отчёт не включает статус прав на момент
                   воспроизведения и не подписан электронной подписью. Для претензии
@@ -346,5 +346,5 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
 }
 
 export async function generateMetadata() {
-  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/documents", "Документы – АудиоЛад Кофейня", "Действующие документы и условия использования музыки в кофейне.");
+  return buildCoffeePublicPageMetadata(getHostnameFromHeaders(await headers()), "/documents", "Документы – АудиоЛад Кофейня", "Действующие документы и условия использования музыки в заведении.");
 }
