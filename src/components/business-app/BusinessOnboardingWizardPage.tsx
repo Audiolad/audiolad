@@ -79,15 +79,15 @@ export default function BusinessOnboardingWizardPage({
     return (
       <div className="mx-auto max-w-2xl">
         <WizardHeader
-          title="Подключение кофейни"
-          subtitle="Войдите или зарегистрируйтесь в АудиоЛаде – и создайте кофейню в этом же кабинете."
+          title="Подключение заведения"
+          subtitle="Войдите или зарегистрируйтесь в АудиоЛаде – и создайте заведение в этом же кабинете."
         />
         <section className="business-app-card space-y-3" data-testid="onboarding-sign-in">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
             Вход в АудиоЛад общий: кабинет узнает вас автоматически.
           </p>
           <p className="text-sm text-[var(--biz-text-muted)]">
-            После входа вернитесь к <Link href="/onboarding" className="underline">подключению кофейни</Link>.</p>
+            После входа вернитесь к <Link href="/onboarding" className="underline">подключению заведения</Link>.</p>
           <p className="text-sm text-[var(--biz-text-muted)]">
             {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
           </p>
@@ -118,12 +118,12 @@ export default function BusinessOnboardingWizardPage({
     return (
       <div className="mx-auto max-w-2xl">
         <WizardHeader
-          title="Кофейня уже подключена"
+          title="Заведение уже подключено"
           subtitle={`${domain.organizationName ?? "Заведение"} · ${domain.location.name}`}
         />
         <section className="business-app-card space-y-3">
           <p className="text-[var(--biz-text-muted)]">
-            Мастер первой кофейни уже пройден. Откройте музыку или статус на главной.
+            Мастер первого заведения уже пройден. Откройте музыку или статус на главной.
           </p>
           {returnHref ? (
             <p className="text-[var(--biz-text)]">Кабинет с музыкой открывается по ссылке ниже.</p>
@@ -340,7 +340,7 @@ export default function BusinessOnboardingWizardPage({
         {step === "confirm" ? (
           <>
             <h2 id="wizard-step-title" className="text-[1.25rem] font-bold">
-              Подтвердите кофейню
+              Подтвердите заведение
             </h2>
             <p className="text-[var(--biz-text-muted)]">
               После подтверждения подключим заведение и подготовим {" "}
@@ -370,7 +370,7 @@ export default function BusinessOnboardingWizardPage({
                   className="block text-sm font-medium text-[var(--biz-text)]"
                   htmlFor="onboarding-loc"
                 >
-                  Кофейня
+                  Заведение
                 </label>
                 <input
                   id="onboarding-loc"
@@ -402,16 +402,16 @@ export default function BusinessOnboardingWizardPage({
         {step === "done" ? (
           <>
             <h2 id="wizard-step-title" className="text-[1.25rem] font-bold">
-              Кофейня создана
+              Заведение создано
             </h2>
             <p className="text-[var(--biz-text)]">
               {returnHref
-                ? "Кофейня подключена. Откройте кабинет и нажмите «Играть»."
-                : "Кофейня готова. Откройте музыку и нажмите «Играть»."}
+                ? "Заведение подключено. Откройте кабинет и нажмите «Играть»."
+                : "Заведение готово. Откройте музыку и нажмите «Играть»."}
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
-                Код кофейни: <code className="text-xs">{created.locationId.slice(0, 8)}…</code>
+                Код заведения: <code className="text-xs">{created.locationId.slice(0, 8)}…</code>
                 {" · "}
                 Код зала: <code className="text-xs">{created.zoneId.slice(0, 8)}…</code>
               </p>
@@ -467,7 +467,7 @@ export default function BusinessOnboardingWizardPage({
                 disabled={pending}
                 className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
-                {pending ? "Создаём…" : "Подтвердить и создать кофейню"}
+                {pending ? "Создаём…" : "Подтвердить и создать заведение"}
               </button>
             ) : (
               <button
