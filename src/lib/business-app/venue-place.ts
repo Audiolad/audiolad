@@ -14,10 +14,10 @@ export function validateVenuePlace(input: { name: string; addressLine1: string }
   const name = input.name.trim();
   const addressLine1 = input.addressLine1.trim();
   if (name.length < 1 || name.length > VENUE_NAME_MAX) {
-    return { ok: false, error: "Укажите название точки: от 1 до 120 символов." };
+    return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
   if (addressLine1.length < 1 || addressLine1.length > VENUE_ADDRESS_MAX || /[\u0000-\u001F\u007F]/.test(addressLine1)) {
-    return { ok: false, error: "Укажите адрес точки: от 1 до 200 символов, одной строкой." };
+    return { ok: false, error: "Укажите адрес заведения: от 1 до 200 символов, одной строкой." };
   }
   return { ok: true, value: { name, addressLine1 } };
 }

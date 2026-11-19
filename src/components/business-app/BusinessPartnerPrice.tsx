@@ -61,13 +61,13 @@ export function BusinessPartnerTerms({ quote, now }: { quote: PartnerQuote; now?
         </p>
       ) : null}
       <p>
-        <BusinessStruckPrice standardRub={quote.standardUnitPriceRub} priceRub={quote.unitPriceRub} /> за точку{" "}
+        <BusinessStruckPrice standardRub={quote.standardUnitPriceRub} priceRub={quote.unitPriceRub} /> за заведение{" "}
         {BUSINESS_PLAN_PERIOD_LABEL}.
       </p>
       <p data-testid="biz-partner-total">
-        Точек: {venues}. Итого:{" "}
+        Заведений: {venues}. Итого:{" "}
         <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-partner-total-price" />{" "}
-        {BUSINESS_PLAN_PERIOD_LABEL}. Одна оплата за все активные точки.
+        {BUSINESS_PLAN_PERIOD_LABEL}. Одна оплата за все активные заведения.
       </p>
       {partnerQuoteTermsLines(quote).map((line) => (
         <p key={line} className="text-[var(--biz-text-muted)]">{line}</p>
@@ -161,7 +161,7 @@ export function BusinessPartnerHomeBanner({ quote }: { quote: PartnerQuote | nul
       <p className="font-semibold text-[var(--biz-text)]">Персональная скидка активна</p>
       <p>
         <BusinessStruckPrice standardRub={quote.standardUnitPriceRub} priceRub={quote.unitPriceRub} testId="biz-home-partner-banner-price" /> за
-        точку {BUSINESS_PLAN_PERIOD_LABEL}.
+        заведение {BUSINESS_PLAN_PERIOD_LABEL}.
         {progress ? ` ${progress}.` : " Цена закрепится за аккаунтом при первой оплате."}
       </p>
     </div>

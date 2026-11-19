@@ -36,7 +36,7 @@ export default async function BusinessOwnerUnlockPage({ searchParams }: PageProp
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
           Это устройство в зале. Чтобы открыть оплату, профиль и управление кофейней, введите пароль владельца.
           Кабинет откроется на {Math.round(BUSINESS_OWNER_UNLOCK_SECONDS / 60)} минут, потом устройство вернётся в режим
-          точки. Музыка в зале не остановится.
+          заведения. Музыка в зале не остановится.
         </p>
         <BusinessOwnerUnlockForm defaultEmail={email} next={next} />
       </section>

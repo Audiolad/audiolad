@@ -217,20 +217,20 @@ export function partnerQuoteTermsLines(quote: PartnerQuote): string[] {
   const total = quote.discountPeriods ?? left;
   const lines: string[] = [];
   if (quote.source === "reserved") {
-    lines.push(`Цена действует ${total} ${ruPeriodsWord(total)} по ${BUSINESS_PAID_PERIOD_DAYS} дней с первой оплаты, для всех точек аккаунта.`);
+    lines.push(`Цена действует ${total} ${ruPeriodsWord(total)} по ${BUSINESS_PAID_PERIOD_DAYS} дней с первой оплаты, для всех заведений аккаунта.`);
   } else if (left === 1) {
     lines.push("Это последний период по персональной цене.");
   } else {
-    lines.push(`По персональной цене осталось ${left} ${ruPeriodsWord(left)} по ${BUSINESS_PAID_PERIOD_DAYS} дней, для всех точек аккаунта.`);
+    lines.push(`По персональной цене осталось ${left} ${ruPeriodsWord(left)} по ${BUSINESS_PAID_PERIOD_DAYS} дней, для всех заведений аккаунта.`);
   }
-  lines.push(`Затем – обычная цена ${quote.standardUnitPriceRub} ₽ за точку за ${BUSINESS_PAID_PERIOD_DAYS} дней.`);
+  lines.push(`Затем – обычная цена ${quote.standardUnitPriceRub} ₽ за заведение за ${BUSINESS_PAID_PERIOD_DAYS} дней.`);
   return lines;
 }
 
 /** After the last personal period: one plain notice on the payment surfaces. */
 export function partnerFinishedNotice(quote: PartnerQuote | null): string | null {
   if (!quote || quote.source !== "finished") return null;
-  return `Персональная цена закончилась: оплачено ${quote.periodsUsed} ${ruPeriodsWord(quote.periodsUsed)}. Сейчас действует обычная цена – ${quote.standardUnitPriceRub} ₽ за точку за ${BUSINESS_PAID_PERIOD_DAYS} дней.`;
+  return `Персональная цена закончилась: оплачено ${quote.periodsUsed} ${ruPeriodsWord(quote.periodsUsed)}. Сейчас действует обычная цена – ${quote.standardUnitPriceRub} ₽ за заведение за ${BUSINESS_PAID_PERIOD_DAYS} дней.`;
 }
 
 /** Reservation length, the same as reserve_business_partner_code. */
@@ -312,7 +312,7 @@ export function partnerLatePaymentNotice(quote: PartnerQuote | null): string | n
   const until = ruMoscowDate(late.periodEnd);
   if (!paid || !until) return null;
   if (late.reason === "partner_code_revoked") {
-    return `Персональный код отозван до первой оплаты. Оплата от ${paid} засчитана полностью: доступ продлён до ${until}. Скидка по коду больше не действует, следующая оплата – по обычной цене ${quote.standardUnitPriceRub} ₽ за точку.`;
+    return `Персональный код отозван до первой оплаты. Оплата от ${paid} засчитана полностью: доступ продлён до ${until}. Скидка по коду больше не действует, следующая оплата – по обычной цене ${quote.standardUnitPriceRub} ₽ за заведение.`;
   }
   return `Прежняя ссылка на оплату всё же была оплачена ${paid}. Оплата засчитана полностью: доступ продлён до ${until}.`;
 }

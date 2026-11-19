@@ -42,7 +42,7 @@ function businessPaymentLabel(domain: ReturnType<typeof useBusinessDomain>): str
 }
 function businessPaymentNote(domain: ReturnType<typeof useBusinessDomain>): string {
   return domain.status === "authenticated" && domain.pilotSlots
-    ? `Тариф – ${BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за одну точку на 30 дней. Итого ${businessPaymentLabel(domain)} за все активные точки. Одна оплата, общая дата продления.`
+    ? `Тариф – ${BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ за одно заведение на 30 дней. Итого ${businessPaymentLabel(domain)} за все активные заведения. Одна оплата, общая дата продления.`
     : businessGiftPriceNote();
 }
 
@@ -332,8 +332,8 @@ export function BusinessOfferAcceptNote() {
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-accept-note">
       {newEdition
-        ? "Опубликована новая редакция договора-оферты. Примите её перед следующей оплатой – один раз для всего аккаунта и всех точек. Музыка в точках играет как раньше."
-        : "Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех точек."}{" "}
+        ? "Опубликована новая редакция договора-оферты. Примите её перед следующей оплатой – один раз для всего аккаунта и всех заведений. Музыка в заведениях играет как раньше."
+        : "Перед первой оплатой примите договор-оферту – один раз для всего аккаунта и всех заведений."}{" "}
       Нажимая «Принять условия», вы принимаете <BusinessOfferTermsLink />, {BUSINESS_OFFER_EDITION.label.toLowerCase()}.
     </p>
   );
@@ -359,7 +359,7 @@ export function BusinessOfferAcceptedStepNote() {
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-terms-step-accepted">
       Принят <BusinessOfferTermsLink testId="biz-home-terms-step-link" />,{" "}
-      {BUSINESS_OFFER_EDITION.label.toLowerCase()}. Один раз для всего аккаунта и всех точек.
+      {BUSINESS_OFFER_EDITION.label.toLowerCase()}. Один раз для всего аккаунта и всех заведений.
     </p>
   );
 }
@@ -567,7 +567,7 @@ export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; a
   if (error.code === "payments_not_configured") {
     return <p role="alert" data-testid="biz-home-pay-error">Оплата временно недоступна. Попробуйте ещё раз позже.</p>;
   }
-  if (error.code === "venue_topup_not_available") return <p role="alert">Новая точка будет включена при следующем продлении. Доплата в текущем периоде пока недоступна.</p>;
+  if (error.code === "venue_topup_not_available") return <p role="alert">Новое заведение будет включено при следующем продлении. Доплата в текущем периоде пока недоступна.</p>;
   if (error.code === "partner_terms_changed") {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
@@ -582,6 +582,6 @@ export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; a
       </p>
     );
   }
-  if (error.code === "pending_order_mismatch") return <p role="alert">Состав точек изменился. Не оплачивайте прежнюю ссылку; обратитесь в поддержку.</p>;
+  if (error.code === "pending_order_mismatch") return <p role="alert">Состав заведений изменился. Не оплачивайте прежнюю ссылку; обратитесь в поддержку.</p>;
   return <p role="alert" data-testid="biz-home-pay-error">Не удалось перейти к оплате. Попробуйте ещё раз.</p>;
 }

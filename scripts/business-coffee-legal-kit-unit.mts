@@ -123,7 +123,11 @@ assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: { ...facts
 assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: { ...facts.licensee, name: "ООО «НОВОЕ»" } }), false, "переименование по ФНС");
 assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: null }), false, "ИНН удалён");
 assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: true }), false, "прекратил деятельность");
-assert.equal(certificateStatusLabel("outdated"), "Не действует: данные точки или лицензиата изменились");
+assert.equal(rows["Заведение"], snap.venueName);
+assert.equal(rows["Адрес заведения"], snap.venueAddress);
+assert.ok(!("Точка" in rows) && !("Адрес точки" in rows), "подписи полей – заведение, не точка");
+assert.equal(certificateStatusLabel("expired"), "Не действует: доступ к заведению закончился");
+assert.equal(certificateStatusLabel("outdated"), "Не действует: данные заведения или лицензиата изменились");
 assert.equal(certificateStatusLabel("valid"), "Действует");
 
 // Начало срока: самое позднее начало среди окон, которые идут сейчас.

@@ -25,7 +25,7 @@ const first = render(0);
 const second = render(1);
 assert.equal((first.match(/aria-pressed=/g) ?? []).length, 2, "two existing halls");
 assert.equal((first.match(/data-testid="biz-add-point"/g) ?? []).length, 1, "one add button for the next hall");
-assert.match(first, /\+ Добавить точку 3/);
+assert.match(first, /\+ Добавить заведение 3/);
 assert.doesNotMatch(first, /резерв/, "no fake reserve slot");
 assert.doesNotMatch(first, /Точек:|из 3|пустые места|за каждую активную точку/, "no capacity sentence");
 assert.match(first, /1598/, "two active venues billed, empty reserve excluded");
@@ -33,60 +33,60 @@ assert.match(first, /Jazz first/);
 assert.doesNotMatch(first, /Jazz second/);
 assert.match(second, /Jazz second/);
 assert.doesNotMatch(second, /Jazz first/);
-assert.match(first, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Точка 1/);
-assert.match(second, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Точка 2/);
+assert.match(first, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Заведение 1/);
+assert.match(second, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span>Заведение 2/);
 // Every ordinary account with one hall gets the same add button, no per-client flag.
 const single = render(0, false, false, undefined, 3, [locations[0]]);
-assert.match(single, /\+ Добавить точку 2/, "single hall can add the second");
+assert.match(single, /\+ Добавить заведение 2/, "single hall can add the second");
 assert.doesNotMatch(single, /data-testid="biz-home-pay"/, "single hall keeps the existing access card for payment");
 const full = render(0, true, false, undefined, 3, [...locations, { id: "three", name: "Стритфуд 3", status: "active" }]);
 assert.doesNotMatch(full, /biz-add-point/, "add blocked at cap");
 assert.match(full, /2397/, "three active halls 2397");
 const raised = render(0, true, false, undefined, 5, [...locations, { id: "three", name: "Стритфуд 3", status: "active" }]);
-assert.match(raised, /\+ Добавить точку 4/, "raised system limit offers the fourth hall");
+assert.match(raised, /\+ Добавить заведение 4/, "raised system limit offers the fourth hall");
 assert.equal(render(0, false, false, undefined, 1, [locations[0]]), "", "limit 1 (old schema) keeps the legacy cabinet");
 assert.equal(render(0, true, true), "", "staff device cannot switch owner locations");
 const tenLimit = render(0, true, false, undefined, 10);
-assert.match(tenLimit, /\+ Добавить точку 3/, "ten-hall setting still offers only the next hall");
-assert.doesNotMatch(tenLimit, /biz-more-points|Точек:|из 10|biz-tenth-point-notice|Написать|десятую точку/);
+assert.match(tenLimit, /\+ Добавить заведение 3/, "ten-hall setting still offers only the next hall");
+assert.doesNotMatch(tenLimit, /biz-more-points|Точек:|из 10|biz-tenth-point-notice|Написать|десятое заведение/);
 const tenHalls = Array.from({ length: 10 }, (_, index) => ({ id: `hall-${index}`, name: `Зал ${index + 1}`, status: "active" }));
 for (let count = 3; count < 10; count++) {
   const next = render(0, true, false, undefined, 10, tenHalls.slice(0, count));
-  assert.match(next, new RegExp(`\\+ Добавить точку ${count + 1}`), "one sequential add button through hall ten");
+  assert.match(next, new RegExp(`\\+ Добавить заведение ${count + 1}`), "one sequential add button through hall ten");
   assert.equal((next.match(/data-testid="biz-add-point"/g) ?? []).length, 1);
   if (count === 9) {
     assert.match(next, /data-testid="biz-tenth-point-notice"/);
-    assert.match(next, /Сейчас вы подключаете десятую точку/);
-    assert.match(next, /В этой конфигурации точек десять/);
-    assert.match(next, /Одиннадцатую так же подключить нельзя/);
+    assert.match(next, /Сейчас вы подключаете десятое заведение/);
+    assert.match(next, /В этой конфигурации заведений десять/);
+    assert.match(next, /Одиннадцатое так же подключить нельзя/);
     assert.match(next, /напишите заранее/);
     assert.match(next, /href="\/profile#kontakty"/);
     assert.match(next, />Написать</);
     assert.doesNotMatch(next, /data-testid="biz-more-points"/);
   } else {
-    assert.doesNotMatch(next, /biz-tenth-point-notice|biz-more-points-write|Сейчас вы подключаете десятую точку|data-testid="biz-more-points"/);
+    assert.doesNotMatch(next, /biz-tenth-point-notice|biz-more-points-write|Сейчас вы подключаете десятое заведение|data-testid="biz-more-points"/);
   }
 }
 const tenFull = render(0, true, false, undefined, 10, tenHalls);
 assert.equal((tenFull.match(/aria-pressed=/g) ?? []).length, 10, "all existing halls remain selectable");
-assert.doesNotMatch(tenFull, /biz-add-point|Добавить точку 11|Точек:|из 10|лимит|https?:|—|<details|Добавить ещё точку/);
+assert.doesNotMatch(tenFull, /biz-add-point|Добавить заведение 11|Точек:|из 10|лимит|https?:|—|<details|Добавить ещё точку/);
 assert.match(tenFull, /data-testid="biz-more-points"/, "visible thank-you after ten, without creating a hall");
 assert.match(tenFull, /Спасибо, что вы с нами и развиваете сеть/);
-assert.match(tenFull, /В этой конфигурации можно подключить десять точек/);
-assert.match(tenFull, /одиннадцатую так же добавить нельзя/);
+assert.match(tenFull, /В этой конфигурации можно подключить десять заведений/);
+assert.match(tenFull, /одиннадцатое так же добавить нельзя/);
 assert.match(tenFull, /напишите заранее/);
 assert.match(tenFull, /именно под вашу ситуацию/);
 assert.match(tenFull, /href="\/profile#kontakty"/);
 assert.match(tenFull, /data-testid="biz-more-points-write"/);
 assert.match(tenFull, />Написать</);
 assert.match(tenFull, /7990/, "ten active halls keep the same billing math");
-assert.match(first, /Активных точек:/);
-assert.match(first, /Одна оплата за все активные точки/);
+assert.match(first, /Активных заведений:/);
+assert.match(first, /Одна оплата за все активные заведения/);
 console.log("business-pilot-ui-unit: sequential self-serve through ten, personal proposal, no capacity copy, billing, legacy, staff: PASS");
 
 const blockedRenewal = render(1, true, false, { paidUntil: "2026-12-06T12:00:00Z", renewalBlocked: true });
 assert.match(blockedRenewal, /Следующее продление/);
-assert.match(blockedRenewal, /Новая точка пока не оплачена/);
+assert.match(blockedRenewal, /Новое заведение пока не оплачено/);
 assert.doesNotMatch(blockedRenewal, /data-testid="biz-home-pay"/, "no mid-period full-price checkout when a venue is unpaid");
 
 // Owner home -> settings must preserve the shell and the existing audio element.

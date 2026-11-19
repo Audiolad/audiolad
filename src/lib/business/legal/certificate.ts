@@ -114,8 +114,8 @@ export function certificateRows(input: { number: string; issuedAt: string; snaps
     ["Номер", certificateDisplayNumber(input.number)],
     ["Выдан", moscowDate(input.issuedAt) ?? ""],
     ["Действует по", moscowDate(s.period.end) ?? ""],
-    ["Точка", s.venueName],
-    ["Адрес точки", s.venueAddress],
+    ["Заведение", s.venueName],
+    ["Адрес заведения", s.venueAddress],
     ["Лицензиат", s.licensee.name],
     [`ИНН / ${ogrnLabel(s.licensee.kind)}`, `${s.licensee.inn} / ${s.licensee.ogrn}`],
     ["Срок доступа", periodLine(s)],
@@ -155,9 +155,9 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
     case "valid":
       return "Действует";
     case "expired":
-      return "Не действует: доступ к точке закончился";
+      return "Не действует: доступ к заведению закончился";
     case "outdated":
-      return "Не действует: данные точки или лицензиата изменились";
+      return "Не действует: данные заведения или лицензиата изменились";
     case "superseded":
       return "Заменён новым сертификатом";
     case "revoked":
@@ -169,8 +169,8 @@ export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, strin
   inn: "Укажите ИНН организации или ИП.",
   inn_inactive: "По данным ФНС организация или ИП с этим ИНН прекратили деятельность. Укажите действующий ИНН.",
   registry: "Не удалось проверить ИНН в реестре ФНС. Откройте страницу позже.",
-  revoked: "Сертификат этой точки отозван. Напишите нам: 1@audiolad.ru.",
-  address: "Укажите адрес точки.",
+  revoked: "Сертификат этого заведения отозван. Напишите нам: 1@audiolad.ru.",
+  address: "Укажите адрес заведения.",
   offer: "Примите новую редакцию договора-оферты.",
   access: "Сертификат выдаётся, пока идёт подарочный или оплаченный период.",
 };

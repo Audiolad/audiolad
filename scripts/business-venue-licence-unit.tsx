@@ -185,7 +185,7 @@ assert.doesNotMatch(expiredPaidHtml, /Подарочный период зако
 const emptyHtml = htmlOf("notStarted");
 assert.match(emptyHtml, /data-status="not_started"/);
 assert.match(emptyHtml, new RegExp(BUSINESS_UNCONFIRMED_NOTE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-assert.match(emptyHtml, /Адрес точки пока не указан/);
+assert.match(emptyHtml, /Адрес заведения пока не указан/);
 
 const url = venueLicencePublicUrl(VENUE_LICENCE_SAMPLE_IDS.trial);
 const square = renderVenueStickerSvg({ publicUrl: url, format: "square80" });

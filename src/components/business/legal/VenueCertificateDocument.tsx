@@ -29,7 +29,7 @@ export default function VenueCertificateDocument({
       <header className="venue-cert__head">
         <div className="venue-cert__brand">АудиоЛад Кофейня</div>
         {sample ? <div className="venue-cert__sample">ОБРАЗЕЦ – данные вымышлены</div> : null}
-        <h1 className="venue-cert__title">Сертификат точки</h1>
+        <h1 className="venue-cert__title">Сертификат заведения</h1>
         <p className="venue-cert__subtitle">о праве публичного исполнения фонограмм каталога «АудиоЛад Кофейня»</p>
         <p className="venue-cert__number">№ {certificateDisplayNumber(number)}</p>
       </header>

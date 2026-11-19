@@ -92,7 +92,7 @@ export const BUSINESS_ONBOARDING_TYPES: readonly BusinessOnboardingTypeOption[] 
       category: "Другой бизнес",
       hint: "Укажем категорию и настроим заведение.",
       defaultOrgName: "Заведение",
-      defaultLocationName: "Точка 1",
+      defaultLocationName: "Заведение 1",
     },
   ] as const;
 
@@ -262,7 +262,7 @@ export function suggestBusinessOnboardingNames(typeId: string | null): {
   const type = getBusinessOnboardingType(typeId);
   return {
     organizationName: type?.defaultOrgName ?? "Заведение",
-    locationName: type?.defaultLocationName ?? "Точка 1",
+    locationName: type?.defaultLocationName ?? "Заведение 1",
     businessCategory: type?.category ?? "Другой бизнес",
   };
 }

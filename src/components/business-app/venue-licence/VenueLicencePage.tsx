@@ -46,7 +46,7 @@ export default function VenueLicencePage({ view }: { view: VenueLicenceView }) {
       </header>
 
       <section className="business-app-card mt-5" data-testid="venue-place">
-        <h2 className="text-lg font-bold text-[var(--biz-text)]">Точка</h2>
+        <h2 className="text-lg font-bold text-[var(--biz-text)]">Заведение</h2>
         <p className="mt-2 text-base font-semibold text-[var(--biz-text)]" data-testid="venue-name">{view.venueName}</p>
         {view.ownerLabel ? (
           <>
@@ -56,9 +56,9 @@ export default function VenueLicencePage({ view }: { view: VenueLicenceView }) {
             </p>
           </>
         ) : null}
-        <h2 className="mt-4 text-lg font-bold text-[var(--biz-text)]">Адрес точки</h2>
+        <h2 className="mt-4 text-lg font-bold text-[var(--biz-text)]">Адрес заведения</h2>
         <p className="mt-2 text-base text-[var(--biz-text)]" data-testid="venue-address">
-          {view.address ?? "Адрес точки пока не указан."}
+          {view.address ?? "Адрес заведения пока не указан."}
         </p>
       </section>
 
@@ -164,7 +164,7 @@ export function VenueLicenceUnavailable() {
   return (
     <article className="venue-licence" data-testid="venue-licence-unavailable">
       <h1 className="text-[1.65rem] font-bold text-[var(--biz-text)]">Лицензия на публичное исполнение музыки в заведении</h1>
-      <p className="business-app-card mt-5 text-sm leading-6 text-[var(--biz-text)]">Страница точки временно недоступна.</p>
+      <p className="business-app-card mt-5 text-sm leading-6 text-[var(--biz-text)]">Страница заведения временно недоступна.</p>
     </article>
   );
 }

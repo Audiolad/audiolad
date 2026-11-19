@@ -100,7 +100,7 @@ export default function BusinessCabinetModeBanner() {
     return (
       <div className="business-app-mode-banner" role="status" data-testid="biz-preview-banner">
         <p className="business-app-mode-banner__text">
-          <strong>Так видит точка.</strong> Музыка на этом телефоне не попадает в отчёт заведения.
+          <strong>Так видит заведение.</strong> Музыка на этом телефоне не попадает в отчёт заведения.
         </p>
         <button type="button" className="business-app-btn business-app-btn-cta business-app-focus-ring" data-testid="biz-preview-back" onClick={back}>
           Вернуться
@@ -113,7 +113,7 @@ export default function BusinessCabinetModeBanner() {
     return (
       <div className="business-app-mode-banner" role="status" data-testid="biz-owner-unlock-banner">
         <p className="business-app-mode-banner__text">
-          <strong>Кабинет владельца открыт до {unlockClock(unlockUntil)}.</strong> Потом устройство снова станет точкой.
+          <strong>Кабинет владельца открыт до {unlockClock(unlockUntil)}.</strong> Потом устройство снова станет заведением.
         </p>
         <button
           type="button"
@@ -127,7 +127,7 @@ export default function BusinessCabinetModeBanner() {
             router.refresh();
           }}
         >
-          Вернуть режим точки
+          Вернуть режим заведения
         </button>
         {cabinet.hallDeviceRevoked ? (
           // Permanent change only by this explicit choice: the device was revoked from the owner's

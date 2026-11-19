@@ -158,7 +158,7 @@ export async function provisionVenuePlayer(input: {
     return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
   }
 
-  const displayName = (input.displayName ?? "Плеер точки").trim() || "Плеер точки";
+  const displayName = (input.displayName ?? "Плеер заведения").trim() || "Плеер заведения";
 
   const { data: created, error: createError } = await supabase.rpc(
     "create_business_player",
@@ -398,6 +398,6 @@ export async function activateBusinessPoint(slot: number): Promise<{ ok: boolean
   if (domain.status !== "authenticated" || !domain.organizationId || (domain.venueSlotLimit ?? 1) < 2 || !domain.canPay) return { ok: false, error: "Активация недоступна." };
   const db = await createClient();
   const { data, error } = await db.rpc("activate_business_pilot_location", { p_organization_id: domain.organizationId, p_slot: slot });
-  if (error || !data?.location_id) return { ok: false, error: "Не удалось активировать точку. Обновите страницу и повторите." };
+  if (error || !data?.location_id) return { ok: false, error: "Не удалось активировать заведение. Обновите страницу и повторите." };
   return selectBusinessPoint(data.location_id);
 }

@@ -55,7 +55,7 @@ function SampleCheck() {
           ["Выдан", certificate.issuedAt],
           ["Действует по", certificate.validUntil],
           ["Лицензиат", certificate.licensee],
-          ["Точка", certificate.venue],
+          ["Заведение", certificate.venue],
           ["Адрес", certificate.venueAddress],
           ["Каталог", certificate.catalog],
           ["Лицензиар", "ИП Петров Сергей Сергеевич"],
@@ -105,7 +105,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
           </p>
           {check.status === "superseded" && current ? (
             <p className={"mt-3 " + legalBodyClass}>
-              Сертификат подлинный, но после изменения данных точки выдан новый:{" "}
+              Сертификат подлинный, но после изменения данных заведения выдан новый:{" "}
               <Link href={businessLegalCertificateHref(current.number)} className={legalLinkClass} {...legalDocLinkProps}>
                 № {certificateDisplayNumber(current.number)}
               </Link>{" "}
@@ -119,8 +119,8 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
               ["Статус", certificateStatusLabel(check.status)],
               ["Выдан", moscowDate(check.issuedAt) ?? ""],
               [check.status === "valid" ? "Действует по" : "Срок в сертификате", moscowDate(check.validUntil) ?? ""],
-              ["Точка", check.snapshot.venueName],
-              ["Адрес точки", check.snapshot.venueAddress],
+              ["Заведение", check.snapshot.venueName],
+              ["Адрес заведения", check.snapshot.venueAddress],
               ["Лицензиат", check.snapshot.licensee.name],
               [`ИНН / ${ogrnLabel(check.snapshot.licensee.kind)}`, `${check.snapshot.licensee.inn} / ${check.snapshot.licensee.ogrn}`],
               ["Срок доступа в сертификате", periodLine(check.snapshot)],
