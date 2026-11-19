@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { BusinessCertificateMissingItem } from "@/components/business-app/legal/BusinessCertificateSetup";
 import CertificatePrintButton from "@/components/business-app/legal/CertificatePrintButton";
 import VenueCertificateDocument from "@/components/business/legal/VenueCertificateDocument";
 import "@/components/business/legal/venue-certificate.css";
-import { BUSINESS_CERTIFICATE_MISSING_TEXT, certificateCheckUrl } from "@/lib/business/legal/certificate";
+import { certificateCheckUrl } from "@/lib/business/legal/certificate";
 import { loadCabinetCertificateContext } from "@/lib/business/legal/certificate-context.server";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +43,11 @@ export default async function BusinessCertificatePage() {
           {context.kind === "ready" && context.state.kind === "missing" ? (
             <ul className="space-y-1 text-sm leading-6">
               {context.state.missing.map((m) => (
-                <li key={m}>• {BUSINESS_CERTIFICATE_MISSING_TEXT[m]}</li>
+                <BusinessCertificateMissingItem key={m} missing={m} />
               ))}
             </ul>
           ) : (
-            <p className="text-sm">Сначала войдите в кабинет и добавьте кофейню.</p>
+            <p className="text-sm">Сначала войдите в кабинет и добавьте заведение.</p>
           )}
           <Link href="/documents#sertifikat" className="business-app-btn business-app-btn-cta business-app-focus-ring">
             Заполнить данные

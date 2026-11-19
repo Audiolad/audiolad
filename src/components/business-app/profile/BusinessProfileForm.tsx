@@ -91,7 +91,7 @@ export default function BusinessProfileForm({ ownerName, ownerSurname, organizat
       <p id="business-profile-surname-hint" className="text-sm text-[var(--biz-text-muted)]"
         data-testid="biz-profile-owner-surname-hint">{BUSINESS_OWNER_SURNAME_HINT}</p>
       {organizationName !== null ? <>
-        <label htmlFor="business-organization-name">Название кофейни / организации</label>
+        <label htmlFor="business-organization-name">Название заведения / организации</label>
         <input id="business-organization-name" name="organizationName" value={organization}
           placeholder={BUSINESS_ORGANIZATION_NAME_PLACEHOLDER} maxLength={120}
           disabled={busy || !canEditOrganization} onChange={(e) => { setOrganization(e.target.value); edit(); }}
@@ -100,7 +100,7 @@ export default function BusinessProfileForm({ ownerName, ownerSurname, organizat
         <p id="business-profile-org-hint" className="text-sm text-[var(--biz-text-muted)]"
           data-testid="biz-profile-organization-hint">{BUSINESS_ORGANIZATION_NAME_HINT}</p>
         {canEditOrganization ? null : (
-          <p className="text-sm text-[var(--biz-text-muted)]">Название кофейни / организации меняет владелец.</p>
+          <p className="text-sm text-[var(--biz-text-muted)]">Название заведения / организации меняет владелец.</p>
         )}
       </> : null}
       <p id="business-profile-limits" className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_PROFILE_LIMITS_TEXT}</p>

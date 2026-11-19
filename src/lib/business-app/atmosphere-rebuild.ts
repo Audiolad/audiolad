@@ -18,7 +18,7 @@ export const ATMOSPHERE_REBUILD_HINT =
 
 export const ATMOSPHERE_REBUILD_DONE = "Атмосфера пересобрана";
 
-export const ATMOSPHERE_REBUILD_DONE_NOTE = "В кофейне новая подборка начнётся со следующего трека – текущий трек доиграет.";
+export const ATMOSPHERE_REBUILD_DONE_NOTE = "В заведении новая подборка начнётся со следующего трека – текущий трек доиграет.";
 
 /** «Уютная, Джаз» – the two choices that make the venue playlist. */
 export function atmosphereChoiceLabel(profile: Pick<GuestCoffeeProfile, "character" | "direction">): string {

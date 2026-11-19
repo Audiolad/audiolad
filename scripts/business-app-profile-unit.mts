@@ -104,7 +104,7 @@ assert.match(readFileSync("src/app/business-app/profile/actions.ts", "utf8"), /r
 assert.doesNotMatch(readFileSync("src/app/business-app/profile/actions.ts", "utf8"), /optional surname/);
 
 assert.doesNotMatch(form, /Например, Анна/);
-assert.match(form, />Название кофейни \/ организации</);
+assert.match(form, />Название заведения \/ организации</);
 assert.match(form, /data-testid="biz-profile-organization-name"/);
 assert.match(form, /BUSINESS_ORGANIZATION_NAME_HINT/);
 assert.match(form, /businessProfileOrganizationFieldValue/);
@@ -141,7 +141,7 @@ assert.doesNotMatch(action, /"Имя не сохранено/);
 assert.match(action, /first_name: parsed\.ownerName/);
 assert.doesNotMatch(action, /CREATE TABLE|ALTER TABLE|migration/, "no DB migration – reuse rename_business_organization");
 const panel = readFileSync("src/components/business-app/VenueControlPanel.tsx", "utf8");
-assert.doesNotMatch(panel, /Название кофейни|biz-venue-name|biz-venue-rename|action: "rename"/, "settings do not edit the cafe name");
+assert.doesNotMatch(panel, /Название заведения|Название кофейни|biz-venue-name|biz-venue-rename|action: "rename"/, "settings do not edit the cafe name");
 const pointRoute = readFileSync("src/app/api/business/point/route.ts", "utf8");
 assert.doesNotMatch(pointRoute, /rename_business_location/, "hall rename stays off the point API");
 assert.match(readFileSync("src/components/business-app/BusinessVenuePlaceForm.tsx", "utf8"), /saveBusinessLocationVenue/, "hall name is edited in the venue place form");

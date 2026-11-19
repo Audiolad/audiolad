@@ -48,10 +48,10 @@ export async function saveBusinessProfile(input: {
         p_organization_id: domain.organizationId, p_name: next,
       });
       if (error?.code === "42501") {
-        return { ok: false, error: "Название кофейни / организации может изменить только владелец." } as const;
+        return { ok: false, error: "Название заведения / организации может изменить только владелец." } as const;
       }
       if (error || !(data as { ok?: boolean } | null)?.ok) {
-        return { ok: false, error: "Не удалось сохранить название кофейни / организации. Попробуйте ещё раз." } as const;
+        return { ok: false, error: "Не удалось сохранить название заведения / организации. Попробуйте ещё раз." } as const;
       }
       organizationName = (data as { name?: string } | null)?.name ?? next;
     } else {
@@ -66,7 +66,7 @@ export async function saveBusinessProfile(input: {
   });
   if (error) {
     // Auth and public data cannot share a transaction. Be explicit about a partial save.
-    return { ok: false, error: "Имя и фамилия не сохранены. Название кофейни / организации могло сохраниться. Повторите попытку." } as const;
+    return { ok: false, error: "Имя и фамилия не сохранены. Название заведения / организации могло сохраниться. Повторите попытку." } as const;
   }
   // The client refreshes the RSC payload, including the layout domain provider, without
   // invalidating/remounting the persistent cabinet player.
@@ -97,7 +97,7 @@ export async function saveBusinessTimezone(input: { timezone: string }) {
   if (!user) return { ok: false, error: "Войдите в аккаунт ещё раз." } as const;
   const domain = await loadBusinessOwnerHomeContext();
   if (domain.status !== "authenticated" || !domain.location) {
-    return { ok: false, error: "Кофейня ещё не подключена." } as const;
+    return { ok: false, error: "Заведение ещё не подключено." } as const;
   }
   const location = domain.location;
   const { data: membership, error: memberError } = await supabase.from("business_organization_members")

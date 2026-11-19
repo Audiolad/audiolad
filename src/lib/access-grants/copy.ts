@@ -53,7 +53,7 @@ export const BUSINESS_EMPTY_CATALOG_NOTE =
 export const BUSINESS_CONNECT_VENUE_NOTE =
   "Чтобы в кабинете играла музыка, подключите кофейню. Это занимает около минуты, карта не нужна.";
 
-export const BUSINESS_CONNECT_VENUE_CTA = "Подключить кофейню";
+export const BUSINESS_CONNECT_VENUE_CTA = "Подключить заведение";
 
 export const BUSINESS_SUBSCRIPTION_NOTE =
   `Музыка остановлена. Кабинет и настройки сохранены. Оплата – ${BUSINESS_PAID_PERIOD_DAYS} дней, картой или по СБП, без автосписания.`;

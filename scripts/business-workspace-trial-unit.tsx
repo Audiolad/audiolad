@@ -1219,7 +1219,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
     onboardingHref: businessCabinetOnboardingPath("cafe"),
   })} />);
   assert.match(connect, /data-testid="biz-workspace-connect-venue"/);
-  assert.match(connect, /Подключить кофейню/);
+  assert.match(connect, /Подключить заведение/);
   assert.match(connect, /href="\/onboarding\?type=cafe&amp;next=%2Fworkspace%3Fspace%3Dcafe"/);
   assert.doesNotMatch(connect, /Подборка в этом направлении готовится/);
 

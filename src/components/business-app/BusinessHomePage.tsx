@@ -92,7 +92,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
   );
   const subtitle =
     domain.status === "anonymous"
-      ? "Войдите, чтобы управлять кофейней."
+      ? "Войдите, чтобы управлять заведением."
       : domain.status === "authenticated" && !domain.location
         ? "Подключите своё заведение – это займёт минуту."
         : buildBusinessGreetingSubtitle();
@@ -116,12 +116,12 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             {isCoffeeHostname(hostname) ? "АудиоЛад Кофейня" : "Аудиолад Бизнес"}
           </h1>
           <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
-            Войдите в аккаунт, чтобы подключить кофейню и увидеть реальный статус.
+            Войдите в аккаунт, чтобы подключить заведение и увидеть реальный статус.
           </p>
         </header>
         <section className="business-app-card max-w-xl">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Здесь появится статус вашей кофейни: плеер, что звучит сейчас, документы. Пока вы в
+            Здесь появится статус вашего заведения: плеер, что звучит сейчас, документы. Пока вы в
             гостевом режиме – настройте звучание и послушайте подборки в разделе «Музыка».
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -159,7 +159,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
         <BusinessHomeAccessCard />
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
-            Первая кофейня
+            Первое заведение
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
             Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим кофейню. Всё в одном кабинете.

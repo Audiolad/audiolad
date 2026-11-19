@@ -17,7 +17,7 @@ export default function BusinessOfferReacceptPrompt({ newEdition }: { newEdition
   const [pending, startTransition] = useTransition();
   if (done) return null;
   return (
-    <section className="business-app-card space-y-3" role="status" data-testid="biz-offer-reaccept">
+    <section className="business-app-card business-cert-anchor space-y-3" id="offer-reaccept" role="status" data-testid="biz-offer-reaccept">
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">
         {newEdition ? "Новая редакция договора" : "Примите договор-оферту"}
       </h2>
