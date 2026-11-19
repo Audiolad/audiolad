@@ -14,7 +14,7 @@ writeFileSync(fake, `#!/bin/sh
 out=""; st=""; prev=""
 for a; do case "$prev" in --out) out="$a";; --status) st="$a";; esac; prev="$a"; done
 cat > "$out" <<'JSON'
-{"engine_version":"t1578u-1","created_at":"2026-11-19T08:00:00Z","input":{"name":"input.m4a","sha256":"x","size_bytes":7,"decoded_duration_s":30,"probe":{"tags":{}}},
+{"engine_version":"t1578u-2","created_at":"2026-11-19T08:00:00Z","input":{"name":"input.m4a","sha256":"x","size_bytes":7,"decoded_duration_s":30,"probe":{"tags":{}}},
  "index":{"version":"v1","built_at":"2026-11-19T07:00:00Z","audfprint_sha256":"a","counts":{"catalog":149,"control":18,"failed":0},"olaf":{"available":true,"version":"3.3.3"}},
  "params":{"window_s":10,"hop_s":5},"claimed_refs":[],"windows":[],
  "segments":[{"code":"AL-T-000001697","kind":"catalog","rec_from_s":0,"rec_to_s":20,"track_from_s":50,"track_to_s":70,"windows":3,"both":2,"confidence":"high"}],

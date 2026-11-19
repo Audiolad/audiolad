@@ -44,7 +44,7 @@ import audfprint_analyze  # noqa: E402
 import audfprint_match  # noqa: E402
 import hash_table  # noqa: E402
 
-ENGINE_VERSION = "t1578u-1"
+ENGINE_VERSION = "t1578u-2"
 SR = 11025
 # Memory bounds on the shared production host (float32 at 11.025 + 16 kHz ≈ 0.11 GB per hour).
 MATCH_MAX_DURATION_S = 2 * 3600
@@ -54,7 +54,11 @@ OLAF_SR = 16000
 DENSITY = 20.0
 HASHBITS = 20
 DEPTH = 20
-MAXTIME = 16384  # frames of 256 samples at 11025 Hz = 380 s
+# Time field of the audfprint hash entries: 2^18 frames of 256 samples at 11025 Hz = 101 min, which
+# covers REF_MAX_DURATION_S (positions beyond it would wrap). The rest of the 32-bit entry is the
+# track id: up to 2^14 − 1 = 16383 reference tracks per index.
+MAXTIME = 1 << 18
+MAX_REF_TRACKS = (1 << (32 - 18)) - 1
 FANOUT = 3
 PKS_PER_FRAME = 5
 FREQ_SD = 30.0
@@ -64,6 +68,7 @@ AUDFPRINT_MIN_ALIGNED = 10  # t1578u benchmark: in-catalog look-alikes reach 9, 
 OLAF_MIN_COUNT = 12  # t1578u benchmark: impostors reach 10
 OFFSET_TOLERANCE_S = 1.5
 T_HOP = 256 / SR
+assert REF_MAX_DURATION_S / T_HOP < MAXTIME, "reference cap must fit the audfprint time field"
 
 
 def log(msg: str) -> None:
@@ -411,6 +416,9 @@ def _build(args, manifest) -> int:
     if not entries:
         log("build_empty_manifest")
         return 2
+    if len(entries) > MAX_REF_TRACKS:
+        log("build_too_many_tracks %d" % len(entries))
+        return 2
     out_dir = os.path.abspath(args.out)
     if os.path.exists(out_dir):
         log("build_out_exists")
@@ -515,7 +523,7 @@ def build_extra_refs(extras: list, olaf: str | None, tmp: str):
     if not extras:
         return None, None, []
     an = make_analyzer(1)
-    ht = hash_table.HashTable(hashbits=HASHBITS, depth=DEPTH, maxtime=1 << 16)
+    ht = hash_table.HashTable(hashbits=HASHBITS, depth=DEPTH, maxtime=MAXTIME)
     home = os.path.join(tmp, "olaf-extra")
     if olaf:
         olaf_prepare_home(home)
@@ -727,7 +735,7 @@ def summarize(windows: list, segments: list) -> dict:
             by["conflict"] += 1
         else:
             by[v["kind"] if v["kind"] in by else "catalog"] += 1
-    claimed = sum(1 for w in windows if (w.get("claimed_verdict") or {}).get("status") not in (None, "none"))
+    claimed = sum(1 for w in windows if (w.get("claimed_verdict") or {}).get("status") in ("both", "audfprint", "olaf"))
     return {"windows": total, "catalog_windows": by["catalog"], "control_windows": by["control"],
             "unmatched_windows": by["none"], "conflict_windows": by["conflict"], "claimed_windows": claimed,
             "catalog_tracks": sorted({s["code"] for s in segments if s["kind"] == "catalog"})}
@@ -794,6 +802,9 @@ def cmd_selftest(args) -> int:
             r = json.load(fh)
         segs = r["segments"]
         ok = bool(segs) and segs[0]["code"] == "AL-T-SELF-1" and abs(segs[0]["track_from_s"] - 12.0) < 1.0
+        # A conflicting claimed window is not counted as the claimant's track being heard.
+        ok = ok and summarize([{"verdict": {"status": "none"}, "claimed_verdict": {"status": "conflict"}}], [])[
+            "claimed_windows"] == 0
         print(json.dumps({"selftest": "ok" if ok else "fail", "segments": segs}, ensure_ascii=False))
         return 0 if ok else 1
 
