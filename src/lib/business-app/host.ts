@@ -71,6 +71,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/privacy": `${BUSINESS_SITE_PATH}/documents/privacy`,
   "/documents/privacy": `${BUSINESS_SITE_PATH}/documents/privacy`,
   "/documents/business-offer": `${BUSINESS_SITE_PATH}/documents/business-offer`,
+  // t1591u: certificate of the owner's point (screen + print to PDF).
+  "/documents/sertifikat": `${BUSINESS_SITE_PATH}/documents/sertifikat`,
   "/documents/venue-license": `${BUSINESS_SITE_PATH}/documents/venue-license`,
   "/documents/b2b-terms": `${BUSINESS_SITE_PATH}/documents/b2b-terms`,
   "/documents/claims-procedure": `${BUSINESS_SITE_PATH}/documents/claims-procedure`,

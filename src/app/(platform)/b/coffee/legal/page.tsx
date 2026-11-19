@@ -17,6 +17,7 @@ import BusinessLegalShell, {
 import {
   BUSINESS_LEGAL_CERTIFICATE_HREF,
   BUSINESS_LEGAL_OFFER_EDITION,
+  BUSINESS_LEGAL_OFFER_HREF,
   BUSINESS_LEGAL_OPERATOR,
   BUSINESS_LEGAL_PROTECTION_HREF,
   BUSINESS_LEGAL_RESPONSE_DAYS,
@@ -31,6 +32,11 @@ export const metadata: Metadata = {
 };
 
 const sections = [
+  {
+    href: BUSINESS_LEGAL_OFFER_HREF,
+    title: "Договор-оферта «АудиоЛад Кофейня»",
+    text: "Редакция 3 от 18.11.2026 с приложениями: лицензия, сертификат точки, защита заведения, комплект документов",
+  },
   {
     href: BUSINESS_LEGAL_RIGHTS_HREF,
     title: "Как устроены права на музыку",

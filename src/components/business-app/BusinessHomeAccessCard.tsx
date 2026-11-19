@@ -71,7 +71,14 @@ export function useBusinessHomePay() {
   const access = useBusinessChromeAccess();
   const domain = useBusinessDomain();
   const canPay = domain.status === "authenticated" && domain.canPay && !domain.pilotBilling?.renewalBlocked;
-  const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
+  const serverAccepted = domain.status === "authenticated" && domain.offerAccepted;
+  const [accepted, setAccepted] = useState(serverAccepted);
+  const [acceptedSource, setAcceptedSource] = useState(serverAccepted);
+  if (acceptedSource !== serverAccepted) {
+    // t1591u: the edition was accepted elsewhere (prompt above, then router.refresh): show «Оплатить» at once.
+    setAcceptedSource(serverAccepted);
+    if (serverAccepted) setAccepted(true);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
   const needsReceiptEmail = domain.status === "authenticated" && Boolean(domain.needsReceiptEmail);

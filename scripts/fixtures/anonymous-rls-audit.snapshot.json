@@ -6701,6 +6701,11 @@
       "statement": "GRANT EXECUTE ON FUNCTION public.analytics_session_is_prefetch_ghost( uuid, uuid, text, timestamptz, timestamptz, text, text, text ) TO service_role;"
     },
     {
+      "file": "supabase/migrations/20270317120000_business_coffee_legal_kit.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.issue_business_venue_certificate(uuid, uuid, text, jsonb, timestamptz, timestamptz, text, text, timestamptz) TO service_role;"
+    },
+    {
       "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.seal_playback_usage_facts(integer) TO service_role;"

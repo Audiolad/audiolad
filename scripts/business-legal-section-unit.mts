@@ -13,6 +13,7 @@ import {
   BUSINESS_LEGAL_CERTIFICATE_HREF,
   BUSINESS_LEGAL_CONTACT,
   BUSINESS_LEGAL_HREF,
+  BUSINESS_LEGAL_OFFER_HREF,
   BUSINESS_LEGAL_PROTECTION_HREF,
   BUSINESS_LEGAL_RIGHTS_HREF,
   BUSINESS_LEGAL_ROBOTS,
@@ -27,6 +28,17 @@ const COMPONENT_DIR = join(ROOT, "src/components/business/legal");
 const OWN_FILES = new Set([
   join(ROOT, "src/lib/business/legal/section.ts"),
 ]);
+// t1591u: кабинет владельца ссылается на раздел (договор, сертификат точки, QR). Меню, подвал и sitemap – нет.
+const CABINET_LINKERS = new Set([
+  join(ROOT, "src/lib/business-app/business-offer-content.ts"), // текст оферты: адрес страницы проверки
+  join(ROOT, "src/lib/business/legal/certificate.ts"),
+  join(ROOT, "src/lib/business/legal/certificate.server.ts"),
+  join(ROOT, "src/lib/business/legal/certificate-context.server.ts"),
+  join(ROOT, "src/app/business-app/documents/page.tsx"),
+  join(ROOT, "src/app/business-app/documents/business-offer/page.tsx"),
+  join(ROOT, "src/app/business-app/documents/sertifikat/page.tsx"),
+  join(ROOT, "src/components/business-app/legal/BusinessCertificateSetup.tsx"),
+]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -38,7 +50,7 @@ function walk(dir: string): string[] {
 const sectionFiles = walk(SECTION_DIR);
 const componentFiles = walk(COMPONENT_DIR);
 const pages = sectionFiles.filter((f) => f.endsWith("page.tsx"));
-assert.equal(pages.length, 5, "5 страниц раздела");
+assert.equal(pages.length, 6, "6 страниц раздела (t1591u: + договор-оферта)");
 assert.ok(sectionFiles.some((f) => f.endsWith(`${join("legal", "layout.tsx")}`)), "layout раздела");
 assert.ok(componentFiles.some((f) => f.endsWith("business-legal.css")), "coffee CSS");
 for (const f of [...sectionFiles, ...componentFiles]) OWN_FILES.add(f);
@@ -70,18 +82,22 @@ assert.equal(BUSINESS_LEGAL_HREF, "/b/coffee/legal");
 assert.equal(BUSINESS_LEGAL_RIGHTS_HREF, "/b/coffee/legal/prava");
 assert.equal(BUSINESS_LEGAL_PROTECTION_HREF, "/b/coffee/legal/zashchita");
 assert.equal(BUSINESS_LEGAL_CERTIFICATE_HREF, "/b/coffee/legal/sertifikat");
+assert.equal(BUSINESS_LEGAL_OFFER_HREF, "/b/coffee/legal/oferta");
 
 // ссылки на раздел только изнутри раздела
 const offenders = walk(join(ROOT, "src"))
-  .filter((f) => /\.(tsx?|mts|md|mdx|json)$/.test(f) && !OWN_FILES.has(f))
+  .filter((f) => /\.(tsx?|mts|md|mdx|json)$/.test(f) && !OWN_FILES.has(f) && !CABINET_LINKERS.has(f))
   .filter((f) => /["'`(]\/b\/(?:coffee\/)?legal|audiolad\.ru\/b\/(?:coffee\/)?legal|business\/legal\/section|business\/legal\/BusinessLegalShell/.test(readFileSync(f, "utf8")));
-assert.deepEqual(offenders, [], "на /b/coffee/legal никто не ссылается");
+assert.deepEqual(offenders, [], "на /b/coffee/legal ссылается только кабинет владельца");
+for (const f of ["src/components/business-app/BusinessSidebar.tsx", "src/components/business-app/BusinessBottomNav.tsx", "src/lib/business-app/nav.ts"]) {
+  assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), /coffee\/legal|business\/legal\/section/, `${f}: раздела нет в меню`);
+}
 
 // тексты
 for (const f of [...sectionFiles, ...OWN_FILES]) {
   const text = readFileSync(f, "utf8");
   assert.doesNotMatch(text, /—/, `${f}: длинное тире`);
-  const external = [...text.matchAll(/https?:\/\/[^\s"'`)]+/g)].map((m) => m[0]);
+  const external = [...text.matchAll(/https?:\/\/[^\s"'`)]+/g)].map((m) => m[0]).filter((u) => !/^https:\/\/audiolad\.ru(\/|$)/.test(u));
   assert.deepEqual(external, [], `${f}: внешние ссылки в тексте`);
   assert.doesNotMatch(text, /Suno|уточнить|\[ЮРИСТ|\[СЕРГЕЙ/i, `${f}: черновые пометки`);
 }
@@ -148,6 +164,20 @@ assert.doesNotMatch(protectionPage, /Юридическая защита и во
 assert.doesNotMatch(protectionPage, /Возмещение по решению суда/, "старый заголовок шага убран");
 assert.match(indexPage, /в пределах 300 000 рублей на одну точку за 12 месяцев; расходы на юридическую защиту, которую организуем мы, в этот лимит не входят/, "на главной лимит только на возмещение");
 assert.doesNotMatch(indexPage, /в четырёх шагах/, "старый заголовок четырёх шагов убран");
+// t1591u: пробная (подарочная) неделя – действующий доступ; начатая защита доводится до конца.
+assert.match(protectionPage, /доступ к этой точке действует – оплаченный или подарочный период/, "подарочный период считается");
+assert.match(protectionPage, /Если защита уже\s+началась, доводим спор до конца/, "начатую защиту доводим");
+assert.match(protectionPage, /Ведём дело во всех инстанциях, в том числе административные дела по ч\. 1 ст\. 7\.12 КоАП РФ/);
+assert.doesNotMatch(protectionPage, /доступ к этой точке оплачен/, "нет условия «только оплаченный доступ»");
+const offerPage = readFileSync(join(SECTION_DIR, "oferta/page.tsx"), "utf8");
+assert.match(offerPage, /BUSINESS_OFFER_SOURCE\.markdown/, "оферта – тот же принятый текст");
+assert.match(offerPage, /BUSINESS_LEGAL_OFFER_PDF_PATH/);
+assert.match(indexPage, /href: BUSINESS_LEGAL_OFFER_HREF/, "главная раздела ведёт на оферту");
+const certPage = readFileSync(join(SECTION_DIR, "sertifikat/page.tsx"), "utf8");
+assert.doesNotMatch(certPage, /юридическ\S* адрес/, "юр. адрес не обещаем: реестр его не отдаёт");
+const checkPage = readFileSync(join(SECTION_DIR, "sertifikat/[number]/page.tsx"), "utf8");
+assert.match(checkPage, /loadCertificateCheck/, "проверка настоящих сертификатов из базы");
+assert.match(checkPage, /force-dynamic/);
 
 const headerNav = /className="business-legal__brand"|business-legal__crumbs/;
 for (const f of [...sectionFiles, ...componentFiles]) {

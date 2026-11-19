@@ -15,6 +15,15 @@ import {
 } from "@/lib/business-app/licensing-copy";
 import { venuePlaceLine } from "@/lib/business-app/venue-place";
 
+import BusinessCertificateSetup from "@/components/business-app/legal/BusinessCertificateSetup";
+import { loadCabinetCertificateContext } from "@/lib/business/legal/certificate-context.server";
+import {
+  BUSINESS_LEGAL_CONTACT,
+  BUSINESS_LEGAL_NOTIFY_DAYS,
+  BUSINESS_LEGAL_OFFER_PDF,
+  businessLegalAbsoluteUrl,
+  BUSINESS_LEGAL_HREF,
+} from "@/lib/business/legal/section";
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
   CLIENT_DOCUMENT_REQUISITES,
@@ -64,6 +73,12 @@ async function loadDocumentsQr(mode: BusinessCabinetMode, pointVenue: Awaited<Re
   };
 }
 
+/**
+ * t1591u: лицензия, условия и порядок защиты редакции 18.10.2026 вошли в договор-оферту редакции 3 как приложения,
+ * поэтому в списке действующих остаётся только политика персональных данных. Старые тексты открываются по прямой ссылке.
+ */
+const CABINET_DOCUMENT_IDS: ReadonlySet<string> = new Set(["privacy"]);
+
 export default async function BusinessAppDocumentsPage({ searchParams }: PageProps) {
   const hostname = getHostnameFromHeaders(await headers());
   const sp = await searchParams;
@@ -105,6 +120,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         ? loadedQr.qrUrl
         : null;
   const sticker = cabinet.mode === "point" ? null : addressReady ? loadedQr.sticker : null;
+  const certificate = await loadCabinetCertificateContext();
   const showAddressPrompt =
     !venueSide && ownerLocation && !addressReady && businessCabinetCan({ mode: cabinet.mode }, "stickerDownload");
 
@@ -122,11 +138,12 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Документы
         </h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Действующие документы «АудиоЛад Бизнес». Оператор сервиса:{" "}
+          Действующие документы «АудиоЛад Кофейня». Оператор сервиса:{" "}
           <span data-testid="client-documents-requisites">{CLIENT_DOCUMENT_REQUISITES}</span>.
         </p>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Правообладатели треков указываются по данным реестра прав сервиса в отчёте «Что играло в заведении».
+          Изготовитель и правообладатель фонограмм каталога – сам сервис, лицензию заведению он предоставляет напрямую
+          (договор-оферта, п. 1.3).
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           <li data-doc-id={BUSINESS_OFFER_EDITION.documentKey}>
@@ -144,7 +161,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Посмотреть</span>
             </Link>
           </li>
-          {CLIENT_DOCUMENTS.map((doc) => (
+          {CLIENT_DOCUMENTS.filter((doc) => CABINET_DOCUMENT_IDS.has(doc.id)).map((doc) => (
             <li key={doc.id} data-doc-id={doc.id}>
               <Link
                 href={clientDocumentHref(doc.id)}
@@ -160,22 +177,44 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               </Link>
             </li>
           ))}
+          <li data-doc-id="business-offer-pdf">
+            <a target="_blank" rel="noopener noreferrer"
+              href={BUSINESS_LEGAL_OFFER_PDF}
+              className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
+              data-doc-link="business-offer-pdf" 
+            >
+              <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">Договор-оферта с приложениями – PDF</div>
+              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">Тот же текст в PDF. Подписывать не нужно: договор принимается в кабинете.</p>
+              <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Скачать</span>
+            </a>
+          </li>
+          <li data-doc-id="legal-section">
+            <a target="_blank" rel="noopener noreferrer"
+              href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_HREF)}
+              className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
+              data-doc-link="legal-section" 
+            >
+              <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">Правовая информация «АудиоЛад Кофейня»</div>
+              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">Как устроены права на музыку, защита заведения, сертификат точки и проверка по QR-коду.</p>
+              <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть</span>
+            </a>
+          </li>
         </ul>
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
           Получили претензию или пришла проверка? Ничего не подписывайте по
-          существу и не платите на месте. Сообщите нам через раздел «Помощь»
-          в течение 3 рабочих дней, а лучше в тот же день – сроки и исключения
-          (обязательные по закону действия, поздно полученный иск, отсутствие
-          нашего ответа) указаны в пп. 2.1–2.2 «Порядка защиты клиента».
+          существу и не платите на месте. Сообщите нам в течение {BUSINESS_LEGAL_NOTIFY_DAYS} рабочих дней,
+          а лучше в тот же день: {BUSINESS_LEGAL_CONTACT.email}, телефон и МАКС {BUSINESS_LEGAL_CONTACT.phoneDisplay}.
+          Сроки и исключения – в разделе 2 приложения 3 к договору-оферте.
         </p>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Без нашего письменного согласия не признавайте требования, не платите
           и не заключайте мировое соглашение, если этого не требует закон, суд
-          или государственный орган. Мы помогаем документами, письменной позицией
-          и участием в деле; возмещение возможно только по вступившему в законную силу
-          судебному акту на условиях раздела 4 порядка.
+          или государственный орган. Защиту ведём и оплачиваем мы; финансовое
+          возмещение – на условиях раздела 6 приложения 3.
         </p>
       </section>
+
+      <BusinessCertificateSetup context={certificate} />
 
       {showAddressPrompt ? (
         <section className="business-app-card space-y-2" data-testid="biz-venue-qr-needs-address">

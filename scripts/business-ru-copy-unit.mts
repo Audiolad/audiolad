@@ -13,6 +13,8 @@ const attributes = new Set(["aria-label", "aria-description", "title", "alt", "p
 const allowed = new Set([
   "AudioLad", // Registered brand name, permitted in cabinet copy.
   "UTC", // Owner-requested zone labels «Москва (UTC+3)» in Профиль (04.11.2026).
+  "PDF", // t1591u: формат файла договора и сертификата для печати (19.11.2026).
+  "DOCX", // t1591u: договор-оферта в редактируемом формате для юриста клиента (19.11.2026).
   "QR", // Owner-approved block title «QR-наклейка с подтверждением прав на музыку» (90d24628, 30.10.2026).
 ]);
 

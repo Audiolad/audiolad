@@ -90,13 +90,13 @@ function sameInstant(a: string, b: string): boolean {
   return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) < 1000;
 }
 
-function clockOf(grant: GrantRow | null, paidUntil: string | null): VenueLicenceClock | null {
+export function clockOf(grant: GrantRow | null, paidUntil: string | null): VenueLicenceClock | null {
   if (!grant && !paidUntil) return null;
   if (paidUntil && (!grant || Date.parse(paidUntil) >= Date.parse(grant.endsAt))) return "subscription";
   return "gift";
 }
 
-function periodOf(
+export function periodOf(
   clock: VenueLicenceClock | null,
   grant: GrantRow | null,
   paidUntil: string | null,

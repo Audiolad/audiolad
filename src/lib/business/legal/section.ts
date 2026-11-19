@@ -4,16 +4,30 @@ import { SERGEY_CONTACT } from "@/lib/business-app/sergey-contact";
 
 /**
  * Правовой раздел «АудиоЛад Кофейня» – audiolad.ru/b/coffee/legal (t1544u, t1567u).
- * Пока раздел скрыт: noindex, nofollow, нет в sitemap, нет ссылок из меню,
- * подвала и других страниц. Открывает только Сергей.
+ * Раздел скрыт от поиска: noindex, nofollow, нет в sitemap, нет ссылок из меню и подвала сайта.
+ * Открывается по прямой ссылке; на него ссылается кабинет владельца (договор, сертификат точки)
+ * и QR-код сертификата (t1591u).
  */
 export const BUSINESS_LEGAL_HREF = "/b/coffee/legal";
 export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/coffee/legal/prava";
 export const BUSINESS_LEGAL_PROTECTION_HREF = "/b/coffee/legal/zashchita";
 export const BUSINESS_LEGAL_CERTIFICATE_HREF = "/b/coffee/legal/sertifikat";
+/** Договор-оферта «АудиоЛад Кофейня», ред. 3, с приложениями 1–4 (t1591u). */
+export const BUSINESS_LEGAL_OFFER_HREF = "/b/coffee/legal/oferta";
+
+/** Сайт раздела: кабинет живёт на coffee./business., раздел – на audiolad.ru. */
+export const BUSINESS_LEGAL_SITE = "https://audiolad.ru";
+export function businessLegalAbsoluteUrl(path: string): string {
+  return `${BUSINESS_LEGAL_SITE}${path}`;
+}
+/** Файлы ред. 3 (тот же текст, что docs/business/public/business-offer.md). */
+export const BUSINESS_LEGAL_OFFER_PDF_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red3.pdf";
+export const BUSINESS_LEGAL_OFFER_DOCX_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red3.docx";
+export const BUSINESS_LEGAL_OFFER_PDF = businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_PDF_PATH);
 
 export const BUSINESS_LEGAL_PATHS = [
   BUSINESS_LEGAL_HREF,
+  BUSINESS_LEGAL_OFFER_HREF,
   BUSINESS_LEGAL_RIGHTS_HREF,
   BUSINESS_LEGAL_PROTECTION_HREF,
   BUSINESS_LEGAL_CERTIFICATE_HREF,
@@ -61,7 +75,7 @@ export type BusinessLegalCertificate = {
   catalog: string;
 };
 
-/** Образец (данные вымышлены). Настоящих сертификатов в базе пока нет. */
+/** Образец (данные вымышлены). Настоящие сертификаты – в базе (business_venue_certificates, t1591u). */
 export const BUSINESS_LEGAL_SAMPLE_CERTIFICATE: BusinessLegalCertificate = {
   number: "АЛК-2026-000001",
   urlNumber: "ALK-2026-000001",
