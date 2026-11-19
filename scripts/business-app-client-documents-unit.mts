@@ -10,7 +10,7 @@ import {
   formatVenueZoneRu,
   venueLocalToUtc,
 } from "../src/lib/business-app/client-documents";
-import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
+import { fetchAllPlaybackFacts, queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
 
 // Редакция r6 от 17.10.2026 (owner decision); r6.1 от 18.10.2026 = the same text with en dashes (Sergey 18.10 13:17).
 // Approved, no draft/lawyer marks, requisites present.
@@ -105,10 +105,60 @@ assert.equal(report.tracks[1].coversT, false);
   has("gte", "occurred_at", "2026-10-16T11:30:00.000Z");
   has("lte", "occurred_at", "2026-10-16T12:30:00.000Z");
   has("limit", 2000);
-  // The loader must go through this query helper.
+  has("order", "id", { ascending: true });
+  // The loader must go through the paged helper (t1578u: no silent cut at one server page).
   const loader = readFileSync("src/lib/business-app/load-playback-report.ts", "utf8");
-  assert.match(loader, /queryPlaybackFacts\(service/);
+  assert.match(loader, /fetchAllPlaybackFacts\(service/);
   assert.doesNotMatch(loader, /from\("playback_usage_facts"\)/);
+  assert.doesNotMatch(loader, /limit: MAX_FACTS/);
+}
+
+// t1578u: paged reading of a long window. The mock server holds 2 350 rows and, like PostgREST,
+// never returns more than 1 000 per request.
+async function pagedRun(total: number, maxRows: number) {
+  const ranges: Array<[number, number]> = [];
+  const mk = () => {
+    const b: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "gt", "gte", "lte", "order"]) b[m] = () => b;
+    b.range = (from: number, to: number) => {
+      ranges.push([from, to]);
+      const n = Math.max(0, Math.min(to, total - 1, from + 999) - from + 1);
+      return Promise.resolve({ data: Array.from({ length: n }, (_, i) => ({ id: from + i })), error: null });
+    };
+    return b;
+  };
+  const client = { from: () => mk() };
+  const res = await fetchAllPlaybackFacts(client, {
+    organizationId: "o", locationId: "l", from: "2026-10-16T00:00:00Z", to: "2026-10-17T00:00:00Z", maxRows,
+  });
+  return { res, ranges };
+}
+{
+  const { res, ranges } = await pagedRun(2350, 50_000);
+  assert.equal(res.rows.length, 2350);
+  assert.equal(res.truncated, false);
+  assert.deepEqual(ranges, [[0, 999], [1000, 1999], [2000, 2999]]);
+  const ids = (res.rows as Array<{ id: number }>).map((r) => r.id);
+  assert.equal(new Set(ids).size, 2350);
+}
+{
+  const { res } = await pagedRun(2350, 1500);
+  assert.equal(res.rows.length, 1500);
+  assert.equal(res.truncated, true);
+}
+{
+  const { res } = await pagedRun(1500, 1500);
+  assert.equal(res.rows.length, 1500);
+  assert.equal(res.truncated, false);
+}
+{
+  const report2 = buildPlaybackReport({
+    at: new Date("2026-10-16T12:00:00Z"), windowMinutes: 30, timezone: "Europe/Moscow",
+    facts: [], titles: new Map(), truncated: true,
+  });
+  assert.equal(report2.truncated, true);
+  const page = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+  assert.match(page, /result\.report\.truncated/);
 }
 console.log("business-app-client-documents-unit OK");
 

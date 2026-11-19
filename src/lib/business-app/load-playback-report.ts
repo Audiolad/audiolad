@@ -8,7 +8,7 @@ import {
   type PlaybackReport,
   type RegistryHolderPeriod,
 } from "@/lib/business-app/client-documents";
-import { queryPlaybackFacts } from "@/lib/business-app/playback-facts-query";
+import { fetchAllPlaybackFacts, PLAYBACK_REPORT_MAX_FACTS } from "@/lib/business-app/playback-facts-query";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -20,7 +20,6 @@ export type PlaybackReportResult =
   | { kind: "error"; locationName: string; timezone: string }
   | { kind: "ok"; locationName: string; report: PlaybackReport };
 
-const MAX_FACTS = 2000;
 /** Above this many grant rows the answer may be truncated: treat as unavailable. */
 const MAX_REGISTRY_ROWS = 1000;
 
@@ -84,16 +83,17 @@ async function buildVenuePlaybackReport(
 
   try {
     const service = createServiceRoleClient();
-    const { data: facts, error } = await queryPlaybackFacts(service, {
+    // t1578u: read the whole window page by page (a single request was capped by the server).
+    const paged = await fetchAllPlaybackFacts(service, {
       organizationId,
       locationId: venue.locationId,
       from,
       to,
-      limit: MAX_FACTS,
+      maxRows: PLAYBACK_REPORT_MAX_FACTS,
     });
-    if (error) return { kind: "error", locationName, timezone };
+    if (paged.error) return { kind: "error", locationName, timezone };
 
-    const rows = (facts ?? []) as PlaybackFactRow[];
+    const rows = paged.rows as PlaybackFactRow[];
     const ids = [
       ...new Set(rows.map((r) => r.audio_item_id).filter((x): x is string => !!x)),
     ];
@@ -140,7 +140,7 @@ async function buildVenuePlaybackReport(
     return {
       kind: "ok",
       locationName,
-      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles, rightsholders, registryUnavailable }),
+      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles, rightsholders, registryUnavailable, truncated: paged.truncated }),
     };
   } catch {
     return { kind: "error", locationName, timezone };

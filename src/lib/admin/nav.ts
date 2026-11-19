@@ -1,5 +1,6 @@
 import { COFFEE_TEST_ACCOUNT_HREF } from "@/lib/admin/coffee-test-reset/model";
 import { BUSINESS_PARTNER_CODES_HREF } from "@/lib/admin/business-partner-codes";
+import { BUSINESS_EVIDENCE_HREF } from "@/lib/evidence/constants";
 import { isAdminNavPathActive } from "@/lib/admin/nav-active";
 import {
   snapshotHasPermission,
@@ -131,6 +132,13 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     requiredPermission: "admin_panel.access",
     ownerOnly: true,
     match: (path) => path.startsWith(BUSINESS_PARTNER_CODES_HREF),
+  },
+  {
+    href: BUSINESS_EVIDENCE_HREF,
+    label: "Сверка записей",
+    requiredPermission: "admin_panel.access",
+    ownerOnly: true,
+    match: (path) => path.startsWith(BUSINESS_EVIDENCE_HREF),
   },
   {
     href: "/admin/school-graduates",

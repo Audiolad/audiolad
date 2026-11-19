@@ -108,6 +108,8 @@ export type PlaybackReport = {
   tracks: PlaybackReportTrack[];
   factCount: number;
   registryUnavailable: boolean;
+  /** t1578u: the window held more facts than the report reads; the list is incomplete. */
+  truncated: boolean;
 };
 
 function toNum(v: unknown): number {
@@ -211,6 +213,8 @@ export function buildPlaybackReport(input: {
   rightsholders?: ReadonlyMap<string, readonly RegistryHolderPeriod[]>;
   /** True when the registry could not be read: holders are unknown, not absent. */
   registryUnavailable?: boolean;
+  /** t1578u: true when the facts query hit its cap; shown as an explicit notice. */
+  truncated?: boolean;
 }): PlaybackReport {
   const w = clampWindowMinutes(input.windowMinutes) * 60_000;
   const atMs = input.at.getTime();
@@ -258,6 +262,7 @@ export function buildPlaybackReport(input: {
     tracks,
     factCount: count,
     registryUnavailable: input.registryUnavailable === true,
+    truncated: input.truncated === true,
   };
 }
 
