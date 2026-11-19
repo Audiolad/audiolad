@@ -30,10 +30,10 @@ const PLAYER = "Стойка администратора";
 // Only a confirmed playback failure is red. A long track never turns anything red.
 const states = {
   playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["ok", "Воспроизведение подтверждено"], action: null },
-  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["calm", "Воспроизведение на паузе"], action: "Продолжить можно в плеере точки у администратора." },
-  offline: { label: "Нет связи более 5 минут", tone: "closed", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 6 минут назад", link: ["closed", "Нет связи с плеером"], sound: ["closed", "Нет свежего подтверждения звука"], action: "Музыка на точке может продолжать играть." },
-  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "Точка закрыта"], sound: ["closed", "Воспроизведение не подтверждено"], action: null },
-  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["bad", "Сбой воспроизведения подтверждён"], action: "Проверьте плеер точки или напишите в поддержку." },
+  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["calm", "Воспроизведение на паузе"], action: "Продолжить можно в плеере заведения у администратора." },
+  offline: { label: "Нет связи более 5 минут", tone: "closed", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 6 минут назад", link: ["closed", "Нет связи с плеером"], sound: ["closed", "Нет свежего подтверждения звука"], action: "Музыка в заведении может продолжать играть." },
+  closed: { label: "Заведение закрыто", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "Заведение закрыто"], sound: ["closed", "Воспроизведение не подтверждено"], action: null },
+  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["bad", "Сбой воспроизведения подтверждён"], action: "Проверьте плеер заведения или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
 
@@ -53,7 +53,7 @@ const dayArc = [
 const venues = [
   ["Спа «Тихий сад» · Тверская", "Музыка играет", "ok"],
   ["Спа «Тихий сад» · Арбат", "Музыка играет", "ok"],
-  ["Спа «Тихий сад» · Химки", "Точка закрыта", "closed"],
+  ["Спа «Тихий сад» · Химки", "Заведение закрыто", "closed"],
 ] as const;
 
 const AUTO_ENERGY = 25;
@@ -93,7 +93,7 @@ export default function SpaDesignPreview() {
       <div>
         <h3>{status.title}</h3>
         <p className={styles.checked}>{status.checked}</p>
-        <ul className={styles.signals} aria-label="Сигналы точки">
+        <ul className={styles.signals} aria-label="Сигналы заведения">
           <li><span className={`${styles.dot} ${styles[status.link[0]]}`} aria-hidden="true" />{status.link[1]}</li>
           <li><span className={`${styles.dot} ${styles[status.sound[0]]}`} aria-hidden="true" />{status.sound[1]}</li>
         </ul>
@@ -122,14 +122,14 @@ export default function SpaDesignPreview() {
           <p className={styles.time}><span>{fmt(track.position)}</span><span>{fmt(track.length)}</span></p>
         </>
       ) : (
-        <p className={styles.note}>{state === "closed" ? "Точка закрыта. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит."}</p>
+        <p className={styles.note}>{state === "closed" ? "Заведение закрыто. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит."}</p>
       )}
       <p className={styles.where} data-testid="where">
         <span className={`${styles.dot} ${styles[state === "playing" ? "ok" : state === "paused" ? "calm" : "closed"]}`} aria-hidden="true" />
-        {state === "playing" ? `Играет на плеере точки · ${PLAYER}` : state === "paused" ? `На паузе на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
+        {state === "playing" ? `Играет на плеере заведения · ${PLAYER}` : state === "paused" ? `На паузе на плеере заведения · ${PLAYER}` : `Плеер заведения · ${PLAYER}`}
       </p>
       <button type="button" className={styles.primaryWide}>Управление музыкой</button>
-      <p className={styles.note}>Откроется отдельный плеер точки – его использует персонал.</p>
+      <p className={styles.note}>Откроется отдельный плеер заведения – его использует персонал.</p>
     </section>
   );
 
@@ -211,9 +211,9 @@ export default function SpaDesignPreview() {
   const licenseCard = (
     <section className={styles.card} aria-labelledby="lic">
       <h3 id="lic">Лицензия и документы</h3>
-      <p>Музыка точки лицензирована · пример</p>
+      <p>Музыка заведения лицензирована · пример</p>
       <dl className={styles.facts}>
-        <div><dt>Точка</dt><dd>Спа «Тихий сад» · Тверская</dd></div>
+        <div><dt>Заведение</dt><dd>Спа «Тихий сад» · Тверская</dd></div>
         <div><dt>Период</dt><dd>01.10.2026 – 30.09.2027</dd></div>
         <div><dt>Покрывает</dt><dd>Фоновая музыка в зале и кабинетах</dd></div>
       </dl>
@@ -238,7 +238,7 @@ export default function SpaDesignPreview() {
 
   const locationsCard = (
     <section className={styles.card} aria-labelledby="loc">
-      <h3 id="loc">Мои точки</h3>
+      <h3 id="loc">Мои заведения</h3>
       <p className={styles.muted}>2 играют · 1 закрыта · действий не требуется</p>
       <ul className={styles.venues}>
         {venues.map(([name, st, tone]) => <li key={name}><span className={`${styles.dot} ${styles[tone]}`} aria-hidden="true" /><span>{name}</span><span className={styles.muted}>{st}</span></li>)}
@@ -263,7 +263,7 @@ export default function SpaDesignPreview() {
       <h3 id="co">Компания и оплата</h3>
       <dl className={styles.facts}>
         <div><dt>Компания</dt><dd>ООО «Тихий сад» · пример</dd></div>
-        <div><dt>Тариф</dt><dd>Аудиолад Бизнес · 3 точки</dd></div>
+        <div><dt>Тариф</dt><dd>Аудиолад Бизнес · 3 заведения</dd></div>
         <div><dt>Оплачено до</dt><dd>30.09.2027</dd></div>
       </dl>
       <button type="button" className={styles.secondary}>Счета и акты</button>
@@ -292,7 +292,7 @@ export default function SpaDesignPreview() {
       </header>
       <div className={styles.banner}>
         <strong>Макет – не реальные данные</strong>
-        <p>Точки, время и статусы вымышлены; треки и обложки – примеры из каталога Аудиолад. Кнопки меняют только макет. Звука и сохранения нет.</p>
+        <p>Заведения, время и статусы вымышлены; треки и обложки – примеры из каталога Аудиолад. Кнопки меняют только макет. Звука и сохранения нет.</p>
       </div>
       <div className={styles.controls}>
         <label>Экран
@@ -314,7 +314,7 @@ export default function SpaDesignPreview() {
       </div>
       <div className={`${styles.frame} ${frame === "phone" ? styles.phone : styles.desktop}`} data-testid="mock">
         <div className={styles.mockHeader}>
-          <div><strong>{POINT}</strong><p>Тверская · ваша точка</p></div>
+          <div><strong>{POINT}</strong><p>Тверская · ваше заведение</p></div>
           <span className={styles.badge}>Макет</span>
         </div>
         <div className={styles.shell}>

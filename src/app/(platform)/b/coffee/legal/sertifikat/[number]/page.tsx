@@ -139,7 +139,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
       <section className={legalCardClass}>
         <h2 className={legalH2Class}>Что это значит</h2>
         <p className={"mt-4 " + legalBodyClass}>
-          Если статус «Действует», точка подключена к «АудиоЛад Кофейня» и имеет право включать музыку каталога через
+          Если статус «Действует», заведение подключена к «АудиоЛад Кофейня» и имеет право включать музыку каталога через
           плеер сервиса до указанной даты. Права на фонограммы каталога лицензиат получает напрямую от их изготовителя и
           правообладателя. Как устроены права – в разделе{" "}
           <Link href={BUSINESS_LEGAL_RIGHTS_HREF} className={legalLinkClass} {...legalDocLinkProps}>
@@ -147,7 +147,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
           </Link>
           , о сертификате –{" "}
           <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass} {...legalDocLinkProps}>
-            «Сертификат на точку»
+            «Сертификат на заведение»
           </Link>
           , условия – в{" "}
           <Link href={BUSINESS_LEGAL_OFFER_HREF} className={legalLinkClass} {...legalDocLinkProps}>

@@ -168,7 +168,7 @@ export const BUSINESS_RELIEF = [
   { id: "dayparts", text: "менять музыку вручную утром, днём и вечером" },
   { id: "staff", text: "контролировать, что включил персонал" },
   { id: "rights", text: "самостоятельно разбираться в правах и документах" },
-  { id: "sites", text: "отдельно следить за каждой точкой" },
+  { id: "sites", text: "отдельно следить за каждым заведением" },
 ] as const;
 
 export const BUSINESS_RELIEF_CLOSER =
@@ -250,9 +250,9 @@ export const BUSINESS_ROLES = [
   { id: "staff", title: "Сотрудник", text: "Пропустить, спокойнее, энергичнее" },
 ] as const;
 
-export const BUSINESS_NETWORK_TITLE = "Одна точка сегодня. Сеть завтра.";
+export const BUSINESS_NETWORK_TITLE = "Одно заведение сегодня. Сеть завтра.";
 export const BUSINESS_NETWORK_LEAD =
-  "Добавляйте новые точки в один кабинет и управляйте музыкой централизованно.";
+  "Добавляйте новые заведения в один кабинет и управляйте музыкой централизованно.";
 export const BUSINESS_LOCATION_PREVIEW = [
   { id: "cafe", name: "Кофейня", now: "Спокойная", status: "playing" },
   { id: "salon", name: "Салон красоты", now: "Премиальная", status: "playing" },
@@ -266,7 +266,7 @@ export const BUSINESS_SUPPORT_NOTE = "Менеджер – только если
 
 export const BUSINESS_PRICE_TITLE = "Понятная цена. Никаких неожиданных списаний.";
 export const BUSINESS_PRICE_ROWS = [
-  { id: "point", title: "Цена точки", text: "Одна понятная сумма за точку, до оплаты." },
+  { id: "point", title: "Цена заведения", text: "Одна понятная сумма за заведение, до оплаты." },
   { id: "zones", title: "Зоны", text: "Отдельные зоны пространства, если они нужны." },
   { id: "next", title: "Следующее списание", text: "Дата и состав периода видны заранее." },
   { id: "included", title: "Что входит", text: "Музыка для зала, документы и помощь." },
@@ -308,13 +308,13 @@ export const BUSINESS_FAQ = [
     id: "price",
     question: "Как устроена цена?",
     answer:
-      "Цена понятная: без неожиданных списаний. Сумма за точку и зоны показывается до оплаты. На этой странице цифры не публикуются.",
+      "Цена понятная: без неожиданных списаний. Сумма за заведение и зоны показывается до оплаты. На этой странице цифры не публикуются.",
   },
   {
     id: "locations",
-    question: "Можно ли подключить несколько точек?",
+    question: "Можно ли подключить несколько заведений?",
     answer:
-      "Да. Новые точки добавляются в один кабинет, музыкой сети управляют централизованно.",
+      "Да. Новые заведения добавляются в один кабинет, музыкой сети управляют централизованно.",
   },
   {
     id: "rights-orgs",
@@ -470,7 +470,7 @@ export function validateBusinessInquiry(
   }
 
   if (!Number.isInteger(locations) || locations < 1 || locations > 10000) {
-    errors.locations = "Укажите число точек от 1 до 10000.";
+    errors.locations = "Укажите число заведений от 1 до 10000.";
   }
 
   if (message.length > 1000) {
@@ -492,7 +492,7 @@ export function buildBusinessInquiryMailto(input: BusinessInquiryInput): string 
     `Имя: ${input.name.trim()}`,
     `Эл. почта: ${input.email.trim()}`,
     input.company.trim() ? `Компания: ${input.company.trim()}` : null,
-    `Количество точек: ${locations}`,
+    `Количество заведений: ${locations}`,
     input.message.trim() ? `Комментарий: ${input.message.trim()}` : null,
     `Страница: ${BUSINESS_LANDING_CANONICAL}`,
   ].filter((line): line is string => Boolean(line));

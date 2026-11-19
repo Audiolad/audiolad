@@ -156,6 +156,8 @@ const nextConfig: NextConfig = {
     // Retired vertical guide URLs and the moved legal section (301).
     return [
       { source: "/b/legal", destination: "/b/coffee/legal", statusCode: 301 as const },
+      { source: "/b-legal/sertifikat-tochki-obrazec.pdf", destination: "/b-legal/sertifikat-zavedeniya-obrazec.pdf", statusCode: 301 as const },
+      { source: "/b-legal/sertifikat-tochki-obrazec.png", destination: "/b-legal/sertifikat-zavedeniya-obrazec.png", statusCode: 301 as const },
       { source: "/b/legal/:path*", destination: "/b/coffee/legal/:path*", statusCode: 301 as const },
       ...buildVerticalGuideRedirects(),
     ];

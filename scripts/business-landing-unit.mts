@@ -283,7 +283,7 @@ const mailto = buildBusinessInquiryMailto({
 });
 const decodedMailto = decodeURIComponent(mailto.replace(/\+/g, "%20"));
 assert.match(mailto, new RegExp(`^mailto:${BUSINESS_INQUIRY_EMAIL}\\?`));
-assert.match(decodedMailto, /Количество точек: 3/);
+assert.match(decodedMailto, /Количество заведений: 3/);
 assert.match(decodedMailto, /Аудиолад Бизнес/);
 
 const selected = selectBusinessListenCandidates([

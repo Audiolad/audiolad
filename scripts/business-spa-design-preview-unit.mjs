@@ -32,7 +32,7 @@ assert.match(client, /Плеер на связи/);
 assert.match(client, /Воспроизведение подтверждено/);
 assert.doesNotMatch(client, /Связь:|Звук:/);
 assert.match(client, /offline: \{[^\n]*tone: "closed"/);
-assert.match(client, /Музыка на точке может продолжать играть/);
+assert.match(client, /Музыка в заведении может продолжать играть/);
 assert.match(client, /closed: \{[^}]*tone: "closed"/);
 assert.match(client, /failed: \{[^}]*tone: "bad"/);
 assert.equal((client.match(/"bad"/g) || []).length, 2, "only confirmed playback failure may be red (tone + sound signal)");
@@ -49,10 +49,10 @@ assert.match(client, /const COVER = "\/business\/design-preview\/now-playing-cov
 assert.ok(existsSync(new URL("../public/business/design-preview/now-playing-cover.webp", import.meta.url)));
 assert.match(css, /\.progress \{ height:3px;/);
 assert.match(client, /Управление музыкой ↗/);
-assert.match(client, /Играет на плеере точки · \$\{PLAYER\}/);
+assert.match(client, /Играет на плеере заведения · \$\{PLAYER\}/);
 assert.doesNotMatch(client, /Открыть плеер точки/);
-assert.match(client, /state === "playing" \? `Играет на плеере точки/, "only confirmed playback says Играет");
-assert.match(client, /На паузе на плеере точки/);
+assert.match(client, /state === "playing" \? `Играет на плеере заведения/, "only confirmed playback says Играет");
+assert.match(client, /На паузе на плеере заведения/);
 // Desktop side nav lists every section reachable from phone «Ещё».
 for (const label of ["Лицензия и документы", "Уведомления", "Компания и оплата", "Поддержка"]) {
   assert.ok(client.split("const sideNav")[1].split("\n")[0].includes(label), `desktop nav missing ${label}`);

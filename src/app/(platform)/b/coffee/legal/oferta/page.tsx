@@ -17,7 +17,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Договор-оферта – АудиоЛад Кофейня",
-  description: "Договор-оферта «АудиоЛад Кофейня» с приложениями: лицензия, сертификат точки, защита заведения.",
+  description: "Договор-оферта «АудиоЛад Кофейня» с приложениями: лицензия, сертификат заведения, защита заведения.",
   robots: BUSINESS_LEGAL_ROBOTS,
 };
 
@@ -32,7 +32,7 @@ export default function BusinessLegalOfferPage() {
       kicker="Правовая информация"
       breadcrumb="Договор-оферта"
       title="Договор-оферта «АудиоЛад Кофейня»"
-      lead={`${BUSINESS_OFFER_EDITION.label}. Принимается в личном кабинете один раз – для всей учётной записи и всех точек. Приложения 1–4 – часть договора.`}
+      lead={`${BUSINESS_OFFER_EDITION.label}. Принимается в личном кабинете один раз – для всей учётной записи и всех заведений. Приложения 1–4 – часть договора.`}
     >
       <section className={legalCardClass}>
         <p className={legalBodyClass}>Тот же текст для печати:</p>

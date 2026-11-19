@@ -147,7 +147,7 @@ function htmlOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
     assert.equal(href.startsWith("//"), false, href);
   }
   assert.match(html, /Что получает клиент/);
-  assert.match(html, /в конкретной точке/);
+  assert.match(html, /в конкретном заведении/);
   assert.match(html, /Лицензия не освобождает от выплат/);
   assert.match(html, /ИП Петров Сергей Сергеевич/);
   assert.doesNotMatch(html, /https?:\/\//);

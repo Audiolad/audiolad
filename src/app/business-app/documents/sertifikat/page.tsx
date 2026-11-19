@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** Сертификат точки владельца (или точки, к которой привязано устройство зала): экран и PDF. */
+/** Сертификат заведения владельца (или заведения, к которой привязано устройство зала): экран и PDF. */
 export default async function BusinessCertificatePage() {
   const context = await loadCabinetCertificateContext();
   return (
