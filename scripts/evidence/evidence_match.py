@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import gzip
 import datetime as _dt
 import hashlib
 import json
@@ -472,8 +473,18 @@ def _build(args, manifest) -> int:
                                      "elapsed_s": round(time.time() - started, 1), "pid": os.getpid(),
                                      "startedAt": started_iso})
     ht.params = {"samplerate": SR, "density": DENSITY}
-    with contextlib.redirect_stdout(sys.stderr):
-        ht.save(os.path.join(work, "audfprint.pklz"))
+    pklz = os.path.join(work, "audfprint.pklz")
+    # audfprint's save() leaves its gzip file open (closed only by garbage collection); on
+    # Python 3.12 that produced a truncated index. Own the file, close and fsync it, then check
+    # that the whole gzip stream reads back before the version can be activated.
+    with open(pklz, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb") as gz, \
+            contextlib.redirect_stdout(sys.stderr):
+        ht.save(pklz, file_object=gz)
+    with open(pklz, "rb") as raw:
+        os.fsync(raw.fileno())
+    with gzip.open(pklz, "rb") as gz:
+        while gz.read(1 << 20):
+            pass
     ok = [t for t in tracks if t["status"] == "ok"]
     index = {
         "engine_version": ENGINE_VERSION,
