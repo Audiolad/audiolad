@@ -176,22 +176,18 @@ export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, strin
 };
 
 /**
- * Начало непрерывного доступа, который идёт сейчас: окно, покрывающее текущий момент, и все примыкающие к нему
- * более ранние окна (подарочная неделя и оплаченные периоды; продление начинается в конце предыдущего).
+ * Начало срока доступа в сертификате: самое позднее начало среди окон, которые идут сейчас (подарочная неделя,
+ * оплаченные периоды владельца). Берём позднее, чтобы срок никогда не начинался раньше, чем доступ этой точки:
+ * продление начинается после текущего периода, а оплата другой точки может покрывать то же время.
  */
-export function continuousAccessStart(windows: readonly { start: string; end: string }[], now: Date): string | null {
+export function currentAccessStart(windows: readonly { start: string; end: string }[], now: Date): string | null {
   const t = now.getTime();
-  const spans = windows
-    .map((w) => ({ start: Date.parse(w.start), end: Date.parse(w.end), iso: w.start }))
-    .filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end) && w.end > w.start);
-  const covering = spans.filter((w) => w.start <= t && w.end > t).sort((a, b) => a.start - b.start)[0];
-  if (!covering) return null;
-  let start = covering;
-  for (let guard = 0; guard < spans.length; guard += 1) {
-    // Стык до минуты считается непрерывным.
-    const prev = spans.filter((w) => w.start < start.start && w.end >= start.start - 60_000).sort((a, b) => a.start - b.start)[0];
-    if (!prev) break;
-    start = prev;
+  let best: { at: number; iso: string } | null = null;
+  for (const w of windows) {
+    const start = Date.parse(w.start);
+    const end = Date.parse(w.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > t || end <= t) continue;
+    if (!best || start > best.at) best = { at: start, iso: new Date(start).toISOString() };
   }
-  return new Date(start.start).toISOString() === start.iso ? start.iso : new Date(start.start).toISOString();
+  return best?.iso ?? null;
 }

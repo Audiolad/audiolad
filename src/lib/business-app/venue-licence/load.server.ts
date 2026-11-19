@@ -69,8 +69,6 @@ export type LocationAccess = {
   grant: GrantRow | null;
   paidUntil: string | null;
   paidPeriod: PaidWindow | null;
-  /** Recent paid periods (newest first) – for the continuous access chain on the point certificate. */
-  paidPeriods: PaidWindow[];
   ownerFirstName: string | null;
   ownerLastName: string | null;
 };
@@ -96,7 +94,6 @@ export async function loadLocationAccess(
   let grant: GrantRow | null = null;
   let paidUntil: string | null = null;
   let paidPeriod: PaidWindow | null = null;
-  let paidPeriods: PaidWindow[] = [];
   let ownerFirstName: string | null = null;
   let ownerLastName: string | null = null;
   if (ownerId) {
@@ -119,13 +116,8 @@ export async function loadLocationAccess(
       .eq("user_id", ownerId)
       .eq("opens_access", true)
       .order("period_end", { ascending: false })
-      .limit(24);
+      .limit(5);
     if (periodError) throw new Error("venue_licence_unavailable");
-    paidPeriods = (periods ?? []).flatMap((period) => {
-      const start = asString(period.period_start);
-      const end = asString(period.period_end);
-      return start && end ? [{ start, end }] : [];
-    });
     if (paidUntil) {
       const match = (periods ?? []).find((period) => {
         const end = asString(period.period_end);
@@ -136,5 +128,5 @@ export async function loadLocationAccess(
     }
   }
 
-  return { ownerId: ownerId ?? null, grant, paidUntil, paidPeriod, paidPeriods, ownerFirstName, ownerLastName };
+  return { ownerId: ownerId ?? null, grant, paidUntil, paidPeriod, ownerFirstName, ownerLastName };
 }

@@ -12,7 +12,7 @@ import {
   certificateDisplayNumber,
   certificateRows,
   certificateSnapshotIsCurrent,
-  continuousAccessStart,
+  currentAccessStart,
   certificateStatusLabel,
   certificateSnapshotHash,
   certificateSnapshotJson,
@@ -126,35 +126,34 @@ assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: tr
 assert.equal(certificateStatusLabel("outdated"), "Не действует: данные точки или лицензиата изменились");
 assert.equal(certificateStatusLabel("valid"), "Действует");
 
-// Начало непрерывного доступа: подарочная неделя и примыкающие оплаченные периоды.
+// Начало срока: самое позднее начало среди окон, которые идут сейчас.
 const nowAt = new Date("2026-11-19T12:00:00Z");
 const gift = { start: "2026-11-19T09:00:00.000Z", end: "2026-11-26T09:00:00.000Z" };
-// Оплата во время подарочной недели: оплаченный период начнётся позже, доступ идёт с начала недели.
-assert.equal(continuousAccessStart([{ start: "2026-11-26T09:00:00.000Z", end: "2026-12-26T09:00:00.000Z" }, gift], nowAt), gift.start);
-// Досрочное продление: последний платёж начнётся 08.12, текущий период 08.11–08.12, до него – подарочная неделя.
+// Оплата во время подарочной недели: оплаченный период начнётся позже, сейчас идёт неделя.
+assert.equal(currentAccessStart([{ start: "2026-11-26T09:00:00.000Z", end: "2026-12-26T09:00:00.000Z" }, gift], nowAt), gift.start);
+// Досрочное продление: идёт период 08.11–08.12, следующий начнётся 08.12.
 assert.equal(
-  continuousAccessStart(
+  currentAccessStart(
     [
       { start: "2026-12-08T09:00:00.000Z", end: "2027-01-07T09:00:00.000Z" },
       { start: "2026-11-08T09:00:00.000Z", end: "2026-12-08T09:00:00.000Z" },
-      { start: "2026-11-01T09:00:00.000Z", end: "2026-11-08T09:00:00.000Z" },
     ],
     nowAt,
   ),
-  "2026-11-01T09:00:00.000Z",
+  "2026-11-08T09:00:00.000Z",
 );
-// Разрыв больше минуты – цепочка прерывается.
+// Два окна сразу (оплата другой точки): берём позднее начало, срок не завышается.
 assert.equal(
-  continuousAccessStart(
+  currentAccessStart(
     [
+      { start: "2026-10-20T09:00:00.000Z", end: "2026-11-20T09:00:00.000Z" },
       { start: "2026-11-10T09:00:00.000Z", end: "2026-12-10T09:00:00.000Z" },
-      { start: "2026-10-01T09:00:00.000Z", end: "2026-10-08T09:00:00.000Z" },
     ],
     nowAt,
   ),
   "2026-11-10T09:00:00.000Z",
 );
-assert.equal(continuousAccessStart([{ start: "2026-11-26T09:00:00.000Z", end: "2026-12-26T09:00:00.000Z" }], nowAt), null, "доступа сейчас нет");
+assert.equal(currentAccessStart([{ start: "2026-11-26T09:00:00.000Z", end: "2026-12-26T09:00:00.000Z" }], nowAt), null, "доступа сейчас нет");
 
 // Сервер: пробная неделя – действующий доступ; выдача только для своей точки; проверка – только чтение.
 const server = readFileSync("src/lib/business/legal/certificate.server.ts", "utf8");
@@ -163,7 +162,8 @@ assert.match(server, /rpc\("issue_business_venue_certificate"/);
 assert.match(server, /REGISTRY_FRESH_MS = 24 \* 60 \* 60 \* 1000/);
 assert.match(server, /status = "outdated"/, "проверка сверяет снимок с текущими данными");
 assert.match(server, /validUntil = access\.end;/, "срок на странице проверки – ровно текущий доступ");
-assert.match(server, /start: continuousAccessStart\(\n\s+\[\.\.\.access\.paidPeriods/);
+assert.match(server, /start: currentAccessStart\(\[\.\.\.paid/);
+assert.match(server, /\.lte\("period_start", at\)\s*\.gt\("period_end", at\)/, "только идущие сейчас периоды, без лимита истории");
 assert.match(server, /refreshOrganizationLegalIdentity\(db, row\.organization_id, stored, now, !unchanged\)/, "новый сертификат – только по свежим сведениям ФНС");
 assert.match(server, /certificate_revoked/);
 const lookupSrc = readFileSync("src/lib/business/legal/egrul.server.ts", "utf8");

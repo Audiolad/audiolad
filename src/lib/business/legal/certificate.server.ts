@@ -11,7 +11,7 @@ import { lookupBusinessRegistry } from "./egrul.server";
 import {
   businessAccountCode,
   certificateSnapshotIsCurrent,
-  continuousAccessStart,
+  currentAccessStart,
   certificateSnapshotHash,
   certificateSnapshotJson,
   parseCertificateSnapshot,
@@ -159,14 +159,29 @@ async function liveAccess(db: Db, location: LocationRow, now: Date): Promise<Liv
   const active = resolved.mode === "trial" || resolved.mode === "paid";
   if (!active) return { active: false, kind: null, start: null, end: null, ownerId: access.ownerId };
   const clock = clockOf(access.grant, access.paidUntil);
+  // Оплаченные периоды, которые идут сейчас (без лимита по истории).
+  let paid: { start: string; end: string }[] = [];
+  if (access.ownerId) {
+    const at = now.toISOString();
+    const { data: periods, error } = await db
+      .from("business_subscription_periods")
+      .select("period_start, period_end")
+      .eq("user_id", access.ownerId)
+      .eq("opens_access", true)
+      .lte("period_start", at)
+      .gt("period_end", at);
+    if (error) throw new Error("certificate_unavailable");
+    paid = (periods ?? []).flatMap((row) => {
+      const start = str(row.period_start);
+      const end = str(row.period_end);
+      return start && end ? [{ start, end }] : [];
+    });
+  }
   const period = periodOf(clock, access.grant, access.paidUntil, access.paidPeriod);
   return {
     active: Boolean(period.end),
     kind: clock === "gift" ? "gift" : "subscription",
-    start: continuousAccessStart(
-      [...access.paidPeriods, ...(access.grant ? [{ start: access.grant.startsAt, end: access.grant.endsAt }] : [])],
-      now,
-    ),
+    start: currentAccessStart([...paid, ...(access.grant ? [{ start: access.grant.startsAt, end: access.grant.endsAt }] : [])], now),
     end: period.end,
     ownerId: access.ownerId,
   };
