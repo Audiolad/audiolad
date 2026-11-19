@@ -190,6 +190,10 @@ assert.match(body, /ADD COLUMN IF NOT EXISTS legal_inactive_at timestamptz/);
 assert.match(body, /RAISE EXCEPTION 'certificate_revoked'/, "отозванный не заменяется молча");
 assert.match(body, /WHERE superseded_at IS NULL AND revoked_at IS NULL/, "один действующий сертификат на точку");
 
+// После принятия в карточке наверху главная сразу показывает «Оплатить» (состояние следует за сервером).
+const payHook = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
+assert.match(payHook, /if \(acceptedSource !== serverAccepted\)/);
+
 // Маршруты кабинета.
 assert.equal(BUSINESS_PUBLIC_PATH_REWRITES["/documents/sertifikat"], "/business-app/documents/sertifikat");
 assert.ok((BUSINESS_ALLOWED_API_PATHS as readonly string[]).includes("/api/business/legal-identity"));

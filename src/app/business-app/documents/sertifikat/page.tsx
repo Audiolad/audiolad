@@ -30,7 +30,7 @@ export default async function BusinessCertificatePage() {
           </div>
           <p className="venue-cert-noprint text-sm leading-6 text-[var(--biz-text-muted)]">
             Проверяющему можно показать этот экран или распечатку. Страница проверки:{" "}
-            <a href={certificateCheckUrl(context.state.number)} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2">
+            <a target="_blank" rel="noopener noreferrer" href={certificateCheckUrl(context.state.number)} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2">
               открыть
             </a>
             . Чтобы сохранить PDF, нажмите «Скачать PDF или распечатать» и выберите «Сохранить как PDF».

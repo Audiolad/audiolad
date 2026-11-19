@@ -178,7 +178,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
             </li>
           ))}
           <li data-doc-id="business-offer-pdf">
-            <a
+            <a target="_blank" rel="noopener noreferrer"
               href={BUSINESS_LEGAL_OFFER_PDF}
               className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
               data-doc-link="business-offer-pdf" 
@@ -189,7 +189,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
             </a>
           </li>
           <li data-doc-id="legal-section">
-            <a
+            <a target="_blank" rel="noopener noreferrer"
               href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_HREF)}
               className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
               data-doc-link="legal-section" 

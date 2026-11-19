@@ -174,12 +174,21 @@ console.log("business-app-client-documents-unit OK");
   const pageSrc = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
   assert.match(pageSrc, /href=\{clientDocumentHref\(doc\.id\)\}/);
   // Owner report 04.11: target=_blank opened a new standalone PWA window (logo launch splash) and left the cabinet.
-  assert.doesNotMatch(pageSrc, /target="_blank"/);
+  // t1591u: only links to the public site (audiolad.ru: PDF, legal section, certificate check) open a new tab –
+  // a cross-origin link in the same tab would unload the cabinet and the hall player. Cabinet links never do.
+  const onlyExternalNewTab = (src: string, f: string) => {
+    for (const tag of src.match(/<(?:a|Link)\b[^>]*target="_blank"[^>]*>/g) ?? []) {
+      assert.match(tag, /^<a\b/, `${f}: next/link never opens a new tab: ${tag}`);
+      assert.match(tag, /href=\{(?:BUSINESS_LEGAL_OFFER_PDF|businessLegalAbsoluteUrl\(|certificateCheckUrl\()/, `${f}: new tab only for audiolad.ru: ${tag}`);
+      assert.match(tag, /rel="noopener noreferrer"/);
+    }
+  };
+  onlyExternalNewTab(pageSrc, "documents/page.tsx");
   assert.match(pageSrc, /<Link\s+href=\{clientDocumentHref\(doc\.id\)\}/);
   assert.match(pageSrc, /<Link\s+href=\{BUSINESS_OFFER_HREF\}/);
   for (const f of ["src/app/business-app/documents/[id]/page.tsx", "src/app/business-app/documents/business-offer/page.tsx"]) {
     const src = readFileSync(f, "utf8");
-    assert.doesNotMatch(src, /target="_blank"/);
+    onlyExternalNewTab(src, f);
     assert.doesNotMatch(src, /<a href="\/documents"/, `${f}: back link is a soft navigation`);
   }
   assert.doesNotMatch(pageSrc, /черновик/i);

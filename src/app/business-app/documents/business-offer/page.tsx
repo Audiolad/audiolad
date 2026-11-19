@@ -60,13 +60,13 @@ export default function BusinessOfferPage() {
           Тот же текст с приложениями 1–4. Подписывать не нужно: договор принимается в кабинете.
         </p>
         <p className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
-          <a href={BUSINESS_LEGAL_OFFER_PDF} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-pdf">
+          <a target="_blank" rel="noopener noreferrer" href={BUSINESS_LEGAL_OFFER_PDF} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-pdf">
             Скачать PDF
           </a>
-          <a href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_DOCX_PATH)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-docx">
+          <a target="_blank" rel="noopener noreferrer" href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_DOCX_PATH)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-docx">
             Скачать DOCX
           </a>
-          <a href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_HREF)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-legal-section">
+          <a target="_blank" rel="noopener noreferrer" href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_HREF)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-legal-section">
             Правовая информация
           </a>
         </p>
