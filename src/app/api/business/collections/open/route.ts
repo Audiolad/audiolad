@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isCoffeeHostRequest } from "@/lib/business-app/host";
-import { COLLECTION_COOKIE, COLLECTION_TOKEN } from "@/lib/business-collections/model";
+import { COLLECTION_COOKIE, COLLECTION_DEAD_MARKER, COLLECTION_TOKEN } from "@/lib/business-collections/model";
 import { collectionTokenHash } from "@/lib/business-collections/load.server";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ function entry(url = ENTRY_URL): NextResponse {
 
 /**
  * The personal link opens the ordinary coffee app (t1616u). A live link sets the browser cookie
- * and goes to the calm entry screen /collection. A revoked or unknown link clears the cookie and
+ * and goes to the calm entry screen /collection. A revoked or unknown link sets a dead marker and
  * goes to /collection?state=unavailable – «Подборка сейчас недоступна». Opening never binds the
  * collection, starts a period or writes anything.
  */
@@ -30,10 +30,14 @@ export async function GET(request: Request) {
     return new NextResponse(null, { status: 404, headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
   }
   const token = new URL(request.url).searchParams.get("token") ?? "";
-  // A dead link never shows another collection kept in this browser: drop the old cookie too.
+  // A dead link never shows another collection kept in this browser: the old cookie is replaced by
+  // a dead marker (matches no link), so the browser stays a quiet link visitor – "/" and the menu
+  // lead to «Подборка сейчас недоступна», and an ordinary start with the whole catalog is refused.
   const unavailable = () => {
     const response = entry(UNAVAILABLE_URL);
-    response.cookies.set(COLLECTION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 0 });
+    response.cookies.set(COLLECTION_COOKIE, COLLECTION_DEAD_MARKER, {
+      httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60,
+    });
     return response;
   };
   if (!COLLECTION_TOKEN.test(token)) return unavailable();

@@ -73,7 +73,7 @@ const openRoute = source('src/app/api/business/collections/open/route.ts');
 assert.match(openRoute, /response.cookies.set\(COLLECTION_COOKIE, token/);
 assert.match(openRoute, /https:\/\/coffee.audiolad.ru\/collection/);
 assert.match(openRoute, /collection\?state=unavailable/);
-assert.match(openRoute, /cookies.set\(COLLECTION_COOKIE, "", \{[^}]*maxAge: 0 \}\)/, 'dead link clears another collection cookie');
+assert.match(openRoute, /cookies.set\(COLLECTION_COOKIE, COLLECTION_DEAD_MARKER, \{/, 'dead link replaces another collection cookie with a dead marker');
 assert.match(page, /state === "unavailable"\) return <Unavailable \/>/);
 assert.doesNotMatch(openRoute, /\.update\(|\.delete\(|\.insert\(|\.upsert\(|signIn|bootstrap/, 'opening writes nothing');
 const start = source('src/app/api/business/guest-start/route.ts');
@@ -153,3 +153,13 @@ console.log('personal-collections: PASS – ordinary app limited to the collecti
 }
 assert.match(readFileSync(new URL('../src/components/business-app/BusinessEligibilityProbePanel.tsx', import.meta.url), 'utf8'),
   /\{quiet \? "Создать заведение" : "Подключить заведение"\}/, 'probe panel is quiet too');
+
+{
+  const ws = readFileSync(new URL('../src/lib/business-workspace/load.server.ts', import.meta.url), 'utf8');
+  assert.match(ws, /if \(input.ownerBrowser && input.locationId\) \{\s*try \{\s*if \(await browserCollectionMismatch\(db, input.locationId\)\) return \{ tracks: \[\], unavailable: false, collectionUnavailable: true \};/, 'link browser plays only that link');
+  assert.match(ws, /if \(permission && assigned.data\?.collection_id === permission.id\) return false;/);
+  for (const route of ['track-url', 'cover', 'queue']) {
+    assert.match(readFileSync(new URL(`../src/app/api/business/workspace/${route}/route.ts`, import.meta.url), 'utf8'), /ownerBrowser: !actor.device/, route);
+  }
+  assert.match(readFileSync(new URL('../src/lib/business-collections/model.ts', import.meta.url), 'utf8'), /COLLECTION_DEAD_MARKER = "0".repeat\(64\)/);
+}

@@ -1,5 +1,6 @@
 import "server-only";
 import { selectPersonalVenuePool } from "@/lib/business-collections/venue-pool.mjs";
+import { hasCollectionCookie, loadCollectionPermission } from "@/lib/business-collections/load.server";
 
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
@@ -488,10 +489,34 @@ async function personalCollectionStrict(db: ServiceDb, locationId: string): Prom
   return !(typeof paidUntil === "string" && Date.parse(paidUntil) > Date.now());
 }
 
+/**
+ * t1616u: an owner browser that holds a personal link (live or dead) plays an unpaid venue only
+ * when the venue holds exactly that link's live collection. Otherwise the music says «Подборка
+ * сейчас недоступна» with a link to the entry screen, which binds a free venue or explains.
+ * Paid venues and hall devices (never called for them) keep their ordinary catalog.
+ */
+async function browserCollectionMismatch(db: ServiceDb, locationId: string): Promise<boolean> {
+  if (!await hasCollectionCookie()) return false;
+  const permission = await loadCollectionPermission();
+  const assigned = await db.from("business_personal_collection_locations").select("collection_id")
+    .eq("location_id", locationId).maybeSingle();
+  if (assigned.error) throw new Error("collection_venue_assignment_unavailable");
+  if (permission && assigned.data?.collection_id === permission.id) return false;
+  const location = await db.from("business_locations").select("organization_id").eq("id", locationId).single();
+  if (location.error || !location.data) throw new Error("collection_venue_unavailable");
+  const { data: paidUntil, error } = await db.rpc("business_venue_paid_until", {
+    p_organization_id: location.data.organization_id, p_location_id: locationId,
+  });
+  if (error) throw new Error("collection_venue_payment_unavailable");
+  return !(typeof paidUntil === "string" && Date.parse(paidUntil) > Date.now());
+}
+
 export async function loadWorkspaceCatalog(input: {
   spaceId: BusinessSpaceId;
   locationId: string | null;
   spaceEnabled: boolean;
+  /** Owner browser (not a hall device): the personal link held by this browser applies. */
+  ownerBrowser?: boolean;
 }): Promise<{ tracks: WorkspaceTrack[]; unavailable: boolean; collectionUnavailable?: boolean }> {
   if (!input.spaceEnabled) return { tracks: [], unavailable: false };
   let db: ServiceDb;
@@ -499,6 +524,11 @@ export async function loadWorkspaceCatalog(input: {
     db = createServiceRoleClient();
   } catch {
     return { tracks: [], unavailable: true };
+  }
+  if (input.ownerBrowser && input.locationId) {
+    try {
+      if (await browserCollectionMismatch(db, input.locationId)) return { tracks: [], unavailable: false, collectionUnavailable: true };
+    } catch { return { tracks: [], unavailable: true }; }
   }
 
   const named = await loadCandidateTracks(db, input.spaceId, input.locationId);
@@ -539,6 +569,7 @@ export async function loadWorkspaceAllowedIds(input: {
   spaceId: BusinessSpaceId;
   locationId: string | null;
   spaceEnabled: boolean;
+  ownerBrowser?: boolean;
 }): Promise<string[] | null> {
   const catalog = await loadWorkspaceCatalog(input);
   if (catalog.unavailable) return null;
@@ -632,6 +663,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         spaceId: space.id,
         locationId,
         spaceEnabled: space.enabled,
+        ownerBrowser: true,
       });
       if (catalog.unavailable) {
         return { ...model, status: "unavailable" };

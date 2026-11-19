@@ -309,6 +309,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       {showEmpty(model) && !model.needsVenue && model.collectionUnavailable ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-collection-unavailable">
           <p>Подборка сейчас недоступна.</p>
+          <p><Link className="underline" href="/collection" data-testid="biz-workspace-collection-entry">Открыть подборку</Link></p>
         </section>
       ) : null}
 
