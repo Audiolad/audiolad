@@ -46,7 +46,7 @@ export async function loadPlaybackReport(params: {
     ? {
         organizationId: params.venue.organizationId,
         locationId: params.venue.locationId,
-        locationName: params.venue.locationName || "Кофейня",
+        locationName: params.venue.locationName || "Заведение",
         timezone: params.venue.timezone ?? null,
       }
     : await loadMemberVenue();

@@ -71,7 +71,7 @@ function viewOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
 const trial = viewOf("trial");
 assert.equal(trial.status, "trial");
 assert.equal(trial.clock, "gift");
-assert.equal(trial.venueName, "Образец кофейни");
+assert.equal(trial.venueName, "Образец заведения");
 assert.match(trial.address ?? "", /ул\. Примерная/);
 assert.equal(trial.ownerLabel, "Владелец: Анна Иванова");
 assert.ok(trial.periodStartLabel && trial.periodEndLabel);
@@ -158,7 +158,7 @@ const trialHtml = htmlOf("trial");
 assert.match(trialHtml, /data-status="trial"/);
 assert.match(trialHtml, /7 дней в подарок/);
 assert.match(trialHtml, /Бесплатный доступ до /);
-assert.match(trialHtml, /Образец кофейни/);
+assert.match(trialHtml, /Образец заведения/);
 
 const paidHtml = htmlOf("paid");
 assert.match(paidHtml, /data-status="paid"/);

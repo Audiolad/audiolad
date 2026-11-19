@@ -259,7 +259,7 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
 
   const locationId = input.locationId.trim();
   if (!locationId) {
-    return { ok: false, error: "Кофейня не выбрана." };
+    return { ok: false, error: "Заведение не выбрано." };
   }
 
   const { data: location, error: locationError } = await supabase
@@ -269,10 +269,10 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
     .maybeSingle();
 
   if (locationError) {
-    return { ok: false, error: "Не удалось загрузить кофейню. Попробуйте ещё раз." };
+    return { ok: false, error: "Не удалось загрузить заведение. Попробуйте ещё раз." };
   }
   if (!location?.organization_id) {
-    return { ok: false, error: "Кофейня не найдена." };
+    return { ok: false, error: "Заведение не найдено." };
   }
 
   const { data: membership, error: membershipError } = await supabase
