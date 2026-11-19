@@ -20,11 +20,16 @@ export type EvidenceFact = {
   phase?: string | null;
   sample_seq?: number | string | null;
   reject_reason?: string | null;
+  /** t1578u M2: sample sent late from the hall buffer; device clock as reported (raw claim). */
+  client_offline?: boolean | null;
+  device_occurred_at?: string | null;
 };
 
 /** Columns read for the extract (playback_usage_facts). */
-export const EVIDENCE_FACT_COLUMNS =
+export const EVIDENCE_FACT_COLUMNS_LEGACY =
   "id, occurred_at, created_at, audio_item_id, player_id, zone_id, listened_ms, position_ms, listening_key, phase, sample_seq, reject_reason";
+/** With the M2 offline marker (migration 20270330120000); the legacy list is the fallback before it. */
+export const EVIDENCE_FACT_COLUMNS = `${EVIDENCE_FACT_COLUMNS_LEGACY}, client_offline, device_occurred_at`;
 
 export type EvidencePlay = {
   playerId: string | null;
@@ -162,6 +167,7 @@ export function playsCsv(
 export const FACTS_CSV_HEADER = [
   "fact_id", "occurred_at_utc", "occurred_at_local", "player_id", "zone_id", "audio_item_id", "track_code",
   "position_ms", "listened_ms", "phase", "sample_seq", "reject_reason", "listening_key", "server_created_at_utc",
+  "client_offline", "device_occurred_at_utc",
 ] as const;
 
 export function factsCsv(
@@ -175,6 +181,7 @@ export function factsCsv(
       f.id, f.occurred_at, formatLocal(f.occurred_at, timeZone), f.player_id, f.zone_id ?? "", f.audio_item_id,
       (f.audio_item_id && labels.get(f.audio_item_id)?.code) || "", num(f.position_ms), num(f.listened_ms),
       f.phase ?? "", f.sample_seq ?? "", f.reject_reason ?? "", f.listening_key ?? "", f.created_at ?? "",
+      f.client_offline === true ? "1" : f.client_offline === false ? "0" : "", f.device_occurred_at ?? "",
     ]),
   );
 }

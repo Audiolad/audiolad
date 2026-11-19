@@ -6699,6 +6699,26 @@
       "file": "supabase/migrations/20270315120000_analytics_prefetch_ghost_visitors.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.analytics_session_is_prefetch_ghost( uuid, uuid, text, timestamptz, timestamptz, text, text, text ) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.seal_playback_usage_facts(integer) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.verify_playback_usage_fact_seal(timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.playback_usage_fact_period_digest(timestamptz) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270330120000_playback_log_protection.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_point_usage_sample_offline(text, uuid, uuid, bigint, uuid, bigint, timestamptz) TO anon, authenticated, service_role;"
     }
   ]
 }

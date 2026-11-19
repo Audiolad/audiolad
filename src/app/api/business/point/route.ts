@@ -26,6 +26,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { normalizeHallAppVersion } from "@/lib/business-app/hall-build-reload";
 import { readServerHallBuildId } from "@/lib/business-app/hall-server-build.server";
 import { HALL_JOURNAL_BATCH, parseHallJournalEvent } from "@/lib/business-app/hall-device-journal";
+import { isMissingRpcError, offlineDeviceAtIso } from "@/lib/business-app/point-usage-offline";
 
 /** Log the collapsed client IP once per server process, not on every attempt. */
 let warnedCollapsedIp = false;
@@ -483,10 +484,20 @@ export async function POST(request: Request) {
         || !Number.isSafeInteger(usage.positionMs) || Number(usage.positionMs) < 0) {
         return json({ ok: false, reason: "invalid_sample" }, 400);
       }
-      const { error: usageError } = await supabase.rpc("apply_business_point_usage_sample", {
+      const sampleArgs = {
         p_token: token, p_client_event_id: usage.eventId, p_playback_session_id: usage.sessionId,
         p_sample_seq: usage.seq, p_audio_item_id: usage.audioItemId, p_position_ms: usage.positionMs,
-      });
+      };
+      // t1578u M2: the device clock of the sample goes to the offline RPC, which marks the fact
+      // client_offline and uses that time only when it is plausible (checked in SQL). Until the
+      // migration is applied (function unknown to PostgREST) the old RPC keeps working unchanged.
+      const deviceAt = offlineDeviceAtIso(usage);
+      let { error: usageError } = deviceAt
+        ? await supabase.rpc("apply_business_point_usage_sample_offline", { ...sampleArgs, p_device_at: deviceAt })
+        : await supabase.rpc("apply_business_point_usage_sample", sampleArgs);
+      if (deviceAt && isMissingRpcError(usageError)) {
+        ({ error: usageError } = await supabase.rpc("apply_business_point_usage_sample", sampleArgs));
+      }
       return json(usageError ? { ok: false, reason: "usage_report_failed" } : { ok: true, data: null });
     }
     if (body.kind === "events") {

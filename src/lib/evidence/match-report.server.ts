@@ -7,11 +7,13 @@ import { chmod, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile }
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { fetchAllPlaybackFacts } from "@/lib/business-app/playback-facts-query";
 import { concordance, type Concordance, type LogPlay, type MatchSegment } from "@/lib/evidence/concordance";
 import { evidencePython, loadEvidenceLocation, loadTrackLabels, type EvidenceLocation } from "@/lib/evidence/extract.server";
 import { REPORT_CURRENT_DIR, readJob, readJobResult, type MatchJob } from "@/lib/evidence/matcher.server";
-import { EVIDENCE_FACT_COLUMNS, formatLocal, localInputToUtc, reconstructPlays, type EvidenceFact } from "@/lib/evidence/play-log";
+import { fetchEvidenceFacts } from "@/lib/evidence/facts.server";
+import type { IndexRegistryEntry } from "@/lib/evidence/index-registry";
+import { ensureIndexRegisteredSafe } from "@/lib/evidence/index-registry.server";
+import { formatLocal, localInputToUtc, reconstructPlays, type EvidenceFact } from "@/lib/evidence/play-log";
 import { evidenceRoot, loadOrCreateSealKey, sealBytes, sha256Hex } from "@/lib/evidence/storage.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -70,9 +72,9 @@ export async function computeJobConcordance(job: MatchJob, result: MatchResult, 
   const durMs = Math.round((result.input.decoded_duration_s || 0) * 1000);
   const from = new Date(claim.at.getTime() - CONCORDANCE_MARGIN_MS - durMs);
   const to = new Date(claim.at.getTime() + CONCORDANCE_MARGIN_MS + durMs);
-  const paged = await fetchAllPlaybackFacts(db, {
+  const paged = await fetchEvidenceFacts(db, {
     organizationId: location.organizationId, locationId: location.id,
-    from: from.toISOString(), to: to.toISOString(), maxRows: CONCORDANCE_MAX_FACTS, columns: EVIDENCE_FACT_COLUMNS,
+    from: from.toISOString(), to: to.toISOString(), maxRows: CONCORDANCE_MAX_FACTS,
   });
   if (paged.error || paged.truncated) throw new Error("evidence_concordance_facts_failed");
   const facts = paged.rows as EvidenceFact[];
@@ -139,6 +141,15 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
   const reportId = `${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`;
   const dir = join(jobDirPath, "reports", reportId);
   const titles = await titlesByCodes(result.segments.map((s) => s.code)).catch(() => ({} as Record<string, string | null>));
+  // M4: what the append-only registry holds for the index version this match used.
+  const registry: IndexRegistryEntry | null = result.index?.version
+    ? await ensureIndexRegisteredSafe(String(result.index.version))
+    : null;
+  const indexRegistry = registry && {
+    ...registry,
+    audfprint_matches_result: registry.audfprint_sha256 && result.index.audfprint_sha256
+      ? registry.audfprint_sha256 === result.index.audfprint_sha256 : null,
+  };
   try {
     await mkdir(dir, { recursive: true, mode: 0o700 });
     const seal = await loadOrCreateSealKey();
@@ -155,6 +166,7 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
       claim: job.claim,
       note: job.note,
       index: result.index,
+      index_registry: indexRegistry,
       engine_version: result.engine_version,
       summary: result.summary,
       segments: result.segments.map((s) => ({ ...s, title: titles[s.code] ?? conc?.titles[s.code] ?? null })),
@@ -210,7 +222,7 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
         decoded_duration_s: result.input.decoded_duration_s },
       claim: job.claim,
       note: job.note,
-      engine: { version: result.engine_version, params: result.params, index: result.index },
+      engine: { version: result.engine_version, params: result.params, index: result.index, index_registry: indexRegistry },
       summary: result.summary,
       segments: pdfInput.segments,
       claimed_refs: result.claimed_refs,
