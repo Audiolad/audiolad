@@ -96,7 +96,7 @@ export default function BusinessSupportDiagnosticPage({
           <Field label="Код заведения" value={location?.id ?? "–"} mono />
           <Field label="Страна" value={countryLabelRu(location?.countryCode)} />
           <Field label="Часовой пояс" value={timezoneLabelRu(location?.timezone)} />
-          <Field label="Статус заведения" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
+          <Field label="Статус заведения" value={location?.status === "active" ? "Активно" : "Нет подтверждённых данных"} />
           <Field
             label="Основной зал"
             value={location?.defaultZoneId ?? "–"}
