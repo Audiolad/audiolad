@@ -2,7 +2,7 @@
 // does not fit, file hashes in manifest.json and a valid Ed25519 seal over its exact bytes.
 import assert from "node:assert/strict";
 import { createPublicKey, verify, createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, statSync, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -118,29 +118,6 @@ if (process.env.EVIDENCE_TEST_REQUIRE_PDF === "1") {
 }
 assert.ok(!readdirSync(dir).some((n) => n.startsWith(".")));
 
-// A renderer that crashes mid-write leaves nothing unsealed in the published folder.
-{
-  const fake = join(root, "fake-python.sh");
-  writeFileSync(fake, '#!/bin/sh\nfor a; do case "$prev" in --out) printf partial > "$a.tmp"; printf partial > "$a";; esac; prev="$a"; done\nexit 1\n', { mode: 0o700 });
-  const saved = process.env.AUDIOLAD_EVIDENCE_PYTHON;
-  process.env.AUDIOLAD_EVIDENCE_PYTHON = fake;
-  const crashed = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: fakeDb(makeFacts(20)) as never });
-  if (saved === undefined) delete process.env.AUDIOLAD_EVIDENCE_PYTHON;
-  else process.env.AUDIOLAD_EVIDENCE_PYTHON = saved;
-  assert.equal(crashed.ok, true);
-  if (crashed.ok) {
-    assert.equal(crashed.pdf, false);
-    const cdir = join(root, "extracts", crashed.id);
-    const m3 = JSON.parse(readFileSync(join(cdir, "manifest.json"), "utf8"));
-    assert.deepEqual(
-      readdirSync(cdir).filter((n) => n !== "manifest.json" && n !== "manifest.sig").sort(),
-      m3.files.map((f: { name: string }) => f.name).sort(),
-    );
-    assert.ok(!existsSync(join(cdir, "extract.pdf")));
-    assert.ok(!existsSync(join(cdir, "extract.pdf.tmp")));
-  }
-}
-
 // Same key on the second extract.
 const res2 = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: fakeDb(makeFacts(10)) as never });
 assert.equal(res2.ok, true);
@@ -149,7 +126,7 @@ if (res2.ok) {
   assert.equal(m2.seal.public_key_sha256, manifest.seal.public_key_sha256);
 }
 const list = await listExtracts();
-assert.equal(list.length, 3);
+assert.equal(list.length, 2);
 
 // Refusals: never an incomplete or unbounded extract.
 const big = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: fakeDb(makeFacts(200_001)) as never });

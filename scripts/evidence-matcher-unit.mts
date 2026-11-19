@@ -1,0 +1,115 @@
+// t1578u: match jobs – chunked upload, background start, sealed report. The engine is
+// replaced by a fake that writes a result, so this runs without numpy/Olaf.
+import assert from "node:assert/strict";
+import { createPublicKey, verify, createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const root = mkdtempSync(join(tmpdir(), "evidence-matcher-unit-"));
+process.env.AUDIOLAD_EVIDENCE_ROOT = root;
+const fake = join(root, "fake-engine.sh");
+// Fake python: `<engine.py> match ... --out X --status S` → writes a result and status done.
+writeFileSync(fake, `#!/bin/sh
+out=""; st=""; prev=""
+for a; do case "$prev" in --out) out="$a";; --status) st="$a";; esac; prev="$a"; done
+cat > "$out" <<'JSON'
+{"engine_version":"t1578u-1","created_at":"2026-11-19T08:00:00Z","input":{"name":"input.m4a","sha256":"x","size_bytes":7,"decoded_duration_s":30,"probe":{"tags":{}}},
+ "index":{"version":"v1","built_at":"2026-11-19T07:00:00Z","audfprint_sha256":"a","counts":{"catalog":149,"control":18,"failed":0},"olaf":{"available":true,"version":"3.3.3"}},
+ "params":{"window_s":10,"hop_s":5},"claimed_refs":[],"windows":[],
+ "segments":[{"code":"AL-T-000001697","kind":"catalog","rec_from_s":0,"rec_to_s":20,"track_from_s":50,"track_to_s":70,"windows":3,"both":2,"confidence":"high"}],
+ "summary":{"windows":5,"catalog_windows":3,"control_windows":0,"unmatched_windows":2,"conflict_windows":0,"claimed_windows":0,"catalog_tracks":["AL-T-000001697"]}}
+JSON
+echo '{"state":"done"}' > "$st"
+`, { mode: 0o700 });
+process.env.AUDIOLAD_EVIDENCE_PYTHON = fake;
+
+const m = await import("../src/lib/evidence/matcher.server");
+const r = await import("../src/lib/evidence/match-report.server");
+const actor = { userId: "u1", email: null };
+
+// Validation.
+assert.deepEqual(await m.createJob({ actor, fileName: "a.exe", size: 5, claim: null, locationId: null, recordedAtLocal: null, note: null }), { ok: false, error: "bad_file" });
+assert.deepEqual(await m.createJob({ actor, fileName: "a.m4a", size: m.MATCH_MAX_INPUT_BYTES + 1, claim: null, locationId: null, recordedAtLocal: null, note: null }), { ok: false, error: "too_large" });
+
+const created = await m.createJob({ actor, fileName: "Запись акта.m4a", size: 7, claim: null, locationId: null, recordedAtLocal: null, note: "акт 15" });
+assert.equal(created.ok, true);
+if (!created.ok) throw new Error("unreachable");
+const id = created.id;
+assert.match(id, m.EVIDENCE_JOB_ID_RE);
+
+// Chunks: gap refused, retry idempotent, overflow refused.
+const enc = (s: string) => new TextEncoder().encode(s);
+assert.deepEqual(await m.appendChunk(id, "input", 3, enc("xyz")), { ok: false, error: "bad_offset" });
+assert.deepEqual(await m.appendChunk(id, "input", 0, enc("abc")), { ok: true, received: 3 });
+assert.deepEqual(await m.appendChunk(id, "input", 0, enc("abc")), { ok: true, received: 3 });
+assert.deepEqual(await m.appendChunk(id, "input", 3, enc("defgh")), { ok: false, error: "too_large" });
+assert.deepEqual(await m.appendChunk(id, "claim", 0, enc("a")), { ok: false, error: "not_found" });
+assert.deepEqual(await m.appendChunk("../../etc", "input", 0, enc("a")), { ok: false, error: "not_found" });
+
+// No index yet: refused, upload stays open.
+assert.deepEqual(await m.finishUploadAndStart(id), { ok: false, error: "no_index" });
+// Fake index.
+mkdirSync(join(root, "index", "versions", "v1"), { recursive: true });
+writeFileSync(join(root, "index", "versions", "v1", "index.json"), JSON.stringify({ version: "v1", built_at: "2026-11-19T07:00:00Z", counts: { catalog: 149, control: 18, failed: 0 }, olaf: { available: true, version: "3.3.3" }, tracks: [] }));
+symlinkSync(join(root, "index", "versions", "v1"), join(root, "index", "current"));
+const state = await m.loadEngineState();
+assert.equal(state.ready, true);
+assert.equal(state.index?.counts.catalog, 149);
+
+// Incomplete upload refused.
+assert.deepEqual(await m.finishUploadAndStart(id), { ok: false, error: "incomplete" });
+assert.deepEqual(await m.appendChunk(id, "input", 3, enc("defg")), { ok: true, received: 7 });
+assert.deepEqual(await m.finishUploadAndStart(id), { ok: true });
+// Upload closed after start.
+assert.deepEqual(await m.appendChunk(id, "input", 7, enc("z")), { ok: false, error: "closed" });
+
+let job = await m.readJob(id);
+for (let i = 0; i < 50 && job?.state !== "done"; i++) {
+  await new Promise((res) => setTimeout(res, 100));
+  job = await m.readJob(id);
+}
+assert.equal(job?.state, "done");
+assert.equal(job?.input.sha256, createHash("sha256").update("abcdefg").digest("hex"));
+assert.ok(existsSync(join(root, "jobs", id, "input.m4a")));
+
+// Sealed report (no venue given → no concordance, still sealed).
+const rep = await r.createMatchReport(id, actor);
+assert.equal(rep.ok, true, JSON.stringify(rep));
+const dir = join(root, "jobs", id);
+const buf = readFileSync(join(dir, "report.json"));
+const report = JSON.parse(buf.toString("utf8"));
+assert.equal(report.recording.sha256, job?.input.sha256);
+assert.equal(report.summary.catalog_tracks[0], "AL-T-000001697");
+assert.equal(report.concordance, null);
+const pub = createPublicKey(readFileSync(join(dir, "seal-public.pem")));
+assert.equal(verify(null, buf, pub, readFileSync(join(dir, "report.sig"))), true);
+for (const f of report.files) {
+  assert.equal(createHash("sha256").update(readFileSync(join(dir, f.name))).digest("hex"), f.sha256, f.name);
+}
+
+// Download allowlist.
+assert.equal(m.jobFilePath(id, "input.m4a"), null);
+assert.equal(m.jobFilePath(id, "../keys/seal-ed25519.pem"), null);
+assert.equal(m.jobFilePath("x/../y", "report.json"), null);
+assert.ok(m.jobFilePath(id, "report.json"));
+assert.equal((await m.listJobs()).length, 1);
+
+// Static guards: owner checks and same-origin on the upload route.
+const up = readFileSync("src/app/api/admin/business-evidence/upload/route.ts", "utf8");
+assert.match(up, /isSameOriginRequest/);
+assert.match(up, /getPlatformOwnerSessionIfOwner/);
+assert.match(readFileSync("src/app/api/admin/business-evidence/job/route.ts", "utf8"), /getPlatformOwnerSessionIfOwner/);
+assert.match(readFileSync("src/app/(platform)/admin/business-evidence/jobs/[id]/page.tsx", "utf8"), /requirePlatformOwnerAccess/);
+const actions = readFileSync("src/app/(platform)/admin/business-evidence/actions.ts", "utf8");
+assert.equal(actions.match(/export async function/g)?.length, actions.match(/requirePlatformOwnerAccess\(BUSINESS_EVIDENCE_HREF\)/g)?.length);
+for (const f of ["src/components/admin/BusinessEvidenceMatcherPanel.tsx", "src/components/admin/BusinessEvidenceJobActions.tsx",
+  "src/app/(platform)/admin/business-evidence/jobs/[id]/page.tsx", "src/lib/evidence/constants.ts", "scripts/evidence/render_match_pdf.py",
+  "docs/business/evidence-matching.md"]) {
+  assert.doesNotMatch(readFileSync(f, "utf8"), /—/, f);
+}
+// The hall player is not imported by any evidence module.
+for (const f of ["src/lib/evidence/matcher.server.ts", "src/lib/evidence/match-report.server.ts"]) {
+  assert.doesNotMatch(readFileSync(f, "utf8"), /BusinessCabinetPlayer|hall-report-queue|cabinet-player-client/);
+}
+console.log("evidence-matcher-unit OK");

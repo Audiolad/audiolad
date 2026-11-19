@@ -1,0 +1,67 @@
+// t1578u: recording ↔ play-log concordance.
+import assert from "node:assert/strict";
+import { concordance, type LogPlay, type MatchSegment } from "../src/lib/evidence/concordance";
+
+const T = Date.parse("2026-11-10T09:00:00.000Z") / 1000;
+const iso = (s: number) => new Date((T + s) * 1000).toISOString();
+const play = (code: string, start: number, dur = 200, player = "AL-P-000000001"): LogPlay => ({
+  code, estTrackStartAt: iso(start), firstAt: iso(start + 10), lastAt: iso(start + dur), posFromMs: 0, posToMs: dur * 1000,
+  playerCode: player,
+});
+// Log: A 0..200, B 200..400, C 400..600, A again 900..1100.
+const plays = [play("A", 0), play("B", 200), play("C", 400), play("A", 900)];
+// Recording started at T+150 (unknown to the tool): hears A at track pos 150..200 (rec 0..50),
+// B at pos 0..200 (rec 50..250), C pos 0..30 (rec 250..280). Matcher offsets jitter ±1 s.
+const segs: MatchSegment[] = [
+  { code: "A", kind: "catalog", rec_from_s: 0, rec_to_s: 50, track_from_s: 150.5, track_to_s: 200 },
+  { code: "B", kind: "catalog", rec_from_s: 50, rec_to_s: 250, track_from_s: 0, track_to_s: 200 },
+  { code: "CTRL-1", kind: "control", rec_from_s: 250, rec_to_s: 260, track_from_s: 5, track_to_s: 15 },
+  { code: "C", kind: "catalog", rec_from_s: 250, rec_to_s: 280, track_from_s: 0.8, track_to_s: 30 },
+];
+{
+  const c = concordance(segs, plays, new Date((T + 120) * 1000));
+  assert.equal(c.catalogSegments, 3);
+  assert.equal(c.confirmedSegments, 3);
+  assert.ok(Math.abs(Date.parse(c.recordingStartUtc!) / 1000 - (T + 150)) <= 1.5, c.recordingStartUtc!);
+  assert.ok(c.claimedDeltaS! >= 29 && c.claimedDeltaS! <= 32, String(c.claimedDeltaS));
+  assert.equal(c.orderConsistent, true);
+  assert.equal(c.checks[0].play, 0);
+  assert.equal(c.checks[1].play, 1);
+  assert.equal(c.checks[2].play, 2);
+  assert.equal(c.checks[0].playerCode, "AL-P-000000001");
+}
+// Without a claimed time the alignment is found too.
+{
+  const c = concordance(segs, plays, null);
+  assert.equal(c.confirmedSegments, 3);
+  assert.equal(c.claimedDeltaS, null);
+}
+// A catalog track that the log does not have at that moment stays unconfirmed.
+{
+  const extra: MatchSegment[] = [...segs, { code: "D", kind: "catalog", rec_from_s: 280, rec_to_s: 300, track_from_s: 40, track_to_s: 60 }];
+  const c = concordance(extra, plays, null);
+  assert.equal(c.catalogSegments, 4);
+  assert.equal(c.confirmedSegments, 3);
+  const d = c.checks.find((x) => x.code === "D")!;
+  assert.equal(d.confirmed, false);
+  assert.ok(d.heardFromUtc);
+}
+// Wrong order in the log is detected.
+{
+  const swapped = [play("B", 0), play("A", 200 + 150), play("C", 600)];
+  const s2: MatchSegment[] = [
+    { code: "A", kind: "catalog", rec_from_s: 0, rec_to_s: 20, track_from_s: 10, track_to_s: 30 },
+    { code: "B", kind: "catalog", rec_from_s: 30, rec_to_s: 50, track_from_s: 30 + 160, track_to_s: 210 },
+  ];
+  // A heard at rec 0 pos 10 → R = 350 − 10 + ... only one of them can align; confirmed ≤ 1.
+  const c = concordance(s2, swapped, null);
+  assert.ok(c.confirmedSegments <= 1);
+}
+// Nothing in the log.
+{
+  const c = concordance(segs, [], null);
+  assert.equal(c.recordingStartUtc, null);
+  assert.equal(c.confirmedSegments, 0);
+  assert.equal(c.orderConsistent, null);
+}
+console.log("evidence-concordance-unit OK");

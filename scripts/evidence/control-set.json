@@ -1,0 +1,132 @@
+{
+ "about": "t1578u: контрольный набор чужой музыки (не каталог АудиоЛад). Kevin MacLeod, incompetech.com, лицензия CC BY 4.0. Нужен, чтобы показать, что инструмент различает чужие треки: совпадение с контролем – это не каталог.",
+ "license": "CC BY 4.0, Kevin MacLeod (incompetech.com)",
+ "tracks": [
+  {
+   "code": "CTRL-KM-01",
+   "kind": "control",
+   "title": "Kevin MacLeod – Backed Vibes Clean",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3",
+   "sha256": "e8dbe9ebab11de3e492fc6a95a4d9523d9a52845f289c4205569268224d521e9"
+  },
+  {
+   "code": "CTRL-KM-02",
+   "kind": "control",
+   "title": "Kevin MacLeod – Bass Walker",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bass%20Walker.mp3",
+   "sha256": "094332b56f4bdd5446b17cbc87a40610518c3aec787c7e289ac6ef4e3eb3e817"
+  },
+  {
+   "code": "CTRL-KM-03",
+   "kind": "control",
+   "title": "Kevin MacLeod – Breaktime",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Breaktime.mp3",
+   "sha256": "6ed36171ecd2fedc28a94eb6a6c56655f79b1f04980bd06a5855e5db6f1f20dd"
+  },
+  {
+   "code": "CTRL-KM-04",
+   "kind": "control",
+   "title": "Kevin MacLeod – Carefree",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3",
+   "sha256": "8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311"
+  },
+  {
+   "code": "CTRL-KM-05",
+   "kind": "control",
+   "title": "Kevin MacLeod – Chill Wave",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Chill%20Wave.mp3",
+   "sha256": "7f07fbf89860959ff527f7b74606146dd0b0de263739989a70ce712c7c361614"
+  },
+  {
+   "code": "CTRL-KM-06",
+   "kind": "control",
+   "title": "Kevin MacLeod – Cool Vibes",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cool%20Vibes.mp3",
+   "sha256": "86e5afb1f71da4c45927bb693cc32e2f72954137cf010599a912fa89cfd4db2e"
+  },
+  {
+   "code": "CTRL-KM-07",
+   "kind": "control",
+   "title": "Kevin MacLeod – Daily Beetle",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Daily%20Beetle.mp3",
+   "sha256": "2d90413d404ab509e7424d531c34f6b1ad281d8a36346df130a5e4c707841faa"
+  },
+  {
+   "code": "CTRL-KM-08",
+   "kind": "control",
+   "title": "Kevin MacLeod – Dreamer",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dreamer.mp3",
+   "sha256": "615e65c9ca131c11f8e12970644ed74ef822ec4f643b1d9d0085a223600bcdfb"
+  },
+  {
+   "code": "CTRL-KM-09",
+   "kind": "control",
+   "title": "Kevin MacLeod – Easy Lemon",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Easy%20Lemon.mp3",
+   "sha256": "2486b8ecfe4575f9ab31613a2c03c2ee45e6e5280301d05b4dd7237c9e1c2531"
+  },
+  {
+   "code": "CTRL-KM-10",
+   "kind": "control",
+   "title": "Kevin MacLeod – Gymnopedie No 1",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3",
+   "sha256": "8cba6bb3da51066ad39520ec218a327bb6222d8fb32bc52f28a1e90b67756f70"
+  },
+  {
+   "code": "CTRL-KM-11",
+   "kind": "control",
+   "title": "Kevin MacLeod – Hep Cats",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hep%20Cats.mp3",
+   "sha256": "090cbdd911a87a6e1f87859082e07a7569993b94ebcdb41e3b17dcf42cbf3476"
+  },
+  {
+   "code": "CTRL-KM-12",
+   "kind": "control",
+   "title": "Kevin MacLeod – Jazz Brunch",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Jazz%20Brunch.mp3",
+   "sha256": "9e980a5a5ff7663d7f5ac22209190f34f1df465c5a6b588dd2c0bcbfc217e380"
+  },
+  {
+   "code": "CTRL-KM-13",
+   "kind": "control",
+   "title": "Kevin MacLeod – Laid Back Guitars",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Laid%20Back%20Guitars.mp3",
+   "sha256": "98e25c4618daf6bd6193e4f9dcbc005f6867cf0ba600fac44cca64ddb9a1d450"
+  },
+  {
+   "code": "CTRL-KM-14",
+   "kind": "control",
+   "title": "Kevin MacLeod – Local Forecast - Elevator",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3",
+   "sha256": "8c46b44e65324bc339fbbc3e770611d671f6c74a40f3ec8dd50332c082b25cc9"
+  },
+  {
+   "code": "CTRL-KM-15",
+   "kind": "control",
+   "title": "Kevin MacLeod – Monkeys Spinning Monkeys",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3",
+   "sha256": "a5bb345c23849ad0786aa0bc5157a9f2d4039660fe00282e55754d475f36dc14"
+  },
+  {
+   "code": "CTRL-KM-16",
+   "kind": "control",
+   "title": "Kevin MacLeod – Sidewalk Shade",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sidewalk%20Shade.mp3",
+   "sha256": "631ebc600aef0e798d3a209fc92e41125629f15e19a5ad1bd9e7039e5446ac50"
+  },
+  {
+   "code": "CTRL-KM-17",
+   "kind": "control",
+   "title": "Kevin MacLeod – Smooth Lovin",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3",
+   "sha256": "97f914222378859a81de72f4c117cd456604d3b106e2041d6bf01cacaaf8801a"
+  },
+  {
+   "code": "CTRL-KM-18",
+   "kind": "control",
+   "title": "Kevin MacLeod – Tea Roots",
+   "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Tea%20Roots.mp3",
+   "sha256": "00f9df4ed6583dab3b1fa47376f0090571ac0da4b2e023d678841f0686e4b313"
+  }
+ ]
+}
