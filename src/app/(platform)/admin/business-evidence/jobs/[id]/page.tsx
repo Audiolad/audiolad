@@ -58,7 +58,7 @@ export default async function AdminBusinessEvidenceJobPage({ params }: { params:
       </div>
 
       {running ? <div className={CARD}><p className="text-sm">Идёт проверка в фоне. Страница обновится сама.</p></div> : null}
-      {job.state === "failed" ? <div className={CARD}><p className="text-sm text-[#b34f63]">Проверка не удалась{job.error ? ` (${job.error})` : ""}.</p></div> : null}
+      {job.state === "failed" ? <div className={CARD}><p className="text-sm text-[#b34f63]">{job.error === "RecordingTooLong" ? "Запись длиннее 2 часов – разрежьте её на части и проверьте по отдельности." : `Проверка не удалась${job.error ? ` (${job.error})` : ""}.`}</p></div> : null}
 
       {result && s ? (
         <div className={CARD} data-testid="admin-evidence-verdict">

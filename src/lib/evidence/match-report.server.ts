@@ -2,14 +2,15 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { readFile, rm, stat, writeFile, chmod } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { chmod, mkdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { fetchAllPlaybackFacts } from "@/lib/business-app/playback-facts-query";
 import { concordance, type Concordance, type LogPlay, type MatchSegment } from "@/lib/evidence/concordance";
 import { evidencePython, loadEvidenceLocation, loadTrackLabels, type EvidenceLocation } from "@/lib/evidence/extract.server";
-import { readJob, readJobResult, type MatchJob } from "@/lib/evidence/matcher.server";
+import { REPORT_CURRENT_DIR, readJob, readJobResult, type MatchJob } from "@/lib/evidence/matcher.server";
 import { EVIDENCE_FACT_COLUMNS, formatLocal, localInputToUtc, reconstructPlays, type EvidenceFact } from "@/lib/evidence/play-log";
 import { evidenceRoot, loadOrCreateSealKey, sealBytes, sha256Hex } from "@/lib/evidence/storage.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -111,10 +112,11 @@ export async function loadJobView(id: string) {
       concError = true;
     }
   }
-  const report = await readFile(join(evidenceRoot(), "jobs", id, "report.json")).catch(() => null);
+  const published = join(evidenceRoot(), "jobs", id, REPORT_CURRENT_DIR);
+  const report = await readFile(join(published, "report.json")).catch(() => null);
   let titles: Record<string, string | null> = {};
   if (result) titles = await titlesByCodes(result.segments.map((s) => s.code)).catch(() => ({}));
-  return { job, result, conc, concError, titles, reportSha256: report ? sha256Hex(report) : null, reportPdf: await stat(join(evidenceRoot(), "jobs", id, "report.pdf")).then(() => true, () => false) };
+  return { job, result, conc, concError, titles, reportSha256: report ? sha256Hex(report) : null, reportPdf: report ? await stat(join(published, "report.pdf")).then(() => true, () => false) : false };
 }
 
 export type ReportResult = { ok: true; sha256: string; pdf: boolean } | { ok: false; error: "not_ready" | "storage_error" | "db_error" };
@@ -130,11 +132,18 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
   } catch {
     return { ok: false, error: "db_error" };
   }
-  const dir = join(evidenceRoot(), "jobs", id);
+  const jobDirPath = join(evidenceRoot(), "jobs", id);
+  // Every report is built in its own new folder and published by one atomic symlink swap, so
+  // parallel runs never share files and a published set (JSON, signature, PDF, key) is always
+  // consistent; a failed PDF in a new run cannot leave an older PDF next to the new JSON.
+  const reportId = `${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`;
+  const dir = join(jobDirPath, "reports", reportId);
   const titles = await titlesByCodes(result.segments.map((s) => s.code)).catch(() => ({} as Record<string, string | null>));
   try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
     const seal = await loadOrCreateSealKey();
-    const resultBuf = await readFile(join(dir, "result.json"));
+    const resultBuf = await readFile(join(jobDirPath, "result.json"));
+    await writeFile(join(dir, "result.json"), resultBuf, { mode: 0o600 }); // the set is self-contained
     const tz = conc?.location.timezone ?? "Europe/Moscow";
     const now = new Date();
     const pdfInput = {
@@ -212,6 +221,9 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
     const buf = Buffer.from(JSON.stringify(report, null, 2) + "\n", "utf8");
     await writeFile(join(dir, "report.json"), buf, { mode: 0o600 });
     await writeFile(join(dir, "report.sig"), sealBytes(seal, buf), { mode: 0o600 });
+    const tmpLink = join(jobDirPath, `.${REPORT_CURRENT_DIR}-${reportId}`);
+    await symlink(join("reports", reportId), tmpLink);
+    await rename(tmpLink, join(jobDirPath, REPORT_CURRENT_DIR));
     return { ok: true, sha256: sha256Hex(buf), pdf };
   } catch (error) {
     console.error("evidence_match_report_failed", error instanceof Error ? error.message.slice(0, 200) : "unknown");

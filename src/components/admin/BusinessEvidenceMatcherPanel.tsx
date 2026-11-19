@@ -142,7 +142,7 @@ export default function BusinessEvidenceMatcherPanel({
       <div className="rounded-[22px] border border-[#e7def6] bg-white p-5">
         <h3 className="text-base font-semibold text-[#25135c]">Проверить запись</h3>
         <p className="mt-1 text-sm text-[#796ba0]">
-          Загрузите запись инспектора (до 500 МБ). Сервис найдёт в ней треки каталога АудиоЛад и сверит их с журналом
+          Загрузите запись инспектора (до 500 МБ и до 2 часов). Сервис найдёт в ней треки каталога АудиоЛад и сверит их с журналом
           воспроизведения точки.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">

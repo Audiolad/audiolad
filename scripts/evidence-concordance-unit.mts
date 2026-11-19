@@ -70,6 +70,14 @@ const segs: MatchSegment[] = [
   const c = concordance([{ code: "B", kind: "catalog", rec_from_s: 50, rec_to_s: 250, track_from_s: 0, track_to_s: 200 }], short, null);
   assert.equal(c.confirmedSegments, 0);
 }
+// The log saw only positions 300–320 s: a fragment heard at positions 0–100 s is not confirmed.
+{
+  const late: LogPlay[] = [{ ...play("A", 0, 400), firstAt: iso(300), lastAt: iso(320), posFromMs: 300_000, posToMs: 320_000 }];
+  const c = concordance([{ code: "A", kind: "catalog", rec_from_s: 0, rec_to_s: 100, track_from_s: 0, track_to_s: 100 }], late, null);
+  assert.equal(c.confirmedSegments, 0);
+  const ok = concordance([{ code: "A", kind: "catalog", rec_from_s: 0, rec_to_s: 15, track_from_s: 302, track_to_s: 317 }], late, null);
+  assert.equal(ok.confirmedSegments, 1);
+}
 // Every confirmed segment stays within the tolerance of the reported start (offsets −15, 0, 15, 15).
 {
   const ps = [play("A", 0, 100), play("B", 1000, 100), play("C", 2000, 100), play("D", 3000, 100)];

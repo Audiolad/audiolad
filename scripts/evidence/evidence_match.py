@@ -46,6 +46,9 @@ import hash_table  # noqa: E402
 
 ENGINE_VERSION = "t1578u-1"
 SR = 11025
+# Memory bounds on the shared production host (float32 at 11.025 + 16 kHz ≈ 0.11 GB per hour).
+MATCH_MAX_DURATION_S = 2 * 3600
+REF_MAX_DURATION_S = 90 * 60
 OLAF_SR = 16000
 # audfprint parameters (match = density/peaks/fanout of the store; shifts 1 for store, 4 for query).
 DENSITY = 20.0
@@ -91,7 +94,12 @@ def decode(path: str, sr: int, start: float | None = None, duration: float | Non
     out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if out.returncode != 0:
         raise RuntimeError("ffmpeg_decode_failed: %s" % out.stderr.decode("utf-8", "replace")[-400:])
-    return np.frombuffer(out.stdout, dtype=np.float32).astype(np.float64)
+    # float32 view on ffmpeg's buffer: no float64 copy (memory is bounded by the duration caps).
+    return np.frombuffer(out.stdout, dtype=np.float32)
+
+
+class RecordingTooLong(RuntimeError):
+    """The recording is longer than MATCH_MAX_DURATION_S (memory bound for the shared host)."""
 
 
 def probe(path: str) -> dict:
@@ -440,12 +448,12 @@ def _build(args, manifest) -> int:
                                "sha256": digest, "expected_sha256": expected})
                 log("build_sha256_mismatch code=%s" % code)
                 continue
-            d = decode(src, SR)
+            d = decode(src, SR, duration=REF_MAX_DURATION_S)
             hashes = array_hashes(an, d)
             ht.store(code, hashes)
             if olaf:
                 wav = os.path.join(tmp, "ref.wav")
-                write_wav(wav, decode(src, OLAF_SR), OLAF_SR)
+                write_wav(wav, decode(src, OLAF_SR, duration=REF_MAX_DURATION_S), OLAF_SR)
                 olaf_store(olaf, olaf_home, wav, code)
             tracks.append({"code": code, "kind": kind, "title": entry.get("title"), "status": "ok",
                            "sha256": digest, "sha256_verified": bool(expected),
@@ -515,11 +523,11 @@ def build_extra_refs(extras: list, olaf: str | None, tmp: str):
     for n, item in enumerate(extras):
         path, label = item
         code = "EXTRA-%d" % (n + 1)
-        d = decode(path, SR)
+        d = decode(path, SR, duration=REF_MAX_DURATION_S)
         ht.store(code, array_hashes(an, d))
         if olaf:
             wav = os.path.join(tmp, "extra-%d.wav" % n)
-            write_wav(wav, decode(path, OLAF_SR), OLAF_SR)
+            write_wav(wav, decode(path, OLAF_SR, duration=REF_MAX_DURATION_S), OLAF_SR)
             olaf_store(olaf, home, wav, code)
         info.append({"code": code, "kind": "claimed", "title": label, "sha256": sha256_file(path),
                      "duration_s": round(len(d) / SR, 3)})
@@ -567,7 +575,11 @@ def _match(args) -> int:
         olaf_prepare_home(olaf_home)  # rewrite the config: the index folder may have been renamed
     inp = args.input
     meta = probe(inp)
-    audio = decode(inp, SR)
+    if (meta.get("duration_s") or 0) > MATCH_MAX_DURATION_S:
+        raise RecordingTooLong()
+    audio = decode(inp, SR, duration=MATCH_MAX_DURATION_S + 1)
+    if len(audio) > MATCH_MAX_DURATION_S * SR:
+        raise RecordingTooLong()
     dur = len(audio) / SR
     window, hop = float(args.window), float(args.hop)
     starts = []
@@ -588,7 +600,7 @@ def _match(args) -> int:
         x_kinds = {i["code"]: "claimed" for i in x_info}
         windows = []
         olaf_files = []
-        audio16 = decode(inp, OLAF_SR) if olaf else None
+        audio16 = decode(inp, OLAF_SR, duration=MATCH_MAX_DURATION_S + 1) if olaf else None
         for n, s in enumerate(starts):
             seg = audio[int(s * SR): int((s + window) * SR)]
             hashes = array_hashes(an, seg)
@@ -661,6 +673,10 @@ def decide(w: dict) -> dict:
     o = next((r for r in w.get("olaf") or [] if r["count"] >= OLAF_MIN_COUNT), None)
     if a and o and a["code"] == o["code"] and abs(a["track_pos_s"] - o["track_pos_s"]) <= OFFSET_TOLERANCE_S:
         return {"status": "both", "code": a["code"], "kind": a["kind"], "track_pos_s": a["track_pos_s"]}
+    if a and o and a["code"] == o["code"]:
+        # Same track, contradicting positions: not evidence, excluded from segments.
+        return {"status": "conflict", "code": a["code"], "kind": a["kind"], "track_pos_s": a["track_pos_s"],
+                "other_code": o["code"], "other_track_pos_s": o["track_pos_s"], "reason": "position"}
     if a and o and a["code"] != o["code"]:
         return {"status": "conflict", "code": a["code"], "kind": a["kind"], "track_pos_s": a["track_pos_s"],
                 "other_code": o["code"]}

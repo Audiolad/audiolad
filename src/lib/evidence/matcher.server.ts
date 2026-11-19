@@ -497,8 +497,12 @@ export async function listJobs(limit = 30): Promise<MatchJob[]> {
   return out;
 }
 
+/** The published report set of a job: a symlink to reports/<report id>/, swapped atomically. */
+export const REPORT_CURRENT_DIR = "report-current";
+
 export function jobFilePath(id: string, name: string): string | null {
   if (!EVIDENCE_JOB_ID_RE.test(id)) return null;
-  if (!["result.json", "report.json", "report.sig", "report.pdf", "seal-public.pem", "VERIFY.txt"].includes(name)) return null;
-  return join(jobDir(id), name);
+  if (name === "result.json") return join(jobDir(id), name);
+  if (!["report.json", "report.sig", "report.pdf", "seal-public.pem"].includes(name)) return null;
+  return join(jobDir(id), REPORT_CURRENT_DIR, name);
 }

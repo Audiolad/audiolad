@@ -76,7 +76,7 @@ assert.ok(existsSync(join(root, "jobs", id, "input.m4a")));
 // Sealed report (no venue given → no concordance, still sealed).
 const rep = await r.createMatchReport(id, actor);
 assert.equal(rep.ok, true, JSON.stringify(rep));
-const dir = join(root, "jobs", id);
+const dir = join(root, "jobs", id, "report-current");
 const buf = readFileSync(join(dir, "report.json"));
 const report = JSON.parse(buf.toString("utf8"));
 assert.equal(report.recording.sha256, job?.input.sha256);
@@ -87,6 +87,25 @@ assert.equal(verify(null, buf, pub, readFileSync(join(dir, "report.sig"))), true
 for (const f of report.files) {
   assert.equal(createHash("sha256").update(readFileSync(join(dir, f.name))).digest("hex"), f.sha256, f.name);
 }
+
+// A second report is a new set; the published one stays consistent (JSON ↔ signature ↔ files).
+const [ra, rb] = await Promise.all([r.createMatchReport(id, actor), r.createMatchReport(id, actor)]);
+assert.equal(ra.ok && rb.ok, true);
+{
+  const b2 = readFileSync(join(dir, "report.json"));
+  assert.equal(verify(null, b2, pub, readFileSync(join(dir, "report.sig"))), true);
+  for (const f of JSON.parse(b2.toString("utf8")).files) {
+    assert.equal(createHash("sha256").update(readFileSync(join(dir, f.name))).digest("hex"), f.sha256, f.name);
+  }
+}
+// A re-run whose PDF fails publishes a set without PDF: the old PDF is no longer offered.
+assert.equal(existsSync(join(dir, "report.pdf")), true);
+process.env.AUDIOLAD_EVIDENCE_PYTHON = "/bin/false";
+assert.equal((await r.createMatchReport(id, actor)).ok, true);
+process.env.AUDIOLAD_EVIDENCE_PYTHON = fake;
+assert.equal(existsSync(join(dir, "report.pdf")), false);
+assert.equal((await r.loadJobView(id))?.reportPdf, false);
+assert.equal(m.jobFilePath(id, "report.pdf"), join(root, "jobs", id, "report-current", "report.pdf"));
 
 // Download allowlist.
 assert.equal(m.jobFilePath(id, "input.m4a"), null);

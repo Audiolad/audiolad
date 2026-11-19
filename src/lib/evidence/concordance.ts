@@ -56,8 +56,9 @@ export type Concordance = {
 
 export const CONCORDANCE_TOLERANCE_S = 15;
 /**
- * The play must cover the whole heard interval: from the track start (or the first fact) to the
- * last fact, give or take this slack (facts are sampled every 5–15 s).
+ * The play must cover the whole heard interval, in time (track start or first fact … last fact) and
+ * in track position (posFrom … posTo seen by the log), give or take this slack (facts are sampled
+ * every 5–15 s).
  */
 export const COVER_SLACK_S = 20;
 
@@ -87,6 +88,8 @@ export function concordance(
       const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
       const coverTo = playTimes[j].last + COVER_SLACK_S;
       if (heardFrom < coverFrom || heardTo > coverTo) return;
+      // …and the positions the log saw must cover the heard track positions.
+      if (s.track_from_s < p.posFromMs / 1000 - COVER_SLACK_S || s.track_to_s > p.posToMs / 1000 + COVER_SLACK_S) return;
       pairs.push({ seg: i, play: j, r });
     });
   }
