@@ -78,6 +78,11 @@ assert.equal(manifest.source.complete, true);
 assert.equal(manifest.location.organizationName, "Кофейня «Тест»");
 assert.equal(manifest.players[0].code, "AL-P-000000009");
 assert.deepEqual(manifest.tracks.map((t: { al_code: string }) => t.al_code), ["AL-T-000000001", "AL-T-000000002"]);
+// Every file of the folder except the manifest and its signature is listed and hashed.
+assert.deepEqual(
+  readdirSync(dir).filter((n) => n !== "manifest.json" && n !== "manifest.sig").sort(),
+  manifest.files.map((f: { name: string }) => f.name).sort(),
+);
 for (const f of manifest.files) {
   const buf = readFileSync(join(dir, f.name));
   assert.equal(createHash("sha256").update(buf).digest("hex"), f.sha256, f.name);

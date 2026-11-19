@@ -277,6 +277,8 @@ export async function createPlayLogExtract(input: {
     await put("plays.csv", "\ufeff" + playsCsv(plays, labels, playerCodes, tz));
     await put("facts.csv", "\ufeff" + factsCsv(facts, labels, tz));
     await put("seal-public.pem", seal.publicPem);
+    // Written before the manifest so its hash is sealed too (no manifest hash inside: no cycle).
+    await put("VERIFY.txt", verifyText(seal.fingerprint));
 
     const window = {
       from_utc: fromIso, to_utc: toIso, from_local: formatLocal(fromIso, tz), to_local: formatLocal(toIso, tz), timezone: tz,
@@ -289,7 +291,7 @@ export async function createPlayLogExtract(input: {
       window,
       counts: { facts: facts.length, plays: plays.length, players: players.length, tracks: tracks.length },
       players,
-      files: files.filter((f) => f.name !== "seal-public.pem"),
+      files: files.filter((f) => f.name.endsWith(".csv")),
       seal_fingerprint: seal.fingerprint,
       plays: plays.map((p) => ({
         first_local: formatLocal(p.firstAt, tz),
@@ -338,7 +340,6 @@ export async function createPlayLogExtract(input: {
     await writeFile(join(tmpDir, "manifest.json"), manifestBuf, { mode: 0o600 });
     await writeFile(join(tmpDir, "manifest.sig"), sealBytes(seal, manifestBuf), { mode: 0o600 });
     const manifestSha256 = sha256Hex(manifestBuf);
-    await writeFile(join(tmpDir, "VERIFY.txt"), verifyText(manifestSha256, seal.fingerprint), { mode: 0o600 });
     await rename(tmpDir, finalDir);
     return { ok: true, id, manifestSha256, facts: facts.length, plays: plays.length, pdf };
   } catch (error) {
@@ -348,14 +349,13 @@ export async function createPlayLogExtract(input: {
   }
 }
 
-function verifyText(manifestSha256: string, fingerprint: string): string {
+function verifyText(fingerprint: string): string {
   return [
     "Проверка выписки журнала воспроизведения АудиоЛад",
     "",
-    `SHA-256 manifest.json: ${manifestSha256}`,
     `SHA-256 открытого ключа печати (seal-public.pem, DER): ${fingerprint}`,
     "",
-    "1. Хеши файлов: sha256sum plays.csv facts.csv extract.pdf – сравнить с полем files в manifest.json.",
+    "1. Хеши файлов: sha256sum plays.csv facts.csv extract.pdf seal-public.pem VERIFY.txt – сравнить с полем files в manifest.json.",
     "2. Печать: openssl pkeyutl -verify -pubin -inkey seal-public.pem -rawin -in manifest.json -sigfile manifest.sig",
     "   Ожидаемый ответ: Signature Verified Successfully.",
     "3. Любое изменение manifest.json или файлов делает проверку неуспешной.",
@@ -402,7 +402,7 @@ export async function listExtracts(limit = 50): Promise<ExtractListItem[]> {
         facts: m.counts.facts,
         plays: m.counts.plays,
         manifestSha256: sha256Hex(buf),
-        files: [...m.files.map((f) => f.name), "manifest.json", "manifest.sig", "VERIFY.txt"],
+        files: [...m.files.map((f) => f.name), "manifest.json", "manifest.sig"],
       });
     } catch {
       // A broken folder is skipped, never shown half-read.
