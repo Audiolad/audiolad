@@ -60,7 +60,8 @@ export function buildBusinessAppRobotsRoute(): MetadataRoute.Robots {
 /** Coffee exposes only these public information pages to crawlers. */
 export function coffeePublicPaths(): string[] {
   return ["/", "/help", ...Object.keys(BUSINESS_PUBLIC_PATH_REWRITES).filter(
-    (path) => path === "/documents" || path.startsWith("/documents/"),
+    // t1591u: the point certificate is a private cabinet page, never in the sitemap.
+    (path) => (path === "/documents" || path.startsWith("/documents/")) && path !== "/documents/sertifikat",
   )];
 }
 

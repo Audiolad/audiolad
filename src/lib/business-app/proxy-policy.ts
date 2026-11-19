@@ -52,6 +52,8 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/point",
   // 90d24628: the venue's own QR sticker. Flag, session and membership are checked in the handler.
   "/api/business/venue-licence/sticker",
+  // t1591u: the Client's ИНН (owner only; session, membership and registry checks in the handler).
+  "/api/business/legal-identity",
 ] as const;
 
 /** Coffee-only platform auth. Server actions POST to the currently rendered page. */

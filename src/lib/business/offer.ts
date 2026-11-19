@@ -21,10 +21,10 @@ export const BUSINESS_OFFER_HREF = "/documents/business-offer";
 /** Absolute link for Business surfaces served on audiolad.ru (landing /b, /b/prava, coffee atlas). */
 export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_HREF}`;
 
-export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Бизнес»";
+export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Кофейня»";
 
 export const BUSINESS_OFFER_SUMMARY =
-  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Остальные документы – его приложения.";
+  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат, лицензия на музыку, сертификат точки и защита заведения. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Приложения 1–4 – часть договора.";
 
 export const BUSINESS_ONBOARDING_HREF = "/onboarding";
 
@@ -41,12 +41,16 @@ export type BusinessOfferDocumentEdition = {
   label: string;
 };
 
-/** Current edition of the offer text (docs/business/public/business-offer.md). */
+/**
+ * Current edition of the offer text (docs/business/public/business-offer.md): «АудиоЛад Кофейня»,
+ * edition 3 of 18.11.2026 with annexes 1–4 in the same file (t1591u). Seed:
+ * 20270317120000_business_coffee_legal_kit.sql. Edition 2 text: archive/business-offer-v2-2026-11-09.md.
+ */
 export const BUSINESS_OFFER_EDITION: BusinessOfferDocumentEdition = {
   documentKey: BUSINESS_OFFER_DOCUMENT_ID,
-  version: "offer-v2-2026-11-09",
-  contentHash: "fb57866ccb90a333fd240bfcb2b3c85bacf12e8751bac1bbfab8946c6930105b",
-  label: "Редакция 2 от 09.11.2026",
+  version: "offer-v3-2026-11-18",
+  contentHash: "154ddc75986187a1f8f2af3c929f7abfb1ecadca45de691b88955a8b3bc14955",
+  label: "Редакция 3 от 18.11.2026",
 };
 
 export type BusinessOfferEdition = {

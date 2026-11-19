@@ -470,3 +470,13 @@
 .business-legal__footer p + p {
   margin-top: 8px;
 }
+
+/* t1591u: договор-оферта на /b/coffee/legal/oferta – текст SimpleMarkdown в цветах кофейни. */
+.business-legal__offer > div { color: var(--legal-text); }
+.business-legal__offer blockquote { border-color: var(--legal-accent); background: var(--legal-bg); }
+.business-legal__offer th,
+.business-legal__offer td { border-color: #e2d3bf; }
+.business-legal__offer h2 { color: var(--legal-accent); }
+.business-legal__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.business-legal__badge--ok { background: #e3f1e2; color: #1f5b24; border-color: #a9cfa6; }
+.business-legal__badge--warn { background: #fbeee0; color: #8a4b12; border-color: #e8c39a; }
