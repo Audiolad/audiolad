@@ -98,13 +98,22 @@ export function concordance(
       if (covers(i, j, r)) pairs.push({ seg: i, play: j, r });
     });
   }
+  // Segments a common start would confirm: within the tolerance of it and covered by the log at
+  // that start (one pair per segment, the closest). Used both to rank candidate starts and for the
+  // final selection, so the chosen start is the one that really confirms the most.
+  const pick = (center: number) => {
+    const m = new Map<number, Pair>();
+    for (const p of pairs) {
+      if (Math.abs(p.r - center) > toleranceS || !covers(p.seg, p.play, center)) continue;
+      const prev = m.get(p.seg);
+      if (!prev || Math.abs(p.r - center) < Math.abs(prev.r - center)) m.set(p.seg, p);
+    }
+    return m;
+  };
   const claimed = claimedStart ? claimedStart.getTime() / 1000 : null;
   let best: { r: number; count: number; dur: number; skew: number } | null = null;
   for (const cand of pairs) {
-    const hit = new Map<number, number>();
-    for (const p of pairs) {
-      if (Math.abs(p.r - cand.r) <= toleranceS) hit.set(p.seg, 1);
-    }
+    const hit = pick(cand.r);
     let dur = 0;
     for (const seg of hit.keys()) dur += segments[seg].rec_to_s - segments[seg].rec_from_s;
     const skew = claimed === null ? 0 : Math.abs(cand.r - claimed);
@@ -115,19 +124,7 @@ export function concordance(
       (hit.size === best.count && Math.abs(dur - best.dur) <= 1e-9 && skew < best.skew);
     if (better) best = { r: cand.r, count: hit.size, dur, skew };
   }
-  // Refine R as the median of the agreeing pairs (one pair per segment, the closest), then
-  // re-select against the refined R, so every confirmed segment is within the tolerance of the
-  // reported recording start.
-  const pick = (center: number) => {
-    const m = new Map<number, Pair>();
-    for (const p of pairs) {
-      // Within the tolerance of the common start, and still covered by the log at that start.
-      if (Math.abs(p.r - center) > toleranceS || !covers(p.seg, p.play, center)) continue;
-      const prev = m.get(p.seg);
-      if (!prev || Math.abs(p.r - center) < Math.abs(prev.r - center)) m.set(p.seg, p);
-    }
-    return m;
-  };
+  // Refine R as the median of the confirmed pairs; keep it only if it confirms no fewer segments.
   let r: number | null = null;
   let chosen = new Map<number, Pair>();
   if (best) {

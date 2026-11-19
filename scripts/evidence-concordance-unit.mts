@@ -95,6 +95,18 @@ const segs: MatchSegment[] = [
     assert.ok(start + ch.recToS <= Date.parse(p.lastAt) / 1000 - T + 20 + 1e-6, JSON.stringify({ start, ch }));
   }
 }
+// Candidate starts are ranked with coverage: offsets 14, 0, 0 where the start 14 would leave two
+// fragments uncovered; the start 0 confirms all three even with the claimed time favouring 14.
+{
+  const ps = [play("A", 0, 100), { ...play("B", 1000, 40), lastAt: iso(1030) }, { ...play("C", 2000, 40), lastAt: iso(2030) }];
+  const ss: MatchSegment[] = [
+    { code: "A", kind: "catalog", rec_from_s: 10, rec_to_s: 40, track_from_s: 10 + 14, track_to_s: 40 + 14 },
+    { code: "B", kind: "catalog", rec_from_s: 1010, rec_to_s: 1040, track_from_s: 10, track_to_s: 40 },
+    { code: "C", kind: "catalog", rec_from_s: 2010, rec_to_s: 2040, track_from_s: 10, track_to_s: 40 },
+  ];
+  const c = concordance(ss, ps, new Date((T + 14) * 1000));
+  assert.equal(c.confirmedSegments, 3, JSON.stringify(c));
+}
 // Every confirmed segment stays within the tolerance of the reported start (offsets −15, 0, 15, 15).
 {
   const ps = [play("A", 0, 100), play("B", 1000, 100), play("C", 2000, 100), play("D", 3000, 100)];
