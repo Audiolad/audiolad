@@ -208,7 +208,12 @@ assert.match(shell, /rel="nofollow noopener" target="_blank"/, "МАКС – н�
   const reaccept = readFileSync(join(ROOT, "src/components/business-app/legal/BusinessOfferReacceptPrompt.tsx"), "utf8");
   assert.match(reaccept, /id="offer-reaccept"/, "якорь карточки принятия");
   const certPage = readFileSync(join(ROOT, "src/app/business-app/documents/sertifikat/page.tsx"), "utf8");
-  assert.match(certPage, /<BusinessCertificateMissingItem /, "страница сертификата – те же пункты-ссылки");
+  assert.match(certPage, /<BusinessCertificateMissingItem\s/, "страница сертификата – те же пункты-ссылки");
+  assert.match(setup, /const allowed = missing === "offer" \? canAcceptOffer : canEditIdentity;/, "ссылка только когда цель есть на странице");
+  for (const src of [setup, certPage]) {
+    assert.match(src, /canEditIdentity=\{context\.canEditIdentity\}/, "ИНН/адрес – ссылка только у владельца");
+    assert.match(src, /canAcceptOffer=\{Boolean\(context\.offerPrompt\)\}/, "редакция – ссылка только при карточке принятия");
+  }
   for (const f of [
     "src/app/business-app/documents/page.tsx",
     "src/app/business-app/documents/sertifikat/page.tsx",

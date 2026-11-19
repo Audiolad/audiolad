@@ -21,9 +21,23 @@ export const BUSINESS_CERTIFICATE_MISSING_HREF: Partial<Record<CertificateMissin
   offer: `/documents#${BUSINESS_OFFER_REACCEPT_ANCHOR_ID}`,
 };
 
-/** Пункт «что заполнить»: ссылка на место, где это исправляется, или просто текст. */
-export function BusinessCertificateMissingItem({ missing }: { missing: CertificateMissing }) {
-  const href = BUSINESS_CERTIFICATE_MISSING_HREF[missing];
+/**
+ * Пункт «что заполнить»: ссылка на место, где это исправляется, или просто текст.
+ * Ссылка – только когда цель есть на странице: ИНН и адрес правит владелец на этом браузере
+ * (блок ИНН и форма #venue есть только у него), карточка принятия – только при offerPrompt.
+ * На устройстве зала и в просмотре – просто текст.
+ */
+export function BusinessCertificateMissingItem({
+  missing,
+  canEditIdentity,
+  canAcceptOffer,
+}: {
+  missing: CertificateMissing;
+  canEditIdentity: boolean;
+  canAcceptOffer: boolean;
+}) {
+  const allowed = missing === "offer" ? canAcceptOffer : canEditIdentity;
+  const href = allowed ? BUSINESS_CERTIFICATE_MISSING_HREF[missing] : undefined;
   const text = BUSINESS_CERTIFICATE_MISSING_TEXT[missing];
   return (
     <li data-missing={missing}>
@@ -69,7 +83,12 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
         ) : (
           <ul className="space-y-1 text-sm leading-6 text-[var(--biz-text)]" data-testid="biz-certificate-missing">
             {missing.map((m) => (
-              <BusinessCertificateMissingItem key={m} missing={m} />
+              <BusinessCertificateMissingItem
+                key={m}
+                missing={m}
+                canEditIdentity={context.canEditIdentity}
+                canAcceptOffer={Boolean(context.offerPrompt)}
+              />
             ))}
           </ul>
         )}

@@ -12,7 +12,7 @@ export const BUSINESS_PROFILE_NAME_HREF = "/profile?edit=name";
 /** Auto name of a new organization and its first venue (guest start, first signup). */
 export const DEFAULT_BUSINESS_ORGANIZATION = "Моя кофейня";
 /** Empty-field placeholder for the account-level cafe / organization name. */
-export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моя кофейня";
+export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моё заведение";
 /** Under the organization name field: not a hall name (Sergey, t1316u). */
 export const BUSINESS_ORGANIZATION_NAME_HINT =
   "Это название заведения или организации. Названия залов задаются отдельно.";

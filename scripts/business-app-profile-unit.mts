@@ -69,7 +69,7 @@ assert.equal(businessProfileOrganizationFieldValue(null), "", "no org → empty,
 assert.equal(businessProfileOrganizationFieldValue(""), "");
 assert.equal(businessProfileOrganizationFieldValue("  Долина Кофе  "), "Долина Кофе");
 assert.equal(businessProfileOrganizationFieldValue(DEFAULT_BUSINESS_ORGANIZATION), DEFAULT_BUSINESS_ORGANIZATION);
-assert.equal(BUSINESS_ORGANIZATION_NAME_PLACEHOLDER, "Моя кофейня");
+assert.equal(BUSINESS_ORGANIZATION_NAME_PLACEHOLDER, "Моё заведение");
 assert.match(BUSINESS_ORGANIZATION_NAME_HINT, /залов/);
 assert.doesNotMatch(BUSINESS_ORGANIZATION_NAME_HINT, /точк/i);
 assert.doesNotMatch(BUSINESS_ORGANIZATION_NAME_HINT, /\u2014/);

@@ -43,7 +43,12 @@ export default async function BusinessCertificatePage() {
           {context.kind === "ready" && context.state.kind === "missing" ? (
             <ul className="space-y-1 text-sm leading-6">
               {context.state.missing.map((m) => (
-                <BusinessCertificateMissingItem key={m} missing={m} />
+                <BusinessCertificateMissingItem
+                  key={m}
+                  missing={m}
+                  canEditIdentity={context.canEditIdentity}
+                  canAcceptOffer={Boolean(context.offerPrompt)}
+                />
               ))}
             </ul>
           ) : (

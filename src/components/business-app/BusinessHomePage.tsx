@@ -162,7 +162,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             Первое заведение
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
-            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим кофейню. Всё в одном кабинете.
+            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим заведение. Всё в одном кабинете.
           </p>
           <Link
             href="/onboarding"
