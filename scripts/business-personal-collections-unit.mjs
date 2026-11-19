@@ -164,3 +164,11 @@ assert.match(readFileSync(new URL('../src/components/business-app/BusinessEligib
   }
   assert.match(readFileSync(new URL('../src/lib/business-collections/model.ts', import.meta.url), 'utf8'), /COLLECTION_DEAD_MARKER = "0".repeat\(64\)/);
 }
+assert.match(source('src/lib/business-collections/load.server.ts'), /if \(error\) return true;\s*return Array.isArray\(data\) && data.length > 0;\s*\} catch \{ return true; \}/, 'visitor lookup errors stay quiet');
+assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? quiet \? "Чтобы слушать подборку, создайте заведение\." : "Подключите своё заведение/);
+{
+  const studio = source('src/components/business-app/sound/BusinessSoundStudio.tsx');
+  assert.match(studio, /limit === "near_end" && !quiet/);
+  assert.match(studio, /\{offerGift && !quiet \? \(/);
+  assert.match(studio, /\{guest && liveAccess && !quiet \? \(/);
+}

@@ -97,7 +97,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
     domain.status === "anonymous"
       ? "Войдите, чтобы управлять заведением."
       : domain.status === "authenticated" && !domain.location
-        ? "Подключите своё заведение – это займёт минуту."
+        ? quiet ? "Чтобы слушать подборку, создайте заведение." : "Подключите своё заведение – это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
   const playback = deriveOwnerPlaybackSignal(

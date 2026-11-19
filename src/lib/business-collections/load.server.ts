@@ -103,8 +103,10 @@ export async function loadCollectionVisitor(userId: string | null): Promise<bool
     if (!userId) return false;
     const { data, error } = await createServiceRoleClient().from("business_personal_collection_accounts")
       .select("collection_id").eq("user_id", userId).limit(1);
-    return !error && Array.isArray(data) && data.length > 0;
-  } catch { return false; }
+    // Unknown binding of a signed-in account: stay quiet (and calm) rather than show sales prompts.
+    if (error) return true;
+    return Array.isArray(data) && data.length > 0;
+  } catch { return true; }
 }
 
 /** A collection cookie of valid shape is present in this browser (live or revoked). */

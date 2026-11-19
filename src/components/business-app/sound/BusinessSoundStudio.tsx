@@ -2,6 +2,9 @@
 
 import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import BusinessGuestStartCta from "../BusinessGuestStartCta";
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
+
+const QUIET_EXHAUSTED = "30 минут знакомства с подборками на этом устройстве использованы.";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -111,6 +114,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   // Gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
   const liveAccess = useHasLiveBusinessAccess();
   const offerGift = guest && !liveAccess;
+  // t1618u: a personal-link visitor gets no gift, connect or «скоро закончится» nudges here.
+  const quiet = useBusinessQuiet();
   const guestStartEnabled = useGuestStartEnabled();
   const playback = useBusinessGuestPlayback();
   const { ctlRef, view, clock, volume, barDismissed, setBarDismissed, limit, seedLimit, atmosphere, setAtmosphere, attachStudio, setBarMeta } = playback;
@@ -227,7 +232,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     ? GUEST_COFFEE_COPY.unavailable
     : exhausted && isPlaying
       ? GUEST_COFFEE_COPY.lastTrack
-      : limit === "near_end"
+      : limit === "near_end" && !quiet
         ? GUEST_COFFEE_COPY.nearEnd
         : null;
   const playerMessage = unavailable || status === "no_access" ? null : view.message;
@@ -304,7 +309,9 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           </h2>
           {showExhaustedPanel ? (
             <div className="business-app-card business-sound-limit" role="status" data-testid="biz-sound-exhausted">
-              {offerGift ? (
+              {quiet ? (
+                <p className="text-[var(--biz-text-muted)]" data-testid="biz-sound-exhausted-text">{QUIET_EXHAUSTED}</p>
+              ) : offerGift ? (
                 <p className="text-[1.05rem] font-bold text-[var(--biz-text)]" data-testid="biz-sound-exhausted-text">
                   {guestStartEnabled ? GUEST_COFFEE_COPY.exhaustedBannerGuestStart : GUEST_COFFEE_COPY.exhaustedBanner}
                 </p>
@@ -318,14 +325,14 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
                   </p>
                 </>
               )}
-              {guest && liveAccess ? (
+              {guest && liveAccess && !quiet ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-connect-cta">
                     Подключить заведение
                   </Link>
                 </div>
               ) : null}
-              {offerGift ? (
+              {offerGift && !quiet ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* 253821e0: one action – the green gift CTA of the top banner, no «Подключить». */}
                   <BusinessGuestStartCta href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-cta business-app-focus-ring" testId="biz-guest-register" enabledLabel={BUSINESS_GIFT_CTA}>
