@@ -41,15 +41,21 @@ export async function GET(request: Request) {
     return response;
   };
   if (!COLLECTION_TOKEN.test(token)) return unavailable();
-  try {
-    const { data, error } = await createServiceRoleClient().from("business_personal_collections").select("id")
-      .eq("token_hash", collectionTokenHash(token)).is("revoked_at", null).maybeSingle();
-    if (error) return entry(UNAVAILABLE_URL);
-    if (!data) return unavailable();
+  // A live link, or a lookup error: this browser now holds THIS link (the cookie authorizes only what
+  // its own hash matches), so a previous collection never stays behind it. The entry screen
+  // re-checks it and says «Подборка сейчас недоступна» if the link is dead or still unreadable.
+  const remember = () => {
     const response = entry();
     response.cookies.set(COLLECTION_COOKIE, token, {
       httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60,
     });
     return response;
-  } catch { return entry(UNAVAILABLE_URL); }
+  };
+  try {
+    const { data, error } = await createServiceRoleClient().from("business_personal_collections").select("id")
+      .eq("token_hash", collectionTokenHash(token)).is("revoked_at", null).maybeSingle();
+    if (error) return remember();
+    if (!data) return unavailable();
+    return remember();
+  } catch { return remember(); }
 }

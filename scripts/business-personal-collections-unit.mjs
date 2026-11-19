@@ -74,6 +74,7 @@ assert.match(openRoute, /response.cookies.set\(COLLECTION_COOKIE, token/);
 assert.match(openRoute, /https:\/\/coffee.audiolad.ru\/collection/);
 assert.match(openRoute, /collection\?state=unavailable/);
 assert.match(openRoute, /cookies.set\(COLLECTION_COOKIE, COLLECTION_DEAD_MARKER, \{/, 'dead link replaces another collection cookie with a dead marker');
+assert.match(openRoute, /if \(error\) return remember\(\);[\s\S]*\} catch \{ return remember\(\); \}/, "lookup errors still replace a previous collection cookie");
 assert.match(page, /state === "unavailable"\) return <Unavailable \/>/);
 assert.doesNotMatch(openRoute, /\.update\(|\.delete\(|\.insert\(|\.upsert\(|signIn|bootstrap/, 'opening writes nothing');
 const start = source('src/app/api/business/guest-start/route.ts');
