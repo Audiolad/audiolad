@@ -21,8 +21,8 @@ export function pointDeviceLink(origin: string, hostname: string, code?: string 
 export function pointShareText(code?: string | null): string {
   const clean = code ? normalizePointCode(code) : null;
   return clean
-    ? `Откройте ссылку на устройстве у колонки в кофейне – оно подключится само. Код ${clean} действует 20 минут.`
-    : "Откройте ссылку на устройстве у колонки в кофейне и введите код из кабинета.";
+    ? `Откройте ссылку на устройстве у колонки в заведении – оно подключится само. Код ${clean} действует 20 минут.`
+    : "Откройте ссылку на устройстве у колонки в заведении и введите код из кабинета.";
 }
 
 /** Telegram share intent. Telegram receives the link, so the code leaves our servers here. */

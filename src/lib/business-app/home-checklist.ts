@@ -47,7 +47,7 @@ export function buildBusinessHomeSteps(input: {
     title: "Включите музыку",
     detail: input.musicDone
       ? "Музыка уже звучала в кабинете."
-      : "Откройте вкладку «Музыка» и включите звучание для кофейни.",
+      : "Откройте вкладку «Музыка» и включите звучание для заведения.",
     done: input.musicDone,
     href: "/music",
     cta: "Открыть музыку",

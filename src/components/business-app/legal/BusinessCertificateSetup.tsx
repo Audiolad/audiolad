@@ -2,10 +2,56 @@ import Link from "next/link";
 
 import BusinessLegalIdentityForm from "@/components/business-app/legal/BusinessLegalIdentityForm";
 import BusinessOfferReacceptPrompt from "@/components/business-app/legal/BusinessOfferReacceptPrompt";
-import { BUSINESS_CERTIFICATE_MISSING_TEXT, certificateDisplayNumber } from "@/lib/business/legal/certificate";
+import {
+  BUSINESS_CERTIFICATE_MISSING_TEXT,
+  certificateDisplayNumber,
+  type CertificateMissing,
+} from "@/lib/business/legal/certificate";
 import type { CabinetCertificateContext } from "@/lib/business/legal/certificate-context.server";
 
 export const BUSINESS_CERTIFICATE_CABINET_HREF = "/documents/sertifikat";
+
+/** Якоря блоков, где исправляется каждый пункт (t1604u): красный пункт ведёт прямо туда. */
+export const BUSINESS_CERTIFICATE_INN_ANCHOR_ID = "legal-inn";
+export const BUSINESS_OFFER_REACCEPT_ANCHOR_ID = "offer-reaccept";
+export const BUSINESS_CERTIFICATE_MISSING_HREF: Partial<Record<CertificateMissing, string>> = {
+  inn: `/documents#${BUSINESS_CERTIFICATE_INN_ANCHOR_ID}`,
+  inn_inactive: `/documents#${BUSINESS_CERTIFICATE_INN_ANCHOR_ID}`,
+  address: "/preferences#venue",
+  offer: `/documents#${BUSINESS_OFFER_REACCEPT_ANCHOR_ID}`,
+};
+
+/**
+ * Пункт «что заполнить»: ссылка на место, где это исправляется, или просто текст.
+ * Ссылка – только когда цель есть на странице: ИНН и адрес правит владелец на этом браузере
+ * (блок ИНН и форма #venue есть только у него), карточка принятия – только при offerPrompt.
+ * На устройстве зала и в просмотре – просто текст.
+ */
+export function BusinessCertificateMissingItem({
+  missing,
+  canEditIdentity,
+  canAcceptOffer,
+}: {
+  missing: CertificateMissing;
+  canEditIdentity: boolean;
+  canAcceptOffer: boolean;
+}) {
+  const allowed = missing === "offer" ? canAcceptOffer : canEditIdentity;
+  const href = allowed ? BUSINESS_CERTIFICATE_MISSING_HREF[missing] : undefined;
+  const text = BUSINESS_CERTIFICATE_MISSING_TEXT[missing];
+  return (
+    <li data-missing={missing}>
+      •{" "}
+      {href ? (
+        <Link href={href} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2" data-testid="biz-certificate-missing-link">
+          {text}
+        </Link>
+      ) : (
+        text
+      )}
+    </li>
+  );
+}
 
 /** «Сертификат заведения» на странице «Документы»: что заполнить и ссылка на готовый сертификат. */
 export default function BusinessCertificateSetup({ context }: { context: CabinetCertificateContext }) {
@@ -37,12 +83,17 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
         ) : (
           <ul className="space-y-1 text-sm leading-6 text-[var(--biz-text)]" data-testid="biz-certificate-missing">
             {missing.map((m) => (
-              <li key={m} data-missing={m}>• {BUSINESS_CERTIFICATE_MISSING_TEXT[m]}</li>
+              <BusinessCertificateMissingItem
+                key={m}
+                missing={m}
+                canEditIdentity={context.canEditIdentity}
+                canAcceptOffer={Boolean(context.offerPrompt)}
+              />
             ))}
           </ul>
         )}
 
-        <div className="space-y-2 border-t border-[var(--biz-border)] pt-3">
+        <div className="business-cert-anchor space-y-2 border-t border-[var(--biz-border)] pt-3" id={BUSINESS_CERTIFICATE_INN_ANCHOR_ID}>
           <h3 className="text-sm font-bold text-[var(--biz-text)]">ИНН</h3>
           <BusinessLegalIdentityForm identity={identity} canEdit={context.canEditIdentity} />
         </div>

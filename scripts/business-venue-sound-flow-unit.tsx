@@ -59,7 +59,7 @@ const at = (html: string, testid: string) => {
     <VenueControlPanel locationId="loc-1" pointCanEdit soundSlot={<p data-testid="slot">picker</p>} />,
   );
   assert.match(closed, /Музыка в зале/);
-  assert.doesNotMatch(closed, /Название кофейни/, "the cafe name is edited in «Профиль»");
+  assert.doesNotMatch(closed, /Название заведения/, "the cafe name is edited in «Профиль»");
   assert.doesNotMatch(closed, /biz-venue-name|biz-venue-rename/);
   assert.doesNotMatch(closed, /точк/i);
   assert.match(closed, /Пауза, продолжение, следующий трек и новое звучание уходят в зал после подтверждения\. Вкладка «Музыка» играет только у вас\./);
@@ -203,7 +203,7 @@ const at = (html: string, testid: string) => {
   // The venue device cannot open the owner controls: no link to the locked /preferences page here.
   assert.doesNotMatch(locked, /<a [^>]*href=/);
   assert.match(locked, /на телефоне владельца, не на этом устройстве/);
-  assert.match(locked, /«Настройка» – «Управление кофейней»/);
+  assert.match(locked, /«Настройка» – «Управление заведением»/);
   assert.match(locked, /переключатель «Разрешить менять музыку с устройства в заведении»/);
   assert.doesNotMatch(locked, /—/);
 }
@@ -216,7 +216,7 @@ const at = (html: string, testid: string) => {
   assert.match(page, /businessCabinetCan\(\{ mode: cabinet\.mode \}, "atmosphereRebuild"\)/);
   assert.match(page, /\{canRebuild && locationId \? \(/);
   assert.match(page, /atmosphereSummary=\{saved \? atmosphereChoiceLabel\(saved\) : null\}/);
-  assert.match(page, /Управление кофейней/);
+  assert.match(page, /Управление заведением/);
   assert.ok(page.indexOf("<BusinessVenuePlaceForm") < page.indexOf("<VenueControlPanel"), "name and address precede device pairing");
 }
 

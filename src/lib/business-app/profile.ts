@@ -12,10 +12,10 @@ export const BUSINESS_PROFILE_NAME_HREF = "/profile?edit=name";
 /** Auto name of a new organization and its first venue (guest start, first signup). */
 export const DEFAULT_BUSINESS_ORGANIZATION = "Моя кофейня";
 /** Empty-field placeholder for the account-level cafe / organization name. */
-export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моя кофейня";
+export const BUSINESS_ORGANIZATION_NAME_PLACEHOLDER = "Моё заведение";
 /** Under the organization name field: not a hall name (Sergey, t1316u). */
 export const BUSINESS_ORGANIZATION_NAME_HINT =
-  "Это название кофейни или организации. Названия залов задаются отдельно.";
+  "Это название заведения или организации. Названия залов задаются отдельно.";
 export const BUSINESS_OWNER_NAME_FIELD_ID = "business-owner-name";
 
 /** Browser only: scroll the profile owner name field into view and put the cursor there. */
@@ -63,7 +63,7 @@ export function validateBusinessProfile(input: unknown) {
   if (!input || typeof input !== "object" || !("ownerName" in input) || !("organizationName" in input) ||
       typeof input.ownerName !== "string" ||
       (input.organizationName !== null && typeof input.organizationName !== "string")) {
-    return { ok: false, error: "Проверьте имя, фамилию и название кофейни / организации." } as const;
+    return { ok: false, error: "Проверьте имя, фамилию и название заведения / организации." } as const;
   }
   // Surname is required (Sergey, t1305s9421). Missing key → empty so the required check fires.
   const rawSurname = "ownerSurname" in input && typeof (input as { ownerSurname?: unknown }).ownerSurname === "string"
@@ -72,7 +72,7 @@ export function validateBusinessProfile(input: unknown) {
       ? null
       : "";
   if (rawSurname === null) {
-    return { ok: false, error: "Проверьте имя, фамилию и название кофейни / организации." } as const;
+    return { ok: false, error: "Проверьте имя, фамилию и название заведения / организации." } as const;
   }
   const rawOrganization = input.organizationName as string | null;
   // Validate before trim so leading/trailing control characters are rejected too.
@@ -91,7 +91,7 @@ export function validateBusinessProfile(input: unknown) {
   }
   if (!ownerSurname) return { ok: false, error: BUSINESS_OWNER_SURNAME_REQUIRED_ERROR } as const;
   if (organizationName === "") {
-    return { ok: false, error: "Введите название кофейни / организации." } as const;
+    return { ok: false, error: "Введите название заведения / организации." } as const;
   }
   return { ok: true, ownerName, ownerSurname, organizationName } as const;
 }

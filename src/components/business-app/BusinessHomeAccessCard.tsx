@@ -544,7 +544,7 @@ export function BusinessPayError({ error, acceptAnchorId }: { error: PayError; a
     return (
       <p role="alert" data-testid="biz-home-pay-error">
         Оплатить может владелец аккаунта.{" "}
-        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить кофейню</Link>.
+        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить заведение</Link>.
       </p>
     );
   }

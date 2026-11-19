@@ -34,7 +34,7 @@ export default async function BusinessOwnerUnlockPage({ searchParams }: PageProp
       <section className="business-app-card" data-testid="biz-owner-unlock">
         <h1 className="text-[1.45rem] font-bold tracking-tight text-[var(--biz-text)]">Кабинет владельца</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
-          Это устройство в зале. Чтобы открыть оплату, профиль и управление кофейней, введите пароль владельца.
+          Это устройство в зале. Чтобы открыть оплату, профиль и управление заведением, введите пароль владельца.
           Кабинет откроется на {Math.round(BUSINESS_OWNER_UNLOCK_SECONDS / 60)} минут, потом устройство вернётся в режим
           заведения. Музыка в зале не остановится.
         </p>
