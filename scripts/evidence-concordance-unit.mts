@@ -78,6 +78,23 @@ const segs: MatchSegment[] = [
   const ok = concordance([{ code: "A", kind: "catalog", rec_from_s: 0, rec_to_s: 15, track_from_s: 302, track_to_s: 317 }], late, null);
   assert.equal(ok.confirmedSegments, 1);
 }
+// Coverage is checked at the final common start too: a neighbour shifts the start by 14 s, and the
+// fragment whose log ends right at its own end is then no longer covered.
+{
+  const ps = [play("A", 0, 100), { ...play("B", 1000, 40), lastAt: iso(1030) }, play("C", 2000, 100)];
+  const ss: MatchSegment[] = [
+    { code: "A", kind: "catalog", rec_from_s: 10, rec_to_s: 40, track_from_s: 10 + 14, track_to_s: 40 + 14 },
+    { code: "B", kind: "catalog", rec_from_s: 1010, rec_to_s: 1040, track_from_s: 10, track_to_s: 40 },
+    { code: "C", kind: "catalog", rec_from_s: 2010, rec_to_s: 2040, track_from_s: 10 + 14, track_to_s: 40 + 14 },
+  ];
+  const c = concordance(ss, ps, null);
+  const start = Date.parse(c.recordingStartUtc!) / 1000 - T;
+  for (const ch of c.checks) {
+    if (!ch.confirmed) continue;
+    const p = ps[ch.play!];
+    assert.ok(start + ch.recToS <= Date.parse(p.lastAt) / 1000 - T + 20 + 1e-6, JSON.stringify({ start, ch }));
+  }
+}
 // Every confirmed segment stays within the tolerance of the reported start (offsets −15, 0, 15, 15).
 {
   const ps = [play("A", 0, 100), play("B", 1000, 100), play("C", 2000, 100), play("D", 3000, 100)];

@@ -3,7 +3,7 @@ import "server-only";
 
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -195,6 +195,11 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
     if (pdf) {
       const b = await readFile(join(dir, "report.pdf"));
       files.push({ name: "report.pdf", sha256: sha256Hex(b), bytes: b.length });
+    }
+    // Nothing unsealed may be published (e.g. a PDF left by a renderer that then failed).
+    const listed = new Set(files.map((f) => f.name));
+    for (const name of await readdir(dir)) {
+      if (!listed.has(name)) await rm(join(dir, name), { recursive: true, force: true });
     }
     const report = {
       schema: "audiolad.evidence.recording-match-report/1",

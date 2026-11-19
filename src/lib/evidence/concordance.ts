@@ -78,19 +78,24 @@ export function concordance(
     first: Date.parse(p.firstAt) / 1000,
     last: Date.parse(p.lastAt) / 1000,
   }));
+  /** Whether play j covers segment i if the recording started at `start` (time and position). */
+  const covers = (i: number, j: number, start: number) => {
+    const s = segments[i];
+    const p = plays[j];
+    const heardFrom = start + s.rec_from_s;
+    const heardTo = start + s.rec_to_s;
+    const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
+    const coverTo = playTimes[j].last + COVER_SLACK_S;
+    if (heardFrom < coverFrom || heardTo > coverTo) return false;
+    // …and the positions the log saw must cover the heard track positions.
+    return !(s.track_from_s < p.posFromMs / 1000 - COVER_SLACK_S || s.track_to_s > p.posToMs / 1000 + COVER_SLACK_S);
+  };
   const pairs: Pair[] = [];
   for (const { s, i } of segs) {
     plays.forEach((p, j) => {
       if (!p.code || p.code !== s.code) return;
       const r = playTimes[j].start + (s.track_from_s - s.rec_from_s);
-      const heardFrom = r + s.rec_from_s;
-      const heardTo = r + s.rec_to_s;
-      const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
-      const coverTo = playTimes[j].last + COVER_SLACK_S;
-      if (heardFrom < coverFrom || heardTo > coverTo) return;
-      // …and the positions the log saw must cover the heard track positions.
-      if (s.track_from_s < p.posFromMs / 1000 - COVER_SLACK_S || s.track_to_s > p.posToMs / 1000 + COVER_SLACK_S) return;
-      pairs.push({ seg: i, play: j, r });
+      if (covers(i, j, r)) pairs.push({ seg: i, play: j, r });
     });
   }
   const claimed = claimedStart ? claimedStart.getTime() / 1000 : null;
@@ -116,7 +121,8 @@ export function concordance(
   const pick = (center: number) => {
     const m = new Map<number, Pair>();
     for (const p of pairs) {
-      if (Math.abs(p.r - center) > toleranceS) continue;
+      // Within the tolerance of the common start, and still covered by the log at that start.
+      if (Math.abs(p.r - center) > toleranceS || !covers(p.seg, p.play, center)) continue;
       const prev = m.get(p.seg);
       if (!prev || Math.abs(p.r - center) < Math.abs(prev.r - center)) m.set(p.seg, p);
     }

@@ -2,7 +2,7 @@
 // replaced by a fake that writes a result, so this runs without numpy/Olaf.
 import assert from "node:assert/strict";
 import { createPublicKey, verify, createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -97,6 +97,24 @@ assert.equal(ra.ok && rb.ok, true);
   for (const f of JSON.parse(b2.toString("utf8")).files) {
     assert.equal(createHash("sha256").update(readFileSync(join(dir, f.name))).digest("hex"), f.sha256, f.name);
   }
+}
+// A renderer that writes a PDF and then fails: the PDF is not published (not covered by the seal).
+{
+  const bad = join(root, "bad-renderer.sh");
+  writeFileSync(bad, '#!/bin/sh\nprev=""\nfor a; do case "$prev" in --out) printf partial > "$a"; printf x > "$a.tmp";; esac; prev="$a"; done\nexit 1\n', { mode: 0o700 });
+  process.env.AUDIOLAD_EVIDENCE_PYTHON = bad;
+  assert.equal((await r.createMatchReport(id, actor)).ok, true);
+  process.env.AUDIOLAD_EVIDENCE_PYTHON = fake;
+  const listed = JSON.parse(readFileSync(join(dir, "report.json"), "utf8")).files.map((f: { name: string }) => f.name).sort();
+  assert.deepEqual(readdirSync(dir).filter((n) => n !== "report.json" && n !== "report.sig").sort(), listed);
+  assert.equal((await r.loadJobView(id))?.reportPdf, false);
+  // A renderer that succeeds: its PDF is published and listed.
+  const good = join(root, "good-renderer.sh");
+  writeFileSync(good, '#!/bin/sh\nprev=""\nfor a; do case "$prev" in --out) printf "%%PDF-1.4" > "$a";; esac; prev="$a"; done\nexit 0\n', { mode: 0o700 });
+  process.env.AUDIOLAD_EVIDENCE_PYTHON = good;
+  assert.equal((await r.createMatchReport(id, actor)).ok, true);
+  process.env.AUDIOLAD_EVIDENCE_PYTHON = fake;
+  assert.equal((await r.loadJobView(id))?.reportPdf, true);
 }
 // A re-run whose PDF fails publishes a set without PDF: the old PDF is no longer offered.
 assert.equal(existsSync(join(dir, "report.pdf")), true);
