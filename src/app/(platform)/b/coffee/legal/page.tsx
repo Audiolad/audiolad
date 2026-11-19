@@ -24,6 +24,7 @@ import {
   BUSINESS_LEGAL_RIGHTS_HREF,
   BUSINESS_LEGAL_ROBOTS,
 } from "@/lib/business/legal/section";
+import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
 
 export const metadata: Metadata = {
   title: "Правовая информация – АудиоЛад Кофейня",
@@ -35,7 +36,7 @@ const sections = [
   {
     href: BUSINESS_LEGAL_OFFER_HREF,
     title: "Договор-оферта «АудиоЛад Кофейня»",
-    text: "Редакция 3 от 18.11.2026 с приложениями: лицензия, сертификат заведения, защита заведения, комплект документов",
+    text: `${BUSINESS_OFFER_EDITION.label} с приложениями: лицензия, сертификат заведения, защита заведения, комплект документов`,
   },
   {
     href: BUSINESS_LEGAL_RIGHTS_HREF,
@@ -112,8 +113,8 @@ export default function BusinessLegalPage() {
           от управления его правами на коллективной основе.
         </p>
         <p className={legalNoteClass}>
-          Всё сказанное относится только к музыке, которая звучит через плеер «АудиоЛад Кофейня» в подключённой
-          заведению.
+          Всё сказанное относится только к музыке, которая звучит через плеер «АудиоЛад Кофейня» в подключённом
+          заведении.
         </p>
       </section>
 

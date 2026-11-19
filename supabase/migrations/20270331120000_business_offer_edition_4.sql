@@ -29,7 +29,7 @@ INSERT INTO public.business_offer_editions (document_key, document_version, cont
 VALUES (
   'business-offer',
   'offer-v4-2026-11-19',
-  '7c0b04b353f6030aff22c2f12ff53a1e95a32c36f83d4dd2e467bf32eb7981b3',
+  'b8883f9f80c98e9709f2ef364c91e3c8255c373fcc90aab9eb3f1b3e0881bc8c',
   DATE '2026-11-19'
 )
 ON CONFLICT (document_key, document_version) DO NOTHING;
@@ -39,7 +39,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.business_offer_editions
     WHERE document_key = 'business-offer' AND document_version = 'offer-v4-2026-11-19'
-      AND content_hash = '7c0b04b353f6030aff22c2f12ff53a1e95a32c36f83d4dd2e467bf32eb7981b3'
+      AND content_hash = 'b8883f9f80c98e9709f2ef364c91e3c8255c373fcc90aab9eb3f1b3e0881bc8c'
   ) THEN
     RAISE EXCEPTION 'Post-check failed: offer edition 4 seed missing or hash differs';
   END IF;

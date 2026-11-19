@@ -50,7 +50,7 @@ export type BusinessOfferDocumentEdition = {
 export const BUSINESS_OFFER_EDITION: BusinessOfferDocumentEdition = {
   documentKey: BUSINESS_OFFER_DOCUMENT_ID,
   version: "offer-v4-2026-11-19",
-  contentHash: "7c0b04b353f6030aff22c2f12ff53a1e95a32c36f83d4dd2e467bf32eb7981b3",
+  contentHash: "b8883f9f80c98e9709f2ef364c91e3c8255c373fcc90aab9eb3f1b3e0881bc8c",
   label: "Редакция 4 от 19.11.2026",
 };
 
