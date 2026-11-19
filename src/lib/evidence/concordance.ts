@@ -55,8 +55,11 @@ export type Concordance = {
 };
 
 export const CONCORDANCE_TOLERANCE_S = 15;
-/** A play must cover the heard moment, give or take this (sampling every 5–15 s). */
-const COVER_SLACK_S = 30;
+/**
+ * The play must cover the whole heard interval: from the track start (or the first fact) to the
+ * last fact, give or take this slack (facts are sampled every 5–15 s).
+ */
+export const COVER_SLACK_S = 20;
 
 type Pair = { seg: number; play: number; r: number };
 
@@ -81,8 +84,9 @@ export function concordance(
       const r = playTimes[j].start + (s.track_from_s - s.rec_from_s);
       const heardFrom = r + s.rec_from_s;
       const heardTo = r + s.rec_to_s;
-      if (heardTo < playTimes[j].first - COVER_SLACK_S - (s.rec_to_s - s.rec_from_s)) return;
-      if (heardFrom > playTimes[j].last + COVER_SLACK_S) return;
+      const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
+      const coverTo = playTimes[j].last + COVER_SLACK_S;
+      if (heardFrom < coverFrom || heardTo > coverTo) return;
       pairs.push({ seg: i, play: j, r });
     });
   }
@@ -103,18 +107,33 @@ export function concordance(
       (hit.size === best.count && Math.abs(dur - best.dur) <= 1e-9 && skew < best.skew);
     if (better) best = { r: cand.r, count: hit.size, dur, skew };
   }
-  // Refine R as the median of the agreeing pairs (one pair per segment, the closest).
-  let r: number | null = null;
-  const chosen = new Map<number, Pair>();
-  if (best) {
+  // Refine R as the median of the agreeing pairs (one pair per segment, the closest), then
+  // re-select against the refined R, so every confirmed segment is within the tolerance of the
+  // reported recording start.
+  const pick = (center: number) => {
+    const m = new Map<number, Pair>();
     for (const p of pairs) {
-      if (Math.abs(p.r - best.r) > toleranceS) continue;
-      const prev = chosen.get(p.seg);
-      if (!prev || Math.abs(p.r - best.r) < Math.abs(prev.r - best.r)) chosen.set(p.seg, p);
+      if (Math.abs(p.r - center) > toleranceS) continue;
+      const prev = m.get(p.seg);
+      if (!prev || Math.abs(p.r - center) < Math.abs(prev.r - center)) m.set(p.seg, p);
     }
-    const rs = [...chosen.values()].map((p) => p.r).sort((a, b) => a - b);
-    const m = Math.floor(rs.length / 2);
-    r = rs.length % 2 ? rs[m] : (rs[m - 1] + rs[m]) / 2;
+    return m;
+  };
+  let r: number | null = null;
+  let chosen = new Map<number, Pair>();
+  if (best) {
+    r = best.r;
+    for (let iter = 0; iter < 5; iter++) {
+      const sel = pick(r);
+      const rs = [...sel.values()].map((p) => p.r).sort((a, b) => a - b);
+      const m = Math.floor(rs.length / 2);
+      const med = rs.length % 2 ? rs[m] : (rs[m - 1] + rs[m]) / 2;
+      if (Math.abs(med - r) < 1e-6) break;
+      // Keep the median only if it does not lose segments agreed at the current centre.
+      if (pick(med).size < sel.size) break;
+      r = med;
+    }
+    chosen = pick(r);
   }
   const iso = (sec: number) => new Date(Math.round(sec * 1000)).toISOString();
   const checks: SegmentCheck[] = segs.map(({ s, i }) => {

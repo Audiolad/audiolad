@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import fcntl
 import datetime as _dt
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -277,63 +279,76 @@ def olaf_query_many(binary: str, olaf_home: str, files: list[str]) -> dict:
 # ---------------------------------------------------------------- heavy-job lock
 
 class HeavyLock:
-    """One heavy job (index build or match) at a time on the host. O_EXCL lock file with the
-    owner pid; a lock whose pid is gone is stale and taken over. Waits instead of failing."""
+    """One heavy job (index build or match) at a time on the host: an exclusive flock(2) on a
+    lock file that is never deleted. The kernel drops the lock when the holder exits or is killed,
+    so there is no stale-lock takeover and no window between creating the file and owning it.
+    Waits instead of failing."""
 
-    def __init__(self, path: str | None, status_path: str | None = None, wait_s: float = 4 * 3600):
+    def __init__(self, path: str | None, status_path: str | None = None, wait_s: float = 4 * 3600,
+                 status_extra: dict | None = None):
         self.path, self.status_path, self.wait_s, self.held = path, status_path, wait_s, False
-
-    def _stale(self) -> bool:
-        try:
-            with open(self.path, "r", encoding="utf-8") as fh:
-                pid = int((fh.read().strip() or "0").split()[0])
-        except (OSError, ValueError):
-            return True
-        if pid <= 0:
-            return True
-        try:
-            os.kill(pid, 0)
-            return False
-        except ProcessLookupError:
-            return True
-        except PermissionError:
-            return False
+        self.status_extra = status_extra or {}
+        self.fd = None
 
     def __enter__(self):
         if not self.path:
             return self
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        fd = os.open(self.path, os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o600)
         deadline = time.time() + self.wait_s
         announced = False
-        while True:
-            try:
-                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                with os.fdopen(fd, "w") as fh:
-                    fh.write("%d %s\n" % (os.getpid(), now_iso()))
-                self.held = True
-                return self
-            except FileExistsError:
-                if self._stale():
-                    try:
-                        os.unlink(self.path)
-                    except FileNotFoundError:
-                        pass
-                    continue
-                if time.time() > deadline:
-                    raise RuntimeError("heavy_lock_timeout")
-                if self.status_path and not announced:
-                    write_json(self.status_path, {"state": "waiting", "since": now_iso()})
-                    announced = True
-                time.sleep(5)
+        try:
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() > deadline:
+                        raise RuntimeError("heavy_lock_timeout")
+                    if self.status_path and not announced:
+                        write_json(self.status_path, {**self.status_extra, "state": "waiting", "since": now_iso(),
+                                                      "startedAt": now_iso(), "pid": os.getpid()})
+                        announced = True
+                    time.sleep(5)
+        except BaseException:
+            os.close(fd)
+            raise
+        # Informational only: who holds the lock.
+        os.ftruncate(fd, 0)
+        os.pwrite(fd, ("%d %s\n" % (os.getpid(), now_iso())).encode(), 0)
+        self.fd, self.held = fd, True
+        return self
 
     def __exit__(self, *exc):
-        if self.held:
+        if self.held and self.fd is not None:
             try:
-                os.unlink(self.path)
-            except FileNotFoundError:
-                pass
-            self.held = False
+                fcntl.flock(self.fd, fcntl.LOCK_UN)
+            finally:
+                os.close(self.fd)
+            self.fd, self.held = None, False
         return False
+
+
+VERSION_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}$")
+
+
+def prune_versions(versions_dir: str, keep: str | None) -> None:
+    """Only called while holding the heavy lock. Removes *.partial leftovers; when `keep` (the
+    version just activated) is given, keeps it and the newest other version and removes the rest."""
+    try:
+        names = os.listdir(versions_dir)
+    except FileNotFoundError:
+        return
+    for n in names:
+        if n.endswith(".partial") and VERSION_RE.match(n[: -len(".partial")]):
+            shutil.rmtree(os.path.join(versions_dir, n), ignore_errors=True)
+    if keep is None:
+        return
+    keep = os.path.realpath(keep)
+    others = sorted((n for n in names if VERSION_RE.match(n) and os.path.isdir(os.path.join(versions_dir, n))
+                     and os.path.realpath(os.path.join(versions_dir, n)) != keep), reverse=True)
+    for n in others[1:]:
+        shutil.rmtree(os.path.join(versions_dir, n), ignore_errors=True)
 
 
 def activate_link(link: str, target: str) -> None:
@@ -393,6 +408,9 @@ def _build(args, manifest) -> int:
         log("build_out_exists")
         return 2
     work = out_dir + ".partial"
+    if args.prune:
+        # Under the heavy lock no other build runs: leftovers of crashed builds can go.
+        prune_versions(os.path.dirname(out_dir), keep=None)
     shutil.rmtree(work, ignore_errors=True)
     os.makedirs(work)
     olaf = olaf_bin(args.olaf)
@@ -404,6 +422,10 @@ def _build(args, manifest) -> int:
     tracks = []
     status_path = args.status
     started = time.time()
+    started_iso = now_iso()
+    if status_path:
+        write_json(status_path, {"state": "running", "done": 0, "total": len(entries), "pid": os.getpid(),
+                                 "startedAt": started_iso})
     for i, entry in enumerate(entries):
         code = str(entry.get("code") or "").strip()
         kind = entry.get("kind") if entry.get("kind") in ("catalog", "control") else "catalog"
@@ -431,7 +453,8 @@ def _build(args, manifest) -> int:
                            "source": "download" if downloaded else "file"})
         if status_path:
             write_json(status_path, {"state": "running", "done": i + 1, "total": len(entries),
-                                     "elapsed_s": round(time.time() - started, 1)})
+                                     "elapsed_s": round(time.time() - started, 1), "pid": os.getpid(),
+                                     "startedAt": started_iso})
     ht.params = {"samplerate": SR, "density": DENSITY}
     with contextlib.redirect_stdout(sys.stderr):
         ht.save(os.path.join(work, "audfprint.pklz"))
@@ -453,6 +476,8 @@ def _build(args, manifest) -> int:
     os.rename(work, out_dir)
     if args.activate_link:
         activate_link(args.activate_link, out_dir)
+    if args.prune:
+        prune_versions(os.path.dirname(out_dir), keep=out_dir)
     if status_path:
         write_json(status_path, {"state": "done", "done": len(entries), "total": len(entries),
                                  "elapsed_s": round(time.time() - started, 1), "index": index["version"]})
@@ -518,7 +543,8 @@ def cmd_match(args) -> int:
     try:
         with HeavyLock(args.lock, args.status):
             if args.status:
-                write_json(args.status, {"state": "running", "since": now_iso()})
+                write_json(args.status, {"state": "running", "since": now_iso(), "startedAt": now_iso(),
+                                         "pid": os.getpid()})
             rc = _match(args)
         if args.status:
             write_json(args.status, {"state": "done" if rc == 0 else "failed", "at": now_iso()})
@@ -591,6 +617,10 @@ def _match(args) -> int:
                 w["claimed_verdict"] = decide({"audfprint": w.get("audfprint_claimed") or [],
                                                "olaf": w.get("olaf_claimed") or []})
     segments = merge_segments(windows)
+    if x_ht is not None:
+        # The claimant's track is matched against its own index; keep its time ranges too.
+        segments = sorted(segments + merge_segments(windows, "claimed_verdict", "claimed"),
+                          key=lambda g: (g["rec_from_s"], g["kind"] != "catalog"))
     summary = summarize(windows, segments)
     result = {
         "engine_version": ENGINE_VERSION,
@@ -641,12 +671,16 @@ def decide(w: dict) -> dict:
     return {"status": "none"}
 
 
-def merge_segments(windows: list) -> list:
+def merge_segments(windows: list, key: str = "verdict", kind: str | None = None) -> list:
+    """Joins consecutive windows with the same track and track offset. `key` picks the verdict
+    (catalog index or the claimant's track); `kind` overrides the segment kind."""
     segs: list = []
     for w in windows:
-        v = w["verdict"]
+        v = w.get(key) or {"status": "none"}
         if v["status"] in ("none", "conflict"):
             continue
+        if kind:
+            v = {**v, "kind": kind}
         base = v["track_pos_s"] - w["rec_from_s"]  # track position at recording time 0
         last = segs[-1] if segs else None
         if (last and last["code"] == v["code"] and abs(last["_base"] - base) <= OFFSET_TOLERANCE_S
@@ -701,12 +735,18 @@ def cmd_selftest(args) -> int:
             refs.append(p)
         man = os.path.join(tmp, "m.json")
         write_json(man, {"tracks": [{"code": "AL-T-SELF-%d" % n, "kind": "catalog", "path": p} for n, p in enumerate(refs)]})
-        idx = os.path.join(tmp, "index")
+        vdir = os.path.join(tmp, "versions")
+        os.makedirs(vdir)
+        for old in ("20200101-000000-00000001", "20200101-000000-00000002"):
+            os.makedirs(os.path.join(vdir, old))
+        idx = os.path.join(vdir, "20200101-000000-0000000f")
         link = os.path.join(tmp, "current")
         lock = os.path.join(tmp, "locks", "heavy.lock")
+        os.makedirs(os.path.join(vdir, "20200101-000000-00000003.partial"))
         ns = argparse.Namespace(manifest=man, out=idx, olaf=args.olaf, status=None, version="selftest",
-                                lock=lock, activate_link=link, delete_manifest=True)
-        if cmd_build(ns) != 0 or os.path.exists(man) or os.path.realpath(link) != os.path.realpath(idx):
+                                lock=lock, activate_link=link, delete_manifest=True, prune=True)
+        if (cmd_build(ns) != 0 or os.path.exists(man) or os.path.realpath(link) != os.path.realpath(idx)
+                or sorted(os.listdir(vdir)) != ["20200101-000000-00000002", "20200101-000000-0000000f"]):
             print(json.dumps({"selftest": "fail", "stage": "build"}))
             return 1
         q = decode(refs[1], SR)[int(12 * SR): int(24 * SR)]
@@ -717,9 +757,23 @@ def cmd_selftest(args) -> int:
         st = os.path.join(tmp, "match-status.json")
         cmd_match(argparse.Namespace(index=link, input=qp, out=out, window=10, hop=5, olaf=args.olaf, extra=[],
                                      lock=lock, status=st))
-        if os.path.exists(lock):
+        probe_fd = os.open(lock, os.O_RDWR)
+        try:
+            fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # must be free after the jobs
+            fcntl.flock(probe_fd, fcntl.LOCK_UN)
+        except BlockingIOError:
             print(json.dumps({"selftest": "fail", "stage": "lock_left"}))
             return 1
+        finally:
+            os.close(probe_fd)
+        try:
+            with HeavyLock(lock):
+                with HeavyLock(lock, wait_s=0):
+                    print(json.dumps({"selftest": "fail", "stage": "lock_not_exclusive"}))
+                    return 1
+        except RuntimeError as exc:
+            if str(exc) != "heavy_lock_timeout":
+                raise
         with open(out, encoding="utf-8") as fh:
             r = json.load(fh)
         segs = r["segments"]
@@ -738,6 +792,7 @@ def main(argv=None) -> int:
     b.add_argument("--status")
     b.add_argument("--version")
     b.add_argument("--lock")
+    b.add_argument("--prune", action="store_true", help="under the lock: drop .partial leftovers, keep active + one")
     b.add_argument("--activate-link")
     b.add_argument("--delete-manifest", action="store_true")
     m = sub.add_parser("match")

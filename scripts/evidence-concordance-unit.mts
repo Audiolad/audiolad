@@ -64,4 +64,21 @@ const segs: MatchSegment[] = [
   assert.equal(c.confirmedSegments, 0);
   assert.equal(c.orderConsistent, null);
 }
+// The log must cover the whole heard interval: a 10 s play does not confirm a 200 s fragment.
+{
+  const short: LogPlay[] = [{ ...play("B", 200, 10) }];
+  const c = concordance([{ code: "B", kind: "catalog", rec_from_s: 50, rec_to_s: 250, track_from_s: 0, track_to_s: 200 }], short, null);
+  assert.equal(c.confirmedSegments, 0);
+}
+// Every confirmed segment stays within the tolerance of the reported start (offsets −15, 0, 15, 15).
+{
+  const ps = [play("A", 0, 100), play("B", 1000, 100), play("C", 2000, 100), play("D", 3000, 100)];
+  const offs = [-15, 0, 15, 15];
+  const ss: MatchSegment[] = ["A", "B", "C", "D"].map((code, k) => ({
+    code, kind: "catalog", rec_from_s: k * 1000 + 10, rec_to_s: k * 1000 + 40, track_from_s: 10 - offs[k], track_to_s: 40 - offs[k],
+  }));
+  const c = concordance(ss, ps, null);
+  for (const ch of c.checks) if (ch.confirmed) assert.ok(Math.abs(ch.deltaS!) <= c.toleranceS + 1e-9, JSON.stringify(ch));
+  assert.ok(c.confirmedSegments >= 3);
+}
 console.log("evidence-concordance-unit OK");

@@ -95,7 +95,7 @@ export default async function AdminBusinessEvidenceJobPage({ params }: { params:
                   <td className="py-1">{mmss(g.rec_from_s)}–{mmss(g.rec_to_s)}</td>
                   <td>
                     {g.code}
-                    {g.kind === "control" ? " (контроль, чужая музыка)" : g.kind === "claimed" ? " (трек из претензии)" : titles[g.code] ? ` «${titles[g.code]}»` : ""}
+                    {g.kind === "control" ? " (контроль, чужая музыка)" : g.kind === "claimed" ? ` (трек из претензии «${result.claimed_refs.find((x) => x.code === g.code)?.title ?? "–"}»)` : titles[g.code] ? ` «${titles[g.code]}»` : ""}
                   </td>
                   <td>{mmss(g.track_from_s)}–{mmss(g.track_to_s)}</td>
                   <td>{CONF[g.confidence] ?? g.confidence}</td>

@@ -109,7 +109,7 @@ export type IndexInfo = {
   failed: Array<{ code: string; status: string }>;
 };
 
-export type BuildStatus = { state: "waiting" | "running" | "done" | "failed"; done?: number; total?: number; error?: string; at?: string; since?: string; startedAt?: string; version?: string };
+export type BuildStatus = { state: "waiting" | "running" | "done" | "failed"; done?: number; total?: number; error?: string; at?: string; since?: string; startedAt?: string; version?: string; pid?: number };
 
 export type EngineState = {
   ready: boolean;
@@ -152,7 +152,11 @@ export async function loadEngineState(): Promise<EngineState> {
       failed: (raw.tracks ?? []).filter((t: { status: string }) => t.status !== "ok").map((t: { code: string; status: string }) => ({ code: t.code, status: t.status })),
     };
   }
-  const build = await readJson<BuildStatus>(p.buildStatus);
+  let build = await readJson<BuildStatus>(p.buildStatus);
+  // A running/waiting status whose engine is gone (killed, reboot) is shown as failed.
+  if (build && (build.state === "running" || build.state === "waiting") && !buildBusy(build)) {
+    build = { ...build, state: "failed", error: build.error ?? "interrupted" };
+  }
   return { ready: pythonOk && !!index, pythonOk, olafOk, index, build };
 }
 
@@ -206,42 +210,47 @@ async function controlEntries(): Promise<ManifestEntry[]> {
   })) as unknown as ManifestEntry[];
 }
 
-/** Keeps the active index and the newest other one (for comparison); older ones go. */
-async function pruneVersions() {
-  const p = paths();
-  let active = "";
+function pidAlive(pid: number): boolean {
   try {
-    active = await realpath(p.current);
-  } catch {
-    active = "";
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
   }
-  const all = await readdir(p.versions).catch(() => [] as string[]);
-  // Leftovers of a failed build (no build is running when this is called).
-  for (const n of all) if (n.endsWith(".partial")) await rm(join(p.versions, n), { recursive: true, force: true });
-  const names = all.filter((n) => EVIDENCE_JOB_ID_RE.test(n)).sort().reverse();
-  let keptOther = false;
-  for (const n of names) {
-    const full = join(p.versions, n);
-    if (full === active) continue;
-    if (!keptOther) {
-      keptOther = true;
-      continue;
-    }
-    await rm(full, { recursive: true, force: true });
-  }
+}
+
+/**
+ * Whether a build is still in progress. The engine records its pid in every running/waiting
+ * status: a dead pid means the build crashed (SIGKILL, reboot) and a new one may start. Without
+ * a pid (the request was written but the engine has not started yet) the status counts as busy
+ * for 10 minutes; a status without any usable time is not busy.
+ */
+export function buildBusy(status: BuildStatus | null, now = Date.now(), alive: (pid: number) => boolean = pidAlive): boolean {
+  if (!status || (status.state !== "running" && status.state !== "waiting")) return false;
+  if (typeof status.pid === "number" && Number.isInteger(status.pid) && status.pid > 0) return alive(status.pid);
+  const since = Date.parse(status.startedAt ?? status.since ?? "");
+  return Number.isFinite(since) && now - since < 10 * 60_000;
 }
 
 export type StartBuildResult = { ok: true; version: string } | { ok: false; error: "busy" | "not_installed" | "no_tracks" | "db_error" | "spawn_failed" };
 
 export async function startIndexBuild(): Promise<StartBuildResult> {
-  const p = paths();
   if (!(await exists(evidencePythonBin(), fsConstants.X_OK))) return { ok: false, error: "not_installed" };
-  const status = await readJson<BuildStatus>(p.buildStatus);
-  if (status && (status.state === "running" || status.state === "waiting")) {
-    // A status older than 6 h with no lock holder is treated as dead.
-    const since = Date.parse(status.startedAt ?? status.since ?? "");
-    if (!(Number.isFinite(since) && Date.now() - since > 6 * 3600_000)) return { ok: false, error: "busy" };
+  if (buildStarting) return { ok: false, error: "busy" };
+  buildStarting = true;
+  try {
+    return await startIndexBuildLocked();
+  } finally {
+    buildStarting = false;
   }
+}
+
+/** In-process guard: two clicks at once must not both pass the status check. */
+let buildStarting = false;
+
+async function startIndexBuildLocked(): Promise<StartBuildResult> {
+  const p = paths();
+  if (buildBusy(await readJson<BuildStatus>(p.buildStatus))) return { ok: false, error: "busy" };
   let entries: ManifestEntry[];
   try {
     entries = [...(await catalogEntries(createServiceRoleClient())), ...(await controlEntries())];
@@ -251,7 +260,7 @@ export async function startIndexBuild(): Promise<StartBuildResult> {
   if (!entries.some((e) => e.kind === "catalog")) return { ok: false, error: "no_tracks" };
   const version = newId();
   await mkdir(p.versions, { recursive: true, mode: 0o700 });
-  await pruneVersions();
+  // Old versions and crashed leftovers are pruned by the engine itself under the heavy lock.
   await mkdir(join(p.root, "locks"), { recursive: true, mode: 0o700 });
   // The manifest carries short-lived signed URLs: 0600, deleted by the engine on start.
   const manifest = join(p.index, `.manifest-${version}.json`);
@@ -260,7 +269,7 @@ export async function startIndexBuild(): Promise<StartBuildResult> {
   try {
     await spawnHeavy([
       "build", "--manifest", manifest, "--delete-manifest", "--out", join(p.versions, version), "--version", version,
-      "--status", p.buildStatus, "--lock", p.lock, "--activate-link", p.current, "--olaf", evidenceOlafBin(),
+      "--status", p.buildStatus, "--lock", p.lock, "--activate-link", p.current, "--prune", "--olaf", evidenceOlafBin(),
     ], p.buildLog);
   } catch {
     await rm(manifest, { force: true });
@@ -347,12 +356,34 @@ export async function createJob(input: {
   }
 }
 
+/** Serialises uploads and finish of one job inside this process. */
+const jobQueues = new Map<string, Promise<unknown>>();
+function withJobLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+  const prev = jobQueues.get(id) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(fn);
+  const tail = run.catch(() => undefined);
+  jobQueues.set(id, tail);
+  void tail.then(() => {
+    if (jobQueues.get(id) === tail) jobQueues.delete(id);
+  });
+  return run;
+}
+
 /**
- * Appends one chunk. `offset` must equal the bytes already stored, so a retried chunk is
- * ignored (idempotent) and a gap is refused.
+ * Stores one chunk. `offset` must equal the bytes already stored, so a retried chunk is
+ * ignored (idempotent) and a gap is refused. Chunks of one job are serialised, and the bytes
+ * are written at `offset` (not appended), so even two overlapping requests from different
+ * processes can only write the same range and never exceed the declared size.
  */
-export async function appendChunk(id: string, slot: JobSlot, offset: number, body: Uint8Array):
+export function appendChunk(id: string, slot: JobSlot, offset: number, body: Uint8Array):
   Promise<{ ok: true; received: number } | { ok: false; error: "not_found" | "bad_offset" | "too_large" | "closed" }> {
+  if (!EVIDENCE_JOB_ID_RE.test(id)) return Promise.resolve({ ok: false, error: "not_found" });
+  return withJobLock(id, () => appendChunkLocked(id, slot, offset, body));
+}
+
+async function appendChunkLocked(id: string, slot: JobSlot, offset: number, body: Uint8Array):
+  Promise<{ ok: true; received: number } | { ok: false; error: "not_found" | "bad_offset" | "too_large" | "closed" }> {
+  if (!Number.isInteger(offset) || offset < 0) return { ok: false, error: "bad_offset" };
   const job = await readJob(id);
   if (!job) return { ok: false, error: "not_found" };
   if (job.state !== "uploading") return { ok: false, error: "closed" };
@@ -366,16 +397,16 @@ export async function appendChunk(id: string, slot: JobSlot, offset: number, bod
   } catch {
     have = 0;
   }
+  if (offset + body.byteLength > expected) return { ok: false, error: "too_large" };
   if (offset + body.byteLength <= have) return { ok: true, received: have };
   if (offset !== have) return { ok: false, error: "bad_offset" };
-  if (have + body.byteLength > expected) return { ok: false, error: "too_large" };
-  const fh = await open(part, "a", 0o600);
+  const fh = await open(part, fsConstants.O_RDWR | fsConstants.O_CREAT, 0o600);
   try {
-    await fh.write(body);
+    await fh.write(body, 0, body.byteLength, offset);
   } finally {
     await fh.close();
   }
-  return { ok: true, received: have + body.byteLength };
+  return { ok: true, received: offset + body.byteLength };
 }
 
 async function sha256File(path: string): Promise<string> {
@@ -386,30 +417,45 @@ async function sha256File(path: string): Promise<string> {
   return h.digest("hex");
 }
 
-export async function finishUploadAndStart(id: string):
-  Promise<{ ok: true } | { ok: false; error: "not_found" | "incomplete" | "no_index" | "spawn_failed" }> {
+type FinishResult = { ok: true } | { ok: false; error: "not_found" | "incomplete" | "no_index" | "spawn_failed" };
+
+export function finishUploadAndStart(id: string): Promise<FinishResult> {
+  if (!EVIDENCE_JOB_ID_RE.test(id)) return Promise.resolve({ ok: false, error: "not_found" });
+  return withJobLock(id, () => finishLocked(id));
+}
+
+async function finishLocked(id: string): Promise<FinishResult> {
   const job = await readJob(id);
   if (!job || job.state !== "uploading") return { ok: false, error: "not_found" };
   const dir = jobDir(id);
   const state = await loadEngineState();
   if (!state.ready) return { ok: false, error: "no_index" };
-  const finalize = async (slot: JobSlot, size: number, ext: string) => {
-    const part = join(dir, `${slot}.part`);
-    const st = await stat(part).catch(() => null);
-    if (!st || st.size !== size) return null;
-    const final = join(dir, `${slot}.${ext}`);
-    await rename(part, final);
-    return { path: final, sha256: await sha256File(final) };
-  };
-  const inp = await finalize("input", job.input.size, job.input.ext);
-  if (!inp) return { ok: false, error: "incomplete" };
+  // Every file must be complete before anything is renamed: an incomplete claim leaves the
+  // job as it was, so the upload can continue and finish can be retried.
+  const slots: Array<{ slot: JobSlot; size: number; ext: string }> = [{ slot: "input", size: job.input.size, ext: job.input.ext }];
+  if (job.claim) slots.push({ slot: "claim", size: job.claim.size, ext: job.claim.ext });
+  for (const x of slots) {
+    const st = await stat(join(dir, `${x.slot}.part`)).catch(() => null);
+    if (!st || st.size !== x.size) return { ok: false, error: "incomplete" };
+  }
+  // Cross-process claim of the finish (e.g. old and new server during a deploy cutover).
+  try {
+    await (await open(join(dir, "finish.claim"), "wx", 0o600)).close();
+  } catch {
+    return { ok: false, error: "not_found" };
+  }
+  const done: Record<string, { path: string; sha256: string }> = {};
+  for (const x of slots) {
+    const final = join(dir, `${x.slot}.${x.ext}`);
+    await rename(join(dir, `${x.slot}.part`), final);
+    done[x.slot] = { path: final, sha256: await sha256File(final) };
+  }
+  const inp = done.input;
   job.input.sha256 = inp.sha256;
   let claimPath: string | null = null;
-  if (job.claim) {
-    const c = await finalize("claim", job.claim.size, job.claim.ext);
-    if (!c) return { ok: false, error: "incomplete" };
-    job.claim.sha256 = c.sha256;
-    claimPath = c.path;
+  if (job.claim && done.claim) {
+    job.claim.sha256 = done.claim.sha256;
+    claimPath = done.claim.path;
   }
   job.state = "queued";
   await writeJsonAtomic(join(dir, "job.json"), job);

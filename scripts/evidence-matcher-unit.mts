@@ -93,7 +93,37 @@ assert.equal(m.jobFilePath(id, "input.m4a"), null);
 assert.equal(m.jobFilePath(id, "../keys/seal-ed25519.pem"), null);
 assert.equal(m.jobFilePath("x/../y", "report.json"), null);
 assert.ok(m.jobFilePath(id, "report.json"));
-assert.equal((await m.listJobs()).length, 1);
+assert.equal((await m.listJobs()).length, 1); // before the second job
+
+// Overlapping duplicate chunks (two requests at once) never double-write.
+const c2 = await m.createJob({ actor, fileName: "b.m4a", size: 6, claim: { fileName: "claim.mp3", size: 4, label: "Трек из претензии" }, locationId: null, recordedAtLocal: null, note: null });
+if (!c2.ok) throw new Error("create failed");
+const dup = await Promise.all([m.appendChunk(c2.id, "input", 0, enc("abc")), m.appendChunk(c2.id, "input", 0, enc("abc")), m.appendChunk(c2.id, "input", 0, enc("abc"))]);
+for (const d of dup) assert.deepEqual(d, { ok: true, received: 3 });
+assert.equal(readFileSync(join(root, "jobs", c2.id, "input.part")).toString(), "abc");
+await Promise.all([m.appendChunk(c2.id, "input", 3, enc("def")), m.appendChunk(c2.id, "input", 3, enc("def"))]);
+assert.equal(readFileSync(join(root, "jobs", c2.id, "input.part")).toString(), "abcdef");
+// Incomplete claim: nothing is renamed, finish can be retried after the claim is complete.
+assert.deepEqual(await m.appendChunk(c2.id, "claim", 0, enc("cl")), { ok: true, received: 2 });
+assert.deepEqual(await m.finishUploadAndStart(c2.id), { ok: false, error: "incomplete" });
+assert.ok(existsSync(join(root, "jobs", c2.id, "input.part")));
+assert.deepEqual(await m.appendChunk(c2.id, "claim", 2, enc("im")), { ok: true, received: 4 });
+const fin = await Promise.all([m.finishUploadAndStart(c2.id), m.finishUploadAndStart(c2.id)]);
+assert.deepEqual(fin[0], { ok: true });
+assert.deepEqual(fin[1], { ok: false, error: "not_found" });
+assert.ok(existsSync(join(root, "jobs", c2.id, "claim.mp3")));
+
+// Build status: a crashed engine (dead pid) does not block a new build forever.
+const now = Date.parse("2026-11-19T10:00:00Z");
+assert.equal(m.buildBusy(null, now), false);
+assert.equal(m.buildBusy({ state: "done" }, now), false);
+assert.equal(m.buildBusy({ state: "running", pid: 4242 }, now, () => true), true);
+assert.equal(m.buildBusy({ state: "running", pid: 4242 }, now, () => false), false);
+assert.equal(m.buildBusy({ state: "running" }, now), false); // no pid, no time
+assert.equal(m.buildBusy({ state: "waiting", startedAt: "2026-11-19T09:55:00Z" }, now), true);
+assert.equal(m.buildBusy({ state: "waiting", startedAt: "2026-11-19T09:40:00Z" }, now), false);
+writeFileSync(join(root, "index", "build-status.json"), JSON.stringify({ state: "running", pid: 2147483646, startedAt: "2026-11-19T09:00:00Z" }));
+assert.equal((await m.loadEngineState()).build?.state, "failed");
 
 // Static guards: owner checks and same-origin on the upload route.
 const up = readFileSync("src/app/api/admin/business-evidence/upload/route.ts", "utf8");
