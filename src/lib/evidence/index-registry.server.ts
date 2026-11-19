@@ -4,7 +4,7 @@ import "server-only";
 
 import { isMissingSchemaError } from "@/lib/evidence/ledger";
 import { INDEX_VERSION_RE, registryRowFromIndex, type IndexRegistryEntry } from "@/lib/evidence/index-registry";
-import { readIndexVersionFile } from "@/lib/evidence/matcher.server";
+import { readIndexVersionFile, readJobIndexFile } from "@/lib/evidence/matcher.server";
 import { sha256Hex } from "@/lib/evidence/storage.server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -31,11 +31,24 @@ async function readStored(db: Db, version: string): Promise<{ row: Stored | null
 
 /**
  * Registers `version` (null: the active index) if it is not in the registry yet, and checks the
- * file on disk against the registry when it is.
+ * file against the registry when it is. With `jobId` the copy of index.json the engine saved for
+ * that match is used first (the version the match really ran on, even after a rebuild pruned it).
  */
-export async function ensureIndexRegistered(db: Db, version: string | null): Promise<IndexRegistryEntry | null> {
+export async function ensureIndexRegistered(
+  db: Db,
+  version: string | null,
+  opts: { jobId?: string } = {},
+): Promise<IndexRegistryEntry | null> {
   if (version !== null && !INDEX_VERSION_RE.test(version)) return null;
-  const file = await readIndexVersionFile(version);
+  let file = opts.jobId ? await readJobIndexFile(opts.jobId) : null;
+  if (file && version !== null) {
+    try {
+      if (String((JSON.parse(file.buf.toString("utf8")) as { version?: unknown }).version) !== version) file = null;
+    } catch {
+      file = null;
+    }
+  }
+  file ??= await readIndexVersionFile(version);
   let raw: unknown = null;
   if (file) {
     try {
@@ -71,9 +84,13 @@ export async function ensureIndexRegistered(db: Db, version: string | null): Pro
 }
 
 /** Same, with the service-role client; never throws (no env, network): null instead. */
-export async function ensureIndexRegisteredSafe(version: string | null, db?: Db): Promise<IndexRegistryEntry | null> {
+export async function ensureIndexRegisteredSafe(
+  version: string | null,
+  db?: Db,
+  opts: { jobId?: string } = {},
+): Promise<IndexRegistryEntry | null> {
   try {
-    return await ensureIndexRegistered(db ?? createServiceRoleClient(), version);
+    return await ensureIndexRegistered(db ?? createServiceRoleClient(), version, opts);
   } catch {
     return null;
   }

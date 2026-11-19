@@ -131,6 +131,21 @@ assert.equal((await ensureIndexRegistered(rdb as never, V))?.status, "mismatch")
 assert.equal((await ensureIndexRegistered(registryDb() as never, "20261119-120000-ffffffff"))?.status, "not_on_disk");
 assert.equal((await ensureIndexRegistered(registryDb({ missing: true }) as never, V))?.status, "unavailable");
 assert.equal(await ensureIndexRegistered(registryDb() as never, "../../etc"), null);
+// A match keeps its own copy of the index.json it ran on: registered from it after the version
+// folder is gone (pruned by a rebuild); a copy of another version is ignored.
+{
+  const V2 = "20261119-130000-0a1b2c3e";
+  const JOB = "20261119-131000-0badc0de";
+  mkdirSync(join(root, "jobs", JOB), { recursive: true });
+  const copy = Buffer.from(JSON.stringify({ ...indexJson, version: V2 }));
+  writeFileSync(join(root, "jobs", JOB, "index.json"), copy);
+  const db2 = registryDb();
+  const r2 = await ensureIndexRegistered(db2 as never, V2, { jobId: JOB });
+  assert.equal(r2?.status, "registered_now");
+  assert.equal(r2?.index_json_sha256, createHash("sha256").update(copy).digest("hex"));
+  assert.equal((await ensureIndexRegistered(registryDb() as never, V, { jobId: JOB }))?.status, "registered_now");
+  assert.equal((await ensureIndexRegistered(registryDb() as never, V2, { jobId: "../x" }))?.status, "not_on_disk");
+}
 assert.equal((await ensureIndexRegisteredSafe(V, { from() { throw new Error("boom"); } } as never))?.status, "error");
 {
   // Without a reachable database: never throws (null without env, an error entry with a dummy one).

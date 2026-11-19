@@ -18,8 +18,8 @@ BEGIN
     listened_ms, position_ms, phase, occurred_at, created_at)
   VALUES (v_fact, gen_random_uuid(), 1, v_ctx, 'smoke:m1', gen_random_uuid(), 1000, 1000, 'advance', now(),
     timestamptz '2020-01-01 00:00:00+00');
-  IF (SELECT created_at FROM public.playback_usage_facts WHERE id = v_fact) <> now() THEN
-    RAISE EXCEPTION 'M1: created_at not forced to now()';
+  IF (SELECT created_at FROM public.playback_usage_facts WHERE id = v_fact) NOT BETWEEN now() AND clock_timestamp() THEN
+    RAISE EXCEPTION 'M1: created_at not forced to the insert time';
   END IF;
   IF (SELECT client_offline FROM public.playback_usage_facts WHERE id = v_fact) THEN
     RAISE EXCEPTION 'M2: consumer fact flagged offline';
@@ -60,15 +60,31 @@ BEGIN
     RAISE EXCEPTION 'M1: service_role lost INSERT/SELECT';
   END IF;
 
-  -- M2: the offline marker of the business offline RPC (transaction-local settings).
-  PERFORM set_config('audiolad.usage_offline', '1', true);
-  PERFORM set_config('audiolad.usage_device_at', '2026-11-19 08:00:00+00', true);
+  -- M2: a session setting alone cannot mark a fact offline (forged mark, no row in the marks table).
+  PERFORM set_config('audiolad.usage_offline_mark', gen_random_uuid()::text, true);
+  INSERT INTO public.playback_usage_facts (client_event_id, sample_seq, listening_key, practice_id,
+    listened_ms, position_ms, phase, occurred_at, usage_kind, organization_id, location_id, zone_id, player_id,
+    client_offline, device_occurred_at)
+  VALUES (gen_random_uuid(), 1, 'smoke:m2-forged', gen_random_uuid(), 1000, 1000, 'advance', now(),
+    'business', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), true, now());
+  IF EXISTS (SELECT 1 FROM public.playback_usage_facts WHERE listening_key = 'smoke:m2-forged'
+             AND (client_offline OR device_occurred_at IS NOT NULL)) THEN
+    RAISE EXCEPTION 'M2: offline marker forged';
+  END IF;
+  IF has_table_privilege('service_role', 'public.playback_usage_offline_marks', 'INSERT')
+     OR has_table_privilege('anon', 'public.playback_usage_offline_marks', 'INSERT') THEN
+    RAISE EXCEPTION 'M2: offline marks writable';
+  END IF;
+  -- The genuine mark of this transaction (as the offline RPC writes it).
+  INSERT INTO public.playback_usage_offline_marks (txid, nonce, device_at)
+    VALUES (txid_current(), 'smoke-nonce', timestamptz '2026-11-19 08:00:00+00');
+  PERFORM set_config('audiolad.usage_offline_mark', 'smoke-nonce', true);
   INSERT INTO public.playback_usage_facts (id, client_event_id, sample_seq, listening_key, practice_id,
     listened_ms, position_ms, phase, occurred_at, usage_kind, organization_id, location_id, zone_id, player_id)
   VALUES (v_biz, gen_random_uuid(), 1, 'smoke:m2', gen_random_uuid(), 1000, 1000, 'advance', now(),
     'business', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid());
-  PERFORM set_config('audiolad.usage_offline', '', true);
-  PERFORM set_config('audiolad.usage_device_at', '', true);
+  PERFORM set_config('audiolad.usage_offline_mark', '', true);
+  DELETE FROM public.playback_usage_offline_marks WHERE nonce = 'smoke-nonce';
   SELECT client_offline, device_occurred_at INTO v_row FROM public.playback_usage_facts WHERE id = v_biz;
   IF NOT v_row.client_offline OR v_row.device_occurred_at <> timestamptz '2026-11-19 08:00:00+00' THEN
     RAISE EXCEPTION 'M2: offline marker not stored';
@@ -198,7 +214,8 @@ BEGIN
   -- Device time before the last report is not trusted either.
   v_res := public.apply_business_point_usage_sample_offline(v_token, gen_random_uuid(), v_ps, 4, v_item, 14000, v_dev);
   IF (v_res->>'device_time_used')::boolean THEN RAISE EXCEPTION 'M2: stale device time used'; END IF;
-  IF current_setting('audiolad.usage_offline', true) IS DISTINCT FROM '' THEN
+  IF current_setting('audiolad.usage_offline_mark', true) IS DISTINCT FROM ''
+     OR EXISTS (SELECT 1 FROM public.playback_usage_offline_marks) THEN
     RAISE EXCEPTION 'M2: offline marker leaked';
   END IF;
   RAISE NOTICE 'playback_log_protection_smoke: offline ok';

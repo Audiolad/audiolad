@@ -28,7 +28,7 @@ export type MatchResult = {
   engine_version: string;
   created_at: string;
   input: { name: string; sha256: string; size_bytes: number; decoded_duration_s: number; probe: { tags?: Record<string, string> } };
-  index: { version: string; built_at: string; audfprint_sha256: string; counts: Record<string, number>; olaf: { available: boolean; version: string | null } };
+  index: { version: string; built_at: string; audfprint_sha256: string; index_json_sha256?: string; counts: Record<string, number>; olaf: { available: boolean; version: string | null } };
   params: Record<string, number>;
   claimed_refs: Array<{ code: string; title: string; sha256: string; duration_s: number }>;
   windows: Array<{ rec_from_s: number; rec_to_s: number; verdict: { status: string; code?: string; kind?: string }; claimed_verdict?: { status: string } }>;
@@ -105,6 +105,8 @@ export async function loadJobView(id: string) {
   const job = await readJob(id);
   if (!job) return null;
   const result = job.state === "done" ? ((await readJobResult(id)) as MatchResult | null) : null;
+  // M4: a finished match registers the index version it ran on (from its own copy of index.json).
+  if (result?.index?.version) await ensureIndexRegisteredSafe(String(result.index.version), undefined, { jobId: id });
   let conc: JobConcordance | null = null;
   let concError = false;
   if (result) {
@@ -143,12 +145,14 @@ export async function createMatchReport(id: string, actor: { userId: string; ema
   const titles = await titlesByCodes(result.segments.map((s) => s.code)).catch(() => ({} as Record<string, string | null>));
   // M4: what the append-only registry holds for the index version this match used.
   const registry: IndexRegistryEntry | null = result.index?.version
-    ? await ensureIndexRegisteredSafe(String(result.index.version))
+    ? await ensureIndexRegisteredSafe(String(result.index.version), undefined, { jobId: id })
     : null;
   const indexRegistry = registry && {
     ...registry,
     audfprint_matches_result: registry.audfprint_sha256 && result.index.audfprint_sha256
       ? registry.audfprint_sha256 === result.index.audfprint_sha256 : null,
+    index_json_matches_result: registry.index_json_sha256 && result.index.index_json_sha256
+      ? registry.index_json_sha256 === result.index.index_json_sha256 : null,
   };
   try {
     await mkdir(dir, { recursive: true, mode: 0o700 });

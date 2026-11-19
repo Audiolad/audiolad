@@ -2,7 +2,6 @@
 
 import { requirePlatformOwnerAccess } from "@/lib/admin/require-platform-owner";
 import { BUSINESS_EVIDENCE_HREF } from "@/lib/evidence/constants";
-import { ensureIndexRegisteredSafe } from "@/lib/evidence/index-registry.server";
 import { createPlayLogExtract, loadEvidenceLocation, type ExtractResult } from "@/lib/evidence/extract.server";
 import { localInputToUtc } from "@/lib/evidence/play-log";
 import { createMatchReport, type ReportResult } from "@/lib/evidence/match-report.server";
@@ -87,10 +86,7 @@ export async function createMatchJobAction(input: {
 
 export async function finishUploadAction(jobId: string) {
   await requirePlatformOwnerAccess(BUSINESS_EVIDENCE_HREF);
-  const res = await finishUploadAndStart(String(jobId ?? ""));
-  // M4: the index this match runs on is in the registry before any later rebuild prunes it.
-  if (res.ok) await ensureIndexRegisteredSafe(null);
-  return res;
+  return finishUploadAndStart(String(jobId ?? ""));
 }
 
 export async function createMatchReportAction(jobId: string): Promise<ReportResult> {

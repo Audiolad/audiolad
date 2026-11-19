@@ -57,33 +57,55 @@ GRANT SELECT ON TABLE public.playback_usage_fact_seals TO service_role;
 
 -- ---------------------------------------------------------------- M1 guard
 
+-- M2: one-shot marks written by apply_business_point_usage_sample_offline() inside its own
+-- transaction. A session setting alone could be forged by any caller able to run set_config; the
+-- mark is a random nonce in a table nobody else can write, bound to the transaction id.
+CREATE TABLE IF NOT EXISTS public.playback_usage_offline_marks (
+  txid bigint NOT NULL,
+  nonce text NOT NULL,
+  device_at timestamptz NULL,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  PRIMARY KEY (txid, nonce)
+);
+COMMENT ON TABLE public.playback_usage_offline_marks IS
+  'audiolad:playback-usage M2; transient proof that the current transaction is an offline hall sample. Rows are deleted by the same transaction.';
+ALTER TABLE public.playback_usage_offline_marks ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.playback_usage_offline_marks FROM PUBLIC, anon, authenticated, service_role;
+
+-- SECURITY DEFINER: reads the offline marks whoever inserts (service_role has no access to them).
 CREATE OR REPLACE FUNCTION public.playback_usage_facts_guard()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_offline text;
-  v_device text;
+  v_nonce text;
+  v_device timestamptz;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    -- Insert time is the server's, never the writer's: the hourly seals rely on it.
-    NEW.created_at := now();
+    -- Insert time is the server's, never the writer's: the hourly seals rely on it. Wall clock
+    -- of the insert itself (not the transaction start), held under a shared barrier lock until
+    -- commit, so seal_playback_usage_facts() never seals an hour with a row still in flight.
+    PERFORM pg_advisory_xact_lock_shared(hashtext('audiolad.playback_usage_fact_seals.barrier'));
+    NEW.created_at := clock_timestamp();
     IF EXISTS (
       SELECT 1 FROM public.playback_usage_fact_seals s
       WHERE s.period_start = date_trunc('hour', NEW.created_at, 'UTC')
     ) THEN
       RAISE EXCEPTION 'playback_usage_period_sealed' USING ERRCODE = '42501';
     END IF;
-    -- M2: set only by apply_business_point_usage_sample_offline() for its own insert.
-    v_offline := current_setting('audiolad.usage_offline', true);
-    v_device := current_setting('audiolad.usage_device_at', true);
-    IF NEW.usage_kind = 'business' AND v_offline = '1' THEN
-      NEW.client_offline := true;
-      NEW.device_occurred_at := CASE WHEN coalesce(v_device, '') = '' THEN NULL ELSE v_device::timestamptz END;
-    ELSE
-      NEW.client_offline := false;
-      NEW.device_occurred_at := NULL;
+    NEW.client_offline := false;
+    NEW.device_occurred_at := NULL;
+    v_nonce := current_setting('audiolad.usage_offline_mark', true);
+    IF NEW.usage_kind = 'business' AND coalesce(v_nonce, '') <> '' THEN
+      SELECT m.device_at INTO v_device
+      FROM public.playback_usage_offline_marks m
+      WHERE m.txid = txid_current() AND m.nonce = v_nonce;
+      IF FOUND THEN
+        NEW.client_offline := true;
+        NEW.device_occurred_at := v_device;
+      END IF;
     END IF;
     RETURN NEW;
   END IF;
@@ -200,8 +222,22 @@ DECLARE
   v_digest record;
   v_chain text;
   v_done integer := 0;
+  v_tries integer := 0;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext('audiolad.playback_usage_fact_seals'));
+  -- Barrier: every insert holds the shared barrier lock until it commits. Taking (and at once
+  -- releasing) the exclusive one proves no insert is in flight; any later insert gets a
+  -- created_at after now() - 1 h, outside the hours sealed below. Never queues: the hall path
+  -- is not blocked behind a waiting seal; after ~5 s of no gap this run seals nothing.
+  LOOP
+    EXIT WHEN pg_try_advisory_lock(hashtext('audiolad.playback_usage_fact_seals.barrier'));
+    v_tries := v_tries + 1;
+    IF v_tries >= 250 THEN
+      RETURN 0;
+    END IF;
+    PERFORM pg_sleep(0.02);
+  END LOOP;
+  PERFORM pg_advisory_unlock(hashtext('audiolad.playback_usage_fact_seals.barrier'));
   SELECT * INTO v_last FROM public.playback_usage_fact_seals ORDER BY period_start DESC LIMIT 1;
   IF FOUND THEN
     v_start := v_last.period_end;
@@ -549,6 +585,7 @@ DECLARE
   v_ctx_last timestamptz;
   v_at timestamptz := NULL;
   v_result jsonb;
+  v_nonce text;
 BEGIN
   IF btrim(coalesce(p_token,'')) !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid_point_token' USING ERRCODE = '42501'; END IF;
@@ -582,18 +619,15 @@ BEGIN
     END IF;
   END IF;
 
-  PERFORM set_config('audiolad.usage_offline', '1', true);
-  PERFORM set_config('audiolad.usage_device_at', coalesce(p_device_at::text, ''), true);
-  BEGIN
-    v_result := public.apply_business_player_usage_sample_at(v_player, p_client_event_id, p_playback_session_id,
-      p_sample_seq, p_audio_item_id, p_position_ms, NULL, 1, 'advance', coalesce(v_at, v_now));
-  EXCEPTION WHEN OTHERS THEN
-    PERFORM set_config('audiolad.usage_offline', '', true);
-    PERFORM set_config('audiolad.usage_device_at', '', true);
-    RAISE;
-  END;
-  PERFORM set_config('audiolad.usage_offline', '', true);
-  PERFORM set_config('audiolad.usage_device_at', '', true);
+  -- The mark (and the setting naming it) live only for this call; on any error the whole
+  -- transaction rolls back, the mark included.
+  v_nonce := gen_random_uuid()::text;
+  INSERT INTO public.playback_usage_offline_marks (txid, nonce, device_at) VALUES (txid_current(), v_nonce, p_device_at);
+  PERFORM set_config('audiolad.usage_offline_mark', v_nonce, true);
+  v_result := public.apply_business_player_usage_sample_at(v_player, p_client_event_id, p_playback_session_id,
+    p_sample_seq, p_audio_item_id, p_position_ms, NULL, 1, 'advance', coalesce(v_at, v_now));
+  PERFORM set_config('audiolad.usage_offline_mark', '', true);
+  DELETE FROM public.playback_usage_offline_marks WHERE txid = txid_current() AND nonce = v_nonce;
   RETURN v_result || jsonb_build_object('device_time_used', v_at IS NOT NULL);
 END; $$;
 REVOKE ALL ON FUNCTION public.apply_business_point_usage_sample_offline(text, uuid, uuid, bigint, uuid, bigint, timestamptz) FROM PUBLIC;

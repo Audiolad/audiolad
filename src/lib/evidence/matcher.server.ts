@@ -146,6 +146,17 @@ export async function readIndexVersionFile(version: string | null): Promise<{ bu
   }
 }
 
+/** t1578u M4: the copy of index.json the engine saved next to a job's result (the version it used). */
+export async function readJobIndexFile(id: string): Promise<{ buf: Buffer; dir: string; sizeBytes: number | null } | null> {
+  if (!EVIDENCE_JOB_ID_RE.test(id)) return null;
+  const dir = join(paths().jobs, id);
+  try {
+    return { buf: await readFile(join(dir, "index.json")), dir, sizeBytes: null };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadEngineState(): Promise<EngineState> {
   const p = paths();
   const pythonOk = await exists(evidencePythonBin(), fsConstants.X_OK);
