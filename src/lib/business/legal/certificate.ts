@@ -2,16 +2,36 @@ import { createHash } from "node:crypto";
 
 import { BUSINESS_LEGAL_OPERATOR } from "./section";
 
+import {
+  BUSINESS_CERTIFICATE_SITE,
+  certificateCheckUrl,
+  certificateDisplayNumber,
+  certificateUrlSlug,
+  isSampleCertificateNumber,
+  parseCertificateNumber,
+  certificateCanonicalNumber,
+} from "./certificate-number";
+
+
 /**
  * Сертификат заведения (оферта «АудиоЛад Кофейня», ред. 3, приложение 2; t1591u).
  * Снимок данных фиксируется при выдаче. Новый номер выдаётся, когда снимок меняется:
  * новый период доступа, адрес или название заведения, ИНН, принятая редакция договора.
- * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер>.
+ * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер> (внутренний вид AL-483271;
+ * старые адреса ALK-2026-000002 продолжают открываться).
  */
 
+export {
+  BUSINESS_CERTIFICATE_SITE,
+  certificateCheckUrl,
+  certificateDisplayNumber,
+  certificateUrlSlug,
+  isSampleCertificateNumber,
+  parseCertificateNumber,
+  certificateCanonicalNumber,
+};
 export const BUSINESS_CERTIFICATE_CATALOG = "закрытый каталог «АудиоЛад Кофейня»";
 export const BUSINESS_CERTIFICATE_GENERATORS = "MusicGPT и другие сервисы генерации музыки";
-export const BUSINESS_CERTIFICATE_SITE = "https://audiolad.ru";
 
 export type CertificatePeriodKind = "gift" | "subscription";
 
@@ -63,15 +83,6 @@ export function parseCertificateSnapshot(raw: unknown): CertificateSnapshot | nu
   if (!s.licensee || typeof s.licensee.inn !== "string" || typeof s.licensee.name !== "string") return null;
   if (!s.period || typeof s.period.end !== "string" || !s.offer || typeof s.offer.version !== "string") return null;
   return s;
-}
-
-/** ALK-2026-000002 → «АЛК-2026-000002» для печати (в адресе страницы – латиница). */
-export function certificateDisplayNumber(number: string): string {
-  return number.replace(/^ALK/, "АЛК");
-}
-
-export function certificateCheckUrl(number: string): string {
-  return `${BUSINESS_CERTIFICATE_SITE}/b/coffee/legal/sertifikat/${number}`;
 }
 
 const MOSCOW_DATE = new Intl.DateTimeFormat("ru-RU", {
@@ -155,7 +166,7 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
     case "valid":
       return "Действует";
     case "expired":
-      return "Не действует: закончился доступ к сервису фоновой музыки АудиоЛад для этого заведения";
+      return "Не действует: закончился доступ к сервису «АудиоЛад Кофейня» для этого заведения";
     case "outdated":
       return "Не действует: данные заведения или лицензиата изменились";
     case "superseded":

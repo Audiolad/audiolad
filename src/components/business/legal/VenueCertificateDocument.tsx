@@ -4,6 +4,7 @@ import {
   certificateCheckUrl,
   certificateDisplayNumber,
   certificateRows,
+  certificateUrlSlug,
   type CertificateSnapshot,
 } from "@/lib/business/legal/certificate";
 
@@ -31,7 +32,7 @@ export default function VenueCertificateDocument({
         {sample ? <div className="venue-cert__sample">ОБРАЗЕЦ – данные вымышлены</div> : null}
         <h1 className="venue-cert__title">Сертификат заведения</h1>
         <p className="venue-cert__subtitle">о праве публичного исполнения фонограмм каталога «АудиоЛад Кофейня»</p>
-        <p className="venue-cert__number">№ {certificateDisplayNumber(number)}</p>
+        <p className="venue-cert__number">{certificateDisplayNumber(number)}</p>
       </header>
 
       <table className="venue-cert__table">
@@ -58,7 +59,7 @@ export default function VenueCertificateDocument({
         <p>
           <strong>Защита.</strong> По обращениям РАО, ВОИС и иных лиц лицензиар ведёт юридическую защиту заведения и
           возмещает потери на условиях приложения 3 к договору: в заведении звучали только фонограммы закрытого каталога «АудиоЛад Кофейня» через плеер,
-          доступ к сервису фоновой музыки АудиоЛад для этого заведения действует.
+          доступ к сервису «АудиоЛад Кофейня» для этого заведения действует.
         </p>
         <p>
           <strong>Пределы.</strong> Сертификат подтверждает права только на фонограммы закрытого каталога «АудиоЛад Кофейня», воспроизведённые через плеер
@@ -73,12 +74,12 @@ export default function VenueCertificateDocument({
 
       <footer className="venue-cert__check">
         <div className="venue-cert__qr">
-          <PointQrCode value={checkUrl} size={132} label={`QR-код проверки сертификата № ${certificateDisplayNumber(number)}`} />
+          <PointQrCode value={checkUrl} size={132} label={`QR-код проверки сертификата ${certificateDisplayNumber(number)}`} />
         </div>
         <div>
           <p className="venue-cert__check-title">Проверить подлинность</p>
           <p>Наведите камеру телефона на QR-код или откройте страницу:</p>
-          <p className="venue-cert__url">audiolad.ru/b/coffee/legal/sertifikat/{number}</p>
+          <p className="venue-cert__url">audiolad.ru/b/coffee/legal/sertifikat/{certificateUrlSlug(number)}</p>
           <p>
             Подпись и печать не требуются. Если данные на странице проверки и в распечатке различаются, верны данные
             страницы.

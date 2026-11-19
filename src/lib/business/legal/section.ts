@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
 
 import { SERGEY_CONTACT } from "@/lib/business-app/sergey-contact";
+import {
+  BUSINESS_CERTIFICATE_SAMPLE_CANONICAL,
+  BUSINESS_CERTIFICATE_SAMPLE_LEGACY,
+  certificateDisplayNumber,
+  isSampleCertificateNumber,
+  normalizeBusinessLegalCertificateNumber,
+} from "@/lib/business/legal/certificate-number";
+
+export { normalizeBusinessLegalCertificateNumber, BUSINESS_CERTIFICATE_SAMPLE_LEGACY };
 
 /**
  * Правовой раздел «АудиоЛад Кофейня» – audiolad.ru/b/coffee/legal (t1544u, t1567u).
@@ -77,8 +86,8 @@ export type BusinessLegalCertificate = {
 
 /** Образец (данные вымышлены). Настоящие сертификаты – в базе (business_venue_certificates, t1591u). */
 export const BUSINESS_LEGAL_SAMPLE_CERTIFICATE: BusinessLegalCertificate = {
-  number: "АЛК-2026-000001",
-  urlNumber: "ALK-2026-000001",
+  number: certificateDisplayNumber(BUSINESS_CERTIFICATE_SAMPLE_CANONICAL),
+  urlNumber: BUSINESS_CERTIFICATE_SAMPLE_CANONICAL,
   isSample: true,
   issuedAt: "19.11.2026",
   validUntil: "19.12.2026",
@@ -95,20 +104,8 @@ export function businessLegalCertificateHref(urlNumber: string): string {
   return `${BUSINESS_LEGAL_CERTIFICATE_HREF}/${encodeURIComponent(urlNumber)}`;
 }
 
-/** ALK-2026-000001 / alk-2026-000001 / АЛК-2026-000001 → ALK-2026-000001; иначе null. */
-export function normalizeBusinessLegalCertificateNumber(raw: string): string | null {
-  let value: string;
-  try {
-    value = decodeURIComponent(raw);
-  } catch {
-    return null;
-  }
-  value = value.trim().toUpperCase().replace(/^АЛК/u, "ALK");
-  return /^ALK-\d{4}-\d{6}$/.test(value) ? value : null;
-}
-
+/** ALK-2026-000001 / АЛК-… / AL-483271 / «АудиоЛад № 483 271» → точный ключ; иначе null.
+ *  Старые адреса образца ALK-2026-000001 тоже принимаются. */
 export function findBusinessLegalCertificate(raw: string): BusinessLegalCertificate | null {
-  const normalized = normalizeBusinessLegalCertificateNumber(raw);
-  if (!normalized) return null;
-  return normalized === BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE : null;
+  return isSampleCertificateNumber(raw) ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE : null;
 }

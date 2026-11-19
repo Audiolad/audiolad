@@ -74,7 +74,7 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
         {state.kind === "issued" ? (
           <div className="space-y-2" data-testid="biz-certificate-ready">
             <p className="text-sm font-semibold text-[var(--biz-text)]">
-              Сертификат № {certificateDisplayNumber(state.number)} готов.
+              Сертификат {certificateDisplayNumber(state.number)} готов.
             </p>
             <Link href={BUSINESS_CERTIFICATE_CABINET_HREF} className="business-app-btn business-app-btn-cta business-app-focus-ring" data-testid="biz-certificate-open">
               Открыть сертификат

@@ -140,8 +140,17 @@ assert.equal(normalizeBusinessLegalCertificateNumber("alk-2026-000001"), "ALK-20
 assert.equal(normalizeBusinessLegalCertificateNumber(encodeURIComponent("АЛК-2026-000001")), "ALK-2026-000001");
 assert.equal(normalizeBusinessLegalCertificateNumber("ALK-2026-1"), null);
 assert.equal(normalizeBusinessLegalCertificateNumber("%E0%A4%A"), null);
+assert.equal(normalizeBusinessLegalCertificateNumber("AL-483271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("al-483271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("АудиоЛад № 483 271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("АудиоЛад №\u00a0483\u202f271"), "AL-483271");
+assert.equal(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number, "АудиоЛад № 483 271");
+assert.equal(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber, "AL-483271");
 assert.equal(findBusinessLegalCertificate("ALK-2026-000001"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
+assert.equal(findBusinessLegalCertificate("AL-483271"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
+assert.equal(findBusinessLegalCertificate("АудиоЛад № 483 271"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
 assert.equal(findBusinessLegalCertificate("ALK-2026-000002"), null);
+assert.equal(findBusinessLegalCertificate("AL-000001"), null);
 assert.equal(findBusinessLegalCertificate("../../etc"), null);
 
 // ссылки в тексте документов открываются в новой вкладке; tel:/mailto: – нет
@@ -178,10 +187,15 @@ assert.match(indexPage, /Расходы на\s+юридическую защит
 assert.doesNotMatch(indexPage, /не входят/, "на главной убрана формулировка «не входят»");
 assert.doesNotMatch(indexPage, /в четырёх шагах/, "старый заголовок четырёх шагов убран");
 // t1591u: пробная (подарочная) неделя – действующий доступ; начатая защита доводится до конца.
-assert.match(protectionPage, /этот доступ действует – оплаченный или подарочный период/, "подарочный период считается");
+assert.match(protectionPage, /период доступа к сервису «АудиоЛад Кофейня» для этого заведения – оплаченный или подарочный период/, "подарочный период считается");
+assert.match(protectionPage, /даже если клиент потом не продлит доступ к сервису/, "начатую защиту доводим, если доступ к сервису не продлён");
 assert.match(protectionPage, /Если защита уже\s+началась, доводим спор до конца/, "начатую защиту доводим");
 assert.match(protectionPage, /Ведём дело во всех инстанциях, в том числе административные дела по ч\. 1 ст\. 7\.12 КоАП РФ/);
 assert.doesNotMatch(protectionPage, /доступ к этому заведению оплачен/, "нет условия «только оплаченный доступ»");
+assert.doesNotMatch(protectionPage, /не лишает защиты|не лишают защиты/, "нет формулы «не лишает защиты»");
+assert.doesNotMatch(protectionPage, /доступа к заведению|доступ к этому заведению действует/, "нет «доступа к заведению»");
+assert.match(protectionPage, /не считается нарушением заведения\. По любому обращению, в том числе от РАО или ВОИС, мы бесплатно готовим ответ на претензию до суда с журналом воспроизведения и справкой/, "случайные звуки: не нарушение, ответ до суда");
+assert.match(protectionPage, /Юридическая защита в суде и финансовая гарантия – только если претензия о музыке закрытого каталога «АудиоЛад Кофейня»/, "суд и гарантия только по закрытому каталогу");
 const offerPage = readFileSync(join(SECTION_DIR, "oferta/page.tsx"), "utf8");
 assert.match(offerPage, /BUSINESS_OFFER_SOURCE\.markdown/, "оферта – тот же принятый текст");
 assert.match(offerPage, /BUSINESS_LEGAL_OFFER_PDF_PATH/);

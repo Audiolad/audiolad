@@ -298,15 +298,38 @@ export type CertificateCheck = {
   supersededByNumber: string | null;
 };
 
-/** Страница проверки: только чтение. Номер уже нормализован (ALK-YYYY-NNNNNN). */
-export async function loadCertificateCheck(number: string, now: Date = new Date()): Promise<CertificateCheck | null> {
-  const db = createServiceRoleClient();
-  const { data: cert, error } = await db
+const CERTIFICATE_CHECK_COLUMNS =
+  "id, number, location_id, issued_at, snapshot, period_end, superseded_at, superseded_by, revoked_at";
+
+/** Страница проверки: только чтение. Номер нормализован (AL-483271 или старый ALK-2026-000002). */
+async function loadCertificateRow(db: Db, number: string) {
+  const byNumber = await db
     .from("business_venue_certificates")
-    .select("number, location_id, issued_at, snapshot, period_end, superseded_at, superseded_by, revoked_at")
+    .select(CERTIFICATE_CHECK_COLUMNS)
     .eq("number", number)
     .maybeSingle();
-  if (error) throw new Error("certificate_unavailable");
+  if (byNumber.error) throw new Error("certificate_unavailable");
+  if (byNumber.data) return byNumber.data;
+  const alias = await db
+    .from("business_venue_certificate_aliases")
+    .select("certificate_id")
+    .eq("alias", number)
+    .maybeSingle();
+  if (alias.error) throw new Error("certificate_unavailable");
+  const id = (alias.data as { certificate_id?: string } | null)?.certificate_id;
+  if (!id) return null;
+  const viaAlias = await db
+    .from("business_venue_certificates")
+    .select(CERTIFICATE_CHECK_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (viaAlias.error) throw new Error("certificate_unavailable");
+  return viaAlias.data ?? null;
+}
+
+export async function loadCertificateCheck(number: string, now: Date = new Date()): Promise<CertificateCheck | null> {
+  const db = createServiceRoleClient();
+  const cert = await loadCertificateRow(db, number);
   if (!cert) return null;
   const snapshot = parseCertificateSnapshot(cert.snapshot);
   if (!snapshot) throw new Error("certificate_unavailable");
