@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 
 import BusinessMusicSection from "@/components/business-app/sound/BusinessMusicSection";
 import { BUSINESS_GUEST_COFFEE_URL, getHostnameFromHeaders, isCoffeeHostname } from "@/lib/business-app/host";
-import { hasCollectionCookie, loadCollectionPermission } from "@/lib/business-collections/load.server";
+import { loadCollectionVisitor } from "@/lib/business-collections/load.server";
 import { businessGuestCoffeeHallRedirect } from "@/lib/business-app/point-device";
 import { businessHallDeviceCookie } from "@/lib/business-app/point-session.server";
 import { buildBusinessAppMetadata, buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
@@ -48,7 +48,11 @@ export default async function BusinessGuestCoffeePage() {
   }
   // t1616u: a personal-link visitor never sees the public demo shelf or its gift offer; the calm
   // entry screen opens the ordinary app with only the collection.
-  // A revoked link cookie goes there too and reads «Подборка сейчас недоступна».
-  if (isCoffeeHostname(getHostnameFromHeaders(await headers())) && (await hasCollectionCookie() || await loadCollectionPermission())) redirect("/collection");
+  // A revoked link (cookie or an account once bound to a collection) goes there too and reads
+  // «Подборка сейчас недоступна».
+  if (isCoffeeHostname(getHostnameFromHeaders(await headers()))) {
+    const { data: { user: visitor } } = await (await createClient()).auth.getUser();
+    if (await loadCollectionVisitor(visitor?.id ?? null)) redirect("/collection");
+  }
   return <BusinessMusicSection />;
 }

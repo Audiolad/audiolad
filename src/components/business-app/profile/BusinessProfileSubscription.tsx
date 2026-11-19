@@ -11,12 +11,14 @@ import { BUSINESS_PAYMENT_HISTORY_HREF, BUSINESS_PAYMENT_HISTORY_LINK_LABEL } fr
 import { businessProfileSubscription } from "@/lib/business-app/profile-subscription";
 
 // The offer state comes from the shared domain (useBusinessHomePay); the prop is kept for the page call.
-export default function BusinessProfileSubscription({ timezone, nowIso, showPaymentHistory = false }: {
+export default function BusinessProfileSubscription({ timezone, nowIso, showPaymentHistory = false, connectVenueHref }: {
   timezone: string;
   nowIso: string;
   offerAccepted?: boolean;
   /** Owner only (t1342u): «История оплат» under «Продлить» / «Оплатить», with a little extra space (t1352u). */
   showPaymentHistory?: boolean;
+  /** Quiet cabinet only: the account has no venue yet; the connect link lives in the folded section. */
+  connectVenueHref?: string;
 }) {
   const quiet = useBusinessQuiet();
   const { access, canPay, accepted, busy, error, accept, pay, askReceiptEmail, receiptEmail, setReceiptEmail } = useBusinessHomePay();
@@ -53,7 +55,10 @@ export default function BusinessProfileSubscription({ timezone, nowIso, showPaym
       <section id="podpiska" className="border-t pt-4" data-testid="biz-profile-quiet-connect">
         <details>
           <summary className="cursor-pointer text-base font-semibold" data-testid="biz-profile-quiet-connect-summary">Подключение и оплата</summary>
-          <div className="mt-3 space-y-3">{body}</div>
+          <div className="mt-3 space-y-3">
+            {connectVenueHref ? <p><a className="underline" href={connectVenueHref} data-testid="biz-profile-quiet-connect-venue">Подключить заведение</a></p> : null}
+            {body}
+          </div>
         </details>
       </section>
     );

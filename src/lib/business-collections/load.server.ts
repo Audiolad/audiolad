@@ -153,3 +153,13 @@ export async function ownerCafeVenueCollections(userId: string): Promise<{ locat
   const byLocation = new Map((assigned.data ?? []).map((row) => [row.location_id as string, row.collection_id as string]));
   return ids.map((locationId) => ({ locationId, collectionId: byLocation.get(locationId) ?? null }));
 }
+
+/** Like loadCollectionVisitor, but a lookup error counts as a visitor (fail closed for starts). */
+export async function collectionVisitorStrict(userId: string | null): Promise<boolean> {
+  if (await hasCollectionCookie()) return true;
+  if (!userId) return false;
+  const { data, error } = await createServiceRoleClient().from("business_personal_collection_accounts")
+    .select("collection_id").eq("user_id", userId).limit(1);
+  if (error) throw new Error("collection_visitor_unavailable");
+  return Array.isArray(data) && data.length > 0;
+}

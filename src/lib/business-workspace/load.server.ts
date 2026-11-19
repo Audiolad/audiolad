@@ -459,17 +459,27 @@ async function loadCandidateTracks(
  * t1616u: a venue that got a personal collection and has no paid period plays only that
  * collection – never the whole closed catalog, also after a revoke. A paid venue keeps the
  * ordinary catalog when its collection is gone, so a paying hall never falls silent.
- * Called only when the collection pool came back empty (venues without a collection: one read).
+ * Called only when the collection pool came back empty (ordinary venues: a few small reads; their lookup errors fall back to the ordinary catalog).
  */
 async function personalCollectionStrict(db: ServiceDb, locationId: string): Promise<boolean> {
   const assigned = await db.from("business_personal_collection_locations").select("collection_id")
     .eq("location_id", locationId).maybeSingle();
   if (assigned.error) throw new Error("collection_venue_assignment_unavailable");
-  if (!assigned.data) return false;
   const location = await db.from("business_locations").select("organization_id").eq("id", locationId).single();
-  if (location.error || !location.data) throw new Error("collection_venue_unavailable");
+  if (!assigned.data) {
+    // t1616u: a venue created by a personal-link account after its link was revoked holds no
+    // collection, but still never plays the whole catalog unpaid. Ordinary venues (owner not bound
+    // to any collection) and lookup errors keep the ordinary catalog, so a hall never goes silent.
+    if (location.error || !location.data) return false;
+    const owners = await db.from("business_organization_members").select("user_id")
+      .eq("organization_id", location.data.organization_id).eq("role", "owner");
+    const ownerIds = (owners.data ?? []).map((row) => row.user_id as string);
+    if (owners.error || ownerIds.length === 0) return false;
+    const bound = await db.from("business_personal_collection_accounts").select("collection_id").in("user_id", ownerIds).limit(1);
+    if (bound.error || !bound.data || bound.data.length === 0) return false;
+  } else if (location.error || !location.data) throw new Error("collection_venue_unavailable");
   const { data: paidUntil, error } = await db.rpc("business_venue_paid_until", {
-    p_organization_id: location.data.organization_id, p_location_id: locationId,
+    p_organization_id: location.data!.organization_id, p_location_id: locationId,
   });
   if (error) throw new Error("collection_venue_payment_unavailable");
   return !(typeof paidUntil === "string" && Date.parse(paidUntil) > Date.now());

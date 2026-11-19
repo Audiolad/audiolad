@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { collectionBoundToUser, collectionHasRoom, loadCollectionPermission } from "@/lib/business-collections/load.server";
+import { collectionBoundToUser, collectionHasRoom, loadCollectionPermission, ownerCafeVenueCollections } from "@/lib/business-collections/load.server";
 import { COLLECTION_ENTRY_COPY as copy } from "@/lib/business-collections/entry";
 import { COFFEE_HOSTNAME, coffeeHostEnabled } from "@/lib/business-app/host";
 import { businessGuestCoffeeHallRedirect } from "@/lib/business-app/point-device";
@@ -42,8 +42,12 @@ export default async function PersonalCollectionPage({ searchParams }: { searchP
   const { data: { user } } = await (await createClient()).auth.getUser();
   let bound = false;
   let room = true;
+  let other = false;
   try {
-    bound = user ? await collectionBoundToUser(permission.id, user.id) : false;
+    // An account whose venue already plays another collection never opens this link as if it were
+    // this one (guest-start refuses it too with collection_other).
+    other = user ? (await ownerCafeVenueCollections(user.id)).some((venue) => venue.collectionId !== null && venue.collectionId !== permission.id) : false;
+    bound = !other && user ? await collectionBoundToUser(permission.id, user.id) : false;
     room = bound || await collectionHasRoom(permission.id, user?.id ?? null);
   } catch { return <Unavailable />; }
   if (bound) redirect("/music");
@@ -52,7 +56,7 @@ export default async function PersonalCollectionPage({ searchParams }: { searchP
       <p className="text-sm text-[var(--biz-text-muted)]">{copy.eyebrow}</p>
       <h1 className="text-2xl font-bold" data-testid="collection-title">{permission.title}</h1>
     </header>
-    {room ? <>
+    {other ? <p data-testid="collection-other">{copy.other}</p> : room ? <>
       <p className="text-[var(--biz-text-muted)]">{copy.lead}</p>
       <CollectionEntry />
     </> : <p data-testid="collection-full">{copy.full}</p>}

@@ -1,4 +1,4 @@
-import { bindPersonalCollection, collectionHasRoom, hasCollectionCookie, loadCollectionPermission, ownerCafeVenueCollections } from "@/lib/business-collections/load.server";
+import { bindPersonalCollection, collectionHasRoom, collectionVisitorStrict, loadCollectionPermission, ownerCafeVenueCollections } from "@/lib/business-collections/load.server";
 import { COLLECTION_ENTRY_HEADER } from "@/lib/business-collections/entry";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -62,10 +62,12 @@ async function handle(request: Request) {
   if (config.enabled && request.method === "POST") {
     try {
       const permission = await loadCollectionPermission();
-      if (!permission && (collectionEntry || await hasCollectionCookie())) return json(410, "collection_unavailable");
+      const { data: { user } } = await (await createClient()).auth.getUser();
+      // A revoked link (cookie in this browser or an account once bound to a collection) never
+      // becomes an ordinary start with the whole catalog.
+      if (!permission && (collectionEntry || await collectionVisitorStrict(user?.id ?? null))) return json(410, "collection_unavailable");
       if (permission) {
         entryCollectionId = permission.id;
-        const { data: { user } } = await (await createClient()).auth.getUser();
         if (!await collectionHasRoom(permission.id, user?.id ?? null)) return json(409, "collection_full");
         if (user && (await ownerCafeVenueCollections(user.id)).some((venue) => venue.collectionId !== null && venue.collectionId !== permission.id)) {
           return json(409, "collection_other");

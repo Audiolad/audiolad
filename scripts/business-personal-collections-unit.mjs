@@ -81,7 +81,7 @@ assert.match(start, /"collection_full"/);
 assert.match(start, /"collection_unavailable"/);
 assert.match(start, /if \(entryCollectionId && !await bindPersonalCollection\(entryCollectionId, input.userId\)\) throw new Error\("collection_full"\);\s*const \{ data, error \} = await createServiceRoleClient\(\).rpc\("business_guest_bootstrap"/, 'bound before the venue exists');
 assert.match(start, /venues.some\(\(venue\) => venue.collectionId !== entryCollectionId\)\) return json\(503/, 'every cafe venue must play this collection after the start');
-assert.match(start, /if \(!permission && \(collectionEntry \|\| await hasCollectionCookie\(\)\)\) return json\(410, "collection_unavailable"\)/, 'a revoked link never becomes an ordinary guest');
+assert.match(start, /if \(!permission && \(collectionEntry \|\| await collectionVisitorStrict\(user\?.id \?\? null\)\)\) return json\(410, "collection_unavailable"\)/, 'a revoked link never becomes an ordinary guest');
 assert.match(start, /venue.collectionId !== null && venue.collectionId !== permission.id\)\) \{\s*return json\(409, "collection_other"\)/, 'another collection is never kept silently');
 assert.match(entry, /COLLECTION_ENTRY_HEADER\]: "1"/);
 assert.ok(start.indexOf('collection_full') < start.indexOf('handleBusinessGuestStart('), 'cap checked before any sign-in');
@@ -97,7 +97,13 @@ assert.match(layout, /customerAccess\?\.mode !== "paid"/);
 assert.match(layout, /quietCollection=\{quietCollection\}/);
 assert.doesNotMatch(layout, /Ваша подборка/);
 const demo = source('src/app/business-app/guest/coffee/page.tsx');
-assert.match(demo, /await hasCollectionCookie\(\) \|\| await loadCollectionPermission\(\)\)\) redirect\("\/collection"\)/);
+assert.match(demo, /if \(await loadCollectionVisitor\(visitor\?.id \?\? null\)\) redirect\("\/collection"\)/, 'a revoked cookie or binding never sees the demo');
+const entryPage = source('src/app/business-app/collection/page.tsx');
+assert.match(entryPage, /other = user \? \(await ownerCafeVenueCollections\(user.id\)\)/, 'a venue with another collection is not opened as this link');
+assert.match(entryPage, /bound = !other && user/);
+const profilePage = source('src/app/business-app/profile/page.tsx');
+assert.match(profilePage, /<BusinessQuietHidden>\s*<p>\s*<Link[^>]*href="\/onboarding">\s*Подключить заведение/, 'profile connect button is hidden in quiet');
+assert.match(source('src/components/business-app/profile/BusinessProfileSubscription.tsx'), /connectVenueHref \? <p><a className="underline" href=\{connectVenueHref\}/);
 assert.match(demo, /redirect\("\/collection"\)/, 'link visitor never sees the public demo');
 const workspace = source('src/lib/business-workspace/load.server.ts');
 assert.match(workspace, /personalCollectionStrict\(db, locationId\)/);
@@ -129,3 +135,11 @@ const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.met
 assert.ok(migrationFiles.includes('20270402120000_business_personal_collections.sql'));
 assert.ok(!migrationFiles.some((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), 'no new migration');
 console.log('personal-collections: PASS – ordinary app limited to the collection, strict unpaid pool, calm entry, quiet cabinet, 10 per link');
+
+// Round 3: a venue created by a bound account after a revoke stays strict while unpaid; ordinary
+// venues fall back on lookup errors (a hall never goes silent).
+{
+  const ws = readFileSync(new URL('../src/lib/business-workspace/load.server.ts', import.meta.url), 'utf8');
+  assert.match(ws, /business_personal_collection_accounts"\)\.select\("collection_id"\)\.in\("user_id", ownerIds\)/);
+  assert.match(ws, /if \(bound.error \|\| !bound.data \|\| bound.data.length === 0\) return false;/);
+}
