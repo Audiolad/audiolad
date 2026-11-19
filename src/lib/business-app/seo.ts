@@ -6,14 +6,14 @@ import { BUSINESS_PUBLIC_PATH_REWRITES, BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE
 export const BUSINESS_APP_SEO_TITLE = "Аудиолад Бизнес";
 
 export const BUSINESS_APP_SEO_DESCRIPTION =
-  "Кабинет владельца кофейни Аудиолад Бизнес";
+  "Кабинет владельца заведения Аудиолад Бизнес";
 
 /** Private B2B app — never index. */
 export function buildBusinessAppMetadata(hostname?: string): Metadata {
   const coffee = Boolean(hostname && isCoffeeHostname(hostname));
   return {
     title: coffee ? COFFEE_BRAND_NAME : BUSINESS_APP_SEO_TITLE,
-    description: coffee ? "Кабинет владельца кофейни АудиоЛад Кофейня" : BUSINESS_APP_SEO_DESCRIPTION,
+    description: coffee ? "Кабинет владельца заведения АудиоЛад Кофейня" : BUSINESS_APP_SEO_DESCRIPTION,
     alternates: {
       canonical: `${coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? COFFEE_ORIGIN : BUSINESS_ORIGIN}/`,
     },

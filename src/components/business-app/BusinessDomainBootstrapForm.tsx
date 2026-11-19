@@ -46,7 +46,7 @@ export default function BusinessDomainBootstrapForm() {
       </div>
       <div>
         <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="locationName">
-          Кофейня
+          Заведение
         </label>
         <input
           id="locationName"
@@ -74,7 +74,7 @@ export default function BusinessDomainBootstrapForm() {
       <input type="hidden" name="countryCode" value="RU" />
       {error ? (
         <p className="text-sm font-medium text-[var(--biz-danger)]" role="alert">
-          Не удалось создать кофейню: {error}
+          Не удалось создать заведение: {error}
         </p>
       ) : null}
       <button

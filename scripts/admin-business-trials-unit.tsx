@@ -49,7 +49,7 @@ const grants = [
   { userId: uid(1), hasEmail: false, kind: KIND, startsAt: at(-1), endsAt: at(6) },
 ];
 const facts = new Map<string, BusinessTrialFacts>([
-  [uid(1), { organizationName: "Моя кофейня", workspacePlaybackAt: at(-0.5), pointSeenAt: at(-1), guestStart: true }],
+  [uid(1), { organizationName: "Моё заведение", workspacePlaybackAt: at(-0.5), pointSeenAt: at(-1), guestStart: true }],
   [uid(2), { firstUsefulAction: true, organizationName: "  " }],
   [uid(3), { paidUntil: at(20), organizationName: "Кофе на углу", deviceSeenAt: at(-0.1) }],
   [uid(4), { guestStart: true, pointSeenAt: at(-11) }],
@@ -75,7 +75,7 @@ const guest = byId.get(uid(1))!;
 assert.equal(guest.status, "trial");
 assert.equal(guest.daysLeft, 5);
 assert.equal(guest.account, "guest");
-assert.equal(guest.title, "Моя кофейня");
+assert.equal(guest.title, "Моё заведение");
 assert.equal(guest.firstPlay, "yes");
 assert.equal(guest.lastActivityAt, at(-0.5), "latest of cabinet and point");
 assert.equal(guest.startsAt, at(-2), "first grant row wins over the duplicate");
@@ -177,7 +177,7 @@ assert.match(navHtml, /data-nav-href="\/admin\/business-trials"[^>]*aria-current
 
 // Static render of the screen.
 const html = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: stats }));
-for (const text of ["Начали", "Сейчас в подарке", "Льготный период", "Сейчас оплачено", "Закрыто", "Моя кофейня", "Кофе на углу", "гость", "зарегистрирован (начинал гостем)", "подарок", "льготный период", "оплачено", "закрыто", "неизвестно", "5 дней", "2 дня", "МСК"]) {
+for (const text of ["Начали", "Сейчас в подарке", "Льготный период", "Сейчас оплачено", "Закрыто", "Моё заведение", "Кофе на углу", "гость", "зарегистрирован (начинал гостем)", "подарок", "льготный период", "оплачено", "закрыто", "неизвестно", "5 дней", "2 дня", "МСК"]) {
   assert.ok(html.includes(text), text);
 }
 assert.doesNotMatch(html, /—/, "en dash only");
@@ -199,7 +199,7 @@ assert.deepEqual(
 assert.equal(businessTrialExcludedOrgIds({}).size, 0);
 assert.equal(businessTrialExcludedOrgIds({ AUDIOLAD_BUSINESS_TRIAL_EXCLUDED_ORG_IDS: "" }).size, 0);
 const hiddenFacts = new Map<string, BusinessTrialFacts>([
-  [uid(1), { organizationId: ORG_TEST_A, organizationName: "Моя кофейня", guestStart: true, workspacePlaybackAt: at(-0.5) }],
+  [uid(1), { organizationId: ORG_TEST_A, organizationName: "Моё заведение", guestStart: true, workspacePlaybackAt: at(-0.5) }],
   [uid(2), { organizationId: ORG_REAL, organizationName: "Настоящая кофейня" }],
   [uid(3), { organizationId: ORG_TEST_B.toUpperCase(), paidUntil: at(20) }],
   [uid(4), { guestStart: true }],
@@ -213,7 +213,7 @@ assert.deepEqual(hidden.rows.map((row) => row.userId).sort(), [uid(2), uid(4)]);
 assert.equal(buildBusinessTrialStats({ now, grants, facts: hiddenFacts }).hiddenTests, 0, "no env list -> nothing hidden");
 const hiddenHtml = renderToStaticMarkup(createElement(AdminBusinessTrials, { data: hidden }));
 assert.match(hiddenHtml, /data-trial-hidden-tests[^>]*>Скрыто тестовых: (<!-- -->)?2</);
-assert.doesNotMatch(hiddenHtml, /Моя кофейня/);
+assert.doesNotMatch(hiddenHtml, /Моё заведение/);
 assert.doesNotMatch(hiddenHtml, /—/, "en dash only");
 
 // Paging: every IN-chunk is read page by page with a stable order; >1000 rows are never truncated.

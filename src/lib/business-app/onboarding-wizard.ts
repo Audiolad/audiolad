@@ -214,7 +214,7 @@ export function validateBusinessOnboardingConfirm(
     return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
   if (locationName.length < 1 || locationName.length > 120) {
-    return { ok: false, error: "Укажите название кофейни: от 1 до 120 символов." };
+    return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
   if (businessCategory.length < 1 || businessCategory.length > 120) {
     return { ok: false, error: "Укажите тип заведения: от 1 до 120 символов." };
