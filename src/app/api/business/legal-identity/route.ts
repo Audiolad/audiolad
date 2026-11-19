@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server";
+import { organizationLegalColumns } from "@/lib/business/legal/egrul";
 import { lookupBusinessRegistry } from "@/lib/business/legal/egrul.server";
 import { checkBusinessInn } from "@/lib/business/legal/inn";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -49,19 +50,10 @@ export async function POST(request: Request) {
   }
   if (lookup.identity.kind !== check.kind) return NextResponse.json({ error: "inn_not_found" }, { status: 422 });
 
-  const [dd, mm, yyyy] = (lookup.identity.registeredOn ?? "").split(".");
   const db = createServiceRoleClient();
   const { error: updateError } = await db
     .from("business_organizations")
-    .update({
-      legal_inn: lookup.identity.inn,
-      legal_kind: lookup.identity.kind,
-      legal_name: lookup.identity.displayName,
-      legal_full_name: lookup.identity.fullName,
-      legal_ogrn: lookup.identity.ogrn,
-      legal_registered_on: yyyy ? `${yyyy}-${mm}-${dd}` : null,
-      legal_checked_at: new Date().toISOString(),
-    })
+    .update(organizationLegalColumns(lookup.identity, new Date()))
     .eq("id", membership.organization_id);
   if (updateError) return NextResponse.json({ error: "internal_error" }, { status: 500 });
 

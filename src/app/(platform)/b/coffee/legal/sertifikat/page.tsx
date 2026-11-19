@@ -69,8 +69,8 @@ export default function BusinessLegalCertificatePage() {
         <img
           src={BUSINESS_LEGAL_SAMPLE_PNG}
           alt="Образец сертификата точки"
-          width={1191}
-          height={1685}
+          width={1192}
+          height={1628}
           loading="lazy"
           className={legalSampleClass}
         />

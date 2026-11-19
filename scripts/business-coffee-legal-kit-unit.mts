@@ -5,12 +5,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { checkBusinessInn, isValidBusinessInn } from "../src/lib/business/legal/inn";
-import { parseRegistryRows, russianQuotes, titleCaseRu } from "../src/lib/business/legal/egrul";
+import { organizationLegalColumns, parseRegistryRows, russianQuotes, titleCaseRu } from "../src/lib/business/legal/egrul";
 import {
   businessAccountCode,
   certificateCheckUrl,
   certificateDisplayNumber,
   certificateRows,
+  certificateSnapshotIsCurrent,
+  certificateStatusLabel,
   certificateSnapshotHash,
   certificateSnapshotJson,
   parseCertificateSnapshot,
@@ -64,6 +66,18 @@ assert.deepEqual(parseRegistryRows("7707083893", { rows: [{ i: "7707083893", k: 
 assert.deepEqual(parseRegistryRows("7707083893", { rows: [{ i: "7707083893", k: "ul", n: "X", o: "12" }] }), { ok: false, error: "registry_unavailable" });
 assert.deepEqual(parseRegistryRows("7707083893", null), { ok: false, error: "inn_not_found" });
 
+// Колонки организации по ответу реестра: дата ГГГГ-ММ-ДД, отметка о прекращении снимается.
+assert.deepEqual(organizationLegalColumns(ip.ok ? ip.identity : (null as never), new Date("2026-11-19T09:00:00Z")), {
+  legal_inn: "507305817690",
+  legal_kind: "ip",
+  legal_name: "ИП Петров Сергей Сергеевич",
+  legal_full_name: "Петров Сергей Сергеевич",
+  legal_ogrn: "316505300063237",
+  legal_registered_on: "2016-11-25",
+  legal_checked_at: "2026-11-19T09:00:00.000Z",
+  legal_inactive_at: null,
+});
+
 // Сертификат: снимок, хеш, поля приложения 2.
 const snap: CertificateSnapshot = {
   v: 1,
@@ -98,10 +112,29 @@ assert.equal(rows["Учётная запись"], "№ 7F3A-21C9");
 assert.ok(!("Юридический адрес" in rows), "юр. адреса в реестре нет – в сертификате тоже");
 for (const v of Object.values(rows)) assert.doesNotMatch(v, /—|@|\+7/, "без длинного тире и личных контактов");
 
+// Действующий сертификат перестаёт действовать, если точка или лицензиат изменились.
+const facts = { venueName: snap.venueName, venueAddress: snap.venueAddress, licensee: { inn: snap.licensee.inn, ogrn: snap.licensee.ogrn, name: snap.licensee.name }, licenseeInactive: false };
+assert.equal(certificateSnapshotIsCurrent(snap, facts), true);
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, venueAddress: "г. Город, ул. Другая, д. 2" }), false, "новый адрес");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, venueAddress: null }), false, "адрес стёрт");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, venueName: "Другая" }), false, "новое название точки");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: { ...facts.licensee, inn: "507305817690" } }), false, "другой ИНН");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: { ...facts.licensee, name: "ООО «НОВОЕ»" } }), false, "переименование по ФНС");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licensee: null }), false, "ИНН удалён");
+assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: true }), false, "прекратил деятельность");
+assert.equal(certificateStatusLabel("outdated"), "Не действует: данные точки или лицензиата изменились");
+assert.equal(certificateStatusLabel("valid"), "Действует");
+
 // Сервер: пробная неделя – действующий доступ; выдача только для своей точки; проверка – только чтение.
 const server = readFileSync("src/lib/business/legal/certificate.server.ts", "utf8");
 assert.match(server, /resolved\.mode === "trial" \|\| resolved\.mode === "paid"/);
 assert.match(server, /rpc\("issue_business_venue_certificate"/);
+assert.match(server, /refreshOrganizationLegalIdentity\(db, row\.organization_id, stored, now\)/, "перед выдачей – свежие сведения ФНС");
+assert.match(server, /REGISTRY_FRESH_MS = 24 \* 60 \* 60 \* 1000/);
+assert.match(server, /status = "outdated"/, "проверка сверяет снимок с текущими данными");
+const lookupSrc = readFileSync("src/lib/business/legal/egrul.server.ts", "utf8");
+assert.match(lookupSrc, /return \{ ok: true, json: await res\.json\(\)/, "тело ответа читается под тем же таймером");
+assert.match(lookupSrc, /TOTAL_TIMEOUT_MS = 20000/);
 const ctx = readFileSync("src/lib/business/legal/certificate-context.server.ts", "utf8");
 assert.match(ctx, /ensureVenueCertificate\(domain\.location\.id\)/, "точка владельца из сессии");
 assert.match(ctx, /ensureVenueCertificate\(venue\.locationId\)/, "точка устройства зала из cookie");
@@ -119,6 +152,7 @@ assert.match(body, /ENABLE ROW LEVEL SECURITY/);
 assert.doesNotMatch(body, /CREATE POLICY/);
 assert.match(body, /REVOKE ALL ON FUNCTION public\.issue_business_venue_certificate\([^)]*\) FROM PUBLIC, anon, authenticated/);
 assert.match(body, /START WITH 2/, "000001 – образец");
+assert.match(body, /ADD COLUMN IF NOT EXISTS legal_inactive_at timestamptz/);
 assert.match(body, /WHERE superseded_at IS NULL AND revoked_at IS NULL/, "один действующий сертификат на точку");
 
 // Маршруты кабинета.

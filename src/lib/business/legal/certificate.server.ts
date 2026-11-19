@@ -6,8 +6,11 @@ import { clockOf, formatVenueAddress, formatVenueName, periodOf } from "@/lib/bu
 import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { organizationLegalColumns } from "./egrul";
+import { lookupBusinessRegistry } from "./egrul.server";
 import {
   businessAccountCode,
+  certificateSnapshotIsCurrent,
   certificateSnapshotHash,
   certificateSnapshotJson,
   parseCertificateSnapshot,
@@ -36,12 +39,14 @@ export type LegalIdentity = {
   fullName: string;
   ogrn: string;
   checkedAt: string | null;
+  /** Повторная проверка в ФНС нашла ИНН недействующим: сертификат не выдаётся и не действует. */
+  inactiveAt: string | null;
 };
 
 export async function loadOrganizationLegalIdentity(db: Db, organizationId: string): Promise<LegalIdentity | null> {
   const { data, error } = await db
     .from("business_organizations")
-    .select("legal_inn, legal_kind, legal_name, legal_full_name, legal_ogrn, legal_checked_at")
+    .select("legal_inn, legal_kind, legal_name, legal_full_name, legal_ogrn, legal_checked_at, legal_inactive_at")
     .eq("id", organizationId)
     .maybeSingle();
   if (error) throw new Error("certificate_unavailable");
@@ -50,7 +55,69 @@ export async function loadOrganizationLegalIdentity(db: Db, organizationId: stri
   const name = str(data?.legal_name);
   const ogrn = str(data?.legal_ogrn);
   if (!inn || !kind || !name || !ogrn) return null;
-  return { inn, kind, name, fullName: str(data?.legal_full_name) ?? name, ogrn, checkedAt: str(data?.legal_checked_at) };
+  return {
+    inn,
+    kind,
+    name,
+    fullName: str(data?.legal_full_name) ?? name,
+    ogrn,
+    checkedAt: str(data?.legal_checked_at),
+    inactiveAt: str(data?.legal_inactive_at),
+  };
+}
+
+/** Сведения ФНС перед выдачей сертификата обновляются, если последней проверке больше суток. */
+const REGISTRY_FRESH_MS = 24 * 60 * 60 * 1000;
+/** Если реестр недоступен, сведения не старше 7 дней ещё годятся, старше – сертификат не выдаётся. */
+const REGISTRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+type RefreshedIdentity =
+  | { ok: true; identity: LegalIdentity }
+  | { ok: false; missing: "inn_inactive" | "registry"; identity: LegalIdentity };
+
+async function refreshOrganizationLegalIdentity(
+  db: Db,
+  organizationId: string,
+  identity: LegalIdentity,
+  now: Date,
+): Promise<RefreshedIdentity> {
+  if (identity.inactiveAt) return { ok: false, missing: "inn_inactive", identity };
+  const checked = identity.checkedAt ? Date.parse(identity.checkedAt) : Number.NaN;
+  const age = Number.isFinite(checked) ? now.getTime() - checked : Number.POSITIVE_INFINITY;
+  if (age < REGISTRY_FRESH_MS) return { ok: true, identity };
+
+  const lookup = await lookupBusinessRegistry(identity.inn);
+  if (lookup.ok && lookup.identity.inn === identity.inn && lookup.identity.kind === identity.kind) {
+    const { error } = await db
+      .from("business_organizations")
+      .update(organizationLegalColumns(lookup.identity, now))
+      .eq("id", organizationId)
+      .eq("legal_inn", identity.inn);
+    if (error) throw new Error("certificate_unavailable");
+    return {
+      ok: true,
+      identity: {
+        ...identity,
+        name: lookup.identity.displayName,
+        fullName: lookup.identity.fullName,
+        ogrn: lookup.identity.ogrn,
+        checkedAt: now.toISOString(),
+        inactiveAt: null,
+      },
+    };
+  }
+  if (!lookup.ok && lookup.error === "registry_unavailable") {
+    return age < REGISTRY_GRACE_MS ? { ok: true, identity } : { ok: false, missing: "registry", identity };
+  }
+  // Прекратил деятельность, не найден или сменил вид: отмечаем, пока владелец не введёт действующий ИНН.
+  const inactiveAt = now.toISOString();
+  const { error } = await db
+    .from("business_organizations")
+    .update({ legal_inactive_at: inactiveAt })
+    .eq("id", organizationId)
+    .eq("legal_inn", identity.inn);
+  if (error) throw new Error("certificate_unavailable");
+  return { ok: false, missing: "inn_inactive", identity: { ...identity, inactiveAt } };
 }
 
 type LocationRow = {
@@ -132,17 +199,20 @@ export async function ensureVenueCertificate(locationId: string, now: Date = new
   if (!location?.id || !location.organization_id) throw new Error("certificate_location_unknown");
   const row = location as LocationRow;
   const venue = venueOf(row);
-  const identity = await loadOrganizationLegalIdentity(db, row.organization_id);
+  const stored = await loadOrganizationLegalIdentity(db, row.organization_id);
+  const refreshed = stored ? await refreshOrganizationLegalIdentity(db, row.organization_id, stored, now) : null;
+  const identity = refreshed?.ok ? refreshed.identity : null;
   const access = await liveAccess(db, row, now);
   const acceptedAt = await currentEditionAcceptedAt(db, access.ownerId);
 
   const missing: CertificateMissing[] = [];
-  if (!identity) missing.push("inn");
+  if (!stored) missing.push("inn");
+  else if (refreshed && !refreshed.ok) missing.push(refreshed.missing);
   if (!venue.address) missing.push("address");
   if (!acceptedAt) missing.push("offer");
   if (!access.active || !access.end || !access.kind) missing.push("access");
   if (missing.length || !identity || !venue.address || !acceptedAt || !access.end || !access.kind) {
-    return { kind: "missing", missing, identity, venueName: venue.name, venueAddressLine: venue.address };
+    return { kind: "missing", missing, identity: stored, venueName: venue.name, venueAddressLine: venue.address };
   }
 
   const snapshot: CertificateSnapshot = {
@@ -211,8 +281,19 @@ export async function loadCertificateCheck(number: string, now: Date = new Date(
   } else {
     const { data: location, error: locError } = await db.from("business_locations").select(LOCATION_COLUMNS).eq("id", cert.location_id).maybeSingle();
     if (locError || !location) throw new Error("certificate_unavailable");
-    const access = await liveAccess(db, location as LocationRow, now);
-    if (access.active && access.end) {
+    const row = location as LocationRow;
+    const venue = venueOf(row);
+    const identity = await loadOrganizationLegalIdentity(db, row.organization_id);
+    const current = certificateSnapshotIsCurrent(snapshot, {
+      venueName: venue.name,
+      venueAddress: venue.address,
+      licensee: identity ? { inn: identity.inn, ogrn: identity.ogrn, name: identity.name } : null,
+      licenseeInactive: Boolean(identity?.inactiveAt),
+    });
+    const access = current ? await liveAccess(db, row, now) : null;
+    if (!current) {
+      status = "outdated";
+    } else if (access?.active && access.end) {
       status = "valid";
       validUntil = Date.parse(access.end) > Date.parse(snapshot.period.end) ? access.end : snapshot.period.end;
     } else {

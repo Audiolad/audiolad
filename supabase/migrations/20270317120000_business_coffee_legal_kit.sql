@@ -21,7 +21,8 @@
 --   ALTER TABLE public.business_organizations
 --     DROP COLUMN IF EXISTS legal_inn, DROP COLUMN IF EXISTS legal_kind, DROP COLUMN IF EXISTS legal_name,
 --     DROP COLUMN IF EXISTS legal_full_name, DROP COLUMN IF EXISTS legal_ogrn,
---     DROP COLUMN IF EXISTS legal_registered_on, DROP COLUMN IF EXISTS legal_checked_at;
+--     DROP COLUMN IF EXISTS legal_registered_on, DROP COLUMN IF EXISTS legal_checked_at,
+--     DROP COLUMN IF EXISTS legal_inactive_at;
 --   DELETE FROM public.business_offer_edition_acceptances WHERE document_key = 'business-offer' AND document_version = 'offer-v3-2026-11-18';
 --   DELETE FROM public.business_offer_editions WHERE document_key = 'business-offer' AND document_version = 'offer-v3-2026-11-18';
 --   COMMIT;
@@ -35,7 +36,8 @@ ALTER TABLE public.business_organizations
   ADD COLUMN IF NOT EXISTS legal_full_name text,
   ADD COLUMN IF NOT EXISTS legal_ogrn text,
   ADD COLUMN IF NOT EXISTS legal_registered_on date,
-  ADD COLUMN IF NOT EXISTS legal_checked_at timestamptz;
+  ADD COLUMN IF NOT EXISTS legal_checked_at timestamptz,
+  ADD COLUMN IF NOT EXISTS legal_inactive_at timestamptz;
 
 DO $$
 BEGIN
@@ -57,6 +59,8 @@ END $$;
 
 COMMENT ON COLUMN public.business_organizations.legal_inn IS
   'audiolad:coffee-legal-kit; Client ИНН typed by the owner (checksum-valid). Name/ОГРН come from the ФНС registry by this ИНН.';
+COMMENT ON COLUMN public.business_organizations.legal_inactive_at IS
+  'audiolad:coffee-legal-kit; set when a registry re-check finds the ИНН terminated or gone: no certificate is issued or shown as valid.';
 
 CREATE SEQUENCE IF NOT EXISTS public.business_venue_certificate_seq START WITH 2 MINVALUE 1;
 

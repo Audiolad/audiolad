@@ -25,7 +25,7 @@ export type CertificateSnapshot = {
   offer: { version: string; label: string; acceptedAt: string };
 };
 
-export type CertificateMissing = "inn" | "address" | "offer" | "access";
+export type CertificateMissing = "inn" | "inn_inactive" | "registry" | "address" | "offer" | "access";
 
 /** «7F3A-21C9»: первые 8 знаков номера организации – номер учётной записи в сертификате. */
 export function businessAccountCode(organizationId: string): string {
@@ -127,7 +127,28 @@ export function certificateRows(input: { number: string; issuedAt: string; snaps
   ];
 }
 
-export type CertificateCheckStatus = "valid" | "expired" | "superseded" | "revoked";
+export type CertificateCheckStatus = "valid" | "expired" | "outdated" | "superseded" | "revoked";
+
+/** Данные, которые должны совпадать у действующего сертификата и у точки сейчас. */
+export type CertificateCurrentFacts = {
+  venueName: string;
+  venueAddress: string | null;
+  licensee: { inn: string; ogrn: string; name: string } | null;
+  licenseeInactive: boolean;
+};
+
+/** Сертификат перестаёт подтверждать право, как только адрес, название точки или лицензиат изменились. */
+export function certificateSnapshotIsCurrent(snapshot: CertificateSnapshot, now: CertificateCurrentFacts): boolean {
+  return (
+    !now.licenseeInactive &&
+    Boolean(now.licensee) &&
+    snapshot.venueName === now.venueName &&
+    snapshot.venueAddress === now.venueAddress &&
+    snapshot.licensee.inn === now.licensee?.inn &&
+    snapshot.licensee.ogrn === now.licensee?.ogrn &&
+    snapshot.licensee.name === now.licensee?.name
+  );
+}
 
 export function certificateStatusLabel(status: CertificateCheckStatus): string {
   switch (status) {
@@ -135,6 +156,8 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
       return "Действует";
     case "expired":
       return "Не действует: доступ к точке закончился";
+    case "outdated":
+      return "Не действует: данные точки или лицензиата изменились";
     case "superseded":
       return "Заменён новым сертификатом";
     case "revoked":
@@ -144,6 +167,8 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
 
 export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, string> = {
   inn: "Укажите ИНН организации или ИП.",
+  inn_inactive: "По данным ФНС организация или ИП с этим ИНН прекратили деятельность. Укажите действующий ИНН.",
+  registry: "Не удалось проверить ИНН в реестре ФНС. Откройте страницу позже.",
   address: "Укажите адрес точки.",
   offer: "Примите новую редакцию договора-оферты.",
   access: "Сертификат выдаётся, пока идёт подарочный или оплаченный период.",

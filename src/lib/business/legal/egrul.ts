@@ -79,3 +79,18 @@ export function parseRegistryRows(inn: string, payload: unknown): BusinessRegist
     },
   };
 }
+
+/** Колонки business_organizations по свежему ответу реестра (ввод ИНН и повторная проверка). */
+export function organizationLegalColumns(identity: BusinessRegistryIdentity, now: Date) {
+  const date = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(identity.registeredOn ?? "");
+  return {
+    legal_inn: identity.inn,
+    legal_kind: identity.kind,
+    legal_name: identity.displayName,
+    legal_full_name: identity.fullName,
+    legal_ogrn: identity.ogrn,
+    legal_registered_on: date ? `${date[3]}-${date[2]}-${date[1]}` : null,
+    legal_checked_at: now.toISOString(),
+    legal_inactive_at: null,
+  };
+}
