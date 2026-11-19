@@ -308,6 +308,11 @@ export async function createPlayLogExtract(input: {
       const buf = await readFile(join(tmpDir, "extract.pdf"));
       files.push({ name: "extract.pdf", sha256: sha256Hex(buf), bytes: buf.length });
     }
+    // Nothing unsealed may stay in the folder (e.g. a half-written PDF after a renderer crash).
+    const listed = new Set(files.map((f) => f.name));
+    for (const name of await readdir(tmpDir)) {
+      if (!listed.has(name)) await rm(join(tmpDir, name), { recursive: true, force: true });
+    }
 
     const manifest: ExtractManifest = {
       schema: "audiolad.evidence.play-log-extract/1",
