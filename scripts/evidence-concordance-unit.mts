@@ -107,6 +107,18 @@ const segs: MatchSegment[] = [
   const c = concordance(ss, ps, new Date((T + 14) * 1000));
   assert.equal(c.confirmedSegments, 3, JSON.stringify(c));
 }
+// Proposals T+10 and T+30 with tolerance 15: the start T+20 confirms both.
+{
+  const ps = [play("A", 0, 300), play("B", 1000, 300)];
+  const ss: MatchSegment[] = [
+    { code: "A", kind: "catalog", rec_from_s: 10, rec_to_s: 40, track_from_s: 20, track_to_s: 50 },
+    { code: "B", kind: "catalog", rec_from_s: 1010, rec_to_s: 1040, track_from_s: 40, track_to_s: 70 },
+  ];
+  const c = concordance(ss, ps, null);
+  assert.equal(c.confirmedSegments, 2, JSON.stringify(c));
+  assert.equal(c.orderConsistent, true);
+  assert.ok(Math.abs(Date.parse(c.recordingStartUtc!) / 1000 - T - 20) <= 5, c.recordingStartUtc!);
+}
 // Every confirmed segment stays within the tolerance of the reported start (offsets −15, 0, 15, 15).
 {
   const ps = [play("A", 0, 100), play("B", 1000, 100), play("C", 2000, 100), play("D", 3000, 100)];

@@ -62,7 +62,8 @@ export const CONCORDANCE_TOLERANCE_S = 15;
  */
 export const COVER_SLACK_S = 20;
 
-type Pair = { seg: number; play: number; r: number };
+type Pair = { seg: number; play: number; r: number; lo: number; hi: number };
+const EPS = 1e-6;
 
 export function concordance(
   segments: readonly MatchSegment[],
@@ -78,67 +79,62 @@ export function concordance(
     first: Date.parse(p.firstAt) / 1000,
     last: Date.parse(p.lastAt) / 1000,
   }));
-  /** Whether play j covers segment i if the recording started at `start` (time and position). */
-  const covers = (i: number, j: number, start: number) => {
-    const s = segments[i];
-    const p = plays[j];
-    const heardFrom = start + s.rec_from_s;
-    const heardTo = start + s.rec_to_s;
-    const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
-    const coverTo = playTimes[j].last + COVER_SLACK_S;
-    if (heardFrom < coverFrom || heardTo > coverTo) return false;
-    // …and the positions the log saw must cover the heard track positions.
-    return !(s.track_from_s < p.posFromMs / 1000 - COVER_SLACK_S || s.track_to_s > p.posToMs / 1000 + COVER_SLACK_S);
-  };
+  /**
+   * Each (segment, play) pair of the same track allows the recording start R in an interval: R must
+   * be within the tolerance of the start the pair proposes, and the log must cover the heard
+   * interval at R (time) – the heard track positions must be covered regardless of R.
+   */
   const pairs: Pair[] = [];
   for (const { s, i } of segs) {
     plays.forEach((p, j) => {
       if (!p.code || p.code !== s.code) return;
+      if (s.track_from_s < p.posFromMs / 1000 - COVER_SLACK_S || s.track_to_s > p.posToMs / 1000 + COVER_SLACK_S) return;
       const r = playTimes[j].start + (s.track_from_s - s.rec_from_s);
-      if (covers(i, j, r)) pairs.push({ seg: i, play: j, r });
+      const coverFrom = Math.min(playTimes[j].start, playTimes[j].first) - COVER_SLACK_S;
+      const coverTo = playTimes[j].last + COVER_SLACK_S;
+      const lo = Math.max(r - toleranceS, coverFrom - s.rec_from_s);
+      const hi = Math.min(r + toleranceS, coverTo - s.rec_to_s);
+      if (lo <= hi + EPS) pairs.push({ seg: i, play: j, r, lo, hi });
     });
   }
-  // Segments a common start would confirm: within the tolerance of it and covered by the log at
-  // that start (one pair per segment, the closest). Used both to rank candidate starts and for the
-  // final selection, so the chosen start is the one that really confirms the most.
+  // Segments a common start R confirms (one pair per segment, the closest proposal).
   const pick = (center: number) => {
     const m = new Map<number, Pair>();
     for (const p of pairs) {
-      if (Math.abs(p.r - center) > toleranceS || !covers(p.seg, p.play, center)) continue;
+      if (center < p.lo - EPS || center > p.hi + EPS) continue;
       const prev = m.get(p.seg);
       if (!prev || Math.abs(p.r - center) < Math.abs(prev.r - center)) m.set(p.seg, p);
     }
     return m;
   };
+  // The largest overlap of closed intervals is reached at some interval's left end, so the left
+  // ends (plus the proposals themselves) are a complete candidate set.
   const claimed = claimedStart ? claimedStart.getTime() / 1000 : null;
   let best: { r: number; count: number; dur: number; skew: number } | null = null;
-  for (const cand of pairs) {
-    const hit = pick(cand.r);
+  for (const cand of pairs.flatMap((p) => [p.lo, p.r])) {
+    const hit = pick(cand);
     let dur = 0;
     for (const seg of hit.keys()) dur += segments[seg].rec_to_s - segments[seg].rec_from_s;
-    const skew = claimed === null ? 0 : Math.abs(cand.r - claimed);
+    const skew = claimed === null ? 0 : Math.abs(cand - claimed);
     const better =
       !best ||
       hit.size > best.count ||
       (hit.size === best.count && dur > best.dur + 1e-9) ||
       (hit.size === best.count && Math.abs(dur - best.dur) <= 1e-9 && skew < best.skew);
-    if (better) best = { r: cand.r, count: hit.size, dur, skew };
+    if (better) best = { r: cand, count: hit.size, dur, skew };
   }
-  // Refine R as the median of the confirmed pairs; keep it only if it confirms no fewer segments.
+  // Centre R: the median of the confirmed proposals, clamped into the common feasible interval of
+  // the confirmed pairs, so every one of them stays confirmed.
   let r: number | null = null;
   let chosen = new Map<number, Pair>();
   if (best) {
-    r = best.r;
-    for (let iter = 0; iter < 5; iter++) {
-      const sel = pick(r);
-      const rs = [...sel.values()].map((p) => p.r).sort((a, b) => a - b);
-      const m = Math.floor(rs.length / 2);
-      const med = rs.length % 2 ? rs[m] : (rs[m - 1] + rs[m]) / 2;
-      if (Math.abs(med - r) < 1e-6) break;
-      // Keep the median only if it does not lose segments agreed at the current centre.
-      if (pick(med).size < sel.size) break;
-      r = med;
-    }
+    const sel = [...pick(best.r).values()];
+    const lo = Math.max(...sel.map((p) => p.lo));
+    const hi = Math.min(...sel.map((p) => p.hi));
+    const rs = sel.map((p) => p.r).sort((a, b) => a - b);
+    const m = Math.floor(rs.length / 2);
+    const med = rs.length % 2 ? rs[m] : (rs[m - 1] + rs[m]) / 2;
+    r = Math.min(Math.max(med, lo), hi);
     chosen = pick(r);
   }
   const iso = (sec: number) => new Date(Math.round(sec * 1000)).toISOString();
