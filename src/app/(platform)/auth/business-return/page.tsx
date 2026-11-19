@@ -20,7 +20,9 @@ import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-sto
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
-import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { collectionVisitorStrict, rememberPersonalCollection } from "@/lib/business-collections/load.server";
+
+const COLLECTION_ENTRY_URL = "https://coffee.audiolad.ru/collection";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -57,8 +59,6 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
       userId: user.id,
       email: user.email,
     });
-    // Explicit registration/sign-in handoff from «Подключить». Preview/listen never reaches here.
-    try { await rememberPersonalCollection(); } catch { /* trial already issued; cabinet can retry later */ }
   } catch {
     return (
       <main className="mx-auto min-h-screen max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 py-10 text-[var(--biz-text,#25135c)]">
@@ -72,6 +72,15 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
       </main>
     );
   }
+
+  // t1616u: a personal-link visitor (cookie in this browser or an account bound to a collection)
+  // continues only bound to a live collection with a free place. A full, revoked or unknown link
+  // goes to the calm entry screen and never reaches onboarding with the whole catalog.
+  let collectionHandoff = false;
+  try {
+    if (await collectionVisitorStrict(user.id)) collectionHandoff = !await rememberPersonalCollection();
+  } catch { collectionHandoff = true; }
+  if (collectionHandoff) redirect(COLLECTION_ENTRY_URL);
 
   let needsVenue = false;
   try {

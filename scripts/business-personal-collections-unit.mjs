@@ -141,5 +141,9 @@ console.log('personal-collections: PASS – ordinary app limited to the collecti
 {
   const ws = readFileSync(new URL('../src/lib/business-workspace/load.server.ts', import.meta.url), 'utf8');
   assert.match(ws, /business_personal_collection_accounts"\)\.select\("collection_id"\)\.in\("user_id", ownerIds\)/);
-  assert.match(ws, /if \(bound.error \|\| !bound.data \|\| bound.data.length === 0\) return false;/);
+  assert.match(ws, /if \(bound.error\) throw new Error\("collection_venue_owner_unavailable"\);/, 'unknown collection status fails closed');
+  const ret = readFileSync(new URL('../src/app/(platform)/auth/business-return/page.tsx', import.meta.url), 'utf8');
+  assert.match(ret, /if \(await collectionVisitorStrict\(user.id\)\) collectionHandoff = !await rememberPersonalCollection\(\);\s*\} catch \{ collectionHandoff = true; \}\s*if \(collectionHandoff\) redirect\(COLLECTION_ENTRY_URL\);/, 'a full or dead link never reaches onboarding');
+  const home = readFileSync(new URL('../src/components/business-app/BusinessHomePage.tsx', import.meta.url), 'utf8');
+  assert.match(home, /\{quiet \? null : \(\s*<details className="mt-4">/, 'quick connect hidden in quiet');
 }

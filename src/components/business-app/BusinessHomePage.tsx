@@ -175,12 +175,14 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
           >
             {quiet ? "Создать заведение" : "Начать подключение"}
           </Link>
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-medium text-[var(--biz-text-muted)]">
-              Быстрое подключение без вопросов
-            </summary>
-            <BusinessDomainBootstrapForm />
-          </details>
+          {quiet ? null : (
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm font-medium text-[var(--biz-text-muted)]">
+                Быстрое подключение без вопросов
+              </summary>
+              <BusinessDomainBootstrapForm />
+            </details>
+          )}
         </section>
       </div>
     );
