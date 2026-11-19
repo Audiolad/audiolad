@@ -69,7 +69,7 @@ export async function loadOrganizationLegalIdentity(db: Db, organizationId: stri
 
 /** Сведения ФНС перед выдачей сертификата обновляются, если последней проверке больше суток. */
 const REGISTRY_FRESH_MS = 24 * 60 * 60 * 1000;
-/** Если реестр недоступен, сведения не старше 7 дней ещё годятся, старше – сертификат не выдаётся. */
+/** Для уже выданного сертификата при недоступном реестре сведения не старше 7 дней ещё годятся. */
 const REGISTRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 type RefreshedIdentity =
@@ -81,11 +81,13 @@ async function refreshOrganizationLegalIdentity(
   organizationId: string,
   identity: LegalIdentity,
   now: Date,
+  /** Новый сертификат: сведения ФНС запрашиваются всегда, без них выдача откладывается (п. 3.3 оферты). */
+  strict: boolean,
 ): Promise<RefreshedIdentity> {
   if (identity.inactiveAt) return { ok: false, missing: "inn_inactive", identity };
   const checked = identity.checkedAt ? Date.parse(identity.checkedAt) : Number.NaN;
   const age = Number.isFinite(checked) ? now.getTime() - checked : Number.POSITIVE_INFINITY;
-  if (age < REGISTRY_FRESH_MS) return { ok: true, identity };
+  if (!strict && age < REGISTRY_FRESH_MS) return { ok: true, identity };
 
   const lookup = await lookupBusinessRegistry(identity.inn);
   if (lookup.ok && lookup.identity.inn === identity.inn && lookup.identity.kind === identity.kind) {
@@ -108,7 +110,7 @@ async function refreshOrganizationLegalIdentity(
     };
   }
   if (!lookup.ok && lookup.error === "registry_unavailable") {
-    return age < REGISTRY_GRACE_MS ? { ok: true, identity } : { ok: false, missing: "registry", identity };
+    return !strict && age < REGISTRY_GRACE_MS ? { ok: true, identity } : { ok: false, missing: "registry", identity };
   }
   // Прекратил деятельность, не найден или сменил вид: отмечаем, пока владелец не введёт действующий ИНН.
   const inactiveAt = now.toISOString();
@@ -161,7 +163,10 @@ async function liveAccess(db: Db, location: LocationRow, now: Date): Promise<Liv
   return {
     active: Boolean(period.end),
     kind: clock === "gift" ? "gift" : "subscription",
-    start: continuousAccessStart(period.start, access.grant, now),
+    start: continuousAccessStart(
+      [...access.paidPeriods, ...(access.grant ? [{ start: access.grant.startsAt, end: access.grant.endsAt }] : [])],
+      now,
+    ),
     end: period.end,
     ownerId: access.ownerId,
   };
@@ -201,10 +206,35 @@ export async function ensureVenueCertificate(locationId: string, now: Date = new
   const row = location as LocationRow;
   const venue = venueOf(row);
   const stored = await loadOrganizationLegalIdentity(db, row.organization_id);
-  const refreshed = stored ? await refreshOrganizationLegalIdentity(db, row.organization_id, stored, now) : null;
-  const identity = refreshed?.ok ? refreshed.identity : null;
   const access = await liveAccess(db, row, now);
   const acceptedAt = await currentEditionAcceptedAt(db, access.ownerId);
+  const { data: currentCert, error: currentError } = await db
+    .from("business_venue_certificates")
+    .select("snapshot_hash")
+    .eq("location_id", row.id)
+    .is("superseded_at", null)
+    .is("revoked_at", null)
+    .maybeSingle();
+  if (currentError) throw new Error("certificate_unavailable");
+
+  const snapshotOf = (who: LegalIdentity): CertificateSnapshot | null =>
+    venue.address && acceptedAt && access.active && access.end && access.kind
+      ? {
+          v: 1,
+          venueName: venue.name,
+          venueAddress: venue.address,
+          licensee: { kind: who.kind, name: who.name, fullName: who.fullName, inn: who.inn, ogrn: who.ogrn },
+          accountCode: businessAccountCode(row.organization_id),
+          period: { kind: access.kind, start: access.start, end: access.end },
+          offer: { version: BUSINESS_OFFER_EDITION.version, label: BUSINESS_OFFER_EDITION.label, acceptedAt },
+        }
+      : null;
+  // Тот же снимок, что у действующего сертификата, – номер не меняется, хватает суточной проверки ФНС.
+  // Новый сертификат – только по сведениям ФНС, полученным сейчас.
+  const draft = stored ? snapshotOf(stored) : null;
+  const unchanged = Boolean(draft && currentCert && str(currentCert.snapshot_hash) === certificateSnapshotHash(draft));
+  const refreshed = stored ? await refreshOrganizationLegalIdentity(db, row.organization_id, stored, now, !unchanged) : null;
+  const identity = refreshed?.ok ? refreshed.identity : null;
 
   const missing: CertificateMissing[] = [];
   if (!stored) missing.push("inn");
@@ -212,19 +242,11 @@ export async function ensureVenueCertificate(locationId: string, now: Date = new
   if (!venue.address) missing.push("address");
   if (!acceptedAt) missing.push("offer");
   if (!access.active || !access.end || !access.kind) missing.push("access");
-  if (missing.length || !identity || !venue.address || !acceptedAt || !access.end || !access.kind) {
+  const snapshot = identity ? snapshotOf(identity) : null;
+  if (missing.length || !snapshot || !acceptedAt || !access.end || !access.kind) {
     return { kind: "missing", missing, identity: stored, venueName: venue.name, venueAddressLine: venue.address };
   }
 
-  const snapshot: CertificateSnapshot = {
-    v: 1,
-    venueName: venue.name,
-    venueAddress: venue.address,
-    licensee: { kind: identity.kind, name: identity.name, fullName: identity.fullName, inn: identity.inn, ogrn: identity.ogrn },
-    accountCode: businessAccountCode(row.organization_id),
-    period: { kind: access.kind, start: access.start, end: access.end },
-    offer: { version: BUSINESS_OFFER_EDITION.version, label: BUSINESS_OFFER_EDITION.label, acceptedAt },
-  };
   const { data: issued, error: issueError } = await db.rpc("issue_business_venue_certificate", {
     p_location_id: row.id,
     p_organization_id: row.organization_id,
@@ -236,7 +258,13 @@ export async function ensureVenueCertificate(locationId: string, now: Date = new
     p_offer_version: BUSINESS_OFFER_EDITION.version,
     p_offer_accepted_at: acceptedAt,
   });
-  if (issueError) throw new Error("certificate_unavailable");
+  if (issueError) {
+    // Отозванный сертификат заново не выдаётся, пока сервис не снимет запрет.
+    if (/certificate_revoked/.test(issueError.message ?? "")) {
+      return { kind: "missing", missing: ["revoked"], identity: stored, venueName: venue.name, venueAddressLine: venue.address };
+    }
+    throw new Error("certificate_unavailable");
+  }
   const out = (Array.isArray(issued) ? issued[0] : issued) as { number?: unknown; issued_at?: unknown } | null;
   const number = str(out?.number);
   const issuedAt = str(out?.issued_at);

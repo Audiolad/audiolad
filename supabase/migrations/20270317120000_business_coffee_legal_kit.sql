@@ -129,6 +129,15 @@ BEGIN
     RAISE EXCEPTION 'certificate_location_unknown' USING ERRCODE = '22023';
   END IF;
 
+  -- A revoked certificate is never silently replaced: the latest certificate of the point being revoked
+  -- blocks new issues until the service clears it (revoked_at back to NULL with Sergey's decision).
+  IF EXISTS (
+    SELECT 1 FROM public.business_venue_certificates c
+    WHERE c.location_id = p_location_id AND c.revoked_at IS NOT NULL AND c.superseded_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'certificate_revoked' USING ERRCODE = '22023';
+  END IF;
+
   SELECT * INTO v_current FROM public.business_venue_certificates c
     WHERE c.location_id = p_location_id AND c.superseded_at IS NULL AND c.revoked_at IS NULL;
 

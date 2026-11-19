@@ -25,7 +25,7 @@ export type CertificateSnapshot = {
   offer: { version: string; label: string; acceptedAt: string };
 };
 
-export type CertificateMissing = "inn" | "inn_inactive" | "registry" | "address" | "offer" | "access";
+export type CertificateMissing = "inn" | "inn_inactive" | "registry" | "address" | "offer" | "access" | "revoked";
 
 /** «7F3A-21C9»: первые 8 знаков номера организации – номер учётной записи в сертификате. */
 export function businessAccountCode(organizationId: string): string {
@@ -169,22 +169,29 @@ export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, strin
   inn: "Укажите ИНН организации или ИП.",
   inn_inactive: "По данным ФНС организация или ИП с этим ИНН прекратили деятельность. Укажите действующий ИНН.",
   registry: "Не удалось проверить ИНН в реестре ФНС. Откройте страницу позже.",
+  revoked: "Сертификат этой точки отозван. Напишите нам: 1@audiolad.ru.",
   address: "Укажите адрес точки.",
   offer: "Примите новую редакцию договора-оферты.",
   access: "Сертификат выдаётся, пока идёт подарочный или оплаченный период.",
 };
 
 /**
- * Начало непрерывного доступа, который идёт сейчас. Оплата во время подарочной недели начинается после неё,
- * поэтому начало оплаченного периода может быть в будущем – тогда доступ идёт с начала подарочной недели.
+ * Начало непрерывного доступа, который идёт сейчас: окно, покрывающее текущий момент, и все примыкающие к нему
+ * более ранние окна (подарочная неделя и оплаченные периоды; продление начинается в конце предыдущего).
  */
-export function continuousAccessStart(
-  periodStart: string | null,
-  grant: { startsAt: string; endsAt: string } | null,
-  now: Date,
-): string | null {
+export function continuousAccessStart(windows: readonly { start: string; end: string }[], now: Date): string | null {
   const t = now.getTime();
-  if (periodStart && Date.parse(periodStart) <= t) return periodStart;
-  if (grant && Date.parse(grant.startsAt) <= t && Date.parse(grant.endsAt) > t) return grant.startsAt;
-  return null;
+  const spans = windows
+    .map((w) => ({ start: Date.parse(w.start), end: Date.parse(w.end), iso: w.start }))
+    .filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end) && w.end > w.start);
+  const covering = spans.filter((w) => w.start <= t && w.end > t).sort((a, b) => a.start - b.start)[0];
+  if (!covering) return null;
+  let start = covering;
+  for (let guard = 0; guard < spans.length; guard += 1) {
+    // Стык до минуты считается непрерывным.
+    const prev = spans.filter((w) => w.start < start.start && w.end >= start.start - 60_000).sort((a, b) => a.start - b.start)[0];
+    if (!prev) break;
+    start = prev;
+  }
+  return new Date(start.start).toISOString() === start.iso ? start.iso : new Date(start.start).toISOString();
 }
