@@ -7,8 +7,14 @@
  * PM2: pm2 start deploy/evidence-seal.ecosystem.config.cjs (after migration 20270330120000)
  */
 import { createClient } from "@supabase/supabase-js";
+// @next/env is CommonJS: a named ESM import fails at runtime in this .mts entrypoint.
+import nextEnv from "@next/env";
+
+const { loadEnvConfig } = nextEnv;
 
 async function main() {
+  // PM2 only sets NODE_ENV; secrets come from .env.production in cwd, same as other workers.
+  loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production", { info() {}, error() {} });
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("evidence_seal_environment_missing");
   }
