@@ -87,12 +87,15 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
   const check = isSample ? null : await loadCertificateCheck(number);
   if (!isSample && !check) notFound();
   const current = check && check.status === "superseded" ? await currentOf(check) : null;
+  const headingNumber = isSample
+    ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number
+    : certificateDisplayNumber(check.number);
 
   return (
     <BusinessLegalShell
       kicker="Проверка сертификата"
       breadcrumb="Проверка сертификата"
-      title={`Сертификат ${isSample ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number : certificateDisplayNumber(number)}`}
+      title={`Сертификат ${headingNumber}`}
       lead="Страница открывается по QR-коду из сертификата и показывает, подлинный ли документ и действует ли он сегодня."
     >
       {isSample || !check ? (
