@@ -1,4 +1,4 @@
-// Stage 1C (Sergey 04.11.2026): the договор-оферта («АудиоЛад Кофейня», edition 4, t1595u) is the one document an owner
+// Stage 1C (Sergey 04.11.2026): the договор-оферта («АудиоЛад Кофейня», edition 5, t1620u / t1621u) is the one document an owner
 // accepts. The file, the embedded copy, the hash and the SQL seed must be the same edition.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -21,7 +21,7 @@ import {
 } from "../src/lib/business/offer";
 import { BUSINESS_GIFT_DAYS, BUSINESS_PAID_PERIOD_DAYS } from "../src/lib/business/plan";
 
-// Edition 4 («АудиоЛад Кофейня», t1595u) names MusicGPT, the lawyer and the track passports on purpose.
+// Edition 5 («АудиоЛад Кофейня», t1620u / t1621u) names MusicGPT, the lawyer and the track passports on purpose.
 function assertCleanRussian(label: string, text: string) {
   const stripped = text.replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, " ").replace(/MusicGPT|QR|PDF|audiolad\.ru\/b\/coffee\/legal\/sertifikat|audiolad\.ru/g, " ");
   const latin = stripped.match(/[^\s]*[A-Za-z][^\s]*/g);
@@ -44,12 +44,12 @@ assert.equal(BUSINESS_OFFER_SOURCE.sha256, sha, "offer hash is stale");
 assert.equal(BUSINESS_OFFER_EDITION.contentHash, sha, "BUSINESS_OFFER_EDITION hash is stale: new text = new edition");
 assert.equal(BUSINESS_OFFER_SOURCE.version, BUSINESS_OFFER_EDITION.version);
 // Every published edition keeps its own additive seed row; the accepted text is never edited in place.
-const migration = readFileSync("supabase/migrations/20270331120000_business_offer_edition_4.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20270403120000_business_offer_edition_5.sql", "utf8");
 assert.match(migration, new RegExp(`'${BUSINESS_OFFER_EDITION.version.replace(/\./g, "\\.")}',\\s*'${sha}'`), "SQL seed must carry the same edition");
 assert.match(migration, /ON CONFLICT \(document_key, document_version\) DO NOTHING/);
-assert.doesNotMatch(migration.replace(/^--.*$/gm, ""), /^\s*(DELETE|DROP)\b/im, "edition 4 migration is additive only");
-assert.equal(BUSINESS_OFFER_EDITION.version, "offer-v4-2026-11-19");
-assert.equal(BUSINESS_OFFER_EDITION.label, "Редакция 4 от 19.11.2026");
+assert.doesNotMatch(migration.replace(/^--.*$/gm, ""), /^\s*(DELETE|DROP)\b/im, "edition 5 migration is additive only");
+assert.equal(BUSINESS_OFFER_EDITION.version, "offer-v5-2026-11-19");
+assert.equal(BUSINESS_OFFER_EDITION.label, "Редакция 5 от 19.11.2026");
 {
   // Editions 1 and 2 stay published and their accepted texts stay readable, byte for byte.
   const v1Sql = readFileSync("supabase/migrations/20270218120000_business_offer_editions.sql", "utf8");
@@ -67,11 +67,17 @@ assert.equal(BUSINESS_OFFER_EDITION.label, "Редакция 4 от 19.11.2026")
   assert.match(v3Sql, new RegExp(`'offer-v3-2026-11-18',\\s*'${v3Hash}'`));
   const v3 = readFileSync("docs/business/public/archive/business-offer-v3-2026-11-18.md", "utf8");
   assert.equal(createHash("sha256").update(v3, "utf8").digest("hex"), v3Hash, "archived edition 3 is verbatim");
+
+  const v4Sql = readFileSync("supabase/migrations/20270331120000_business_offer_edition_4.sql", "utf8");
+  const v4Hash = "b8883f9f80c98e9709f2ef364c91e3c8255c373fcc90aab9eb3f1b3e0881bc8c";
+  assert.match(v4Sql, new RegExp(`'offer-v4-2026-11-19',\\s*'${v4Hash}'`));
+  const v4 = readFileSync("docs/business/public/archive/business-offer-v4-2026-11-19.md", "utf8");
+  assert.equal(createHash("sha256").update(v4, "utf8").digest("hex"), v4Hash, "archived edition 4 is verbatim");
 }
 assert.match(BUSINESS_OFFER_EDITION.label, /^Редакция \d+ от \d{2}\.\d{2}\.\d{4}$/);
 assert.equal(BUSINESS_OFFER_HREF, "/documents/business-offer");
 
-// 2. Required content, wording rules (edition 4: offer + annexes 1–4 in one accepted text).
+// 2. Required content, wording rules (edition 5: offer + annexes 1–4 in one accepted text).
 const text = file;
 assert.match(text, /^# Договор-оферта «АудиоЛад Кофейня»\n/);
 for (const n of [1, 2, 3, 4]) assert.match(text, new RegExp(`^## Приложение ${n}\\. `, "m"), `annex ${n} is part of the accepted text`);
@@ -82,11 +88,11 @@ assert.doesNotMatch(text, /\d+\s*₽/, "no fixed price in the offer text");
   const description = pageSrc.match(/const DESCRIPTION = "([^"]+)"/)?.[1] ?? "";
   for (const [label, t] of [["summary", BUSINESS_OFFER_SUMMARY], ["description", description]] as const) {
     assert.doesNotMatch(t, /₽|\d{3,}/, `${label}: no fixed price`);
-    assert.match(t, /Стоимость одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты\./, label);
+    assert.match(t, /Стоимость доступа к сервису фоновой музыки АудиоЛад для одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты\./, label);
     assert.doesNotMatch(t, /—/, label);
   }
 }
-assert.match(text, new RegExp(`Стоимость доступа к одному заведению на ${BUSINESS_PAID_PERIOD_DAYS} дней устанавливается действующими тарифами Сервиса`));
+assert.match(text, new RegExp(`Стоимость доступа к сервису фоновой музыки АудиоЛад для одного заведения на ${BUSINESS_PAID_PERIOD_DAYS} дней устанавливается действующими тарифами Сервиса`));
 assert.match(text, /Действующий тариф указывается в личном кабинете до оплаты/);
 assert.match(text, /Изменённая стоимость применяется со следующей оплаты, уже оплаченные периоды не пересчитываются/);
 assert.match(text, new RegExp(`${BUSINESS_GIFT_DAYS} дней`));
@@ -94,8 +100,8 @@ assert.match(text, /начинаются с окончания текущего 
 assert.match(text, /завершается вместе с окончанием подарочного или оплаченного периода/);
 assert.match(text, /## \d+\. Возврат денежных средств/);
 // Sergey 19.11.2026 (t1591u): the gift week counts as active access on the claim date; a started defence is finished.
-assert.match(text, /на день получения претензии или иска по этому заведению действует доступ – оплаченный или подарочный период \(п\. 5\.6 приложения 3\)/);
-assert.match(text, /по этому заведению действует доступ – оплаченный или подарочный период \(раздел 4 оферты\), и Клиент уведомил/);
+assert.match(text, /на день получения претензии или иска доступ к сервису фоновой музыки АудиоЛад для этого заведения действует – оплаченный или подарочный период \(п\. 5\.6 приложения 3\)/);
+assert.match(text, /для этого заведения действует доступ к сервису фоновой музыки АудиоЛад – оплаченный или подарочный период \(раздел 4 оферты\), и Клиент уведомил/);
 assert.match(text, /5\.7\. \*\*Начатая защита\.\*\* Если защита начата, когда Клиент был действующим клиентом по заведению, АудиоЛад доводит этот спор до конца/);
 assert.doesNotMatch(text, /действует оплаченный доступ/, "no «оплаченный доступ only» condition left");
 // The registry search gives name and ОГРН/ОГРНИП, not the legal address: the offer does not promise it.
@@ -115,7 +121,7 @@ assert.ok(text.includes("Индивидуальный предпринимате
 for (const part of CLIENT_DOCUMENT_REQUISITES.match(/\d{12,15}/g) ?? []) assert.ok(text.includes(part), `requisite ${part}`);
 
 // 4. The PDF/DOCX for print are published next to the text.
-for (const f of ["public/b-legal/dogovor-oferta-audiolad-kofeynya-red4.pdf", "public/b-legal/dogovor-oferta-audiolad-kofeynya-red4.docx"]) {
+for (const f of ["public/b-legal/dogovor-oferta-audiolad-kofeynya-red5.pdf", "public/b-legal/dogovor-oferta-audiolad-kofeynya-red5.docx"]) {
   assert.ok(readFileSync(f).length > 10_000, f);
 }
 
@@ -127,7 +133,7 @@ assert.match(html, new RegExp(`data-document-version="${BUSINESS_OFFER_EDITION.v
 assert.ok(html.includes(BUSINESS_OFFER_EDITION.label));
 assert.equal((html.match(/<h1/g) ?? []).length, 1, "one page title");
 assert.ok(html.includes(BUSINESS_OFFER_TITLE));
-assert.match(html, /href="https:\/\/audiolad\.ru\/b-legal\/dogovor-oferta-audiolad-kofeynya-red4\.pdf"/);
+assert.match(html, /href="https:\/\/audiolad\.ru\/b-legal\/dogovor-oferta-audiolad-kofeynya-red5\.pdf"/);
 assert.doesNotMatch(html.replace(/href="https:\/\/audiolad\.ru\/[^"]*"/g, ""), /href="https?:/, "no third-party links on the offer page");
 assert.doesNotMatch(html, /—/);
 const visible = html.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ");

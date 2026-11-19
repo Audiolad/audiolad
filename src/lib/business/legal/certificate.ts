@@ -9,7 +9,7 @@ import { BUSINESS_LEGAL_OPERATOR } from "./section";
  * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер>.
  */
 
-export const BUSINESS_CERTIFICATE_CATALOG = "каталог «АудиоЛад Кофейня»";
+export const BUSINESS_CERTIFICATE_CATALOG = "закрытый каталог «АудиоЛад Кофейня»";
 export const BUSINESS_CERTIFICATE_GENERATORS = "MusicGPT и другие сервисы генерации музыки";
 export const BUSINESS_CERTIFICATE_SITE = "https://audiolad.ru";
 
@@ -101,7 +101,7 @@ export function periodLine(s: CertificateSnapshot): string {
   return `${start ? `с ${start} ` : ""}по ${end}, ${periodKindLabel(s.period.kind)}`;
 }
 
-export const BUSINESS_CERTIFICATE_LICENSOR_LINE = `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip} – изготовитель и правообладатель фонограмм каталога`;
+export const BUSINESS_CERTIFICATE_LICENSOR_LINE = `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip} – изготовитель и правообладатель фонограмм закрытого каталога «АудиоЛад Кофейня»`;
 
 export function basisLine(s: CertificateSnapshot): string {
   return `Договор-оферта «АудиоЛад Кофейня», ${s.offer.label.toLowerCase()}, принята ${moscowDate(s.offer.acceptedAt) ?? ""}`;
@@ -118,7 +118,7 @@ export function certificateRows(input: { number: string; issuedAt: string; snaps
     ["Адрес заведения", s.venueAddress],
     ["Лицензиат", s.licensee.name],
     [`ИНН / ${ogrnLabel(s.licensee.kind)}`, `${s.licensee.inn} / ${s.licensee.ogrn}`],
-    ["Срок доступа", periodLine(s)],
+    ["Срок доступа к сервису", periodLine(s)],
     ["Каталог", BUSINESS_CERTIFICATE_CATALOG],
     ["Создание музыки", BUSINESS_CERTIFICATE_GENERATORS],
     ["Учётная запись", `№ ${s.accountCode}`],
@@ -155,7 +155,7 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
     case "valid":
       return "Действует";
     case "expired":
-      return "Не действует: доступ к заведению закончился";
+      return "Не действует: закончился доступ к сервису фоновой музыки АудиоЛад для этого заведения";
     case "outdated":
       return "Не действует: данные заведения или лицензиата изменились";
     case "superseded":

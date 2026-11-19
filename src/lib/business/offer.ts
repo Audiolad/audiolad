@@ -5,7 +5,7 @@
  * cabinet («Принять условия») before the first payment. One acceptance per account and
  * edition covers every point of that owner; the same edition is never asked twice.
  * Version and hash must match a seed row of business_offer_editions (edition 1:
- * 20270218120000_business_offer_editions.sql, edition 2: 20270303120000_business_offer_edition_2.sql, edition 4: 20270331120000_business_offer_edition_4.sql).
+ * 20270218120000_business_offer_editions.sql, edition 2: 20270303120000_business_offer_edition_2.sql, edition 4: 20270331120000_business_offer_edition_4.sql, edition 5: 20270403120000_business_offer_edition_5.sql).
  * A new text needs a new
  * edition (version + hash + seed row); the owner then accepts it once more.
  *
@@ -24,7 +24,7 @@ export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_
 export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Кофейня»";
 
 export const BUSINESS_OFFER_SUMMARY =
-  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат, лицензия на музыку, сертификат заведения и защита заведения. Стоимость одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Приложения 1–4 – часть договора.";
+  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат, лицензия на музыку, сертификат заведения и защита заведения. Стоимость доступа к сервису фоновой музыки АудиоЛад для одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Приложения 1–4 – часть договора.";
 
 export const BUSINESS_ONBOARDING_HREF = "/onboarding";
 
@@ -43,15 +43,15 @@ export type BusinessOfferDocumentEdition = {
 
 /**
  * Current edition of the offer text (docs/business/public/business-offer.md): «АудиоЛад Кофейня»,
- * edition 4 of 19.11.2026 with annexes 1–4 in the same file (t1595u / t1597u). Seed:
- * 20270331120000_business_offer_edition_4.sql. Edition 3 text:
- * archive/business-offer-v3-2026-11-18.md (seed 20270317120000_business_coffee_legal_kit.sql).
+ * edition 5 of 19.11.2026 with annexes 1–4 in the same file (t1620u / t1621u). Seed:
+ * 20270403120000_business_offer_edition_5.sql. Edition 4 text:
+ * archive/business-offer-v4-2026-11-19.md (seed 20270331120000_business_offer_edition_4.sql).
  */
 export const BUSINESS_OFFER_EDITION: BusinessOfferDocumentEdition = {
   documentKey: BUSINESS_OFFER_DOCUMENT_ID,
-  version: "offer-v4-2026-11-19",
-  contentHash: "b8883f9f80c98e9709f2ef364c91e3c8255c373fcc90aab9eb3f1b3e0881bc8c",
-  label: "Редакция 4 от 19.11.2026",
+  version: "offer-v5-2026-11-19",
+  contentHash: "939773fb3900534b3179ffd53320628920280b27806b3dcb75aeac35bb947b2e",
+  label: "Редакция 5 от 19.11.2026",
 };
 
 export type BusinessOfferEdition = {
@@ -62,8 +62,8 @@ export type BusinessOfferEdition = {
 
 const CURRENT_EDITION: BusinessOfferEdition = {
   documentKey: "b2b-terms",
-  version: "r8-2026-10-18",
-  contentHash: "0fbbfe610f344920a084e58b5987cce5f4d7033528abc8760aac07b89de7078a",
+  version: "r9-2026-11-19",
+  contentHash: "22508fe0609bc9278b2513b36b6c9a1f24789776524bb4b80f4613005861dc29",
 };
 
 const LEGACY_EDITION: BusinessOfferEdition = {

@@ -123,7 +123,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
               ["Адрес заведения", check.snapshot.venueAddress],
               ["Лицензиат", check.snapshot.licensee.name],
               [`ИНН / ${ogrnLabel(check.snapshot.licensee.kind)}`, `${check.snapshot.licensee.inn} / ${check.snapshot.licensee.ogrn}`],
-              ["Срок доступа в сертификате", periodLine(check.snapshot)],
+              ["Срок доступа к сервису в сертификате", periodLine(check.snapshot)],
               ["Каталог", BUSINESS_CERTIFICATE_CATALOG],
               ["Создание музыки", BUSINESS_CERTIFICATE_GENERATORS],
               ["Лицензиар", `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip}`],

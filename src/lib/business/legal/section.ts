@@ -12,7 +12,7 @@ export const BUSINESS_LEGAL_HREF = "/b/coffee/legal";
 export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/coffee/legal/prava";
 export const BUSINESS_LEGAL_PROTECTION_HREF = "/b/coffee/legal/zashchita";
 export const BUSINESS_LEGAL_CERTIFICATE_HREF = "/b/coffee/legal/sertifikat";
-/** Договор-оферта «АудиоЛад Кофейня», ред. 4, с приложениями 1–4 (t1595u). */
+/** Договор-оферта «АудиоЛад Кофейня», ред. 5, с приложениями 1–4 (t1620u / t1621u). */
 export const BUSINESS_LEGAL_OFFER_HREF = "/b/coffee/legal/oferta";
 
 /** Сайт раздела: кабинет живёт на coffee./business., раздел – на audiolad.ru. */
@@ -20,9 +20,9 @@ export const BUSINESS_LEGAL_SITE = "https://audiolad.ru";
 export function businessLegalAbsoluteUrl(path: string): string {
   return `${BUSINESS_LEGAL_SITE}${path}`;
 }
-/** Файлы ред. 4 (тот же текст, что docs/business/public/business-offer.md). Ред. 3 остаётся по прежним путям. */
-export const BUSINESS_LEGAL_OFFER_PDF_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red4.pdf";
-export const BUSINESS_LEGAL_OFFER_DOCX_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red4.docx";
+/** Файлы ред. 5 (тот же текст, что docs/business/public/business-offer.md). Ред. 4 и ред. 3 остаются по прежним путям. */
+export const BUSINESS_LEGAL_OFFER_PDF_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red5.pdf";
+export const BUSINESS_LEGAL_OFFER_DOCX_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red5.docx";
 export const BUSINESS_LEGAL_OFFER_PDF = businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_PDF_PATH);
 
 export const BUSINESS_LEGAL_PATHS = [

@@ -104,8 +104,8 @@ assert.equal(rows["Выдан"], "19.11.2026");
 assert.equal(rows["Действует по"], "26.11.2026");
 assert.equal(rows["Лицензиат"], "ООО «КОФЕЙНЯ ПРИМЕР»");
 assert.equal(rows["ИНН / ОГРН"], "7707083893 / 1027700132195");
-assert.equal(rows["Срок доступа"], "с 19.11.2026 по 26.11.2026, подарочный период");
-assert.equal(rows["Каталог"], "каталог «АудиоЛад Кофейня»");
+assert.equal(rows["Срок доступа к сервису"], "с 19.11.2026 по 26.11.2026, подарочный период");
+assert.equal(rows["Каталог"], "закрытый каталог «АудиоЛад Кофейня»");
 assert.equal(rows["Создание музыки"], "MusicGPT и другие сервисы генерации музыки");
 assert.match(rows["Лицензиар"], /ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237/);
 assert.equal(rows["Основание"], "Договор-оферта «АудиоЛад Кофейня», редакция 3 от 18.11.2026, принята 19.11.2026");
@@ -126,7 +126,7 @@ assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: tr
 assert.equal(rows["Заведение"], snap.venueName);
 assert.equal(rows["Адрес заведения"], snap.venueAddress);
 assert.ok(!("Точка" in rows) && !("Адрес точки" in rows), "подписи полей – заведение, не точка");
-assert.equal(certificateStatusLabel("expired"), "Не действует: доступ к заведению закончился");
+assert.equal(certificateStatusLabel("expired"), "Не действует: закончился доступ к сервису фоновой музыки АудиоЛад для этого заведения");
 assert.equal(certificateStatusLabel("outdated"), "Не действует: данные заведения или лицензиата изменились");
 assert.equal(certificateStatusLabel("valid"), "Действует");
 
