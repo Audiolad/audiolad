@@ -4,15 +4,20 @@ import type { Metadata } from "next";
 
 import SimpleMarkdown from "@/components/legal/SimpleMarkdown";
 import { BUSINESS_OFFER_SOURCE } from "@/lib/business-app/business-offer-content";
-import { businessOfferAnnexes } from "@/lib/business-app/business-offer-annexes";
-import { CLIENT_DOCUMENT_EDITION_LABEL, CLIENT_DOCUMENT_REQUISITES } from "@/lib/business-app/client-documents";
+import { CLIENT_DOCUMENT_REQUISITES } from "@/lib/business-app/client-documents";
+import {
+  BUSINESS_LEGAL_HREF,
+  BUSINESS_LEGAL_OFFER_DOCX_PATH,
+  BUSINESS_LEGAL_OFFER_PDF,
+  businessLegalAbsoluteUrl,
+} from "@/lib/business/legal/section";
 import { getHostnameFromHeaders } from "@/lib/business-app/host";
 import { buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE } from "@/lib/business/offer";
 
 export const dynamic = "force-dynamic";
 
-const DESCRIPTION = "Договор-оферта сервиса «АудиоЛад Бизнес»: 7 дней в подарок, разовые оплаты, продление и возврат. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты.";
+const DESCRIPTION = "Договор-оферта «АудиоЛад Кофейня» с приложениями: 7 дней в подарок, оплата, продление и возврат, лицензия, сертификат точки и защита заведения. Стоимость одной точки на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${BUSINESS_OFFER_TITLE} – ${BUSINESS_OFFER_EDITION.label}`;
@@ -29,7 +34,6 @@ function bodyWithoutTitle(markdown: string): string {
 }
 
 export default function BusinessOfferPage() {
-  const annexes = businessOfferAnnexes();
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <article
@@ -50,19 +54,22 @@ export default function BusinessOfferPage() {
           <SimpleMarkdown source={bodyWithoutTitle(BUSINESS_OFFER_SOURCE.markdown)} />
         </div>
       </article>
-      <section className="business-app-card" aria-labelledby="business-offer-annexes" data-testid="business-offer-annexes">
-        <h2 id="business-offer-annexes" className="text-lg font-bold text-[var(--biz-text)]">Приложения к договору</h2>
-        <ol className="mt-3 space-y-2 text-sm leading-6">
-          {annexes.map((annex) => (
-            <li key={annex.id} data-testid={`business-offer-annex-${annex.id}`}>
-              Приложение {annex.number} –{" "}
-              <Link href={annex.href} className="font-semibold text-[var(--biz-accent)] underline underline-offset-2">
-                «{annex.title}»
-              </Link>
-              . {CLIENT_DOCUMENT_EDITION_LABEL}.
-            </li>
-          ))}
-        </ol>
+      <section className="business-app-card" aria-labelledby="business-offer-files" data-testid="business-offer-files">
+        <h2 id="business-offer-files" className="text-lg font-bold text-[var(--biz-text)]">Для печати</h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">
+          Тот же текст с приложениями 1–4. Подписывать не нужно: договор принимается в кабинете.
+        </p>
+        <p className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
+          <a target="_blank" rel="noopener noreferrer" href={BUSINESS_LEGAL_OFFER_PDF} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-pdf">
+            Скачать PDF
+          </a>
+          <a target="_blank" rel="noopener noreferrer" href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_DOCX_PATH)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-docx">
+            Скачать DOCX
+          </a>
+          <a target="_blank" rel="noopener noreferrer" href={businessLegalAbsoluteUrl(BUSINESS_LEGAL_HREF)} className="text-[var(--biz-accent)] underline underline-offset-2" data-testid="business-offer-legal-section">
+            Правовая информация
+          </a>
+        </p>
       </section>
     </div>
   );

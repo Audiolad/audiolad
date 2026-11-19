@@ -10,6 +10,7 @@ import { businessAuthHref } from "@/lib/access-grants/paths";
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessHomeChecklist from "@/components/business-app/BusinessHomeChecklist";
 import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
+import BusinessOfferReacceptPrompt from "@/components/business-app/legal/BusinessOfferReacceptPrompt";
 import BusinessHallHome from "@/components/business-app/BusinessHallHome";
 import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointMode";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
@@ -182,6 +183,9 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
 
   const needsSurname =
     domain.status === "authenticated" && !domain.owner.lastName.trim();
+  // t1591u: a new edition of the договор-оферта – accept once, on the next visit; music is not gated.
+  const needsNewEdition =
+    domain.status === "authenticated" && domain.canPay && !domain.offerAccepted && Boolean(domain.offerNewEditionPending);
 
   return (
     <div className="mx-auto max-w-3xl" data-testid="biz-home" data-entry="person">
@@ -195,6 +199,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
       </header>
       <div className="business-app-owner-home space-y-4">
         {needsSurname ? <BusinessOwnerSurnamePrompt /> : null}
+        {needsNewEdition ? <BusinessOfferReacceptPrompt newEdition /> : null}
         <BusinessHomeChecklist steps={steps} showAccess />
       </div>
     </div>

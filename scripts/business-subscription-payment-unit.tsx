@@ -101,9 +101,9 @@ assert.doesNotMatch(graceHtml, /—/);
 // Every «Принять условия» says what is accepted, once per account, and links the document (in-app sheet, no new PWA window).
 assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
 assert.match(graceHtml, /один раз для всего аккаунта/);
-assert.match(graceHtml, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
-assert.match(graceHtml, /data-offer-version="offer-v2-2026-11-09"/);
-assert.match(graceHtml, /редакция 2 от 09\.11\.2026/);
+assert.match(graceHtml, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Кофейня»<\/a>/);
+assert.match(graceHtml, /data-offer-version="offer-v3-2026-11-18"/);
+assert.match(graceHtml, /редакция 3 от 18\.11\.2026/);
 assert.match(graceHtml, /Перед первой оплатой примите договор-оферту/);
 assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
 
@@ -198,7 +198,7 @@ assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /needsRecei
 assert.match(accepted, /data-testid="biz-home-pay-button"/);
 // Next to «Оплатить» the same offer link and edition, every time.
 assert.match(accepted, /data-testid="biz-home-terms-accepted"/);
-assert.match(accepted, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Бизнес»<\/a>/);
+assert.match(accepted, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Кофейня»<\/a>/);
 assert.ok(accepted.indexOf("biz-home-terms-accepted") < accepted.indexOf("biz-home-pay-button"), "offer link before pay");
 assert.match(accepted, /Оплатить/);
 assert.match(accepted, /Автосписания нет/);

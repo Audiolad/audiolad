@@ -47,6 +47,40 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
     postalCode: asString(location.postal_code),
   };
 
+  const { grant, paidUntil, paidPeriod, ownerFirstName, ownerLastName } = await loadLocationAccess(db, {
+    id: location.id,
+    organization_id: location.organization_id,
+  });
+
+  return presentVenueLicence({
+    publicId,
+    place,
+    now,
+    grant,
+    paidUntil,
+    paidPeriod,
+    ownerFirstName,
+    ownerLastName,
+  });
+}
+
+export type LocationAccess = {
+  ownerId: string | null;
+  grant: GrantRow | null;
+  paidUntil: string | null;
+  paidPeriod: PaidWindow | null;
+  ownerFirstName: string | null;
+  ownerLastName: string | null;
+};
+
+/**
+ * The organization owner's clock for one location: gift grant, paid-until and the paid window
+ * that ends at paid-until. Shared by the public licence card and the point certificate (t1591u).
+ */
+export async function loadLocationAccess(
+  db: Db,
+  location: { id: string; organization_id: string },
+): Promise<LocationAccess> {
   const { data: owners, error: ownerError } = await db
     .from("business_organization_members")
     .select("user_id")
@@ -94,14 +128,5 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
     }
   }
 
-  return presentVenueLicence({
-    publicId,
-    place,
-    now,
-    grant,
-    paidUntil,
-    paidPeriod,
-    ownerFirstName,
-    ownerLastName,
-  });
+  return { ownerId: ownerId ?? null, grant, paidUntil, paidPeriod, ownerFirstName, ownerLastName };
 }
