@@ -41,20 +41,6 @@ export async function loadCollectionPermission(): Promise<CollectionRow | null> 
   } catch { return null; }
 }
 
-/** Bind a browser selection to the verified account, never to an id from a URL/form.
- * Called after explicit start and at the cabinet handoff after ordinary registration.
- * The account trigger also fills empty venue assignments; gift/billing functions are never called.
- */
-export async function rememberPersonalCollection(): Promise<CollectionRow | null> {
-  const permission = await loadCollectionPermission();
-  if (!permission) return null;
-  const token = (await cookies()).get(COLLECTION_COOKIE)?.value;
-  if (!token || !COLLECTION_TOKEN.test(token)) return permission;
-  const { data: { user } } = await (await createClient()).auth.getUser();
-  if (!user) return permission;
-  return await bindPersonalCollection(permission.id, user.id) ? permission : null;
-}
-
 /**
  * Bind a collection to a verified account id (from the session or the start's own sign-in, never
  * from a URL/form). At most COLLECTION_ACCOUNT_LIMIT accounts per link: a full link binds nothing
@@ -162,4 +148,29 @@ export async function collectionVisitorStrict(userId: string | null): Promise<bo
     .select("collection_id").eq("user_id", userId).limit(1);
   if (error) throw new Error("collection_visitor_unavailable");
   return Array.isArray(data) && data.length > 0;
+}
+
+export type CollectionVenueGate = { ok: true; collectionId: string | null } | { ok: false; reason: "unavailable" | "full" | "other" };
+
+/**
+ * t1616u: before a personal-link visitor (cookie in this browser or an account bound to a
+ * collection) gets a venue or continues into the cabinet. Ordinary accounts pass untouched
+ * (collectionId null). A visitor passes only with a live collection, a free place, no venue that
+ * holds another collection, and the account bound to it, so a new venue inherits it. Lookup errors
+ * throw (callers refuse).
+ */
+export async function collectionVenueGate(userId: string): Promise<CollectionVenueGate> {
+  if (!await collectionVisitorStrict(userId)) return { ok: true, collectionId: null };
+  const permission = await loadCollectionPermission();
+  if (!permission) return { ok: false, reason: "unavailable" };
+  if ((await ownerCafeVenueCollections(userId)).some((venue) => venue.collectionId !== null && venue.collectionId !== permission.id)) {
+    return { ok: false, reason: "other" };
+  }
+  if (!await bindPersonalCollection(permission.id, userId)) return { ok: false, reason: "full" };
+  return { ok: true, collectionId: permission.id };
+}
+
+/** After the gate: every cafe venue of the account holds exactly this collection. */
+export async function collectionVenuesMatch(userId: string, collectionId: string): Promise<boolean> {
+  return (await ownerCafeVenueCollections(userId)).every((venue) => venue.collectionId === collectionId);
 }

@@ -88,11 +88,11 @@ assert.ok(start.indexOf('collection_full') < start.indexOf('handleBusinessGuestS
 const loader = source('src/lib/business-collections/load.server.ts');
 assert.match(loader, /count < COLLECTION_ACCOUNT_LIMIT/);
 assert.match(loader, /if \(!await collectionHasRoom\(collectionId, userId\)\) return false;/);
-assert.match(loader, /return await bindPersonalCollection\(permission.id, user.id\) \? permission : null;/);
+assert.doesNotMatch(loader, /rememberPersonalCollection/, "binding happens only through the gate or the start");
 assert.doesNotMatch(loader, /activateBusinessTrial|bootstrap|access_grants/);
 assert.match(source('src/lib/business-collections/model.ts'), /COLLECTION_ACCOUNT_LIMIT = 10;/);
 const layout = source('src/app/business-app/layout.tsx');
-assert.doesNotMatch(layout, /rememberPersonalCollection/, 'opening any coffee page must not bind the collection');
+assert.doesNotMatch(layout, /collectionVenueGate|bindPersonalCollection/, 'opening any coffee page must not bind the collection');
 assert.match(layout, /customerAccess\?\.mode !== "paid"/);
 assert.match(layout, /quietCollection=\{quietCollection\}/);
 assert.doesNotMatch(layout, /Ваша подборка/);
@@ -143,7 +143,11 @@ console.log('personal-collections: PASS – ordinary app limited to the collecti
   assert.match(ws, /business_personal_collection_accounts"\)\.select\("collection_id"\)\.in\("user_id", ownerIds\)/);
   assert.match(ws, /if \(bound.error\) throw new Error\("collection_venue_owner_unavailable"\);/, 'unknown collection status fails closed');
   const ret = readFileSync(new URL('../src/app/(platform)/auth/business-return/page.tsx', import.meta.url), 'utf8');
-  assert.match(ret, /if \(await collectionVisitorStrict\(user.id\)\) collectionHandoff = !await rememberPersonalCollection\(\);\s*\} catch \{ collectionHandoff = true; \}\s*if \(collectionHandoff\) redirect\(COLLECTION_ENTRY_URL\);/, 'a full or dead link never reaches onboarding');
+  assert.match(ret, /const gate = await collectionVenueGate\(user.id\);\s*collectionHandoff = !gate.ok \|\| \(gate.collectionId !== null && !await collectionVenuesMatch\(user.id, gate.collectionId\)\);\s*\} catch \{ collectionHandoff = true; \}\s*if \(collectionHandoff\) redirect\(COLLECTION_ENTRY_URL\);/, 'a full, dead or other link never reaches onboarding');
+  const actions = readFileSync(new URL('../src/app/business-app/actions.ts', import.meta.url), 'utf8');
+  assert.match(actions, /const gate = await collectionVenueGate\(user.id\);\s*if \(!gate.ok\)[\s\S]*?create_business_organization_with_location/, 'venue creation is gated for collection visitors');
+  const gateSrc = readFileSync(new URL('../src/lib/business-collections/load.server.ts', import.meta.url), 'utf8');
+  assert.match(gateSrc, /if \(!permission\) return \{ ok: false, reason: "unavailable" \};[\s\S]*reason: "other"[\s\S]*if \(!await bindPersonalCollection\(permission.id, userId\)\) return \{ ok: false, reason: "full" \};/);
   const home = readFileSync(new URL('../src/components/business-app/BusinessHomePage.tsx', import.meta.url), 'utf8');
   assert.match(home, /\{quiet \? null : \(\s*<details className="mt-4">/, 'quick connect hidden in quiet');
 }

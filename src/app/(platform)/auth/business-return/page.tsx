@@ -20,7 +20,7 @@ import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-sto
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
-import { collectionVisitorStrict, rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { collectionVenueGate, collectionVenuesMatch } from "@/lib/business-collections/load.server";
 
 const COLLECTION_ENTRY_URL = "https://coffee.audiolad.ru/collection";
 import { createClient } from "@/lib/supabase/server";
@@ -76,9 +76,11 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
   // t1616u: a personal-link visitor (cookie in this browser or an account bound to a collection)
   // continues only bound to a live collection with a free place. A full, revoked or unknown link
   // goes to the calm entry screen and never reaches onboarding with the whole catalog.
+  // An account whose venue holds another collection is refused too (the venue would keep it).
   let collectionHandoff = false;
   try {
-    if (await collectionVisitorStrict(user.id)) collectionHandoff = !await rememberPersonalCollection();
+    const gate = await collectionVenueGate(user.id);
+    collectionHandoff = !gate.ok || (gate.collectionId !== null && !await collectionVenuesMatch(user.id, gate.collectionId));
   } catch { collectionHandoff = true; }
   if (collectionHandoff) redirect(COLLECTION_ENTRY_URL);
 
