@@ -87,9 +87,9 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
   const check = isSample ? null : await loadCertificateCheck(number);
   if (!isSample && !check) notFound();
   const current = check && check.status === "superseded" ? await currentOf(check) : null;
-  const headingNumber = isSample
-    ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number
-    : certificateDisplayNumber(check.number);
+  const headingNumber = check
+    ? certificateDisplayNumber(check.number)
+    : BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number;
 
   return (
     <BusinessLegalShell
