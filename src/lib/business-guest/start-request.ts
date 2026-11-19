@@ -17,7 +17,7 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Pick<Response, "o
 export async function requestGuestStart(body: Record<string, unknown>, options: {
   fetchImpl?: FetchLike; timeoutMs?: number; online?: boolean;
   /** Screen-specific wording (the personal-link entry screen has no gift copy). */
-  messages?: { limit?: string; collectionFull?: string; collectionUnavailable?: string; failed?: string };
+  messages?: { limit?: string; collectionFull?: string; collectionUnavailable?: string; collectionOther?: string; failed?: string };
   /** Extra request headers (the personal-link entry marks its start). */
   headers?: Record<string, string>;
 } = {}): Promise<GuestStartOutcome> {
@@ -44,6 +44,7 @@ export async function requestGuestStart(body: Record<string, unknown>, options: 
       }
       if (result.code === "collection_full") return { kind: "error", message: options.messages?.collectionFull ?? failed };
       if (result.code === "collection_unavailable") return { kind: "error", message: options.messages?.collectionUnavailable ?? failed };
+      if (result.code === "collection_other") return { kind: "error", message: options.messages?.collectionOther ?? failed };
       return { kind: "error", message: response.status === 429 ? options.messages?.limit ?? copy.limit : result.code === "offer_changed" ? copy.offerChanged : failed };
     })()]);
   } catch {

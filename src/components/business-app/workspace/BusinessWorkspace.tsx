@@ -297,10 +297,10 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {showEmpty(model) && model.needsVenue ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-connect">
-          <p>{BUSINESS_CONNECT_VENUE_NOTE}</p>
+          <p>{quiet ? "Чтобы слушать подборку, создайте заведение – это займёт минуту." : BUSINESS_CONNECT_VENUE_NOTE}</p>
           <p>
             <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.onboardingHref} data-testid="biz-workspace-connect-venue">
-              {BUSINESS_CONNECT_VENUE_CTA}
+              {quiet ? "Создать заведение" : BUSINESS_CONNECT_VENUE_CTA}
             </Link>
           </p>
         </section>

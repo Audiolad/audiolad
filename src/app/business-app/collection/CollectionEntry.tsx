@@ -35,7 +35,7 @@ export default function CollectionEntry() {
       }
       const outcome = await requestGuestStart(
         { accepted: true, offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash, idempotencyKey: key.current },
-        { online: typeof navigator === "undefined" ? undefined : navigator.onLine, messages: { limit: copy.limit, collectionFull: copy.full, collectionUnavailable: copy.gone, failed: copy.failed },
+        { online: typeof navigator === "undefined" ? undefined : navigator.onLine, messages: { limit: copy.limit, collectionFull: copy.full, collectionUnavailable: copy.gone, collectionOther: copy.other, failed: copy.failed },
           headers: { [COLLECTION_ENTRY_HEADER]: "1" } },
       );
       if (outcome.kind === "redirect") {

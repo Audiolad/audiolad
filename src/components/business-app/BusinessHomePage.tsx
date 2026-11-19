@@ -165,13 +165,15 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             Первое заведение
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
-            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим заведение. Всё в одном кабинете.
+            {quiet
+              ? "Чтобы слушать подборку, создайте заведение – это займёт минуту."
+              : "Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим заведение. Всё в одном кабинете."}
           </p>
           <Link
             href="/onboarding"
             className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
           >
-            Начать подключение
+            {quiet ? "Создать заведение" : "Начать подключение"}
           </Link>
           <details className="mt-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--biz-text-muted)]">

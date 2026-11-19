@@ -120,9 +120,7 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode} quietCollection={quietCollection}>
-          {children}
-        </BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode} quietCollection={quietCollection}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

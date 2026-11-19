@@ -70,14 +70,6 @@ export async function bindPersonalCollection(collectionId: string, userId: strin
   return true;
 }
 
-/** The venue's assigned collection id, or null. */
-export async function loadVenueCollectionId(locationId: string): Promise<string | null> {
-  const { data, error } = await createServiceRoleClient().from("business_personal_collection_locations")
-    .select("collection_id").eq("location_id", locationId).maybeSingle();
-  if (error) throw new Error("collection_venue_assignment_unavailable");
-  return (data?.collection_id as string | undefined) ?? null;
-}
-
 export type CatalogCollectionTrack = {
   audio_item_id: string; album_id: string; title: string; album_title: string;
   duration_seconds: number | null; cover_ref: string | null;
@@ -127,4 +119,37 @@ export async function loadCollectionVisitor(userId: string | null): Promise<bool
       .select("collection_id").eq("user_id", userId).limit(1);
     return !error && Array.isArray(data) && data.length > 0;
   } catch { return false; }
+}
+
+/** A collection cookie of valid shape is present in this browser (live or revoked). */
+export async function hasCollectionCookie(): Promise<boolean> {
+  const token = (await cookies()).get(COLLECTION_COOKIE)?.value ?? null;
+  return Boolean(token && COLLECTION_TOKEN.test(token));
+}
+
+/**
+ * Collection assignment of every cafe venue the account owns (ids come from the verified
+ * session/start, never from the request). Used to fail a personal-link start closed: no venue of
+ * the account may play another collection or, after the start, the whole catalog.
+ */
+export async function ownerCafeVenueCollections(userId: string): Promise<{ locationId: string; collectionId: string | null }[]> {
+  const db = createServiceRoleClient();
+  const members = await db.from("business_organization_members").select("organization_id").eq("user_id", userId).eq("role", "owner");
+  if (members.error) throw new Error("collection_owner_unavailable");
+  const orgs = (members.data ?? []).map((row) => row.organization_id as string);
+  if (orgs.length === 0) return [];
+  const [locations, categories] = await Promise.all([
+    db.from("business_locations").select("id,business_category").in("organization_id", orgs),
+    db.from("business_content_categories").select("category").eq("direction_key", "cafe"),
+  ]);
+  if (locations.error || categories.error) throw new Error("collection_owner_unavailable");
+  const cafe = new Set((categories.data ?? []).map((row) => String(row.category)));
+  const ids = (locations.data ?? [])
+    .filter((row) => cafe.has(String(row.business_category ?? "").trim().toLowerCase()))
+    .map((row) => row.id as string);
+  if (ids.length === 0) return [];
+  const assigned = await db.from("business_personal_collection_locations").select("location_id,collection_id").in("location_id", ids);
+  if (assigned.error) throw new Error("collection_owner_unavailable");
+  const byLocation = new Map((assigned.data ?? []).map((row) => [row.location_id as string, row.collection_id as string]));
+  return ids.map((locationId) => ({ locationId, collectionId: byLocation.get(locationId) ?? null }));
 }

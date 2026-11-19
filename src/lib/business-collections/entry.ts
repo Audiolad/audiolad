@@ -15,6 +15,7 @@ export const COLLECTION_ENTRY_COPY = {
   unavailableTitle: "Подборка сейчас недоступна",
   unavailableText: "Ссылка больше не действует. Напишите нам – пришлём новую.",
   gone: "Подборка сейчас недоступна. Напишите нам – пришлём новую ссылку.",
+  other: "В этом браузере уже открыта другая подборка. Напишите нам – поможем.",
 } as const;
 
 /** Sent by the entry screen: the guest start then fails closed for the collection. */
