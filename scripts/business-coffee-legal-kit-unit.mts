@@ -12,6 +12,7 @@ import {
   certificateDisplayNumber,
   certificateRows,
   certificateSnapshotIsCurrent,
+  continuousAccessStart,
   certificateStatusLabel,
   certificateSnapshotHash,
   certificateSnapshotJson,
@@ -125,6 +126,14 @@ assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: tr
 assert.equal(certificateStatusLabel("outdated"), "Не действует: данные точки или лицензиата изменились");
 assert.equal(certificateStatusLabel("valid"), "Действует");
 
+// Оплата во время подарочной недели: оплаченный период начнётся позже, доступ идёт с начала недели.
+const nowAt = new Date("2026-11-19T12:00:00Z");
+const gift = { startsAt: "2026-11-19T09:00:00Z", endsAt: "2026-11-26T09:00:00Z" };
+assert.equal(continuousAccessStart("2026-11-26T09:00:00Z", gift, nowAt), gift.startsAt);
+assert.equal(continuousAccessStart("2026-11-01T09:00:00Z", gift, nowAt), "2026-11-01T09:00:00Z");
+assert.equal(continuousAccessStart("2026-11-26T09:00:00Z", null, nowAt), null);
+assert.equal(continuousAccessStart(null, { startsAt: "2026-11-01T00:00:00Z", endsAt: "2026-11-08T00:00:00Z" }, nowAt), null);
+
 // Сервер: пробная неделя – действующий доступ; выдача только для своей точки; проверка – только чтение.
 const server = readFileSync("src/lib/business/legal/certificate.server.ts", "utf8");
 assert.match(server, /resolved\.mode === "trial" \|\| resolved\.mode === "paid"/);
@@ -132,6 +141,8 @@ assert.match(server, /rpc\("issue_business_venue_certificate"/);
 assert.match(server, /refreshOrganizationLegalIdentity\(db, row\.organization_id, stored, now\)/, "перед выдачей – свежие сведения ФНС");
 assert.match(server, /REGISTRY_FRESH_MS = 24 \* 60 \* 60 \* 1000/);
 assert.match(server, /status = "outdated"/, "проверка сверяет снимок с текущими данными");
+assert.match(server, /validUntil = access\.end;/, "срок на странице проверки – ровно текущий доступ");
+assert.match(server, /start: continuousAccessStart\(period\.start, access\.grant, now\)/);
 const lookupSrc = readFileSync("src/lib/business/legal/egrul.server.ts", "utf8");
 assert.match(lookupSrc, /return \{ ok: true, json: await res\.json\(\)/, "тело ответа читается под тем же таймером");
 assert.match(lookupSrc, /TOTAL_TIMEOUT_MS = 20000/);

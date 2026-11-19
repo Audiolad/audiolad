@@ -11,6 +11,7 @@ import { lookupBusinessRegistry } from "./egrul.server";
 import {
   businessAccountCode,
   certificateSnapshotIsCurrent,
+  continuousAccessStart,
   certificateSnapshotHash,
   certificateSnapshotJson,
   parseCertificateSnapshot,
@@ -160,7 +161,7 @@ async function liveAccess(db: Db, location: LocationRow, now: Date): Promise<Liv
   return {
     active: Boolean(period.end),
     kind: clock === "gift" ? "gift" : "subscription",
-    start: period.start,
+    start: continuousAccessStart(period.start, access.grant, now),
     end: period.end,
     ownerId: access.ownerId,
   };
@@ -295,7 +296,8 @@ export async function loadCertificateCheck(number: string, now: Date = new Date(
       status = "outdated";
     } else if (access?.active && access.end) {
       status = "valid";
-      validUntil = Date.parse(access.end) > Date.parse(snapshot.period.end) ? access.end : snapshot.period.end;
+      // Срок действующего сертификата – ровно текущий доступ: продление его увеличивает, сокращение уменьшает.
+      validUntil = access.end;
     } else {
       status = "expired";
     }

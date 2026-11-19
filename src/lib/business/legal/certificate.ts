@@ -173,3 +173,18 @@ export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, strin
   offer: "Примите новую редакцию договора-оферты.",
   access: "Сертификат выдаётся, пока идёт подарочный или оплаченный период.",
 };
+
+/**
+ * Начало непрерывного доступа, который идёт сейчас. Оплата во время подарочной недели начинается после неё,
+ * поэтому начало оплаченного периода может быть в будущем – тогда доступ идёт с начала подарочной недели.
+ */
+export function continuousAccessStart(
+  periodStart: string | null,
+  grant: { startsAt: string; endsAt: string } | null,
+  now: Date,
+): string | null {
+  const t = now.getTime();
+  if (periodStart && Date.parse(periodStart) <= t) return periodStart;
+  if (grant && Date.parse(grant.startsAt) <= t && Date.parse(grant.endsAt) > t) return grant.startsAt;
+  return null;
+}
