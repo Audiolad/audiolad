@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import { locationSoundProfile, locationSoundPrefs } from "@/lib/business-app/location-sound-settings";
 
 import BusinessGuestStartCta from "../BusinessGuestStartCta";
@@ -63,6 +64,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   // Day-time choices stay with the owner (cabinet-mode.ts), also in the preview. Ratings are the
   // owner's and, while the owner's switch is on, the hall's (trackRatings: if_allowed).
   const cabinet = useBusinessCabinetMode();
+  // t1617u/t1618u: personal-link visitor – no gift CTA, no «подключить» links on the music page.
+  const quiet = useBusinessQuiet();
   const adopt = player.adopt;
   const playIndex = player.playIndex;
   const setQueueOrder = player.setQueueOrder;
@@ -229,7 +232,13 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(aheadTotal));
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
-      {model.status === "anonymous" ? (
+      {model.status === "anonymous" && quiet ? (
+        <section className="business-app-card space-y-3" data-testid="biz-workspace-collection-entry">
+          <p><Link className="underline" href="/collection">Открыть подборку</Link></p>
+        </section>
+      ) : null}
+
+      {model.status === "anonymous" && !quiet ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
           <p>{guestStartEnabled ? "Откройте кабинет без регистрации. Карта не нужна." : "Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна."}</p>
           <div className="flex flex-wrap gap-2">
@@ -272,11 +281,13 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
           <p>
             {cabinet.side === "venue"
               ? "Попросите владельца продлить доступ."
-              : model.endsAtLabel
+              : quiet
+                ? "Пробный доступ к подборке закончился."
+                : model.endsAtLabel
                 ? `Подарочный период закончился ${model.endsAtLabel}. Полный плеер закрыт.`
                 : "Подарочный период закончился. Полный плеер закрыт."}
           </p>
-          {cabinet.can("payLink") ? (
+          {cabinet.can("payLink") && !quiet ? (
             <p>
               <Link className="underline" href={`${businessCabinetHomePath(hostname)}#dostup`} data-testid="biz-workspace-terms">Условия и подписка</Link>
             </p>
@@ -295,17 +306,23 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         </section>
       ) : null}
 
-      {showEmpty(model) && !model.needsVenue ? (
+      {showEmpty(model) && !model.needsVenue && model.collectionUnavailable ? (
+        <section className="business-app-card space-y-3" data-testid="biz-workspace-collection-unavailable">
+          <p>Подборка сейчас недоступна.</p>
+        </section>
+      ) : null}
+
+      {showEmpty(model) && !model.needsVenue && !model.collectionUnavailable ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-empty">
           <p>{BUSINESS_EMPTY_CATALOG_NOTE}</p>
           <p className="flex flex-wrap gap-3">
             <a className="underline" href={model.rightsHref}>Как устроены права на музыку</a>
-            <Link className="underline" href={model.onboardingHref}>Перейти и подключить заведение</Link>
+            {quiet ? null : <Link className="underline" href={model.onboardingHref}>Перейти и подключить заведение</Link>}
           </p>
         </section>
       ) : null}
 
-      {playbackBlocked(model) ? (
+      {playbackBlocked(model) && !model.collectionUnavailable ? (
         <BusinessEligibilityProbePanel compact />
       ) : null}
 

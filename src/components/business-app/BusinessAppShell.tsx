@@ -26,7 +26,9 @@ import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspa
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
 import { BusinessGuestPlaybackProvider } from "@/components/business-app/sound/BusinessGuestPlayback";
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
+import { BusinessQuietProvider } from "@/components/business-app/BusinessQuietMode";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 import type { BusinessEntry } from "@/lib/business-app/live-refresh";
@@ -48,6 +50,7 @@ export default function BusinessAppShell({
   pointReports = false,
   initialEntry = "person",
   cabinetMode,
+  quietCollection = false,
 }: {
   children: ReactNode;
   /** Read-only gift / paid state from the layout; null for anonymous visitors. */
@@ -60,6 +63,8 @@ export default function BusinessAppShell({
   initialEntry?: BusinessEntry;
   /** owner | preview | point and the hall device facts (layout, cabinet-mode.server.ts). */
   cabinetMode?: BusinessCabinetServerMode;
+  /** Personal-link visitor without a paid period: no CTAs, prices, countdowns (t1617u/t1618u). */
+  quietCollection?: boolean;
 }) {
   const modeValue: BusinessCabinetServerMode = cabinetMode ?? {
     mode: pointReports ? "point" : "owner",
@@ -70,6 +75,7 @@ export default function BusinessAppShell({
     canPreview: false,
   };
   return (
+    <BusinessQuietProvider value={quietCollection}>
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
         <BusinessCabinetModeProvider value={modeValue}>
@@ -79,6 +85,7 @@ export default function BusinessAppShell({
         </BusinessCabinetModeProvider>
       </BusinessGuestStatusProvider>
     </BusinessChromeAccessProvider>
+    </BusinessQuietProvider>
   );
 }
 
@@ -95,9 +102,10 @@ function BusinessShellFrame({ children, pointReports, initialGuestLimit }: { chi
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  const personalCollection = pathname === "/collection";
-  const showGuestBar = !personalCollection && access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
-  const showAccessLine = liveAccess && !cabinetMusic && cabinet.can("accessLine");
+  // t1617u/t1618u: the entry screen and the quiet cabinet show no gift strip and no period line.
+  const quiet = useBusinessQuiet();
+  const showGuestBar = !quiet && access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
+  const showAccessLine = !quiet && liveAccess && !cabinetMusic && cabinet.can("accessLine");
 
   return (
     <div className="business-app-shell" data-access={access.level}>

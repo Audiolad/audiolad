@@ -8,7 +8,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import BusinessMusicSection from "@/components/business-app/sound/BusinessMusicSection";
-import { BUSINESS_GUEST_COFFEE_URL, getHostnameFromHeaders } from "@/lib/business-app/host";
+import { BUSINESS_GUEST_COFFEE_URL, getHostnameFromHeaders, isCoffeeHostname } from "@/lib/business-app/host";
+import { loadCollectionPermission } from "@/lib/business-collections/load.server";
 import { businessGuestCoffeeHallRedirect } from "@/lib/business-app/point-device";
 import { businessHallDeviceCookie } from "@/lib/business-app/point-session.server";
 import { buildBusinessAppMetadata, buildCoffeePublicPageMetadata } from "@/lib/business-app/seo";
@@ -45,5 +46,8 @@ export default async function BusinessGuestCoffeePage() {
       if (!error && data) return <BusinessWorkspace model={await loadWorkspacePage("cafe")} />;
     }
   }
+  // t1616u: a personal-link visitor never sees the public demo shelf or its gift offer; the calm
+  // entry screen opens the ordinary app with only the collection.
+  if (isCoffeeHostname(getHostnameFromHeaders(await headers())) && await loadCollectionPermission()) redirect("/collection");
   return <BusinessMusicSection />;
 }

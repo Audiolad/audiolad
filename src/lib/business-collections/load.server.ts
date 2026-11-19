@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { COLLECTION_COOKIE, COLLECTION_TOKEN, collectionTrackPath, resolveCollectionPermission, type CollectionTrack } from "./model";
+import { COLLECTION_ACCOUNT_LIMIT, COLLECTION_COOKIE, COLLECTION_TOKEN, resolveCollectionPermission } from "./model";
 
 export function collectionTokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -52,6 +52,9 @@ export async function rememberPersonalCollection(): Promise<CollectionRow | null
   if (!token || !COLLECTION_TOKEN.test(token)) return permission;
   const { data: { user } } = await (await createClient()).auth.getUser();
   if (!user) return permission;
+  // At most COLLECTION_ACCOUNT_LIMIT accounts per link. A full link opens nothing new for this
+  // account; the cabinet then keeps its ordinary catalog (no collection was ever assigned).
+  if (!await collectionHasRoom(permission.id, user.id)) return null;
   const { error } = await createServiceRoleClient().from("business_personal_collection_accounts")
     .upsert({ user_id: user.id, collection_id: permission.id, selected_at: new Date().toISOString() }, { onConflict: "user_id,collection_id" });
   if (error) throw new Error("collection_account_save_failed");
@@ -69,30 +72,42 @@ export async function loadCollectionCatalog(collectionId: string | null, trackId
   if (error || !Array.isArray(data)) throw new Error("collection_catalog_unavailable");
   return data as CatalogCollectionTrack[];
 }
-export async function loadPersonalCollection() {
-  const permission = await loadCollectionPermission();
-  if (!permission) return null;
+
+/** True when this account is already on the link, or the link has fewer than the limit. */
+export async function collectionHasRoom(collectionId: string, userId: string | null): Promise<boolean> {
   const db = createServiceRoleClient();
-  const [catalog, items] = await Promise.all([
-    loadCollectionCatalog(permission.id),
-    db.from("business_personal_collection_items").select("audio_item_id,position")
-      .eq("collection_id", permission.id).order("position"),
-  ]);
-  if (items.error) throw new Error("collection_items_unavailable");
-  const byId = new Map(catalog.map((track) => [track.audio_item_id, track]));
-  const tracks: CollectionTrack[] = (items.data ?? []).flatMap((item) => {
-    const row = byId.get(item.audio_item_id);
-    return row ? [{
-      audioItemId: row.audio_item_id, albumId: row.album_id, title: row.title,
-      albumTitle: row.album_title, durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
-      coverUrl: collectionTrackPath("cover", permission.id, row.audio_item_id),
-    }] : [];
-  });
-  return { ...permission, tracks };
+  if (userId) {
+    const own = await db.from("business_personal_collection_accounts").select("collection_id")
+      .eq("collection_id", collectionId).eq("user_id", userId).maybeSingle();
+    if (own.error) throw new Error("collection_accounts_unavailable");
+    if (own.data) return true;
+  }
+  const { count, error } = await db.from("business_personal_collection_accounts")
+    .select("user_id", { count: "exact", head: true }).eq("collection_id", collectionId);
+  if (error || typeof count !== "number") throw new Error("collection_accounts_unavailable");
+  return count < COLLECTION_ACCOUNT_LIMIT;
 }
 
-export async function authorizedCollectionTrack(collectionId: string, trackId: string) {
-  const permission = await loadCollectionPermission();
-  if (!permission || permission.id !== collectionId) return null;
-  return (await loadCollectionCatalog(permission.id, trackId)).find((track) => track.audio_item_id === trackId) ?? null;
+/** Whether the verified account is already bound to this collection. */
+export async function collectionBoundToUser(collectionId: string, userId: string): Promise<boolean> {
+  const { data, error } = await createServiceRoleClient().from("business_personal_collection_accounts")
+    .select("collection_id").eq("collection_id", collectionId).eq("user_id", userId).maybeSingle();
+  if (error) throw new Error("collection_accounts_unavailable");
+  return Boolean(data);
+}
+
+/**
+ * Quiet cabinet (t1617u/t1618u): a visitor who came by a personal link – the link cookie in this
+ * browser, or an account bound to any collection (also after a revoke). Paid access is checked by
+ * the caller. Read-only; a lookup error keeps the ordinary cabinet.
+ */
+export async function loadCollectionVisitor(userId: string | null): Promise<boolean> {
+  try {
+    const token = (await cookies()).get(COLLECTION_COOKIE)?.value ?? null;
+    if (token && COLLECTION_TOKEN.test(token)) return true;
+    if (!userId) return false;
+    const { data, error } = await createServiceRoleClient().from("business_personal_collection_accounts")
+      .select("collection_id").eq("user_id", userId).limit(1);
+    return !error && Array.isArray(data) && data.length > 0;
+  } catch { return false; }
 }

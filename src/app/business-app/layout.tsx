@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { loadCollectionPermission } from "@/lib/business-collections/load.server";
+import { loadCollectionVisitor } from "@/lib/business-collections/load.server";
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { createClient } from "@/lib/supabase/server";
@@ -61,10 +60,6 @@ export default async function BusinessAppLayout({
   // owner | preview | point from one table (cabinet-mode.ts): the hall device is the venue side
   // until the owner re-enters the password on it; the owner's preview never reports as a point.
   const cabinet = await loadBusinessCabinetMode();
-  // Read-only: show an already chosen collection. Do not bind it to the account or
-  // venues here – that happens only after explicit guest-start / «Подключить».
-  const personalCollection = isCoffeeHostname(hostname) && cabinet.mode !== "point"
-    ? await loadCollectionPermission().catch(() => null) : null;
   // A revoked or unchecked device cookie keeps the hall menu but sends no player reports.
   const pointReports = businessPointReports(cabinet) && cabinet.deviceStatus === "alive";
   const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;
@@ -108,6 +103,14 @@ export default async function BusinessAppLayout({
       ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
       : null;
 
+  // t1617u/t1618u: a personal-link visitor without a paid period gets the quiet cabinet. Read-only:
+  // nothing is bound here – binding happens only at the explicit start / business-return.
+  let quietCollection = false;
+  if (isCoffeeHostname(hostname) && cabinet.mode !== "point" && customerAccess?.mode !== "paid") {
+    const { data: { user } } = await (await createClient()).auth.getUser();
+    quietCollection = await loadCollectionVisitor(user?.id ?? null);
+  }
+
   // Header switcher side (owner or preview «как видит точка») so a reload opens the same side without a flash.
   const initialEntry = parseBusinessEntry((await cookies()).get(BUSINESS_VIEW_COOKIE)?.value);
 
@@ -117,8 +120,7 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>
-          {personalCollection ? <p className="business-app-span-full px-4"><Link href="/collection" className="underline">Ваша подборка: {personalCollection.title}</Link></p> : null}
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode} quietCollection={quietCollection}>
           {children}
         </BusinessAppShell>
       </BusinessDomainProvider>

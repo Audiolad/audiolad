@@ -7,6 +7,7 @@ import { useBusinessHostname, useBusinessDomain } from "@/components/business-ap
 import { isCoffeeHostname } from "@/lib/business-app/host";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessHomeChecklist from "@/components/business-app/BusinessHomeChecklist";
 import BusinessOwnerSurnamePrompt from "@/components/business-app/BusinessOwnerSurnamePrompt";
@@ -78,6 +79,8 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
   const hostname = useBusinessHostname();
   // owner | preview | point (cabinet-mode.ts): the venue side gets the hall home.
   const cabinet = useBusinessCabinetMode();
+  // t1617u/t1618u: personal-link visitor – no access card, payment step or prompts on the home.
+  const quiet = useBusinessQuiet();
   const rawSignals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
   const elapsedSeconds = useOwnerHomeElapsed(rawSignals);
@@ -155,8 +158,8 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             {subtitle}
           </p>
         </header>
-        {needsSurname ? <div className="mb-4 max-w-xl"><BusinessOwnerSurnamePrompt /></div> : null}
-        <BusinessHomeAccessCard />
+        {needsSurname && !quiet ? <div className="mb-4 max-w-xl"><BusinessOwnerSurnamePrompt /></div> : null}
+        {quiet ? null : <BusinessHomeAccessCard />}
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
             Первое заведение
@@ -198,9 +201,9 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
         </p>
       </header>
       <div className="business-app-owner-home space-y-4">
-        {needsSurname ? <BusinessOwnerSurnamePrompt /> : null}
-        {needsNewEdition ? <BusinessOfferReacceptPrompt newEdition /> : null}
-        <BusinessHomeChecklist steps={steps} showAccess />
+        {needsSurname && !quiet ? <BusinessOwnerSurnamePrompt /> : null}
+        {needsNewEdition && !quiet ? <BusinessOfferReacceptPrompt newEdition /> : null}
+        <BusinessHomeChecklist steps={steps} showAccess={!quiet} />
       </div>
     </div>
   );

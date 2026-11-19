@@ -12,7 +12,7 @@ export function isCabinetPublicCoverUrl(url: string): boolean {
   const value = url.trim();
   if (!value || value.startsWith("data:") || value.startsWith("blob:")) return false;
   // 39a7ef48 PR-D: same-origin, token-free route for private business-only covers.
-  if (isBusinessWorkspaceCoverUrl(value) || value.startsWith("/api/business/collections/cover?")) return true;
+  if (isBusinessWorkspaceCoverUrl(value)) return true;
   const lower = value.toLowerCase();
   if (
     lower.includes("token=") ||
@@ -34,7 +34,7 @@ export function cabinetAlbumCoverUrl(input: {
   coverImage?: unknown;
   updatedAt?: string | null;
 }): string | null {
-  if (isBusinessWorkspaceCoverUrl(input.coverUrl) || input.coverUrl?.startsWith("/api/business/collections/cover?")) return input.coverUrl!.trim();
+  if (isBusinessWorkspaceCoverUrl(input.coverUrl)) return input.coverUrl!.trim();
   const resolved = getProductCoverDisplayUrl(
     input.coverUrl,
     input.updatedAt,

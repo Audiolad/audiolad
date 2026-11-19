@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import { detectVenueTimezone } from "@/lib/business-app/venue-timezones";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -46,6 +47,8 @@ export default function BusinessOnboardingWizardPage({
   const hostname = useBusinessHostname();
   // Gift already live: show its end date instead of re-offering «N дней в подарок, затем 799 ₽» (BUSINESS_GIFT_TITLE).
   const accessLine = businessAccessLine(useBusinessChromeAccess());
+  // t1617u/t1618u: no period or price line for a personal-link visitor.
+  const quiet = useBusinessQuiet();
   const router = useRouter();
   const [step, setStep] = useState<BusinessOnboardingStep>("type");
   const [typeId, setTypeId] = useState<string | null>(
@@ -216,7 +219,7 @@ export default function BusinessOnboardingWizardPage({
         title="Музыка для заведения за минуту"
         subtitle="Выберите тип заведения и атмосферу, затем подтвердите подключение."
       />
-      {step !== "done" ? (
+      {step !== "done" && !quiet ? (
         accessLine ? (
           <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-access-line">
             {accessLine}.

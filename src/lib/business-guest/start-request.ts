@@ -16,7 +16,10 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Pick<Response, "o
  */
 export async function requestGuestStart(body: Record<string, unknown>, options: {
   fetchImpl?: FetchLike; timeoutMs?: number; online?: boolean;
+  /** Screen-specific wording (the personal-link entry screen has no gift copy). */
+  messages?: { limit?: string; collectionFull?: string; failed?: string };
 } = {}): Promise<GuestStartOutcome> {
+  const failed = options.messages?.failed ?? copy.failed;
   if (options.online === false) return { kind: "error", message: copy.offline };
   const fetchImpl: FetchLike = options.fetchImpl ?? ((input, init) => fetch(input, init));
   const controller = new AbortController();
@@ -37,10 +40,11 @@ export async function requestGuestStart(body: Record<string, unknown>, options: 
       if (response.ok && result.ok === true && typeof result.redirect === "string" && GUEST_START_REDIRECTS.includes(result.redirect)) {
         return { kind: "redirect", url: result.redirect };
       }
-      return { kind: "error", message: response.status === 429 ? copy.limit : result.code === "offer_changed" ? copy.offerChanged : copy.failed };
+      if (result.code === "collection_full") return { kind: "error", message: options.messages?.collectionFull ?? failed };
+      return { kind: "error", message: response.status === 429 ? options.messages?.limit ?? copy.limit : result.code === "offer_changed" ? copy.offerChanged : failed };
     })()]);
   } catch {
-    return { kind: "error", message: timedOut ? copy.timeout : copy.failed };
+    return { kind: "error", message: timedOut ? copy.timeout : failed };
   } finally {
     clearTimeout(timer);
   }

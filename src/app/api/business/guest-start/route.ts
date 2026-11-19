@@ -1,4 +1,4 @@
-import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { collectionHasRoom, loadCollectionPermission, rememberPersonalCollection } from "@/lib/business-collections/load.server";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -47,6 +47,21 @@ async function handle(request: Request) {
     return NextResponse.json({ ok: false, reason: "venue_device" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
   const config = businessGuestStartConfig(process.env);
+  // t1616u: at most COLLECTION_ACCOUNT_LIMIT accounts start by one personal link. Checked before
+  // any sign-in or period, so a full link never leaves a half-made guest behind.
+  if (config.enabled && request.method === "POST") {
+    try {
+      const permission = await loadCollectionPermission();
+      if (permission) {
+        const { data: { user } } = await (await createClient()).auth.getUser();
+        if (!await collectionHasRoom(permission.id, user?.id ?? null)) {
+          return NextResponse.json({ ok: false, code: "collection_full" }, { status: 409, headers: { "Cache-Control": "no-store" } });
+        }
+      }
+    } catch {
+      return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+  }
   // Lazy clients keep the disabled path independent of Auth and service credentials.
   const session = () => createClient();
   const result = await handleBusinessGuestStart({ method: request.method, headers: request.headers, text: () => boundedText(request) }, {

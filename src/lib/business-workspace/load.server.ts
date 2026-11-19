@@ -455,11 +455,31 @@ async function loadCandidateTracks(
   });
 }
 
+/**
+ * t1616u: a venue that got a personal collection and has no paid period plays only that
+ * collection – never the whole closed catalog, also after a revoke. A paid venue keeps the
+ * ordinary catalog when its collection is gone, so a paying hall never falls silent.
+ * Called only when the collection pool came back empty (venues without a collection: one read).
+ */
+async function personalCollectionStrict(db: ServiceDb, locationId: string): Promise<boolean> {
+  const assigned = await db.from("business_personal_collection_locations").select("collection_id")
+    .eq("location_id", locationId).maybeSingle();
+  if (assigned.error) throw new Error("collection_venue_assignment_unavailable");
+  if (!assigned.data) return false;
+  const location = await db.from("business_locations").select("organization_id").eq("id", locationId).single();
+  if (location.error || !location.data) throw new Error("collection_venue_unavailable");
+  const { data: paidUntil, error } = await db.rpc("business_venue_paid_until", {
+    p_organization_id: location.data.organization_id, p_location_id: locationId,
+  });
+  if (error) throw new Error("collection_venue_payment_unavailable");
+  return !(typeof paidUntil === "string" && Date.parse(paidUntil) > Date.now());
+}
+
 export async function loadWorkspaceCatalog(input: {
   spaceId: BusinessSpaceId;
   locationId: string | null;
   spaceEnabled: boolean;
-}): Promise<{ tracks: WorkspaceTrack[]; unavailable: boolean }> {
+}): Promise<{ tracks: WorkspaceTrack[]; unavailable: boolean; collectionUnavailable?: boolean }> {
   if (!input.spaceEnabled) return { tracks: [], unavailable: false };
   let db: ServiceDb;
   try {
@@ -488,12 +508,15 @@ export async function loadWorkspaceCatalog(input: {
     return track ? [track] : [];
   });
   if (input.spaceId === "cafe" && input.locationId) {
+    const locationId = input.locationId;
     try {
-      tracks = await selectPersonalVenuePool(tracks, async () => {
-        const { data, error } = await db.rpc("business_personal_collection_location_tracks", { p_location_id: input.locationId });
+      const pool = await selectPersonalVenuePool(tracks, async () => {
+        const { data, error } = await db.rpc("business_personal_collection_location_tracks", { p_location_id: locationId });
         if (error || !Array.isArray(data)) throw new Error("collection_venue_pool_unavailable");
         return (data as { audio_item_id: string }[]).map((row) => row.audio_item_id);
-      });
+      }, () => personalCollectionStrict(db, locationId));
+      if (pool === "collection_unavailable") return { tracks: [], unavailable: false, collectionUnavailable: true };
+      tracks = pool;
     } catch { return { tracks: [], unavailable: true }; }
   }
   return { tracks, unavailable: false };
@@ -522,6 +545,7 @@ async function loadPointDeviceWorkspacePage(
   const access = pointDeviceWorkspaceAccess(await loadPointDeviceAccess(venue));
   const endsAtLabel = access.endsAt ? formatMoscowDateTime(new Date(access.endsAt)) : null;
   let tracks: WorkspaceTrack[] = [];
+  let collectionUnavailable = false;
   if (workspacePlayerOpen({ status: access.status, spaceEnabled: space.enabled })) {
     const catalog = await loadWorkspaceCatalog({
       spaceId: space.id,
@@ -532,9 +556,11 @@ async function loadPointDeviceWorkspacePage(
       return { ...model, status: "unavailable" };
     }
     tracks = catalog.tracks;
+    collectionUnavailable = catalog.collectionUnavailable === true;
   }
   return {
     ...model,
+    collectionUnavailable,
     playbackScope: venue.pilotSlots ? venue.locationId : undefined,
     status: access.status,
     endsAtLabel,
@@ -585,6 +611,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       : null;
     let tracks: WorkspaceTrack[] = [];
     let needsVenue = false;
+    let collectionUnavailable = false;
     if (workspacePlayerOpen({ status, spaceEnabled: space.enabled })) {
       const locationId = selectedLocationId;
       needsVenue = locationId == null;
@@ -597,6 +624,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         return { ...model, status: "unavailable" };
       }
       tracks = catalog.tracks;
+      collectionUnavailable = catalog.collectionUnavailable === true;
     }
     const saved = selectedDomain.pilotSlots ? null : await store.readPlayback(user.id, space.id);
     return {
@@ -611,6 +639,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       playbackUntil: activation.access.playbackUntil,
       tracks,
       needsVenue,
+      collectionUnavailable,
       playback: saved
         ? {
             index: saved.index,
