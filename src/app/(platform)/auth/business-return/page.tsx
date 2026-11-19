@@ -20,6 +20,7 @@ import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-sto
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
+import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,8 @@ export default async function BusinessTrialReturnPage({ searchParams }: {
       userId: user.id,
       email: user.email,
     });
+    // Explicit registration/sign-in handoff from «Подключить». Preview/listen never reaches here.
+    try { await rememberPersonalCollection(); } catch { /* trial already issued; cabinet can retry later */ }
   } catch {
     return (
       <main className="mx-auto min-h-screen max-w-[430px] bg-[var(--biz-bg,var(--platform-surface-background))] px-5 py-10 text-[var(--biz-text,#25135c)]">

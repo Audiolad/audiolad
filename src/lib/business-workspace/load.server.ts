@@ -1,4 +1,5 @@
 import "server-only";
+import { selectPersonalVenuePool } from "@/lib/business-collections/venue-pool.mjs";
 
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
@@ -482,13 +483,20 @@ export async function loadWorkspaceCatalog(input: {
   });
   if (ids.length === 0) return { tracks: [], unavailable: false };
 
-  return {
-    tracks: ids.flatMap((id) => {
-      const track = curatedById.get(id);
-      return track ? [track] : [];
-    }),
-    unavailable: false,
-  };
+  let tracks = ids.flatMap((id) => {
+    const track = curatedById.get(id);
+    return track ? [track] : [];
+  });
+  if (input.spaceId === "cafe" && input.locationId) {
+    try {
+      tracks = await selectPersonalVenuePool(tracks, async () => {
+        const { data, error } = await db.rpc("business_personal_collection_location_tracks", { p_location_id: input.locationId });
+        if (error || !Array.isArray(data)) throw new Error("collection_venue_pool_unavailable");
+        return (data as { audio_item_id: string }[]).map((row) => row.audio_item_id);
+      });
+    } catch { return { tracks: [], unavailable: true }; }
+  }
+  return { tracks, unavailable: false };
 }
 
 export async function loadWorkspaceAllowedIds(input: {

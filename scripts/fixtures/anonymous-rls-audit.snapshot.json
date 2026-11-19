@@ -6729,6 +6729,16 @@
       "file": "supabase/migrations/20270401120000_business_guest_default_venue_name.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_guest_bootstrap(uuid, text, text, int, text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270402120000_business_personal_collections.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_personal_collection_tracks(uuid), public.create_business_personal_collection(text,text,uuid,uuid[]) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270402120000_business_personal_collections.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_personal_collection_location_tracks(uuid) TO service_role;"
     }
   ]
 }
