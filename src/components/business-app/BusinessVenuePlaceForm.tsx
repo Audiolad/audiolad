@@ -25,7 +25,7 @@ export default function BusinessVenuePlaceForm({
 
   return (
     <section className="business-app-card space-y-3" id="venue" data-testid="biz-venue-place">
-      <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Точка</h2>
+      <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Заведение</h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">{BUSINESS_LICENCE_PLACE_RULE}</p>
       {canEdit ? (
         <form
@@ -49,7 +49,7 @@ export default function BusinessVenuePlaceForm({
           }}
         >
           <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="venue-name">
-            Название точки
+            Название заведения
             <input
               id="venue-name"
               value={venueName}
@@ -60,7 +60,7 @@ export default function BusinessVenuePlaceForm({
             />
           </label>
           <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="venue-address">
-            Адрес точки (город, улица, дом, при необходимости офис или помещение)
+            Адрес заведения (город, улица, дом, при необходимости офис или помещение)
             <input
               id="venue-address"
               value={address}
@@ -87,7 +87,7 @@ export default function BusinessVenuePlaceForm({
         </form>
       ) : (
         <p className="text-sm leading-6 text-[var(--biz-text)]" data-testid="venue-place-readonly">
-          {addressLine1 ? `${name} – ${addressLine1}` : "Адрес точки ещё не указан."}
+          {addressLine1 ? `${name} – ${addressLine1}` : "Адрес заведения ещё не указан."}
         </p>
       )}
     </section>

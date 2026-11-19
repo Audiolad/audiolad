@@ -16,7 +16,7 @@ assert.ok(businessHeaderHallOptions(halls, "iphone", false).every((option) => !o
 assert.equal(businessHeaderHallOptions([halls[0]], "iphone", true).length, 1);
 assert.equal(businessHeaderHallOptions([], "iphone", true).length, 0, "no invented halls or empty add slots");
 const duplicate = businessHeaderHallOptions(halls.map((hall) => ({ ...hall, name: "Кофейня" })), "iphone", true);
-assert.deepEqual(duplicate.map((option) => option.label), ["Точка 1: Кофейня", "Точка 2: Кофейня"]);
+assert.deepEqual(duplicate.map((option) => option.label), ["Заведение 1: Кофейня", "Заведение 2: Кофейня"]);
 assert.equal(businessHeaderHallOptions([{ ...halls[0], name: " " }], "iphone", true)[0].label, "Кофейня");
 assert.equal(businessHeaderHallOptions([{ ...halls[0], status: "inactive" }], "iphone", true)[0].disabled, true);
 

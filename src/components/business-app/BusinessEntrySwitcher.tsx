@@ -144,11 +144,11 @@ export default function BusinessEntrySwitcher() {
     ...businessHeaderHallOptions(halls, domain.location.id, venueOn).map((hallOption): EntryOption => ({
       ...hallOption,
       // Owner phone: each venue side previews that hall device menu (same table, no reports).
-      ariaLabel: `${hallOption.label} – как видит точка`,
+      ariaLabel: `${hallOption.label} – как видит заведение`,
       testId: `biz-entry-venue-${hallOption.locationId}`,
       onSelect: async () => {
         if (point) {
-          setHint("Это устройство в зале. Чтобы вернуть его в режим точки, нажмите «Вернуть режим точки».");
+          setHint("Это устройство в зале. Чтобы вернуть его в режим заведения, нажмите «Вернуть режим заведения».");
           return;
         }
         // Load the server action only when choosing a hall, so tests that render the shell stay client-only.
@@ -157,7 +157,7 @@ export default function BusinessEntrySwitcher() {
           setHint(null);
           switchTo("venue");
         });
-        if (!opened) setHint("Не удалось выбрать точку. Обновите страницу и повторите.");
+        if (!opened) setHint("Не удалось выбрать заведение. Обновите страницу и повторите.");
       },
     })),
   ];

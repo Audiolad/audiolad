@@ -11,7 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Instead assert source contracts + reimplement tiny checks matching venue-place.ts.
 const venuePlace = readFileSync(join(root, "src/lib/business-app/venue-place.ts"), "utf8");
 assert.match(venuePlace, /VENUE_ADDRESS_MAX = 200/);
-assert.match(venuePlace, /Укажите адрес точки/);
+assert.match(venuePlace, /Укажите адрес заведения/);
 assert.match(venuePlace, /venuePlaceLine/);
 assert.match(venuePlace, /\$\{title\} – \$\{place\}/, "en dash in place line");
 assert.doesNotMatch(venuePlace, /\u2014/, "no em dash");
@@ -22,7 +22,7 @@ assert.match(form, /id="venue"/);
 assert.match(form, /data-testid="venue-address"/);
 assert.match(
   form,
-  /htmlFor="venue-address">\s*Адрес точки \(город, улица, дом, при необходимости офис или помещение\)\s*<input/,
+  /htmlFor="venue-address">\s*Адрес заведения \(город, улица, дом, при необходимости офис или помещение\)\s*<input/,
   "address guidance stays in the editable field label",
 );
 

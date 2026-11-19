@@ -3,11 +3,11 @@
 export const BUSINESS_LICENCE_PLACE_RULE =
   "Лицензия действует в конкретной точке (адрес, зона), указанной в кабинете, через плеер АудиоЛад, в период доступа.";
 
-export const BUSINESS_VENUE_ADDRESS_PROMPT = "Укажите адрес точки.";
+export const BUSINESS_VENUE_ADDRESS_PROMPT = "Укажите адрес заведения.";
 
 export const BUSINESS_VENUE_ADDRESS_LINK = "Указать адрес";
 
-export const BUSINESS_VENUE_ADDRESS_MISSING = "Адрес точки ещё не указан.";
+export const BUSINESS_VENUE_ADDRESS_MISSING = "Адрес заведения ещё не указан.";
 
 /** QR / наклейка доступны только когда адрес сохранён. */
 export const BUSINESS_VENUE_QR_NEEDS_ADDRESS =

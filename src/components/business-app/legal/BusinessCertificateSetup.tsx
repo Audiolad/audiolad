@@ -7,7 +7,7 @@ import type { CabinetCertificateContext } from "@/lib/business/legal/certificate
 
 export const BUSINESS_CERTIFICATE_CABINET_HREF = "/documents/sertifikat";
 
-/** «Сертификат точки» на странице «Документы»: что заполнить и ссылка на готовый сертификат. */
+/** «Сертификат заведения» на странице «Документы»: что заполнить и ссылка на готовый сертификат. */
 export default function BusinessCertificateSetup({ context }: { context: CabinetCertificateContext }) {
   if (context.kind !== "ready") return null;
   const { state } = context;
@@ -19,9 +19,9 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
     <>
       {context.offerPrompt ? <BusinessOfferReacceptPrompt newEdition={context.offerPrompt.newEdition} /> : null}
       <section className="business-app-card space-y-4" id="sertifikat" data-testid="biz-certificate-setup">
-        <h2 className="text-[1.2rem] font-bold text-[var(--biz-text)]">Сертификат точки</h2>
+        <h2 className="text-[1.2rem] font-bold text-[var(--biz-text)]">Сертификат заведения</h2>
         <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-          Документ для проверяющих: право на музыку в этой точке, ИНН и адрес. Подлинность проверяется по QR-коду на
+          Документ для проверяющих: право на музыку в этом заведении, ИНН и адрес. Подлинность проверяется по QR-коду на
           нашем сайте, подпись и печать не нужны.
         </p>
 
@@ -48,7 +48,7 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
         </div>
 
         <div className="space-y-1 border-t border-[var(--biz-border)] pt-3 text-sm leading-6">
-          <h3 className="text-sm font-bold text-[var(--biz-text)]">Адрес точки</h3>
+          <h3 className="text-sm font-bold text-[var(--biz-text)]">Адрес заведения</h3>
           {state.venueAddressLine ? (
             <p className="text-[var(--biz-text)]">{state.venueName} – {state.venueAddressLine}</p>
           ) : (
@@ -56,7 +56,7 @@ export default function BusinessCertificateSetup({ context }: { context: Cabinet
           )}
           {context.canEditIdentity ? (
             <Link href="/preferences#venue" className="font-semibold text-[var(--biz-accent)] underline underline-offset-2" data-testid="biz-certificate-address-link">
-              {state.venueAddressLine ? "Изменить адрес точки" : "Указать адрес точки"}
+              {state.venueAddressLine ? "Изменить адрес заведения" : "Указать адрес заведения"}
             </Link>
           ) : null}
         </div>

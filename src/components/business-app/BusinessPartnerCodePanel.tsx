@@ -93,7 +93,7 @@ export default function BusinessPartnerCodePanel({ canPay }: { canPay: boolean }
         Подарочный код
       </label>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Введите код из персонального приглашения. До оплаты вы увидите новую цену рядом с обычной – для всех точек
+        Введите код из персонального приглашения. До оплаты вы увидите новую цену рядом с обычной – для всех заведений
         аккаунта.
       </p>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-partner-code-hold-hint">

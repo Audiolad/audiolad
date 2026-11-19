@@ -68,9 +68,9 @@ function moscowYear(date: Date): string {
 export function ruVenuesWord(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "точка";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "точки";
-  return "точек";
+  if (mod10 === 1 && mod100 !== 11) return "заведение";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "заведения";
+  return "заведений";
 }
 
 /** «10 ноября – 10 декабря 2026», or both years when the period crosses the new year. */

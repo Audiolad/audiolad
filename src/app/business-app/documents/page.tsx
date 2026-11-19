@@ -195,7 +195,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               data-doc-link="legal-section" 
             >
               <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">Правовая информация «АудиоЛад Кофейня»</div>
-              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">Как устроены права на музыку, защита заведения, сертификат точки и проверка по QR-коду.</p>
+              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">Как устроены права на музыку, защита заведения, сертификат заведения и проверка по QR-коду.</p>
               <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть</span>
             </a>
           </li>

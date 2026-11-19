@@ -10,7 +10,7 @@ import { loadCabinetCertificateContext } from "@/lib/business/legal/certificate-
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Сертификат точки – АудиоЛад Кофейня",
+  title: "Сертификат заведения – АудиоЛад Кофейня",
   robots: { index: false, follow: false },
 };
 
@@ -38,7 +38,7 @@ export default async function BusinessCertificatePage() {
         </>
       ) : (
         <section className="business-app-card space-y-3" data-testid="biz-certificate-not-ready">
-          <h1 className="text-[1.3rem] font-bold text-[var(--biz-text)]">Сертификат точки</h1>
+          <h1 className="text-[1.3rem] font-bold text-[var(--biz-text)]">Сертификат заведения</h1>
           {context.kind === "ready" && context.state.kind === "missing" ? (
             <ul className="space-y-1 text-sm leading-6">
               {context.state.missing.map((m) => (

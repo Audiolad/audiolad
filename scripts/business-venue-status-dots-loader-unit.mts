@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * loadVenueStatusDots + small UI contracts for «Мои точки» status circles (t1309u review).
+ * loadVenueStatusDots + small UI contracts for «Мои заведения» status circles (t1309u review).
  * Mocks createServiceRoleClient; no live DB.
  */
 import assert from "node:assert/strict";
@@ -271,7 +271,7 @@ const cssSrc = readFileSync(new URL("../src/components/business-app/business-app
 assert.match(slotsSrc, /data-testid="biz-venue-status-legend"/, "legend present");
 assert.match(slotsSrc, /HALL_STALE_BUILD_NOTE/);
 assert.match(slotsSrc, /biz-venue-stale-build-notes/);
-assert.match(slotsSrc, /aria-label="Обозначения статуса точек"/);
+assert.match(slotsSrc, /aria-label="Обозначения статуса заведений"/);
 assert.match(slotsSrc, /VENUE_STATUS_LEGEND\.map/);
 assert.match(slotsSrc, /aria-label=\{ariaLabel\}/);
 assert.match(slotsSrc, /\$\{label\} – \$\{status\.label\}/, "aria-label includes status");

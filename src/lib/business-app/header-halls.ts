@@ -1,4 +1,4 @@
-/** Existing halls only, in the same array order as «Мои точки». */
+/** Existing halls only, in the same array order as «Мои заведения». */
 export type BusinessHeaderHall = { id: string; name: string; status: string };
 
 export function businessHeaderHallOptions(
@@ -11,7 +11,7 @@ export function businessHeaderHallOptions(
     id: `venue-${hall.id}`,
     locationId: hall.id,
     label: labels.filter((label) => label === labels[index]).length > 1
-      ? `Точка ${index + 1}: ${labels[index]}` : labels[index],
+      ? `Заведение ${index + 1}: ${labels[index]}` : labels[index],
     selected: venueOn && hall.id === currentLocationId,
     disabled: hall.status !== "active",
     hall,

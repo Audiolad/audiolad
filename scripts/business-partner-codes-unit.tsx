@@ -135,12 +135,12 @@ assert.equal(parsePartnerQuote({ source: "weird" }), null);
 const last = parsePartnerQuote({ source: "entitlement", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1,
   total_minor: 39900, discount_periods: 3, period_index: 3, periods_used: 2 });
 assert.ok(last);
-assert.deepEqual(partnerQuoteTermsLines(last), ["Это последний период по персональной цене.", "Затем – обычная цена 799 ₽ за точку за 30 дней."]);
+assert.deepEqual(partnerQuoteTermsLines(last), ["Это последний период по персональной цене.", "Затем – обычная цена 799 ₽ за заведение за 30 дней."]);
 const finished = parsePartnerQuote({ source: "finished", unit_price_minor: 79900, standard_unit_price_minor: 79900, venue_count: 2,
   total_minor: 159800, discount_periods: 3, periods_used: 3 });
 assert.ok(finished);
 assert.equal(partnerQuoteIsDiscounted(finished), false, "after the window no discount is shown");
-assert.match(partnerFinishedNotice(finished) ?? "", /Персональная цена закончилась: оплачено 3 оплаченных периода\. Сейчас действует обычная цена – 799 ₽ за точку за 30 дней\./);
+assert.match(partnerFinishedNotice(finished) ?? "", /Персональная цена закончилась: оплачено 3 оплаченных периода\. Сейчас действует обычная цена – 799 ₽ за заведение за 30 дней\./);
 assert.equal(ruPeriodsWord(1), "оплаченный период");
 
 // A late bank confirmation of a replaced link: shown plainly, never a bare personal price.
@@ -148,7 +148,7 @@ const revokedLate = parsePartnerQuote({ source: "standard", unit_price_minor: 79
   total_minor: 79900, late_payment: { reason: "partner_code_revoked", paid_at: "2026-11-09T07:00:00Z", period_end: "2026-12-09T07:00:00Z" } });
 assert.ok(revokedLate?.latePayment);
 assert.equal(partnerLatePaymentNotice(revokedLate),
-  "Персональный код отозван до первой оплаты. Оплата от 9 ноября засчитана полностью: доступ продлён до 9 декабря. Скидка по коду больше не действует, следующая оплата – по обычной цене 799 ₽ за точку.");
+  "Персональный код отозван до первой оплаты. Оплата от 9 ноября засчитана полностью: доступ продлён до 9 декабря. Скидка по коду больше не действует, следующая оплата – по обычной цене 799 ₽ за заведение.");
 assert.doesNotMatch(partnerLatePaymentNotice(revokedLate) ?? "", /399/, "no bare personal price");
 const replacedLate = parsePartnerQuote({ source: "reserved", unit_price_minor: 39900, standard_unit_price_minor: 79900, venue_count: 1,
   total_minor: 39900, discount_periods: 3, period_index: 1, periods_used: 0,
@@ -267,10 +267,10 @@ const midBanner = renderToStaticMarkup(<BusinessPartnerHomeBanner quote={mid} />
 assert.match(midBanner, /Скидка на оплату 2 из 3/);
 assert.doesNotMatch(terms, /biz-partner-reservation/, "no hold note without a hold end");
 assert.match(terms, /скидка 50%/);
-assert.match(terms, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>[\s\S]*за точку/);
-assert.match(terms, /Точек: 2\. Итого:[\s\S]*<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/);
+assert.match(terms, /<s[^>]*>799\u00a0₽<\/s> <strong[^>]*>399\u00a0₽<\/strong>[\s\S]*за заведение/);
+assert.match(terms, /Заведений: 2\. Итого:[\s\S]*<s[^>]*>1598\u00a0₽<\/s> <strong[^>]*>798\u00a0₽<\/strong>/);
 assert.match(terms, /3 оплаченных периода по 30 дней с первой оплаты/);
-assert.match(terms, /Затем – обычная цена 799 ₽ за точку за 30 дней/);
+assert.match(terms, /Затем – обычная цена 799 ₽ за заведение за 30 дней/);
 assert.doesNotMatch(terms, /399\.5|399,5|—/, "no kopecks, no em dash");
 
 // The shared «Оплатить» block: discounted terms replace the 799 line; the standard path is unchanged.

@@ -92,15 +92,15 @@ export default function BusinessPartnerLanding({ offer, signedIn }: { offer: Par
       </h1>
       <p className="text-xl">
         <BusinessStruckPrice standardRub={offer.standardUnitPriceRub} priceRub={offer.unitPriceRub} testId="biz-partner-landing-price" />{" "}
-        за точку {BUSINESS_PLAN_PERIOD_LABEL}
+        за заведение {BUSINESS_PLAN_PERIOD_LABEL}
       </p>
       <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-[var(--biz-text-muted)]">
         <li>
           Цена действует {periods} {ruPeriodsWord(periods)} по {BUSINESS_PAID_PERIOD_DAYS} дней, считая с первой оплаты.
         </li>
-        <li>Одна цена для всех точек аккаунта, в том числе добавленных за это время.</li>
+        <li>Одна цена для всех заведений аккаунта, в том числе добавленных за это время.</li>
         <li>
-          Затем – обычная цена {offer.standardUnitPriceRub} ₽ за точку {BUSINESS_PLAN_PERIOD_LABEL}. Автосписания нет.
+          Затем – обычная цена {offer.standardUnitPriceRub} ₽ за заведение {BUSINESS_PLAN_PERIOD_LABEL}. Автосписания нет.
         </li>
         <li>Сначала – {BUSINESS_GIFT_TITLE.toLowerCase()}: без карты, они не входят в эти оплаты.</li>
         <li>{PARTNER_CODE_RESERVATION_HINT}</li>

@@ -110,7 +110,7 @@ assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-te
 {
   // Edition 2 (09.11.2026): an owner who accepted edition 1 is asked once more, per account, before the next payment.
   const pending = card({ ...ownerDomain, offerAccepted: false, offerNewEditionPending: true }, grace);
-  assert.match(pending, /Опубликована новая редакция договора-оферты\. Примите её перед следующей оплатой – один раз для всего аккаунта и всех точек\./);
+  assert.match(pending, /Опубликована новая редакция договора-оферты\. Примите её перед следующей оплатой – один раз для всего аккаунта и всех заведений\./);
   assert.match(pending, /data-testid="biz-home-accept"/);
   assert.doesNotMatch(pending, /data-testid="biz-home-pay-button"/, "checkout needs the current edition");
   assert.doesNotMatch(pending, /Перед первой оплатой/);
@@ -121,7 +121,7 @@ assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-te
   assert.match(pending, /id="biz-offer-accept-[A-Za-z0-9_-]+"[^>]*data-testid="biz-home-accept"/);
   // The regular tariff per point is shown before payment, as section 4 item 1 of the offer says.
   const multi = card({ ...ownerDomain, offerAccepted: true, pilotSlots: true, locations: [{ status: "active" }, { status: "active" }] } as unknown as BusinessOwnerHomeContext, grace);
-  assert.match(multi, /Тариф – 799 ₽ за одну точку на 30 дней\. Итого 1598 ₽ за все активные точки\./);
+  assert.match(multi, /Тариф – 799 ₽ за одно заведение на 30 дней\. Итого 1598 ₽ за все активные заведения\./);
   // Access is never gated on the offer: only the pay controls read it.
   for (const f of ["src/lib/access-grants/policy.ts", "src/lib/business-app/proxy-policy.ts"]) {
     assert.doesNotMatch(readFileSync(f, "utf8"), /offerAccepted|offerNewEditionPending|business_offer_edition/, f);

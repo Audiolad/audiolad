@@ -107,9 +107,9 @@ export default function BusinessPointSlots() {
     start(async () => {
       try {
         const result = slot.location ? await selectBusinessPoint(slot.location.id) : await activateBusinessPoint(slot.number);
-        if (!result.ok) { setError("Не удалось выбрать или активировать точку. Обновите страницу и повторите."); return; }
+        if (!result.ok) { setError("Не удалось выбрать или активировать заведение. Обновите страницу и повторите."); return; }
       } catch {
-        setError("Не удалось выбрать или активировать точку. Обновите страницу и повторите.");
+        setError("Не удалось выбрать или активировать заведение. Обновите страницу и повторите.");
         return;
       }
       // The action sets the selected hall cookie and revalidates the layout, including cached forms.
@@ -122,14 +122,14 @@ export default function BusinessPointSlots() {
   const writeLink = (
     <Link className="business-app-btn business-app-btn-primary business-app-focus-ring mt-3 inline-flex" href="/profile#kontakty" data-testid="biz-more-points-write">Написать</Link>
   );
-  return <section className="business-app-card mx-auto mb-4 max-w-3xl space-y-3" aria-label="Точки организации">
-    <h2 className="text-lg font-bold">Мои точки</h2>
+  return <section className="business-app-card mx-auto mb-4 max-w-3xl space-y-3" aria-label="Заведения организации">
+    <h2 className="text-lg font-bold">Мои заведения</h2>
     <div className="flex flex-wrap gap-2">
       {slots.map((slot) => {
         const status = slot.location ? statusById.get(slot.location.id) : undefined;
         // Before the first owner-state poll, status is unknown – not "not paired" (grey).
         const dotKind = status?.color ?? (slot.location ? "pending" : null);
-        const label = slot.location ? `Точка ${slot.number}: ${slot.location.name}` : `+ Добавить точку ${slot.number}`;
+        const label = slot.location ? `Заведение ${slot.number}: ${slot.location.name}` : `+ Добавить заведение ${slot.number}`;
         const ariaLabel = status ? `${label} – ${status.label}` : label;
         return <button key={slot.number} type="button"
           className={slot.location
@@ -156,13 +156,13 @@ export default function BusinessPointSlots() {
       <ul className="space-y-1" data-testid="biz-venue-stale-build-notes" aria-label="Устройства на старой версии">
         {slots.filter((slot) => slot.location && statusById.get(slot.location.id)?.staleBuild).map((slot) => (
           <li key={slot.number} className="text-sm text-[var(--biz-text-muted)]" data-testid={`biz-venue-stale-build-${slot.location!.id}`}>
-            Точка {slot.number}: {HALL_STALE_BUILD_NOTE}
+            Заведение {slot.number}: {HALL_STALE_BUILD_NOTE}
           </li>
         ))}
       </ul>
     ) : null}
     {halls.length > 0 ? (
-      <ul className="business-venue-status-legend" aria-label="Обозначения статуса точек" data-testid="biz-venue-status-legend">
+      <ul className="business-venue-status-legend" aria-label="Обозначения статуса заведений" data-testid="biz-venue-status-legend">
         {VENUE_STATUS_LEGEND.map((item) => (
           <li key={item.color}>
             <span className={`business-venue-status-dot business-venue-status-dot--${item.color}`} aria-hidden="true" />
@@ -172,21 +172,21 @@ export default function BusinessPointSlots() {
       </ul>
     ) : null}
     {addingTenth ? <div className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-tenth-point-notice">
-      <p className="text-sm text-[var(--biz-text-muted)]">Сейчас вы подключаете десятую точку. В этой конфигурации точек десять. Одиннадцатую так же подключить нельзя – нужно чуть изменить конфигурацию. Если планируете подключать ещё, напишите заранее – подберём под вас отдельную структуру.</p>
+      <p className="text-sm text-[var(--biz-text-muted)]">Сейчас вы подключаете десятое заведение. В этой конфигурации заведений десять. Одиннадцатое так же подключить нельзя – нужно чуть изменить конфигурацию. Если планируете подключать ещё, напишите заранее – подберём под вас отдельную структуру.</p>
       {writeLink}
     </div> : null}
     {atCap ? <div className="rounded-xl border border-[var(--biz-border)] p-3" data-testid="biz-more-points">
       <p className="text-sm text-[var(--biz-text-muted)]">{limit >= 10
-        ? "Спасибо, что вы с нами и развиваете сеть. В этой конфигурации можно подключить десять точек; одиннадцатую так же добавить нельзя. Если планируете больше, напишите заранее – подберём более удобную схему именно под вашу ситуацию."
+        ? "Спасибо, что вы с нами и развиваете сеть. В этой конфигурации можно подключить десять заведений; одиннадцатое так же добавить нельзя. Если планируете больше, напишите заранее – подберём более удобную схему именно под вашу ситуацию."
         : "Спасибо, что вы с нами и развиваете сеть. Для большей сети мы подберём более удобную схему именно под вашу ситуацию."}</p>
       {writeLink}
     </div> : null}
     {multi ? <>
-    <p className="text-sm text-[var(--biz-text-muted)]">Активных точек: {active}. {partnerQuoteIsDiscounted(quote)
+    <p className="text-sm text-[var(--biz-text-muted)]">Активных заведений: {active}. {partnerQuoteIsDiscounted(quote)
       ? <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-points-price" />
-      : `${active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽`} за 30 дней всего. Одна оплата за все активные точки.</p>
+      : `${active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽`} за 30 дней всего. Одна оплата за все активные заведения.</p>
     {domain.pilotBilling?.paidUntil || access.endsAt ? <p className="text-sm">Следующее продление / конец доступа: {formatMoscowDateTime(new Date(domain.pilotBilling?.paidUntil ?? access.endsAt!))} (МСК).</p> : null}
-    {domain.pilotBilling?.renewalBlocked ? <p role="status">Новая точка пока не оплачена. Она будет включена при следующем продлении; доплата в текущем периоде недоступна.</p> : null}
+    {domain.pilotBilling?.renewalBlocked ? <p role="status">Новое заведение пока не оплачено. Оно будет включено при следующем продлении; доплата в текущем периоде недоступна.</p> : null}
     <BusinessPayControls canPay={payment.canPay} accepted={payment.accepted} busy={payment.busy} error={payment.error}
       onAccept={payment.accept} onPay={payment.pay} receiptEmail={payment.askReceiptEmail ? { value: payment.receiptEmail, onChange: payment.setReceiptEmail } : null} />
     {domain.location ? <p className="text-sm" role="status">

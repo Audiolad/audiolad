@@ -106,20 +106,20 @@ assert.equal(standard.dateLabel, "10 ноября 2026");
 assert.equal(standard.timeLabel, "08:03 МСК");
 assert.equal(standard.amountRub, 799);
 assert.equal(standard.standardAmountRub, null);
-assert.equal(standard.venuesLabel, "1 точка");
+assert.equal(standard.venuesLabel, "1 заведение");
 assert.equal(standard.periodLabel, "10 ноября – 10 декабря 2026");
 assert.equal(partner.dateLabel, "5 ноября 2026");
 assert.equal(partner.timeLabel, "23:30 МСК");
 assert.equal(partner.amountRub, 798);
 assert.equal(partner.standardAmountRub, 1598, "two venues at 399 instead of 799");
-assert.equal(partner.venuesLabel, "2 точки");
+assert.equal(partner.venuesLabel, "2 заведения");
 assert.equal(refund.refunded, true);
-assert.equal(legacy.venuesLabel, "1 точка");
+assert.equal(legacy.venuesLabel, "1 заведение");
 assert.equal(view.totalRub, 799 + 798 + 799, "refunded payment is not counted");
 
 assert.equal(formatBusinessPaidPeriod("2026-12-20T10:00:00Z", "2027-01-19T10:00:00Z"), "20 декабря 2026 – 19 января 2027");
 assert.equal(formatBusinessPaidPeriod("bad", "2027-01-19T10:00:00Z"), "");
-assert.deepEqual([1, 2, 5, 11, 21, 22, 25].map(ruVenuesWord), ["точка", "точки", "точек", "точек", "точка", "точки", "точек"]);
+assert.deepEqual([1, 2, 5, 11, 21, 22, 25].map(ruVenuesWord), ["заведение", "заведения", "заведений", "заведений", "заведение", "заведения", "заведений"]);
 
 const html = renderToStaticMarkup(<BusinessPaymentHistoryList view={view} />);
 assert.ok(html.includes("10 ноября 2026"));
