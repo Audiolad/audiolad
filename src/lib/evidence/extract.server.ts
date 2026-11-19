@@ -135,7 +135,7 @@ export type ExtractResult =
   | { ok: true; id: string; manifestSha256: string; facts: number; plays: number; pdf: boolean }
   | { ok: false; error: "bad_window" | "window_too_long" | "no_location" | "too_many_facts" | "db_error" | "storage_error" };
 
-async function loadLabels(db: Db, ids: string[]) {
+export async function loadTrackLabels(db: Db, ids: string[]) {
   const labels = new Map<string, TrackLabel>();
   const tracks: ExtractManifest["tracks"] = [];
   for (let i = 0; i < ids.length; i += 200) {
@@ -242,7 +242,7 @@ export async function createPlayLogExtract(input: {
   let tracks: ExtractManifest["tracks"];
   const players: ExtractManifest["players"] = [];
   try {
-    ({ labels, tracks } = await loadLabels(db, audioIds));
+    ({ labels, tracks } = await loadTrackLabels(db, audioIds));
     if (playerIds.length) {
       const { data, error } = await db.from("business_players").select("id, player_code, display_name").in("id", playerIds);
       if (error) throw new Error("evidence_players_failed");
