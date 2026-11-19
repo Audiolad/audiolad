@@ -14,6 +14,8 @@ import { businessHallDeviceLocked } from "@/lib/business-app/cabinet-mode.server
 import { BUSINESS_SITE_PATH } from "@/lib/business-app/host";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { collectionVenueGate } from "@/lib/business-collections/load.server";
+import { COLLECTION_ENTRY_COPY } from "@/lib/business-collections/entry";
 
 export type BootstrapBusinessDomainResult =
   | { ok: true; organizationId: string; locationId: string; zoneId: string }
@@ -35,6 +37,17 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
 
   if (!user) {
     return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
+  }
+
+  // t1616u: a personal-link visitor gets a venue only bound to a live collection with a free place,
+  // so the venue inherits it; a full, revoked or other collection never yields the whole catalog.
+  try {
+    const gate = await collectionVenueGate(user.id);
+    if (!gate.ok) {
+      return { ok: false, error: COLLECTION_ENTRY_COPY[gate.reason === "unavailable" ? "gone" : gate.reason] };
+    }
+  } catch {
+    return { ok: false, error: "Не удалось подключить заведение. Попробуйте ещё раз." };
   }
 
   const countryCode = (input.countryCode ?? "RU").trim().toUpperCase();

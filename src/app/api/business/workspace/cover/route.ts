@@ -34,6 +34,7 @@ export async function GET(request: Request) {
     spaceId: actor.space.id,
     locationId: actor.locationId,
     spaceEnabled: actor.space.enabled,
+    ownerBrowser: !actor.device,
   });
   if (!allowed || !allowed.includes(audioItemId)) return notFound();
 

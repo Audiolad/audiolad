@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import { useBusinessChromeAccess, useHasLiveBusinessAccess } from "./BusinessAccessLine";
 import { BusinessPayControls, useBusinessHomePay } from "./BusinessHomeAccessCard";
 import { formatMoscowDateTime } from "@/lib/access-grants/policy";
@@ -97,6 +98,7 @@ export default function BusinessPointSlots() {
   const statusById = useMemo(() => new Map(venueDots.map((row) => [row.locationId, row])), [venueDots]);
   const limit = domain.status === "authenticated" ? domain.venueSlotLimit ?? 1 : 1;
   // Same rule for every owner: one hall at start, «Добавить» up to the system limit.
+  const quiet = useBusinessQuiet();
   if (cabinet.side === "venue" || domain.status !== "authenticated" || limit < 2) return null;
   const halls = domain.locations ?? [];
   const slots = businessPilotSlots(halls, limit);
@@ -181,7 +183,7 @@ export default function BusinessPointSlots() {
         : "Спасибо, что вы с нами и развиваете сеть. Для большей сети мы подберём более удобную схему именно под вашу ситуацию."}</p>
       {writeLink}
     </div> : null}
-    {multi ? <>
+    {multi && !quiet ? <>
     <p className="text-sm text-[var(--biz-text-muted)]">Активных заведений: {active}. {partnerQuoteIsDiscounted(quote)
       ? <BusinessStruckPrice standardRub={quote.standardTotalRub} priceRub={quote.totalRub} testId="biz-points-price" />
       : `${active * BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽`} за 30 дней всего. Одна оплата за все активные заведения.</p>

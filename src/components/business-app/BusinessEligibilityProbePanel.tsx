@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { useBusinessHostname, useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import { businessAuthHref } from "@/lib/access-grants/paths";
 
 import { resolveBusinessAirplayEligibilityProbe } from "@/app/business-app/actions";
@@ -29,6 +30,7 @@ export default function BusinessEligibilityProbePanel({
   compact?: boolean;
 }) {
   const domain = useBusinessDomain();
+  const quiet = useBusinessQuiet();
   const hostname = useBusinessHostname();
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
 
@@ -89,7 +91,7 @@ export default function BusinessEligibilityProbePanel({
           <h2 className="text-lg font-bold text-[var(--biz-text)]">
             {compact && probe.status !== "idle" ? "Музыка для заведения" : empty.title}
           </h2>
-          <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{empty.description}{!domain.location ? <> <Link href="/onboarding" className="underline">Подключить заведение</Link></> : null}</p>
+          <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{empty.description}{!domain.location ? <> <Link href="/onboarding" className="underline">{quiet ? "Создать заведение" : "Подключить заведение"}</Link></> : null}</p>
           <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
             Проверяем разрешение на воспроизведение. Отсутствие сведений не означает, что права подтверждены.</p>
         </div>
