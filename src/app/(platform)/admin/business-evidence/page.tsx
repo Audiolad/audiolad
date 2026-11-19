@@ -8,6 +8,8 @@ import BusinessEvidenceMatcherPanel, {
 } from "@/components/admin/BusinessEvidenceMatcherPanel";
 import { requirePlatformOwnerAccess } from "@/lib/admin/require-platform-owner";
 import { BUSINESS_EVIDENCE_HREF, JOB_STATE_TEXT } from "@/lib/evidence/constants";
+import { REGISTRY_STATUS_TEXT } from "@/lib/evidence/index-registry";
+import { ensureIndexRegisteredSafe } from "@/lib/evidence/index-registry.server";
 import { listJobs, loadEngineState } from "@/lib/evidence/matcher.server";
 import { listEvidenceLocations, listExtracts } from "@/lib/evidence/extract.server";
 import { formatLocal } from "@/lib/evidence/play-log";
@@ -45,13 +47,17 @@ export default async function AdminBusinessEvidencePage() {
       files: x.files,
     }));
     const engine = await loadEngineState();
+    // M4: the active index version goes into the append-only registry (once per version).
+    const registry = engine.index
+      ? await ensureIndexRegisteredSafe(engine.index.version)
+      : null;
     const mb = (n: number | null) => (n === null ? "" : `, ${Math.max(1, Math.round(n / 1024 / 1024))} МБ`);
     index = {
       ready: engine.ready,
       installed: engine.pythonOk,
       olaf: engine.olafOk && engine.index?.olaf.available !== false,
       summary: engine.index
-        ? `Версия ${engine.index.version} от ${formatLocal(engine.index.builtAt, "Europe/Moscow")} МСК: треков каталога ${engine.index.counts.catalog}, контрольных чужих ${engine.index.counts.control}${mb(engine.index.sizeBytes)}.`
+        ? `Версия ${engine.index.version} от ${formatLocal(engine.index.builtAt, "Europe/Moscow")} МСК: треков каталога ${engine.index.counts.catalog}, контрольных чужих ${engine.index.counts.control}${mb(engine.index.sizeBytes)}.${registry ? ` ${REGISTRY_STATUS_TEXT[registry.status].replace(/^./, (c) => c.toUpperCase())}${registry.registered_at ? ` ${formatLocal(registry.registered_at, "Europe/Moscow")} МСК` : ""}.` : ""}`
         : null,
       build: engine.build
         ? engine.build.state === "running"

@@ -117,6 +117,11 @@ if (process.env.EVIDENCE_TEST_REQUIRE_PDF === "1") {
   assert.ok(existsSync(join(dir, "extract.pdf")));
 }
 assert.ok(!readdirSync(dir).some((n) => n.startsWith(".")));
+// No ledger RPC in this fake database: the extract is made and says so (migration not applied).
+assert.equal(manifest.schema, "audiolad.evidence.play-log-extract/2");
+assert.equal(manifest.ledger.available, false);
+assert.match(readFileSync(join(dir, "VERIFY.txt"), "utf8"), /Печати часов журнала в этой выписке недоступны/);
+assert.match(factsCsv.split("\r\n")[0], /,client_offline,device_occurred_at_utc$/);
 
 // A renderer that crashes mid-write leaves nothing unsealed in the published folder.
 {
@@ -173,6 +178,88 @@ assert.deepEqual(nowhere, { ok: false, error: "no_location" });
   assert.equal(one.ok, true);
 }
 
+// t1578u M3: hourly seals in the manifest; M2 columns with a fallback before the migration.
+{
+  const H = 3600_000;
+  const hour0 = Math.floor(T0 / H) * H;
+  const seal = (k: number) => ({
+    period_start: new Date(hour0 + k * H).toISOString(), period_end: new Date(hour0 + (k + 1) * H).toISOString(),
+    fact_count: 360, listened_ms: 3_600_000, facts_sha256: String(k).repeat(64).slice(0, 64),
+    prev_chain_sha256: "0".repeat(64), chain_sha256: String(k + 1).repeat(64).slice(0, 64), canon_version: 1,
+  });
+  const seals = [seal(0), seal(1), seal(2)];
+  const ledgerDb = (rows: unknown[], opts: { tampered?: boolean; legacyOnly?: boolean } = {}) => {
+    const base = fakeDb(rows) as unknown as { from(t: string): Record<string, unknown> };
+    const calls: string[] = [];
+    return {
+      calls,
+      rpc(name: string, args: Record<string, unknown>) {
+        calls.push(name);
+        if (name === "seal_playback_usage_facts") return Promise.resolve({ data: 0, error: null });
+        if (name === "verify_playback_usage_fact_seal") {
+          const ok = !(opts.tampered && args.p_period_start === seals[1].period_start);
+          return Promise.resolve({ data: [{ period_start: args.p_period_start, ok, chain_ok: true, fact_count: 360 }], error: null });
+        }
+        return Promise.resolve({ data: null, error: { code: "PGRST202", message: "not found" } });
+      },
+      from(table: string) {
+        if (table === "playback_usage_facts" && opts.legacyOnly) {
+          const b = base.from(table);
+          let cols = "";
+          const select = b.select as (c: string) => unknown;
+          b.select = (c: string) => { cols = c; select(c); return b; };
+          const range = b.range as (f: number, t: number) => Promise<unknown>;
+          b.range = (f: number, t: number) => /client_offline/.test(cols)
+            ? Promise.resolve({ data: null, error: { code: "42703", message: "column playback_usage_facts.client_offline does not exist" } })
+            : range(f, t);
+          return b;
+        }
+        if (table !== "playback_usage_fact_seals") return base.from(table);
+        const out = [...seals];
+        const b: Record<string, unknown> = {};
+        b.select = () => b;
+        b.gte = () => b;
+        b.lte = () => b;
+        b.order = (_c: string, o: { ascending: boolean }) => { out.sort((x, y) => (o.ascending ? 1 : -1) * x.period_start.localeCompare(y.period_start)); return b; };
+        b.limit = (n: number) => Promise.resolve({ data: out.slice(0, n), error: null });
+        return b;
+      },
+    };
+  };
+  const rows = makeFacts(2500); // created_at 09:00:00.040 … 15:56:30.040 UTC: 7 hours
+  const db = ledgerDb(rows);
+  const r = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: db as never });
+  assert.equal(r.ok, true);
+  if (!r.ok) throw new Error("unreachable");
+  const ldir = join(root, "extracts", r.id);
+  const m = JSON.parse(readFileSync(join(ldir, "manifest.json"), "utf8"));
+  assert.equal(db.calls[0], "seal_playback_usage_facts");
+  assert.equal(m.ledger.available, true);
+  assert.equal(m.ledger.hours_touched, 7);
+  assert.equal(m.ledger.hours_sealed, 3);
+  assert.equal(m.ledger.all_sealed_hours_verified, true);
+  assert.equal(m.ledger.facts_in_unsealed_hours, 2500 - 3 * 360);
+  assert.equal(m.ledger.chain_head.period_start, seals[2].period_start);
+  assert.equal(m.ledger.seals[1].chain_sha256, seals[1].chain_sha256);
+  const verifyTxt = readFileSync(join(ldir, "VERIFY.txt"), "utf8");
+  assert.match(verifyTxt, /запечатано 3 из 7 ч/);
+  assert.match(verifyTxt, /перепроверены базой при выписке: да/);
+  // VERIFY.txt is itself hashed in the manifest.
+  assert.equal(m.files.find((f: { name: string }) => f.name === "VERIFY.txt").sha256, createHash("sha256").update(verifyTxt).digest("hex"));
+
+  const bad = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: ledgerDb(rows, { tampered: true }) as never });
+  assert.equal(bad.ok, true);
+  if (bad.ok) {
+    const mb = JSON.parse(readFileSync(join(root, "extracts", bad.id, "manifest.json"), "utf8"));
+    assert.equal(mb.ledger.all_sealed_hours_verified, false);
+    assert.equal(mb.ledger.seals[1].verified, false);
+    assert.match(readFileSync(join(root, "extracts", bad.id, "VERIFY.txt"), "utf8"), /при выписке: НЕТ/);
+  }
+
+  const legacy = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db: ledgerDb(makeFacts(30), { legacyOnly: true }) as never });
+  assert.equal(legacy.ok, true, JSON.stringify(legacy));
+}
+
 // Static guards.
 const page = readFileSync("src/app/(platform)/admin/business-evidence/page.tsx", "utf8");
 assert.match(page, /requirePlatformOwnerAccess/);
@@ -181,7 +268,8 @@ assert.match(action, /requirePlatformOwnerAccess/);
 const route = readFileSync("src/app/api/admin/business-evidence/extract/route.ts", "utf8");
 assert.match(route, /getPlatformOwnerSessionIfOwner/);
 for (const f of [page, action, route, readFileSync("src/components/admin/BusinessEvidenceExtractPanel.tsx", "utf8"),
-  readFileSync("scripts/evidence/render_extract_pdf.py", "utf8"), readFileSync("src/lib/evidence/extract.server.ts", "utf8")]) {
+  readFileSync("scripts/evidence/render_extract_pdf.py", "utf8"), readFileSync("src/lib/evidence/extract.server.ts", "utf8"),
+  readFileSync("src/lib/evidence/ledger.ts", "utf8"), readFileSync("src/lib/evidence/ledger.server.ts", "utf8")]) {
   assert.doesNotMatch(f, /—/);
 }
 const nav = readFileSync("src/lib/admin/nav.ts", "utf8");
