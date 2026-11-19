@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +29,7 @@ import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.serv
 import {
   getHostnameFromHeaders,
   isBusinessHostname,
+  isCoffeeHostname,
 } from "@/lib/business-app/host";
 import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
 import { BUSINESS_THEMES, resolveBusinessTheme } from "@/lib/business-app/theme";
@@ -58,6 +61,9 @@ export default async function BusinessAppLayout({
   // owner | preview | point from one table (cabinet-mode.ts): the hall device is the venue side
   // until the owner re-enters the password on it; the owner's preview never reports as a point.
   const cabinet = await loadBusinessCabinetMode();
+  // Preview permission only: never activates a gift, and hall devices keep their venue scope.
+  const personalCollection = isCoffeeHostname(hostname) && cabinet.mode !== "point"
+    ? await rememberPersonalCollection().catch(() => null) : null;
   // A revoked or unchecked device cookie keeps the hall menu but sends no player reports.
   const pointReports = businessPointReports(cabinet) && cabinet.deviceStatus === "alive";
   const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;
@@ -110,7 +116,10 @@ export default async function BusinessAppLayout({
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain} hostname={hostname} guestStartEnabled={businessGuestStartConfig(process.env).available} attributionEnabled={attributionEnabled}>
         {attributionEnabled ? <BusinessAttributionCapture /> : null}
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports} initialEntry={initialEntry} cabinetMode={cabinetMode}>
+          {personalCollection ? <p className="business-app-span-full px-4"><Link href="/collection" className="underline">Ваша подборка: {personalCollection.title}</Link></p> : null}
+          {children}
+        </BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

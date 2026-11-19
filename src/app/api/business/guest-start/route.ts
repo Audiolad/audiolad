@@ -1,3 +1,4 @@
+import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -116,6 +117,10 @@ async function handle(request: Request) {
     },
     log: (code) => console.warn(code),
   });
+  if (result.body.ok) {
+    try { await rememberPersonalCollection(); }
+    catch { return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: result.headers }); }
+  }
   return NextResponse.json(result.body, { status: result.status, headers: result.headers });
 }
 export const POST = handle;

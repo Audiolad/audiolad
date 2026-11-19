@@ -95,7 +95,8 @@ function BusinessShellFrame({ children, pointReports, initialGuestLimit }: { chi
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  const showGuestBar = access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
+  const personalCollection = pathname === "/collection";
+  const showGuestBar = !personalCollection && access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess && cabinet.can("accessLine");
   const showAccessLine = liveAccess && !cabinetMusic && cabinet.can("accessLine");
 
   return (

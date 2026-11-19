@@ -21,6 +21,7 @@ export default async function ClosedBusinessCatalogPage() {
       <p className="mt-3 inline-flex max-w-full rounded-full border border-[#eadff8] bg-[#faf6ff] px-3 py-1 text-sm font-medium text-[#5f5484]">{BUSINESS_ONLY_BADGE}</p>
       <p className="mt-3 max-w-[760px] text-sm leading-6 text-[#5f5484]">Человек вручную создаёт, выбирает и мастерит музыку. Администратор загружает мастер и заполняет паспорт. Допуск не публикует альбом автоматически. Права, направления для заведений и качество звука проверяются отдельно.</p>
     </div>
+    <Link href="/admin/business-catalog/collections" className={linkCardClassName}>Персональные подборки Кофейни</Link>
     <CreateClosedAlbum authors={authors} />
     <ClosedCatalogOnlySettings authors={visibleClosedCatalogOnlySettingsAuthors(authors)} />
     <ClosedAlbumWork albums={albums} catalogLicenseRef={catalogLicenseRef} catalogDefaults={catalogDefaults} />

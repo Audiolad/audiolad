@@ -27,6 +27,10 @@ export const BUSINESS_PUBLIC_ASSET_PATHS = [
 /** Minimal platform telemetry endpoints still hit by root BaseProviders. */
 export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/guest-start",
+  "/api/business/collections/open",
+  "/api/business/collections/audio",
+  "/api/business/collections/cover",
+  "/api/business/collections/state",
   "/api/client-errors",
   "/api/health/build",
   // c02fe282: stable (build-independent) /spa player endpoints.

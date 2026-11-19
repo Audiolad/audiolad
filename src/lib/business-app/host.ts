@@ -62,6 +62,7 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/cabinet": BUSINESS_SITE_PATH,
   "/locations": `${BUSINESS_SITE_PATH}/locations`,
   "/music": `${BUSINESS_SITE_PATH}/music`,
+  "/collection": `${BUSINESS_SITE_PATH}/collection`,
   "/stats": `${BUSINESS_SITE_PATH}/stats`,
   "/more": `${BUSINESS_SITE_PATH}/more`,
   "/announcements": `${BUSINESS_SITE_PATH}/announcements`,
