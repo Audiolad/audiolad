@@ -5,14 +5,14 @@ import { SERGEY_CONTACT } from "@/lib/business-app/sergey-contact";
 /**
  * Правовой раздел «АудиоЛад Кофейня» – audiolad.ru/b/coffee/legal (t1544u, t1567u).
  * Раздел скрыт от поиска: noindex, nofollow, нет в sitemap, нет ссылок из меню и подвала сайта.
- * Открывается по прямой ссылке; на него ссылается кабинет владельца (договор, сертификат точки)
+ * Открывается по прямой ссылке; на него ссылается кабинет владельца (договор, сертификат заведения)
  * и QR-код сертификата (t1591u).
  */
 export const BUSINESS_LEGAL_HREF = "/b/coffee/legal";
 export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/coffee/legal/prava";
 export const BUSINESS_LEGAL_PROTECTION_HREF = "/b/coffee/legal/zashchita";
 export const BUSINESS_LEGAL_CERTIFICATE_HREF = "/b/coffee/legal/sertifikat";
-/** Договор-оферта «АудиоЛад Кофейня», ред. 3, с приложениями 1–4 (t1591u). */
+/** Договор-оферта «АудиоЛад Кофейня», ред. 4, с приложениями 1–4 (t1595u). */
 export const BUSINESS_LEGAL_OFFER_HREF = "/b/coffee/legal/oferta";
 
 /** Сайт раздела: кабинет живёт на coffee./business., раздел – на audiolad.ru. */
@@ -20,9 +20,9 @@ export const BUSINESS_LEGAL_SITE = "https://audiolad.ru";
 export function businessLegalAbsoluteUrl(path: string): string {
   return `${BUSINESS_LEGAL_SITE}${path}`;
 }
-/** Файлы ред. 3 (тот же текст, что docs/business/public/business-offer.md). */
-export const BUSINESS_LEGAL_OFFER_PDF_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red3.pdf";
-export const BUSINESS_LEGAL_OFFER_DOCX_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red3.docx";
+/** Файлы ред. 4 (тот же текст, что docs/business/public/business-offer.md). Ред. 3 остаётся по прежним путям. */
+export const BUSINESS_LEGAL_OFFER_PDF_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red4.pdf";
+export const BUSINESS_LEGAL_OFFER_DOCX_PATH = "/b-legal/dogovor-oferta-audiolad-kofeynya-red4.docx";
 export const BUSINESS_LEGAL_OFFER_PDF = businessLegalAbsoluteUrl(BUSINESS_LEGAL_OFFER_PDF_PATH);
 
 export const BUSINESS_LEGAL_PATHS = [
@@ -34,7 +34,7 @@ export const BUSINESS_LEGAL_PATHS = [
 ] as const;
 
 /** Редакция договора-оферты, на которую ссылается раздел (решение Сергея, t1551u). */
-export const BUSINESS_LEGAL_OFFER_EDITION = "18.11.2026";
+export const BUSINESS_LEGAL_OFFER_EDITION = "19.11.2026";
 
 /** Сроки (t1551u): заведение сообщает об обращении – 5 рабочих дней; мы отвечаем – 3 рабочих дня. */
 export const BUSINESS_LEGAL_NOTIFY_DAYS = 5;
@@ -80,16 +80,16 @@ export const BUSINESS_LEGAL_SAMPLE_CERTIFICATE: BusinessLegalCertificate = {
   number: "АЛК-2026-000001",
   urlNumber: "ALK-2026-000001",
   isSample: true,
-  issuedAt: "18.11.2026",
-  validUntil: "18.12.2026",
+  issuedAt: "19.11.2026",
+  validUntil: "19.12.2026",
   licensee: "ООО «Кофейня Пример»",
   venue: "Кофейня «Пример» на Примерной",
   venueAddress: "000000, г. Город, ул. Примерная, д. 1",
   catalog: "«АудиоЛад Кофейня»",
 };
 
-export const BUSINESS_LEGAL_SAMPLE_PDF = "/b-legal/sertifikat-tochki-obrazec.pdf";
-export const BUSINESS_LEGAL_SAMPLE_PNG = "/b-legal/sertifikat-tochki-obrazec.png";
+export const BUSINESS_LEGAL_SAMPLE_PDF = "/b-legal/sertifikat-zavedeniya-obrazec.pdf";
+export const BUSINESS_LEGAL_SAMPLE_PNG = "/b-legal/sertifikat-zavedeniya-obrazec.png";
 
 export function businessLegalCertificateHref(urlNumber: string): string {
   return `${BUSINESS_LEGAL_CERTIFICATE_HREF}/${encodeURIComponent(urlNumber)}`;

@@ -16,7 +16,7 @@ export default function BusinessLegalCertificateNotFound() {
           Проверьте номер: он указан в сертификате рядом с датой выдачи. Удобнее всего открыть эту страницу по
           QR-коду. Как устроен сертификат – на странице{" "}
           <Link href={BUSINESS_LEGAL_CERTIFICATE_HREF} className={legalLinkClass} {...legalDocLinkProps}>
-            «Сертификат на точку»
+            «Сертификат на заведение»
           </Link>
           .
         </p>

@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { BUSINESS_LEGAL_OPERATOR } from "./section";
 
 /**
- * Сертификат точки (оферта «АудиоЛад Кофейня», ред. 3, приложение 2; t1591u).
+ * Сертификат заведения (оферта «АудиоЛад Кофейня», ред. 3, приложение 2; t1591u).
  * Снимок данных фиксируется при выдаче. Новый номер выдаётся, когда снимок меняется:
- * новый период доступа, адрес или название точки, ИНН, принятая редакция договора.
+ * новый период доступа, адрес или название заведения, ИНН, принятая редакция договора.
  * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер>.
  */
 
@@ -129,7 +129,7 @@ export function certificateRows(input: { number: string; issuedAt: string; snaps
 
 export type CertificateCheckStatus = "valid" | "expired" | "outdated" | "superseded" | "revoked";
 
-/** Данные, которые должны совпадать у действующего сертификата и у точки сейчас. */
+/** Данные, которые должны совпадать у действующего сертификата и у заведения сейчас. */
 export type CertificateCurrentFacts = {
   venueName: string;
   venueAddress: string | null;
@@ -137,7 +137,7 @@ export type CertificateCurrentFacts = {
   licenseeInactive: boolean;
 };
 
-/** Сертификат перестаёт подтверждать право, как только адрес, название точки или лицензиат изменились. */
+/** Сертификат перестаёт подтверждать право, как только адрес, название заведения или лицензиат изменились. */
 export function certificateSnapshotIsCurrent(snapshot: CertificateSnapshot, now: CertificateCurrentFacts): boolean {
   return (
     !now.licenseeInactive &&
@@ -177,8 +177,8 @@ export const BUSINESS_CERTIFICATE_MISSING_TEXT: Record<CertificateMissing, strin
 
 /**
  * Начало срока доступа в сертификате: самое позднее начало среди окон, которые идут сейчас (подарочная неделя,
- * оплаченные периоды владельца). Берём позднее, чтобы срок никогда не начинался раньше, чем доступ этой точки:
- * продление начинается после текущего периода, а оплата другой точки может покрывать то же время.
+ * оплаченные периоды владельца). Берём позднее, чтобы срок никогда не начинался раньше, чем доступ этого заведения:
+ * продление начинается после текущего периода, а оплата другого заведения может покрывать то же время.
  */
 export function currentAccessStart(windows: readonly { start: string; end: string }[], now: Date): string | null {
   const t = now.getTime();

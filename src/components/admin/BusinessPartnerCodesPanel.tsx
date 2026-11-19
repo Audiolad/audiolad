@@ -141,7 +141,7 @@ export default function BusinessPartnerCodesPanel({ rows }: { rows: PartnerCodeA
           <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-sm">Кому / заметка
             <input className={INPUT} value={note} maxLength={200} onChange={(event) => setNote(event.target.value)} placeholder="Например: кастдев, кофейня на Ленина" />
           </label>
-          <label className="flex w-[140px] flex-col gap-1 text-sm">Цена за точку, ₽
+          <label className="flex w-[140px] flex-col gap-1 text-sm">Цена за заведение, ₽
             <input className={INPUT} inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value)} />
           </label>
           <label className="flex w-[140px] flex-col gap-1 text-sm">Оплаченных периодов
@@ -149,7 +149,7 @@ export default function BusinessPartnerCodesPanel({ rows }: { rows: PartnerCodeA
           </label>
         </div>
         <p className="text-sm text-[#796ba0]">
-          По умолчанию: {PARTNER_CODE_DEFAULT_UNIT_PRICE_RUB} ₽ за точку на {PARTNER_CODE_DEFAULT_PERIODS} оплаченных периода по 30 дней,
+          По умолчанию: {PARTNER_CODE_DEFAULT_UNIT_PRICE_RUB} ₽ за заведение на {PARTNER_CODE_DEFAULT_PERIODS} оплаченных периода по 30 дней,
           затем {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽. Получатель увидит {BUSINESS_PLAN_MONTHLY_PRICE_RUB} ₽ зачёркнутой рядом с новой ценой.
         </p>
         <button type="submit" className={GREEN} disabled={pending}>Создать код</button>

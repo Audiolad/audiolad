@@ -537,7 +537,7 @@ export default function BusinessLandingView({
               {BUSINESS_NETWORK_TITLE}
             </h2>
             <p className="business-lead">{BUSINESS_NETWORK_LEAD}</p>
-            <ul className="business-points" aria-label="Точки в кабинете">
+            <ul className="business-points" aria-label="Заведения в кабинете">
               {BUSINESS_LOCATION_PREVIEW.map((point) => (
                 <li key={point.id} className="business-point">
                   <span
@@ -630,7 +630,7 @@ export default function BusinessLandingView({
               Поможем подключить музыку
             </h2>
             <p className="business-lead">
-              Оставьте почту – подскажем, как запустить музыку в вашем заведении или сразу в нескольких точках.
+              Оставьте почту – подскажем, как запустить музыку в вашем заведении или сразу в нескольких заведениях.
             </p>
             <div className="business-inquiry">
               <BusinessInquiryForm />
