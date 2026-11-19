@@ -151,3 +151,5 @@ console.log('personal-collections: PASS – ordinary app limited to the collecti
   const home = readFileSync(new URL('../src/components/business-app/BusinessHomePage.tsx', import.meta.url), 'utf8');
   assert.match(home, /\{quiet \? null : \(\s*<details className="mt-4">/, 'quick connect hidden in quiet');
 }
+assert.match(readFileSync(new URL('../src/components/business-app/BusinessEligibilityProbePanel.tsx', import.meta.url), 'utf8'),
+  /\{quiet \? "Создать заведение" : "Подключить заведение"\}/, 'probe panel is quiet too');
