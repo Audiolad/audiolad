@@ -605,10 +605,13 @@ BEGIN
     RAISE EXCEPTION 'track_not_eligible' USING ERRCODE = '42501'; END IF;
 
   IF p_playback_session_id IS NOT NULL AND p_device_at IS NOT NULL THEN
+    -- Row lock until commit: a parallel sample of the same session waits, so the "after the last
+    -- report" check and the apply below see the same context (no double credit of one interval).
     SELECT c.created_at, c.last_reported_at INTO v_ctx_created, v_ctx_last
     FROM public.playback_usage_contexts c
     WHERE c.listening_key = 'business:' || v_player::text || ':' || p_playback_session_id::text
-      AND c.usage_kind = 'business' AND c.player_id = v_player;
+      AND c.usage_kind = 'business' AND c.player_id = v_player
+    FOR UPDATE;
     IF FOUND
        AND p_device_at <= v_now
        AND p_device_at >= v_now - interval '26 hours'
