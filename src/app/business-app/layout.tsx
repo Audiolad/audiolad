@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { loadCollectionPermission } from "@/lib/business-collections/load.server";
 import { pilotLocationAccess } from "@/lib/business-app/location-access.server";
 import { businessAccessPrincipal } from "@/lib/access-grants/principal";
 import { createClient } from "@/lib/supabase/server";
@@ -61,9 +61,10 @@ export default async function BusinessAppLayout({
   // owner | preview | point from one table (cabinet-mode.ts): the hall device is the venue side
   // until the owner re-enters the password on it; the owner's preview never reports as a point.
   const cabinet = await loadBusinessCabinetMode();
-  // Preview permission only: never activates a gift, and hall devices keep their venue scope.
+  // Read-only: show an already chosen collection. Do not bind it to the account or
+  // venues here – that happens only after explicit guest-start / «Подключить».
   const personalCollection = isCoffeeHostname(hostname) && cabinet.mode !== "point"
-    ? await rememberPersonalCollection().catch(() => null) : null;
+    ? await loadCollectionPermission().catch(() => null) : null;
   // A revoked or unchecked device cookie keeps the hall menu but sends no player reports.
   const pointReports = businessPointReports(cabinet) && cabinet.deviceStatus === "alive";
   const pointVenue = cabinet.pointAlive ? await loadPointDeviceVenue() : null;

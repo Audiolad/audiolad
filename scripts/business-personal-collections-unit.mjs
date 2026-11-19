@@ -78,6 +78,11 @@ assert.match(page, /ИНН и адрес/);
 assert.doesNotMatch(page, /activateBusinessTrial|bootstrap|recordAccessActivity/);
 const start = source('src/app/api/business/guest-start/route.ts');
 assert.match(start, /if \(result.body.ok\)\s*\{\s*try \{ await rememberPersonalCollection\(\)/);
+const layout = source('src/app/business-app/layout.tsx');
+assert.doesNotMatch(layout, /rememberPersonalCollection/, 'opening any coffee page must not bind the collection');
+assert.match(layout, /loadCollectionPermission\(\)/);
+assert.equal((start.match(/rememberPersonalCollection/g) || []).length, 2);
+
 const loader = source('src/lib/business-collections/load.server.ts');
 assert.match(loader, /auth.getUser\(\)/);
 assert.match(loader, /user_id: user.id/);
@@ -145,4 +150,4 @@ assert.ok(migrationFiles.includes('20270402120000_business_personal_collections.
 assert.ok(!migrationFiles.includes('20270401120000_business_personal_collections.sql'));
 assert.equal(migrationFiles.filter(name => name.startsWith('20270402120000_')).length, 1);
 assert.doesNotMatch(source('supabase/rollbacks/20270402120000_business_personal_collections.rollback.sql'), /\b(DROP|DELETE|TRUNCATE)\s+(TABLE|FROM|public\.)/i);
-console.log('personal-collections-follow-up: PASS – two cookies, rotation/revoke audio+cover, green onboarding CTA, eligibility-intersected venue pool/fallback, unique stamp');
+console.log('personal-collections-follow-up: PASS – two cookies, rotation/revoke audio+cover, green onboarding CTA, eligibility-intersected venue pool/fallback, unique stamp, preview does not bind');
