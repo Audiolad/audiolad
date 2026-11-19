@@ -249,6 +249,12 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   {formatVenueTime(result.report.fromUtc, result.report.timezone)} –{" "}
                   {formatVenueTime(result.report.toUtc, result.report.timezone)}
                 </p>
+                {result.report.truncated ? (
+                  <p className="mt-3 text-sm" role="status">
+                    В этом интервале очень много данных, показана только начальная часть. Выберите
+                    интервал короче.
+                  </p>
+                ) : null}
                 {result.report.tracks.length === 0 ? (
                   <p className="mt-3 text-sm">
                     В этом интервале сервер не получал данных о воспроизведении в кофейне.

@@ -1,0 +1,4 @@
+# t1578u: evidence tool venv (outside releases): /var/lib/audiolad/evidence-matcher/.venv
+# Install once on prod: nice -n 10 bash deploy/scripts/setup-evidence-matcher.sh
+reportlab==5.1.0
+pillow==13.0.0
