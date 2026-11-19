@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 const root = mkdtempSync(join(tmpdir(), "evidence-unit-"));
 process.env.AUDIOLAD_EVIDENCE_ROOT = root;
 
-const { createPlayLogExtract, listExtracts, readExtractFile } = await import("../src/lib/evidence/extract.server");
+const { createPlayLogExtract, listEvidenceLocations, listExtracts, readExtractFile } = await import("../src/lib/evidence/extract.server");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const LOC = "22222222-2222-4222-8222-222222222222";
@@ -33,9 +33,9 @@ function makeFacts(n: number) {
   });
 }
 
-function fakeDb(facts: unknown[]) {
+function fakeDb(facts: unknown[], extraLocations: unknown[] = []) {
   const tables: Record<string, unknown[]> = {
-    business_locations: [{ id: LOC, organization_id: ORG, name: "Зал у окна", timezone: "Europe/Moscow", address_line1: "ул. Тестовая, 1", city: "Москва", status: "active" }],
+    business_locations: [...extraLocations, { id: LOC, organization_id: ORG, name: "Зал у окна", timezone: "Europe/Moscow", address_line1: "ул. Тестовая, 1", city: "Москва", status: "active" }],
     business_organizations: [{ id: ORG, name: "Кофейня «Тест»" }],
     audio_items: [{ id: TRACK_A, title: "Утро, кофе", music_track_code: "AL-T-000000001" }, { id: TRACK_B, title: "=Вечер", music_track_code: null }],
     business_track_passports: [{ audio_item_id: TRACK_B, al_code: "AL-T-000000002", status: "approved", master_sha256: "a".repeat(64), fingerprint_sha256: "b".repeat(64) }],
@@ -43,9 +43,13 @@ function fakeDb(facts: unknown[]) {
   };
   return {
     from(table: string) {
-      const rows = table === "playback_usage_facts" ? facts : tables[table] ?? [];
+      let rows = (table === "playback_usage_facts" ? facts : tables[table] ?? []) as Array<Record<string, unknown>>;
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "gt", "gte", "lte", "order", "in"]) b[m] = () => b;
+      for (const m of ["select", "gt", "gte", "lte", "order", "in"]) b[m] = () => b;
+      b.eq = (col: string, val: unknown) => {
+        if (table !== "playback_usage_facts") rows = rows.filter((r) => r[col] === val);
+        return b;
+      };
       b.limit = () => Promise.resolve({ data: rows, error: null });
       b.range = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, Math.min(to, from + 999) + 1), error: null });
       b.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(res);
@@ -126,6 +130,20 @@ const long = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc: new D
 assert.deepEqual(long, { ok: false, error: "window_too_long" });
 const nowhere = await createPlayLogExtract({ locationId: ORG, fromUtc, toUtc, actor, db: fakeDb([]) as never });
 assert.deepEqual(nowhere, { ok: false, error: "no_location" });
+
+// Venue lookup does not depend on the picker list; the picker list is read page by page.
+{
+  const many = Array.from({ length: 2400 }, (_, i) => ({
+    id: `loc-${i}`, organization_id: ORG, name: `Точка ${i}`, timezone: "Europe/Moscow", address_line1: null, city: null, status: "active",
+  }));
+  const db = fakeDb(makeFacts(5), many) as never;
+  const all = await listEvidenceLocations(db);
+  assert.equal(all.length, 2401);
+  assert.equal(new Set(all.map((l) => l.id)).size, 2401);
+  assert.equal(all[2400].id, LOC);
+  const one = await createPlayLogExtract({ locationId: LOC, fromUtc, toUtc, actor, db });
+  assert.equal(one.ok, true);
+}
 
 // Static guards.
 const page = readFileSync("src/app/(platform)/admin/business-evidence/page.tsx", "utf8");

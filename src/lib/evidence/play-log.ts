@@ -193,5 +193,9 @@ export function localInputToUtc(local: string, timeZone: string): Date | null {
   let guess = asUtc - offset(asUtc);
   guess = asUtc - offset(guess);
   const d = new Date(guess);
-  return Number.isFinite(d.getTime()) ? d : null;
+  if (!Number.isFinite(d.getTime())) return null;
+  // Reject dates and wall times that do not exist (31 February, the hour skipped at a DST
+  // change): the signed period must be exactly what was typed, never silently shifted.
+  const want = `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6] ?? "00"}`;
+  return formatLocal(d.toISOString(), timeZone) === want ? d : null;
 }

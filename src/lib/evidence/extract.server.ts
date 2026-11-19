@@ -47,19 +47,19 @@ export type EvidenceLocation = {
   status: string;
 };
 
-export async function listEvidenceLocations(db: Db = createServiceRoleClient()): Promise<EvidenceLocation[]> {
-  const { data, error } = await db
-    .from("business_locations")
-    .select("id, organization_id, name, timezone, address_line1, city, status")
-    .order("created_at", { ascending: true })
-    .limit(1000);
-  if (error) throw new Error("evidence_locations_failed");
-  const rows = data ?? [];
+const LOCATION_COLUMNS = "id, organization_id, name, timezone, address_line1, city, status";
+const LOCATIONS_PAGE = 1000;
+const LOCATIONS_MAX = 50_000;
+
+type LocationRow = Record<string, unknown>;
+
+async function withOrgNames(db: Db, rows: LocationRow[]): Promise<EvidenceLocation[]> {
   const orgIds = [...new Set(rows.map((r) => r.organization_id as string))];
   const orgNames = new Map<string, string>();
-  if (orgIds.length) {
-    const { data: orgs } = await db.from("business_organizations").select("id, name").in("id", orgIds);
-    for (const o of orgs ?? []) orgNames.set(o.id as string, (o.name as string) ?? "");
+  for (let i = 0; i < orgIds.length; i += 200) {
+    const { data, error } = await db.from("business_organizations").select("id, name").in("id", orgIds.slice(i, i + 200));
+    if (error) throw new Error("evidence_organizations_failed");
+    for (const o of data ?? []) orgNames.set(o.id as string, (o.name as string) ?? "");
   }
   return rows.map((r) => ({
     id: r.id as string,
@@ -70,6 +70,33 @@ export async function listEvidenceLocations(db: Db = createServiceRoleClient()):
     address: [r.city, r.address_line1].filter((x) => typeof x === "string" && x.trim()).join(", "),
     status: (r.status as string) ?? "",
   }));
+}
+
+/** All venues for the picker, page by page (no silent cut at one server page). */
+export async function listEvidenceLocations(db: Db = createServiceRoleClient()): Promise<EvidenceLocation[]> {
+  const rows: LocationRow[] = [];
+  while (rows.length < LOCATIONS_MAX) {
+    const { data, error } = await db
+      .from("business_locations")
+      .select(LOCATION_COLUMNS)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(rows.length, rows.length + LOCATIONS_PAGE - 1);
+    if (error) throw new Error("evidence_locations_failed");
+    const batch = (data ?? []) as LocationRow[];
+    rows.push(...batch);
+    if (batch.length < LOCATIONS_PAGE) break;
+  }
+  return withOrgNames(db, rows);
+}
+
+/** One venue by id, independent of the picker list. */
+export async function loadEvidenceLocation(id: string, db: Db = createServiceRoleClient()): Promise<EvidenceLocation | null> {
+  const { data, error } = await db.from("business_locations").select(LOCATION_COLUMNS).eq("id", id).limit(1);
+  if (error) throw new Error("evidence_location_failed");
+  const row = (data ?? [])[0] as LocationRow | undefined;
+  if (!row || row.id !== id) return null;
+  return (await withOrgNames(db, [row]))[0] ?? null;
 }
 
 export type ExtractFile = { name: string; sha256: string; bytes: number };
@@ -186,9 +213,12 @@ export async function createPlayLogExtract(input: {
   } catch {
     return { ok: false, error: "db_error" };
   }
-  const locations = await listEvidenceLocations(db).catch(() => null);
-  if (!locations) return { ok: false, error: "db_error" };
-  const location = locations.find((l) => l.id === input.locationId);
+  let location: EvidenceLocation | null;
+  try {
+    location = await loadEvidenceLocation(input.locationId, db);
+  } catch {
+    return { ok: false, error: "db_error" };
+  }
   if (!location) return { ok: false, error: "no_location" };
 
   const fromIso = new Date(from).toISOString();

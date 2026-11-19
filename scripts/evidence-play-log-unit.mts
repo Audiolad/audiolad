@@ -70,5 +70,11 @@ assert.equal(localInputToUtc("2026-11-10T12:00", "Europe/Moscow")?.toISOString()
 assert.equal(localInputToUtc("2026-07-01T12:00", "Europe/Berlin")?.toISOString(), "2026-07-01T10:00:00.000Z");
 assert.equal(localInputToUtc("2026-01-01T12:00", "Europe/Berlin")?.toISOString(), "2026-01-01T11:00:00.000Z");
 assert.equal(localInputToUtc("bad", "Europe/Moscow"), null);
+// Non-existent dates and wall times are refused, never shifted.
+assert.equal(localInputToUtc("2026-02-31T12:00", "Europe/Moscow"), null);
+assert.equal(localInputToUtc("2026-03-29T02:30", "Europe/Berlin"), null);
+assert.equal(localInputToUtc("2026-03-29T03:30", "Europe/Berlin")?.toISOString(), "2026-03-29T01:30:00.000Z");
+assert.equal(localInputToUtc("2026-10-25T02:30", "Europe/Berlin") !== null, true);
+assert.equal(localInputToUtc("2026-11-10T24:00", "Europe/Moscow"), null);
 
 console.log("evidence-play-log-unit OK");
