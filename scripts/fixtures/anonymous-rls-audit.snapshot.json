@@ -6739,6 +6739,31 @@
       "file": "supabase/migrations/20270402120000_business_personal_collections.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.business_personal_collection_location_tracks(uuid) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270403120000_business_offer_edition_5.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.record_business_offer_edition_acceptance(uuid, text, text, text, text, text, text) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270403120000_business_offer_edition_5.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.accept_business_offer(text, text, text) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270403120000_business_offer_edition_5.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.business_offer_acceptance_for_caller() TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270403120000_business_offer_edition_5.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.create_business_subscription_order(uuid) TO authenticated, service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270403120000_business_offer_edition_5.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.apply_business_subscription_for_order(uuid) TO service_role;"
     }
   ]
 }
