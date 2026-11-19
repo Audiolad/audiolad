@@ -52,13 +52,30 @@ export async function rememberPersonalCollection(): Promise<CollectionRow | null
   if (!token || !COLLECTION_TOKEN.test(token)) return permission;
   const { data: { user } } = await (await createClient()).auth.getUser();
   if (!user) return permission;
-  // At most COLLECTION_ACCOUNT_LIMIT accounts per link. A full link opens nothing new for this
-  // account; the cabinet then keeps its ordinary catalog (no collection was ever assigned).
-  if (!await collectionHasRoom(permission.id, user.id)) return null;
+  return await bindPersonalCollection(permission.id, user.id) ? permission : null;
+}
+
+/**
+ * Bind a collection to a verified account id (from the session or the start's own sign-in, never
+ * from a URL/form). At most COLLECTION_ACCOUNT_LIMIT accounts per link: a full link binds nothing
+ * and returns false. The cap is checked by the app (no migration, owner decision 19.11.2026), so two
+ * clicks on the very last place at the same moment may both pass. The account trigger fills empty
+ * venue assignments; venues created later inherit the collection. No gift/billing call here.
+ */
+export async function bindPersonalCollection(collectionId: string, userId: string): Promise<boolean> {
+  if (!await collectionHasRoom(collectionId, userId)) return false;
   const { error } = await createServiceRoleClient().from("business_personal_collection_accounts")
-    .upsert({ user_id: user.id, collection_id: permission.id, selected_at: new Date().toISOString() }, { onConflict: "user_id,collection_id" });
+    .upsert({ user_id: userId, collection_id: collectionId, selected_at: new Date().toISOString() }, { onConflict: "user_id,collection_id" });
   if (error) throw new Error("collection_account_save_failed");
-  return permission;
+  return true;
+}
+
+/** The venue's assigned collection id, or null. */
+export async function loadVenueCollectionId(locationId: string): Promise<string | null> {
+  const { data, error } = await createServiceRoleClient().from("business_personal_collection_locations")
+    .select("collection_id").eq("location_id", locationId).maybeSingle();
+  if (error) throw new Error("collection_venue_assignment_unavailable");
+  return (data?.collection_id as string | undefined) ?? null;
 }
 
 export type CatalogCollectionTrack = {

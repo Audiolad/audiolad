@@ -91,9 +91,9 @@ export default function BusinessOnboardingWizardPage({
           </p>
           <p className="text-sm text-[var(--biz-text-muted)]">
             После входа вернитесь к <Link href="/onboarding" className="underline">подключению заведения</Link>.</p>
-          <p className="text-sm text-[var(--biz-text-muted)]">
+          {quiet ? null : <p className="text-sm text-[var(--biz-text-muted)]">
             {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
-          </p>
+          </p>}
           <div className="flex flex-wrap gap-2">
             <a
               href={businessAuthHref(hostname, "sign-in")}

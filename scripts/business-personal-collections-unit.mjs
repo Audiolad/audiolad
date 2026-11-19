@@ -72,14 +72,22 @@ assert.match(entry, /collectionEntryDestination/);
 const openRoute = source('src/app/api/business/collections/open/route.ts');
 assert.match(openRoute, /response.cookies.set\(COLLECTION_COOKIE, token/);
 assert.match(openRoute, /https:\/\/coffee.audiolad.ru\/collection/);
+assert.match(openRoute, /collection\?state=unavailable/);
+assert.match(openRoute, /cookies.set\(COLLECTION_COOKIE, "", \{[^}]*maxAge: 0 \}\)/, 'dead link clears another collection cookie');
+assert.match(page, /state === "unavailable"\) return <Unavailable \/>/);
 assert.doesNotMatch(openRoute, /\.update\(|\.delete\(|\.insert\(|\.upsert\(|signIn|bootstrap/, 'opening writes nothing');
 const start = source('src/app/api/business/guest-start/route.ts');
 assert.match(start, /code: "collection_full"/);
-assert.match(start, /if \(result.body.ok\)\s*\{\s*try \{ await rememberPersonalCollection\(\)/);
+assert.match(start, /code: "collection_unavailable"/);
+assert.match(start, /if \(entryCollectionId && !await bindPersonalCollection\(entryCollectionId, input.userId\)\) throw new Error\("collection_full"\);\s*const \{ data, error \} = await createServiceRoleClient\(\).rpc\("business_guest_bootstrap"/, 'bound before the venue exists');
+assert.match(start, /loadVenueCollectionId\(startedLocationId\) === null/, 'new venue must hold the collection');
+assert.match(start, /await rememberPersonalCollection\(\);/);
+assert.match(entry, /COLLECTION_ENTRY_HEADER\]: "1"/);
 assert.ok(start.indexOf('collection_full') < start.indexOf('handleBusinessGuestStart('), 'cap checked before any sign-in');
 const loader = source('src/lib/business-collections/load.server.ts');
 assert.match(loader, /count < COLLECTION_ACCOUNT_LIMIT/);
-assert.match(loader, /if \(!await collectionHasRoom\(permission.id, user.id\)\) return null;/);
+assert.match(loader, /if \(!await collectionHasRoom\(collectionId, userId\)\) return false;/);
+assert.match(loader, /return await bindPersonalCollection\(permission.id, user.id\) \? permission : null;/);
 assert.doesNotMatch(loader, /activateBusinessTrial|bootstrap|access_grants/);
 assert.match(source('src/lib/business-collections/model.ts'), /COLLECTION_ACCOUNT_LIMIT = 10;/);
 const layout = source('src/app/business-app/layout.tsx');
@@ -99,9 +107,10 @@ const quietGates = {
   'src/components/business-app/BusinessSidebar.tsx': [/!collapsed && !quiet/],
   'src/components/business-app/BusinessHomePage.tsx': [/quiet \? null : <BusinessHomeAccessCard \/>/, /showAccess=\{!quiet\}/, /needsNewEdition && !quiet/],
   'src/components/business-app/BusinessPointSlots.tsx': [/multi && !quiet/],
-  'src/components/business-app/workspace/BusinessWorkspace.tsx': [/model.status === "anonymous" && !quiet/, /cabinet.can\("payLink"\) && !quiet/, /Подборка сейчас недоступна/],
+  'src/components/business-app/workspace/BusinessWorkspace.tsx': [/model.status === "anonymous" && !quiet/, /cabinet.can\("payLink"\) && !quiet/, /Подборка сейчас недоступна/, /if \(model.collectionUnavailable\) return false;/],
+  'src/app/business-app/profile/page.tsx': [/<BusinessQuietHidden>\s*<div className="mb-4">\s*<BusinessOwnerSurnamePrompt \/>/],
   'src/components/business-app/profile/BusinessProfileSubscription.tsx': [/<details>/, /Подключение и оплата/],
-  'src/components/business-app/BusinessOnboardingWizardPage.tsx': [/step !== "done" && !quiet/],
+  'src/components/business-app/BusinessOnboardingWizardPage.tsx': [/step !== "done" && !quiet/, /\{quiet \? null : <p className="text-sm text-\[var\(--biz-text-muted\)\]">\s*\{GUEST_COFFEE_TERMS\}/],
 };
 for (const [file, patterns] of Object.entries(quietGates)) {
   const text = source(file);

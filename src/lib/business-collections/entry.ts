@@ -14,7 +14,11 @@ export const COLLECTION_ENTRY_COPY = {
   full: "По этой ссылке приложение уже открыто на всех местах. Напишите нам – пришлём новую ссылку.",
   unavailableTitle: "Подборка сейчас недоступна",
   unavailableText: "Ссылка больше не действует. Напишите нам – пришлём новую.",
+  gone: "Подборка сейчас недоступна. Напишите нам – пришлём новую ссылку.",
 } as const;
+
+/** Sent by the entry screen: the guest start then fails closed for the collection. */
+export const COLLECTION_ENTRY_HEADER = "x-audiolad-collection-entry";
 
 /** The ordinary guest start answers /cabinet on coffee; the personal link opens the music first. */
 export function collectionEntryDestination(url: string): string {

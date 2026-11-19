@@ -322,7 +322,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         </section>
       ) : null}
 
-      {playbackBlocked(model) && !model.collectionUnavailable ? (
+      {playbackBlocked(model) ? (
         <BusinessEligibilityProbePanel compact />
       ) : null}
 
@@ -497,6 +497,8 @@ function showEmpty(model: WorkspacePageModel): boolean {
 
 /** Rights check stays on «Музыка» only while the player has nothing to play. */
 function playbackBlocked(model: WorkspacePageModel): boolean {
+  // A revoked personal collection is not a rights problem: no rights probe then (t1616u).
+  if (model.collectionUnavailable) return false;
   return !workspacePlayerOpen(model) || model.tracks.length === 0;
 }
 

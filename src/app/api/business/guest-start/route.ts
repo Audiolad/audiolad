@@ -1,4 +1,5 @@
-import { collectionHasRoom, loadCollectionPermission, rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { bindPersonalCollection, collectionHasRoom, loadCollectionPermission, loadVenueCollectionId, rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { COLLECTION_ENTRY_HEADER } from "@/lib/business-collections/entry";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -47,11 +48,21 @@ async function handle(request: Request) {
     return NextResponse.json({ ok: false, reason: "venue_device" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
   const config = businessGuestStartConfig(process.env);
-  // t1616u: at most COLLECTION_ACCOUNT_LIMIT accounts start by one personal link. Checked before
-  // any sign-in or period, so a full link never leaves a half-made guest behind.
+  // t1616u: a start from the personal-link entry screen (/collection) fails closed: the link must
+  // still be live, have a free place (at most COLLECTION_ACCOUNT_LIMIT accounts) and be bound to the
+  // new account BEFORE its venue is created, so the venue inherits the collection in the same
+  // transaction. It never ends as an ordinary guest with the whole catalog.
+  const collectionEntry = request.headers.get(COLLECTION_ENTRY_HEADER) === "1";
+  let entryCollectionId: string | null = null;
+  let startedUserId: string | null = null;
+  let startedLocationId: string | null = null;
   if (config.enabled && request.method === "POST") {
     try {
       const permission = await loadCollectionPermission();
+      if (collectionEntry && !permission) {
+        return NextResponse.json({ ok: false, code: "collection_unavailable" }, { status: 410, headers: { "Cache-Control": "no-store" } });
+      }
+      if (collectionEntry && permission) entryCollectionId = permission.id;
       if (permission) {
         const { data: { user } } = await (await createClient()).auth.getUser();
         if (!await collectionHasRoom(permission.id, user?.id ?? null)) {
@@ -70,6 +81,7 @@ async function handle(request: Request) {
     currentUser: async () => {
       const { data, error } = await (await session()).auth.getUser();
       if (error && error.name !== "AuthSessionMissingError") throw new Error("guest_start_failed");
+      startedUserId = data.user?.id ?? null;
       return data.user;
     },
     ready: async (userId) => {
@@ -89,11 +101,15 @@ async function handle(request: Request) {
       return data.user;
     },
     bootstrap: async (input) => {
+      startedUserId = input.userId;
+      // Bound first: the venue the bootstrap creates inherits the collection (location trigger).
+      if (entryCollectionId && !await bindPersonalCollection(entryCollectionId, input.userId)) throw new Error("collection_full");
       const { data, error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {
         p_user_id: input.userId, p_idempotency_hash: input.idempotencyHash, p_network_hash: input.networkHash,
         p_gift_seconds: input.giftSeconds, p_venue_name: input.venueName,
       });
       if (error || !Array.isArray(data) || !data[0]?.organization_id || !data[0]?.location_id) throw new Error("guest_start_failed");
+      startedLocationId = data[0].location_id as string;
       // First setup only (created = true): the venue gets the browser's zone mapped to one of the
       // 11 Russian zones. The SQL default stays Moscow; an existing venue is never touched here.
       if (data[0].created === true && input.timezone && input.timezone !== VENUE_TIMEZONE_DEFAULT_ID) {
@@ -133,8 +149,20 @@ async function handle(request: Request) {
     log: (code) => console.warn(code),
   });
   if (result.body.ok) {
-    try { await rememberPersonalCollection(); }
-    catch { return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: result.headers }); }
+    try {
+      if (entryCollectionId) {
+        // Fail closed: the account (also an already started one) must hold the collection and the
+        // venue made by this start must play it.
+        if (!startedUserId || !await bindPersonalCollection(entryCollectionId, startedUserId)) {
+          return NextResponse.json({ ok: false, code: "collection_full" }, { status: 409, headers: result.headers });
+        }
+        if (startedLocationId && await loadVenueCollectionId(startedLocationId) === null) {
+          return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: result.headers });
+        }
+      } else {
+        await rememberPersonalCollection();
+      }
+    } catch { return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: result.headers }); }
   }
   return NextResponse.json(result.body, { status: result.status, headers: result.headers });
 }

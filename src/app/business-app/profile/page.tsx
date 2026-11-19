@@ -1,4 +1,5 @@
 import BusinessLoginAccess from "@/components/business-app/profile/BusinessLoginAccess";
+import { BusinessQuietHidden } from "@/components/business-app/BusinessQuietMode";
 import { businessPasswordState } from "@/lib/business-app/login-access";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -68,9 +69,11 @@ export default async function BusinessProfilePage() {
       ) : (
         <>
         {ownerSurname.trim() ? null : (
-          <div className="mb-4">
-            <BusinessOwnerSurnamePrompt />
-          </div>
+          <BusinessQuietHidden>
+            <div className="mb-4">
+              <BusinessOwnerSurnamePrompt />
+            </div>
+          </BusinessQuietHidden>
         )}
         {user && domain.status === "authenticated" && domain.canPay ? (
           <BusinessLoginAccess email={email} anonymous={user.is_anonymous === true} savedEmail={domain.savedReceiptEmail ?? null} passwordState={businessPasswordState(user)} />

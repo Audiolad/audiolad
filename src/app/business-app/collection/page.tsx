@@ -29,12 +29,14 @@ function Unavailable() {
  * after «Открыть приложение» the visitor is in the ordinary coffee app, whose music holds only
  * this collection. An account already on the link goes straight to the music.
  */
-export default async function PersonalCollectionPage() {
-  // After the rewrite /collection → /business-app/collection, Host is localhost (#1309).
+export default async function PersonalCollectionPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // After the rewrite /collection → /business-app/collection, Host is localhost (hotfix 1309).
   if (!(coffeeHostEnabled() && publicHostnameFromHeaders(await headers()) === COFFEE_HOSTNAME)) notFound();
   // A hall device never starts a new account here; it keeps its venue player.
   const hall = businessGuestCoffeeHallRedirect(await businessHallDeviceCookie());
   if (hall) redirect(hall);
+  // A revoked or unknown link (open route) never falls through to another collection.
+  if ((await searchParams).state === "unavailable") return <Unavailable />;
   const permission = await loadCollectionPermission();
   if (!permission) return <Unavailable />;
   const { data: { user } } = await (await createClient()).auth.getUser();

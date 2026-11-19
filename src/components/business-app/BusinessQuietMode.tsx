@@ -21,3 +21,8 @@ export function useBusinessQuiet(): boolean {
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   return quiet || pathname === "/collection";
 }
+
+/** Renders its children only outside the quiet cabinet (for server pages such as the profile). */
+export function BusinessQuietHidden({ children }: { children: ReactNode }) {
+  return useBusinessQuiet() ? null : <>{children}</>;
+}

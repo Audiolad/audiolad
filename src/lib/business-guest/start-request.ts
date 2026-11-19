@@ -17,7 +17,9 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Pick<Response, "o
 export async function requestGuestStart(body: Record<string, unknown>, options: {
   fetchImpl?: FetchLike; timeoutMs?: number; online?: boolean;
   /** Screen-specific wording (the personal-link entry screen has no gift copy). */
-  messages?: { limit?: string; collectionFull?: string; failed?: string };
+  messages?: { limit?: string; collectionFull?: string; collectionUnavailable?: string; failed?: string };
+  /** Extra request headers (the personal-link entry marks its start). */
+  headers?: Record<string, string>;
 } = {}): Promise<GuestStartOutcome> {
   const failed = options.messages?.failed ?? copy.failed;
   if (options.online === false) return { kind: "error", message: copy.offline };
@@ -32,7 +34,7 @@ export async function requestGuestStart(body: Record<string, unknown>, options: 
     // The race also settles when a fetch implementation ignores the abort signal.
     return await Promise.race([deadline, (async (): Promise<GuestStartOutcome> => {
       const response = await fetchImpl("/api/business/guest-start", {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store",
+        method: "POST", headers: { ...options.headers, "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store",
         body: JSON.stringify({ timezone: detectVenueTimezone(), ...body }), signal: controller.signal,
       });
       let result: { ok?: unknown; redirect?: unknown; code?: unknown } = {};
@@ -41,6 +43,7 @@ export async function requestGuestStart(body: Record<string, unknown>, options: 
         return { kind: "redirect", url: result.redirect };
       }
       if (result.code === "collection_full") return { kind: "error", message: options.messages?.collectionFull ?? failed };
+      if (result.code === "collection_unavailable") return { kind: "error", message: options.messages?.collectionUnavailable ?? failed };
       return { kind: "error", message: response.status === 429 ? options.messages?.limit ?? copy.limit : result.code === "offer_changed" ? copy.offerChanged : failed };
     })()]);
   } catch {

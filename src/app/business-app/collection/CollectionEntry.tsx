@@ -5,7 +5,7 @@ import { requestGuestStart } from "@/lib/business-guest/start-request";
 import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
 import { BUSINESS_OFFER_LINK_ATTR, BusinessOfferDocumentLink } from "@/components/business-app/BusinessOfferDocumentLink";
 import { BusinessPrivacyDocumentLink } from "@/components/business-app/BusinessPrivacyDocumentLink";
-import { COLLECTION_ENTRY_COPY as copy, collectionEntryDestination } from "@/lib/business-collections/entry";
+import { COLLECTION_ENTRY_COPY as copy, COLLECTION_ENTRY_HEADER, collectionEntryDestination } from "@/lib/business-collections/entry";
 
 const STORAGE_KEY = "audiolad.business.collection-start.v1";
 
@@ -35,7 +35,8 @@ export default function CollectionEntry() {
       }
       const outcome = await requestGuestStart(
         { accepted: true, offerVersion: BUSINESS_OFFER_EDITION.version, offerHash: BUSINESS_OFFER_EDITION.contentHash, idempotencyKey: key.current },
-        { online: typeof navigator === "undefined" ? undefined : navigator.onLine, messages: { limit: copy.limit, collectionFull: copy.full, failed: copy.failed } },
+        { online: typeof navigator === "undefined" ? undefined : navigator.onLine, messages: { limit: copy.limit, collectionFull: copy.full, collectionUnavailable: copy.gone, failed: copy.failed },
+          headers: { [COLLECTION_ENTRY_HEADER]: "1" } },
       );
       if (outcome.kind === "redirect") {
         try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
