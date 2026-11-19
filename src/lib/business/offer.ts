@@ -24,7 +24,7 @@ export const BUSINESS_OFFER_URL = `https://business.audiolad.ru${BUSINESS_OFFER_
 export const BUSINESS_OFFER_TITLE = "Договор-оферта «АудиоЛад Кофейня»";
 
 export const BUSINESS_OFFER_SUMMARY =
-  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат, лицензия на музыку, сертификат заведения и защита заведения. Стоимость доступа к сервису фоновой музыки АудиоЛад для одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Приложения 1–4 – часть договора.";
+  "Основной договор: 7 дней в подарок, разовые оплаты, продление и возврат, лицензия на музыку, сертификат заведения и защита заведения. Стоимость доступа к сервису «АудиоЛад Кофейня» для одного заведения на 30 дней – по действующему тарифу, который показан в личном кабинете до оплаты. Приложения 1–4 – часть договора.";
 
 export const BUSINESS_ONBOARDING_HREF = "/onboarding";
 
@@ -50,7 +50,7 @@ export type BusinessOfferDocumentEdition = {
 export const BUSINESS_OFFER_EDITION: BusinessOfferDocumentEdition = {
   documentKey: BUSINESS_OFFER_DOCUMENT_ID,
   version: "offer-v5-2026-11-19",
-  contentHash: "939773fb3900534b3179ffd53320628920280b27806b3dcb75aeac35bb947b2e",
+  contentHash: "909fcb8881f2e49cacf5f9e9ec85dce7dec9163a0a0c5c0c727cb48c452e031b",
   label: "Редакция 5 от 19.11.2026",
 };
 
