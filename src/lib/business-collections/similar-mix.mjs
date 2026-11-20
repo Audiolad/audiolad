@@ -152,3 +152,15 @@ export function pickSimilarTracks(input) {
   scored.sort((left, right) => right.score - left.score || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   return scored.slice(0, k).map((row) => row.track);
 }
+
+/** Successful analyzer-run rows only. A query error must not be treated as "no vectors". */
+export function takeAnalyzerRuns(result) {
+  if (!result || result.error || !Array.isArray(result.data)) {
+    throw new Error("collection_mix_analyzer_unavailable");
+  }
+  const map = new Map();
+  for (const row of result.data) {
+    if (row && typeof row.id === "string") map.set(row.id, row.normalized_json);
+  }
+  return map;
+}

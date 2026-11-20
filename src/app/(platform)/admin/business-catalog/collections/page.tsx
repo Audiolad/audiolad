@@ -43,16 +43,24 @@ export default async function PersonalCollectionsAdminPage() {
     audioItemId: track.audio_item_id, albumId: track.album_id, title: track.title,
     albumTitle: track.album_title, durationSeconds: track.duration_seconds, coverUrl: "",
   }));
-  const itemRows = rows.length
-    ? await db.from("business_personal_collection_items").select("collection_id,audio_item_id")
-      .in("collection_id", rows.map((row) => row.id))
-    : { data: [], error: null };
-  if (itemRows.error) throw new Error("Не удалось загрузить треки подборок.");
   const itemsByCollection = new Map<string, string[]>();
-  for (const row of itemRows.data ?? []) {
-    const list = itemsByCollection.get(row.collection_id) ?? [];
-    list.push(row.audio_item_id);
-    itemsByCollection.set(row.collection_id, list);
+  if (rows.length) {
+    const collectionIds = rows.map((row) => row.id);
+    for (let from = 0; from <= 200000; from += ACCOUNT_PAGE) {
+      const itemRows = await db.from("business_personal_collection_items").select("collection_id,audio_item_id")
+        .in("collection_id", collectionIds)
+        .order("collection_id", { ascending: true })
+        .order("audio_item_id", { ascending: true })
+        .range(from, from + ACCOUNT_PAGE - 1);
+      if (itemRows.error || !itemRows.data) throw new Error("Не удалось загрузить треки подборок.");
+      for (const row of itemRows.data) {
+        const list = itemsByCollection.get(row.collection_id) ?? [];
+        list.push(row.audio_item_id);
+        itemsByCollection.set(row.collection_id, list);
+      }
+      if (itemRows.data.length < ACCOUNT_PAGE) break;
+      if (from + ACCOUNT_PAGE > 200000) throw new Error("Не удалось загрузить треки подборок.");
+    }
   }
   const previews = await loadCollectionSimilarPreviews(rows, catalogTracks, itemsByCollection);
   const collections: CollectionEntry[] = rows.map((row) => {

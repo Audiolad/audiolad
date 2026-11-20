@@ -6,12 +6,14 @@ import {
   loadGuestCoffeePassportBundle,
   type GuestCoffeePassportClient,
 } from "@/lib/business-app/guest-coffee/passport-query";
+import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
   normalizeCollectionSharePercent,
   pickSimilarTracks,
   readClapVector,
+  takeAnalyzerRuns,
 } from "./similar-mix.mjs";
 
 const CACHE_MS = 2 * 60 * 1000;
@@ -37,17 +39,27 @@ export async function loadMixSignals(trackIds: readonly string[]): Promise<MixSi
   if (signalCache && signalCache.key === key && now - signalCache.at < CACHE_MS) return signalCache.value;
   const empty: MixSignals = { vectors: new Map(), energy: new Map(), tags: new Map() };
   if (key.length === 0) return empty;
+  const db = createServiceRoleClient();
   const bundle = await loadGuestCoffeePassportBundle(
-    createServiceRoleClient() as unknown as GuestCoffeePassportClient,
+    db as unknown as GuestCoffeePassportClient,
     [...new Set(trackIds)],
   );
+  const runIds = [...new Set(bundle.versions.flatMap((version) => {
+    const runId = bundle.runIdFor(version);
+    return runId ? [runId] : [];
+  }))];
+  const normalizedByRun = new Map<string, unknown>();
+  for (const chunk of chunkIds(runIds)) {
+    const result = await db.from("music_analyzer_runs").select("id, normalized_json").in("id", chunk);
+    for (const [id, json] of takeAnalyzerRuns(result)) normalizedByRun.set(id, json);
+  }
   const vectors = new Map<string, Float64Array>();
   const energy = new Map<string, number | null>();
   const tags = new Map<string, CafeTrackSignals>();
   for (const version of bundle.versions) {
     if (tags.has(version.audio_item_id)) continue;
     const runId = bundle.runIdFor(version);
-    const normalized = runId ? bundle.normalizedByRun.get(runId) : undefined;
+    const normalized = runId ? normalizedByRun.get(runId) : undefined;
     const signals = cafeSignalsFromPassport(
       version,
       bundle.attributesByPassport.get(version.id) ?? [],

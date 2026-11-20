@@ -217,6 +217,7 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.ok(box.indexOf('value={fresh.url}') < box.indexOf('Копировать ссылку'), 'copy button is inside the box next to the URL');
   assert.match(adminPage, /select\("id,title,revoked_at,created_at,collection_share_percent"\)/);
   assert.match(adminPage, /loadCollectionSimilarPreviews/);
+  assert.match(adminPage, /business_personal_collection_items[\s\S]*?order\("audio_item_id"[\s\S]*?range\(from, from \+ ACCOUNT_PAGE - 1\)/);
   assert.match(adminPage, /business_personal_collection_accounts"\)\.select\("collection_id"\)/);
   assert.match(adminPage, /\.order\("collection_id", \{ ascending: true \}\)/);
   assert.match(adminPage, /\.order\("user_id", \{ ascending: true \}\)/);

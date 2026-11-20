@@ -11,6 +11,7 @@ import {
   pickSimilarTracks,
   readClapVector,
   similarCount,
+  takeAnalyzerRuns,
 } from "../src/lib/business-collections/similar-mix.mjs";
 
 function source(path) {
@@ -123,5 +124,14 @@ assert.match(source("supabase/migrations/20270405120000_business_personal_collec
 assert.match(source("supabase/migrations/20270405120000_business_personal_collection_share_percent.sql"), /DROP COLUMN IF EXISTS collection_share_percent/);
 assert.doesNotMatch(source("supabase/migrations/20270405120000_business_personal_collection_share_percent.sql"), /GRANT /);
 assert.match(source("supabase/rollbacks/20270405120000_business_personal_collection_share_percent.rollback.sql"), /DROP COLUMN IF EXISTS collection_share_percent/);
+
+
+assert.throws(() => takeAnalyzerRuns({ error: { message: "boom" }, data: [] }), /collection_mix_analyzer_unavailable/);
+assert.throws(() => takeAnalyzerRuns({ error: null, data: null }), /collection_mix_analyzer_unavailable/);
+const partial = takeAnalyzerRuns({ error: null, data: [{ id: "run-1", normalized_json: { ok: true } }] });
+assert.equal(partial.get("run-1").ok, true);
+assert.equal(partial.has("run-missing"), false, "a successful query with a missing run is not a failure");
+assert.match(source("src/lib/business-collections/similar-mix.server.ts"), /takeAnalyzerRuns\(result\)/);
+assert.doesNotMatch(source("src/lib/business-collections/similar-mix.server.ts"), /bundle\.normalizedByRun/, "mix must not use analyzer rows swallowed by the guest passport bundle");
 
 console.log("business-collection-similar-mix-unit: PASS");
