@@ -29,13 +29,13 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   const url = String(input);
   const body = bodies.get(url);
   if (!body) return new Response(null, { status: 404 });
-  return new Response(body, { status: 200, headers: { "Content-Type": "image/webp" } });
+  return new Response(Buffer.from(body), { status: 200, headers: { "Content-Type": "image/webp" } });
 }) as typeof fetch;
 
 // preload() is a browser helper; Node unit tests get a stub window.
 (globalThis as unknown as { window: unknown }).window = globalThis;
 
-const cache = await import("../src/lib/business-app/cabinet-cover-cache.ts");
+const cache = await import("../src/lib/business-app/cabinet-cover-cache");
 cache.resetCabinetCoverCacheForTests();
 
 const privateSrc = "/api/business/workspace/cover?space=cafe&track=aaa";
