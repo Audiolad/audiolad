@@ -17,6 +17,7 @@ import {
   basisLine,
   certificateDisplayNumber,
   certificateStatusLabel,
+  isSampleCertificateNumber,
   moscowDate,
   ogrnLabel,
   periodLine,
@@ -82,16 +83,19 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
   const { number: raw } = await params;
   const number = normalizeBusinessLegalCertificateNumber(raw);
   if (!number) notFound();
-  const isSample = number === BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber;
+  const isSample = isSampleCertificateNumber(raw) || isSampleCertificateNumber(number);
   const check = isSample ? null : await loadCertificateCheck(number);
   if (!isSample && !check) notFound();
   const current = check && check.status === "superseded" ? await currentOf(check) : null;
+  const headingNumber = check
+    ? certificateDisplayNumber(check.number)
+    : BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number;
 
   return (
     <BusinessLegalShell
       kicker="Проверка сертификата"
       breadcrumb="Проверка сертификата"
-      title={`Сертификат № ${isSample ? BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number : certificateDisplayNumber(number)}`}
+      title={`Сертификат ${headingNumber}`}
       lead="Страница открывается по QR-коду из сертификата и показывает, подлинный ли документ и действует ли он сегодня."
     >
       {isSample || !check ? (
@@ -107,7 +111,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
             <p className={"mt-3 " + legalBodyClass}>
               Сертификат подлинный, но после изменения данных заведения выдан новый:{" "}
               <Link href={businessLegalCertificateHref(current.number)} className={legalLinkClass} {...legalDocLinkProps}>
-                № {certificateDisplayNumber(current.number)}
+                {certificateDisplayNumber(current.number)}
               </Link>{" "}
               – {certificateStatusLabel(current.status).toLowerCase()}
               {current.status === "valid" ? `, по ${moscowDate(current.validUntil)}` : ""}.
@@ -123,7 +127,7 @@ export default async function BusinessLegalCertificateCheckPage({ params }: Prop
               ["Адрес заведения", check.snapshot.venueAddress],
               ["Лицензиат", check.snapshot.licensee.name],
               [`ИНН / ${ogrnLabel(check.snapshot.licensee.kind)}`, `${check.snapshot.licensee.inn} / ${check.snapshot.licensee.ogrn}`],
-              ["Срок доступа в сертификате", periodLine(check.snapshot)],
+              ["Срок доступа к сервису в сертификате", periodLine(check.snapshot)],
               ["Каталог", BUSINESS_CERTIFICATE_CATALOG],
               ["Создание музыки", BUSINESS_CERTIFICATE_GENERATORS],
               ["Лицензиар", `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip}`],

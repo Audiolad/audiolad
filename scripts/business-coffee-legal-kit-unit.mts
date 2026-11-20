@@ -96,16 +96,20 @@ assert.notEqual(certificateSnapshotHash(snap), certificateSnapshotHash({ ...snap
 assert.match(certificateSnapshotHash(snap), /^[0-9a-f]{64}$/);
 assert.equal(parseCertificateSnapshot(JSON.parse(certificateSnapshotJson(snap)))?.licensee.inn, "7707083893");
 assert.equal(parseCertificateSnapshot({ v: 2 }), null);
-assert.equal(certificateDisplayNumber("ALK-2026-000002"), "АЛК-2026-000002");
+assert.equal(certificateDisplayNumber("ALK-2026-000002"), "АудиоЛад № 000 002");
+assert.equal(certificateDisplayNumber("AL-483271"), "АудиоЛад № 483 271");
 assert.equal(certificateCheckUrl("ALK-2026-000002"), "https://audiolad.ru/b/coffee/legal/sertifikat/ALK-2026-000002");
+assert.equal(certificateCheckUrl("AL-483271"), "https://audiolad.ru/b/coffee/legal/sertifikat/AL-483271");
 const rows = Object.fromEntries(certificateRows({ number: "ALK-2026-000002", issuedAt: "2026-11-19T09:06:00.000Z", snapshot: snap }));
-assert.equal(rows["Номер"], "АЛК-2026-000002");
+assert.equal(rows["Номер"], "АудиоЛад № 000 002");
+const rowsNew = Object.fromEntries(certificateRows({ number: "AL-483271", issuedAt: "2026-11-19T09:06:00.000Z", snapshot: snap }));
+assert.equal(rowsNew["Номер"], "АудиоЛад № 483 271");
 assert.equal(rows["Выдан"], "19.11.2026");
 assert.equal(rows["Действует по"], "26.11.2026");
 assert.equal(rows["Лицензиат"], "ООО «КОФЕЙНЯ ПРИМЕР»");
 assert.equal(rows["ИНН / ОГРН"], "7707083893 / 1027700132195");
-assert.equal(rows["Срок доступа"], "с 19.11.2026 по 26.11.2026, подарочный период");
-assert.equal(rows["Каталог"], "каталог «АудиоЛад Кофейня»");
+assert.equal(rows["Срок доступа к сервису"], "с 19.11.2026 по 26.11.2026, подарочный период");
+assert.equal(rows["Каталог"], "закрытый каталог «АудиоЛад Кофейня»");
 assert.equal(rows["Создание музыки"], "MusicGPT и другие сервисы генерации музыки");
 assert.match(rows["Лицензиар"], /ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237/);
 assert.equal(rows["Основание"], "Договор-оферта «АудиоЛад Кофейня», редакция 3 от 18.11.2026, принята 19.11.2026");
@@ -126,7 +130,7 @@ assert.equal(certificateSnapshotIsCurrent(snap, { ...facts, licenseeInactive: tr
 assert.equal(rows["Заведение"], snap.venueName);
 assert.equal(rows["Адрес заведения"], snap.venueAddress);
 assert.ok(!("Точка" in rows) && !("Адрес точки" in rows), "подписи полей – заведение, не точка");
-assert.equal(certificateStatusLabel("expired"), "Не действует: доступ к заведению закончился");
+assert.equal(certificateStatusLabel("expired"), "Не действует: закончился доступ к сервису «АудиоЛад Кофейня» для этого заведения");
 assert.equal(certificateStatusLabel("outdated"), "Не действует: данные заведения или лицензиата изменились");
 assert.equal(certificateStatusLabel("valid"), "Действует");
 
@@ -193,6 +197,20 @@ assert.match(body, /START WITH 2/, "000001 – образец");
 assert.match(body, /ADD COLUMN IF NOT EXISTS legal_inactive_at timestamptz/);
 assert.match(body, /RAISE EXCEPTION 'certificate_revoked'/, "отозванный не заменяется молча");
 assert.match(body, /WHERE superseded_at IS NULL AND revoked_at IS NULL/, "один действующий сертификат на точку");
+
+const numberSql = readFileSync("supabase/migrations/20270404120000_business_certificate_number_al.sql", "utf8");
+assert.match(numberSql, /нужно подтверждение Сергея/i);
+assert.match(numberSql, /AL-\[0-9\]\{6\}/);
+assert.match(numberSql, /floor\(random\(\) \* 1000000\)/, "случайный 6-значный номер, не последовательность");
+assert.match(numberSql, /FOR v_attempt IN 1\.\.64/, "повтор при столкновении");
+assert.match(numberSql, /business_venue_certificate_aliases/);
+assert.match(numberSql, /483271/, "образец зарезервирован");
+assert.doesNotMatch(numberSql, /SET number\s*=/, "схема не переписывает существующие номера");
+const reassignSql = readFileSync("supabase/migrations/20270404120100_business_certificate_number_al_reassign.sql", "utf8");
+assert.match(reassignSql, /ОТДЕЛЬНОЕ ПОДТВЕРЖДЕНИЕ СЕРГЕЯ/);
+assert.match(reassignSql, /business_venue_certificate_aliases/);
+assert.match(reassignSql, /SET number = v_number/);
+assert.match(reassignSql, /Откат/);
 
 // После принятия в карточке наверху главная сразу показывает «Оплатить» (состояние следует за сервером).
 const payHook = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");

@@ -72,7 +72,7 @@ export const PROGRAM_DOCUMENT_ARCHIVE_NOTICE =
  */
 export const UNIFIED_PROGRAM_TERMS_DOCUMENT: PublicProgramDocument = {
   ...PUBLIC_PROGRAM_DOCUMENTS.business_program_terms,
-  version: "r8-2026-10-18",
+  version: "r9-2026-11-19",
   markdown: PROGRAM_TERMS_MD,
   sha256: PROGRAM_TERMS_MD_SHA256,
 };
