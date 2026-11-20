@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import {
   preloadCabinetCover,
@@ -17,9 +17,11 @@ type Props = {
 /**
  * Cabinet / queue thumbnail. Uses a tab-lifetime blob URL when the cover was
  * already fetched, so a remount paints immediately instead of the brown placeholder.
+ * When the track changes, the same mounted instance (mini-player / now playing)
+ * must follow the new src, using the cached blob if it is already ready.
  */
 export default function CabinetCoverImage({ src, width, height, onError }: Props) {
-  const [current] = useState(() => resolveCabinetCoverSrc(src) ?? src);
+  const current = resolveCabinetCoverSrc(src) ?? src;
   useEffect(() => {
     preloadCabinetCover(src);
   }, [src]);
