@@ -3,6 +3,7 @@ import { loadCollectionCatalog } from "@/lib/business-collections/load.server";
 import { normalizeCollectionSharePercent } from "@/lib/business-collections/similar-mix.mjs";
 import { loadCollectionSimilarPreviews } from "@/lib/business-collections/similar-mix.server";
 import { COLLECTION_ADMIN_PATH } from "@/lib/business-collections/model";
+import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import CollectionAdmin, { type CollectionEntry } from "./CollectionAdmin";
 
@@ -13,19 +14,22 @@ const ACCOUNT_PAGE = 1000;
 async function loadUsedCounts(db: ReturnType<typeof createServiceRoleClient>, collectionIds: string[]): Promise<Map<string, number> | null> {
   const usedById = new Map<string, number>();
   if (!collectionIds.length) return usedById;
-  for (let from = 0; from <= 20000; from += ACCOUNT_PAGE) {
-    const used = await db.from("business_personal_collection_accounts").select("collection_id")
-      .in("collection_id", collectionIds)
-      .order("collection_id", { ascending: true })
-      .order("user_id", { ascending: true })
-      .range(from, from + ACCOUNT_PAGE - 1);
-    if (used.error || !used.data) return null;
-    for (const row of used.data) {
-      usedById.set(row.collection_id, (usedById.get(row.collection_id) ?? 0) + 1);
+  for (const chunk of chunkIds(collectionIds)) {
+    for (let from = 0; from <= 20000; from += ACCOUNT_PAGE) {
+      const used = await db.from("business_personal_collection_accounts").select("collection_id")
+        .in("collection_id", chunk)
+        .order("collection_id", { ascending: true })
+        .order("user_id", { ascending: true })
+        .range(from, from + ACCOUNT_PAGE - 1);
+      if (used.error || !used.data) return null;
+      for (const row of used.data) {
+        usedById.set(row.collection_id, (usedById.get(row.collection_id) ?? 0) + 1);
+      }
+      if (used.data.length < ACCOUNT_PAGE) break;
+      if (from + ACCOUNT_PAGE > 20000) return null;
     }
-    if (used.data.length < ACCOUNT_PAGE) return usedById;
   }
-  return null;
+  return usedById;
 }
 
 export default async function PersonalCollectionsAdminPage() {
@@ -46,20 +50,22 @@ export default async function PersonalCollectionsAdminPage() {
   const itemsByCollection = new Map<string, string[]>();
   if (rows.length) {
     const collectionIds = rows.map((row) => row.id);
-    for (let from = 0; from <= 200000; from += ACCOUNT_PAGE) {
-      const itemRows = await db.from("business_personal_collection_items").select("collection_id,audio_item_id")
-        .in("collection_id", collectionIds)
-        .order("collection_id", { ascending: true })
-        .order("audio_item_id", { ascending: true })
-        .range(from, from + ACCOUNT_PAGE - 1);
-      if (itemRows.error || !itemRows.data) throw new Error("Не удалось загрузить треки подборок.");
-      for (const row of itemRows.data) {
-        const list = itemsByCollection.get(row.collection_id) ?? [];
-        list.push(row.audio_item_id);
-        itemsByCollection.set(row.collection_id, list);
+    for (const chunk of chunkIds(collectionIds)) {
+      for (let from = 0; from <= 200000; from += ACCOUNT_PAGE) {
+        const itemRows = await db.from("business_personal_collection_items").select("collection_id,audio_item_id")
+          .in("collection_id", chunk)
+          .order("collection_id", { ascending: true })
+          .order("audio_item_id", { ascending: true })
+          .range(from, from + ACCOUNT_PAGE - 1);
+        if (itemRows.error || !itemRows.data) throw new Error("Не удалось загрузить треки подборок.");
+        for (const row of itemRows.data) {
+          const list = itemsByCollection.get(row.collection_id) ?? [];
+          list.push(row.audio_item_id);
+          itemsByCollection.set(row.collection_id, list);
+        }
+        if (itemRows.data.length < ACCOUNT_PAGE) break;
+        if (from + ACCOUNT_PAGE > 200000) throw new Error("Не удалось загрузить треки подборок.");
       }
-      if (itemRows.data.length < ACCOUNT_PAGE) break;
-      if (from + ACCOUNT_PAGE > 200000) throw new Error("Не удалось загрузить треки подборок.");
     }
   }
   const previews = await loadCollectionSimilarPreviews(rows, catalogTracks, itemsByCollection);
