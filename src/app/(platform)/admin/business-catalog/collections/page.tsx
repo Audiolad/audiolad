@@ -6,6 +6,26 @@ import CollectionAdmin, { type CollectionEntry } from "./CollectionAdmin";
 
 export const dynamic = "force-dynamic";
 
+const ACCOUNT_PAGE = 1000;
+
+async function loadUsedCounts(db: ReturnType<typeof createServiceRoleClient>, collectionIds: string[]): Promise<Map<string, number> | null> {
+  const usedById = new Map<string, number>();
+  if (!collectionIds.length) return usedById;
+  for (let from = 0; from <= 20000; from += ACCOUNT_PAGE) {
+    const used = await db.from("business_personal_collection_accounts").select("collection_id")
+      .in("collection_id", collectionIds)
+      .order("collection_id", { ascending: true })
+      .order("user_id", { ascending: true })
+      .range(from, from + ACCOUNT_PAGE - 1);
+    if (used.error || !used.data) return null;
+    for (const row of used.data) {
+      usedById.set(row.collection_id, (usedById.get(row.collection_id) ?? 0) + 1);
+    }
+    if (used.data.length < ACCOUNT_PAGE) return usedById;
+  }
+  return null;
+}
+
 export default async function PersonalCollectionsAdminPage() {
   await requirePlatformOwnerAccess(COLLECTION_ADMIN_PATH);
   const db = createServiceRoleClient();
@@ -16,24 +36,13 @@ export default async function PersonalCollectionsAdminPage() {
   ]);
   if (entries.error) throw new Error("Не удалось загрузить подборки.");
   const rows = entries.data ?? [];
-  const usedById = new Map<string, number>();
-  let usedOk = false;
-  if (rows.length) {
-    const used = await db.from("business_personal_collection_accounts").select("collection_id")
-      .in("collection_id", rows.map((row) => row.id));
-    if (!used.error && used.data) {
-      usedOk = true;
-      for (const row of used.data) {
-        usedById.set(row.collection_id, (usedById.get(row.collection_id) ?? 0) + 1);
-      }
-    }
-  }
+  const usedById = await loadUsedCounts(db, rows.map((row) => row.id));
   const collections: CollectionEntry[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
     revoked_at: row.revoked_at,
     created_at: row.created_at,
-    usedCount: usedOk ? (usedById.get(row.id) ?? 0) : null,
+    usedCount: usedById ? (usedById.get(row.id) ?? 0) : null,
   }));
   return <section className="space-y-6">
     <h1 className="text-2xl font-semibold">Персональные подборки Кофейни</h1>

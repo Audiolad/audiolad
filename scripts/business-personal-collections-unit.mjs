@@ -204,7 +204,11 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.ok(box.indexOf('value={fresh.url}') < box.indexOf('Копировать ссылку'), 'copy button is inside the box next to the URL');
   assert.match(adminPage, /select\("id,title,revoked_at,created_at"\)/);
   assert.match(adminPage, /business_personal_collection_accounts"\)\.select\("collection_id"\)/);
-  assert.match(adminPage, /usedCount: usedOk \? \(usedById\.get\(row\.id\) \?\? 0\) : null/);
+  assert.match(adminPage, /\.order\("collection_id", \{ ascending: true \}\)/);
+  assert.match(adminPage, /\.order\("user_id", \{ ascending: true \}\)/);
+  assert.match(adminPage, /\.range\(from, from \+ ACCOUNT_PAGE - 1\)/);
+  assert.match(adminPage, /if \(used\.error \|\| !used\.data\) return null;/);
+  assert.match(adminPage, /usedCount: usedById \? \(usedById\.get\(row\.id\) \?\? 0\) : null/);
   assert.match(adminActions, /p_token_hash: collectionTokenHash\(token\)/);
   assert.match(adminActions, /update\(\{ token_hash: collectionTokenHash\(token\), revoked_at: null \}\)/);
   assert.match(adminActions, /id: asCollectionId\(data\), title, createdAt:/);
