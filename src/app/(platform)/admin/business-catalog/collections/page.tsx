@@ -1,5 +1,6 @@
 import { requirePlatformOwnerAccess } from "@/lib/admin/require-platform-owner";
 import { loadCollectionCatalog } from "@/lib/business-collections/load.server";
+import { albumsFromTracks } from "@/lib/business-collections/edit-collection.mjs";
 import { normalizeCollectionSharePercent } from "@/lib/business-collections/similar-mix.mjs";
 import { loadCollectionSimilarPreviews } from "@/lib/business-collections/similar-mix.server";
 import { COLLECTION_ADMIN_PATH } from "@/lib/business-collections/model";
@@ -79,6 +80,7 @@ export default async function PersonalCollectionsAdminPage() {
       usedCount: usedById ? (usedById.get(row.id) ?? 0) : null,
       sharePercent: preview?.sharePercent ?? normalizeCollectionSharePercent(row.collection_share_percent),
       similar: preview?.similar ?? [],
+      albums: albumsFromTracks(catalogTracks, itemsByCollection.get(row.id) ?? []),
     };
   });
   return <section className="space-y-6">
