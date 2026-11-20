@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import {
   preloadCabinetCover,
   resolveCabinetCoverSrc,
+  scheduleCabinetCoverPreload,
 } from "@/lib/business-app/cabinet-cover-cache";
 
 type Props = {
@@ -23,7 +24,9 @@ type Props = {
 export default function CabinetCoverImage({ src, width, height, onError }: Props) {
   const current = resolveCabinetCoverSrc(src) ?? src;
   useEffect(() => {
-    preloadCabinetCover(src);
+    return scheduleCabinetCoverPreload(() => {
+      void preloadCabinetCover(src);
+    });
   }, [src]);
 
   return (
@@ -34,6 +37,7 @@ export default function CabinetCoverImage({ src, width, height, onError }: Props
       width={width}
       height={height}
       decoding="sync"
+      fetchPriority="low"
       onError={onError}
     />
   );
