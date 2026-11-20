@@ -3,7 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 
-import { BUSINESS_POINT_COOKIE } from "@/lib/business-app/point-session";
 import {
   VPN_NOTICE_STORAGE_KEY,
   VPN_NOTICE_TEXT,
@@ -12,11 +11,6 @@ import {
   parseVpnNoticeShownUntil,
   shouldShowVpnNotice,
 } from "@/lib/vpn-notice/decision";
-
-function hasHallDeviceCookie(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((part) => part.trim().startsWith(`${BUSINESS_POINT_COOKIE}=`));
-}
 
 function readShownUntil(): number | null {
   try {
@@ -56,7 +50,6 @@ export default function VpnNoticeBanner({
       hostname,
       pathname,
       shownUntil: readShownUntil(),
-      hallDevice: hasHallDeviceCookie(),
     });
 
   useEffect(() => {
