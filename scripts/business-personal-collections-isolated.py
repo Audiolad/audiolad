@@ -10,6 +10,8 @@ root = Path(__file__).resolve().parent.parent
 pg = Path('/usr/lib/postgresql/17/bin')
 migration = (root / 'supabase/migrations/20270402120000_business_personal_collections.sql').read_text()
 rollback = (root / 'supabase/rollbacks/20270402120000_business_personal_collections.rollback.sql').read_text()
+share_migration = (root / 'supabase/migrations/20270405120000_business_personal_collection_share_percent.sql').read_text()
+share_rollback = (root / 'supabase/rollbacks/20270405120000_business_personal_collection_share_percent.rollback.sql').read_text()
 base = """
 CREATE ROLE anon;
 CREATE ROLE authenticated;
@@ -111,6 +113,19 @@ DO $$ DECLARE r text; t text; BEGIN
  END LOOP;
 END $$;
 SELECT check_test(has_function_privilege('service_role','business_personal_collection_tracks(uuid)','EXECUTE'),'server RPC allowed');
+SELECT check_test((SELECT count(*)=2 AND min(collection_share_percent)=50 AND max(collection_share_percent)=50 FROM business_personal_collections), 'existing rows default to 50');
+SELECT check_test((SELECT is_nullable='YES' FROM information_schema.columns WHERE table_schema='public' AND table_name='business_personal_collections' AND column_name='collection_share_percent'), 'share column nullable');
+UPDATE business_personal_collections SET collection_share_percent=NULL WHERE id=current_setting('test.other')::uuid;
+SELECT check_test((SELECT collection_share_percent IS NULL FROM business_personal_collections WHERE id=current_setting('test.other')::uuid), 'null share allowed');
+SELECT expect_denied('UPDATE business_personal_collections SET collection_share_percent=49 WHERE id=current_setting(''test.other'')::uuid');
+SELECT expect_denied('UPDATE business_personal_collections SET collection_share_percent=96 WHERE id=current_setting(''test.other'')::uuid');
+UPDATE business_personal_collections SET collection_share_percent=95 WHERE id=current_setting('test.other')::uuid;
+SELECT check_test((SELECT collection_share_percent=95 FROM business_personal_collections WHERE id=current_setting('test.other')::uuid), '95 allowed');
+SELECT check_test((SELECT count(*) FILTER (WHERE grantee IN ('anon','authenticated') AND privilege_type IN ('SELECT','INSERT','UPDATE','DELETE'))=0 FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name='business_personal_collections'), 'grants unchanged: clients still have no table access');
+"""
+share_after = """
+SELECT check_test(NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='business_personal_collections' AND column_name='collection_share_percent'), 'share rollback drops the column');
+SELECT check_test((SELECT count(*)=2 FROM business_personal_collections),'share rollback retains collections');
 """
 after = """
 SELECT check_test(NOT has_function_privilege('service_role','business_personal_collection_tracks(uuid)','EXECUTE'),'rollback disables new feature');
@@ -130,7 +145,7 @@ with tempfile.TemporaryDirectory(prefix='personal-collections-pg-') as directory
     subprocess.run([str(pg / 'initdb'), '-D', str(data), '-A', 'trust', '-U', 'postgres', '--no-locale'], check=True, capture_output=True)
     # Single-user server needs no socket permission. Privilege/RLS metadata are checked
     # explicitly; actual PostgREST and Auth integration still require the test stand.
-    blocks = [base, migration, checks, rollback, after]
+    blocks = [base, migration, share_migration, checks, share_rollback, share_after, rollback, after]
     sql = '\n'.join(' '.join(line for line in block.splitlines() if not line.lstrip().startswith('--')) for block in blocks) + '\n'
     result = subprocess.run([str(pg / 'postgres'), '--single', '-D', str(data), 'postgres'], input=sql, text=True, capture_output=True)
     if result.returncode or 'ERROR:' in result.stderr or 'FATAL:' in result.stderr or 'personal-collections-sql: PASS' not in result.stdout:

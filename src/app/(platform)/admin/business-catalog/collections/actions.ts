@@ -59,3 +59,19 @@ export async function regenerateCollection(id: string): Promise<{ ok: true; link
     return { ok: true, link: collectionLink(token), title: data[0]?.title ?? "" };
   } catch { return { ok: false, error: "Не удалось перевыпустить ссылку." }; }
 }
+
+export async function saveCollectionShare(input: { id: string; percent: number }): Promise<{ ok: true; percent: number } | { ok: false; error: string }> {
+  await requirePlatformOwnerAccess(COLLECTION_ADMIN_PATH);
+  const id = typeof input?.id === "string" ? input.id : "";
+  const percent = input?.percent;
+  if (!COLLECTION_UUID.test(id) || !Number.isInteger(percent) || percent < 50 || percent > 95) {
+    return { ok: false, error: "Укажите долю подборки от 50 до 95." };
+  }
+  try {
+    const { data, error } = await createServiceRoleClient().from("business_personal_collections")
+      .update({ collection_share_percent: percent }).eq("id", id).select("id");
+    if (error || !data?.length) return { ok: false, error: "Не удалось сохранить долю. Обновите страницу и повторите попытку." };
+    revalidatePath(COLLECTION_ADMIN_PATH);
+    return { ok: true, percent };
+  } catch { return { ok: false, error: "Не удалось сохранить долю. Повторите попытку." }; }
+}

@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COLLECTION_ACCOUNT_LIMIT, type CollectionTrack } from "@/lib/business-collections/model";
-import { createCollection, revokeCollection, regenerateCollection } from "./actions";
+import { COLLECTION_SHARE_PRESETS, collectionShareLabel, normalizeCollectionSharePercent } from "@/lib/business-collections/similar-mix.mjs";
+import { createCollection, revokeCollection, regenerateCollection, saveCollectionShare } from "./actions";
+
+export type CollectionSimilarTrack = { audioItemId?: string; title: string; albumTitle: string };
 
 export type CollectionEntry = {
   id: string;
@@ -11,6 +14,8 @@ export type CollectionEntry = {
   revoked_at: string | null;
   created_at: string;
   usedCount: number | null;
+  sharePercent: number;
+  similar: CollectionSimilarTrack[];
 };
 
 type FreshLink = { collectionId: string; title: string; url: string };
@@ -79,6 +84,8 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
   const [busy, setBusy] = useState(false);
   const [regenerated, setRegenerated] = useState<string[]>([]);
   const [revoked, setRevoked] = useState<string[]>([]);
+  const [shareById, setShareById] = useState<Record<string, number>>({});
+  const [shareDraft, setShareDraft] = useState<Record<string, string>>({});
   const albums = [...new Map(tracks.map((track) => [track.albumId, track.albumTitle])).entries()];
   const toggle = (ids: string[], checked: boolean) => setSelected((old) => checked ? [...new Set([...old, ...ids])] : old.filter((id) => !ids.includes(id)));
   const incomingIds = new Set(collections.map((entry) => entry.id));
@@ -103,6 +110,8 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
             revoked_at: null,
             created_at: result.createdAt,
             usedCount: 0,
+            sharePercent: 50,
+            similar: [],
           };
           setCreated((old) => [entry, ...old.filter((item) => item.id !== entry.id)]);
         }
@@ -151,6 +160,19 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
       setCopied(false);
       setMessage("Выделите и скопируйте ссылку из поля.");
     }
+  }
+
+  async function saveShare(id: string) {
+    const percent = normalizeCollectionSharePercent(shareById[id] ?? list.find((entry) => entry.id === id)?.sharePercent);
+    setBusy(true); setMessage(null);
+    try {
+      const result = await saveCollectionShare({ id, percent });
+      if (result.ok) {
+        setShareById((old) => ({ ...old, [id]: result.percent }));
+        router.refresh();
+      } else setMessage(result.error);
+    } catch { setMessage("Не удалось сохранить долю. Повторите попытку."); }
+    finally { setBusy(false); }
   }
 
   function isRevoked(entry: CollectionEntry): boolean {
@@ -206,7 +228,72 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
                 {entry.usedCount !== null ? (
                   <p className="mt-1 text-sm leading-6">Воспользовались: {entry.usedCount} из {COLLECTION_ACCOUNT_LIMIT}</p>
                 ) : null}
-                <p className="mt-1 text-sm leading-6 text-[#5f5484]">
+                <div className="mt-3 rounded-lg bg-[#faf6ff] p-3">
+                  <p className="text-sm font-medium text-[#25135c]">Доля подборки после оплаты</p>
+                  <p className="mt-1 text-sm leading-6 text-[#5f5484]">
+                    После оплаты подборка остаётся основой, к ней подмешиваются похожие треки из закрытого каталога. До оплаты играет только подборка.
+                  </p>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <label className="text-sm">Соотношение
+                      <select
+                        className="ml-2 rounded border border-[#d9cdef] bg-white p-1.5"
+                        disabled={busy}
+                        value={shareById[entry.id] ?? entry.sharePercent}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          setShareById((old) => ({ ...old, [entry.id]: value }));
+                          setShareDraft((old) => ({ ...old, [entry.id]: String(value) }));
+                        }}
+                      >
+                        {(() => {
+                          const current = shareById[entry.id] ?? entry.sharePercent;
+                          const values = COLLECTION_SHARE_PRESETS.includes(current) ? COLLECTION_SHARE_PRESETS : [...COLLECTION_SHARE_PRESETS, current].sort((a, b) => a - b);
+                          return values.map((percent) => (
+                            <option key={percent} value={percent}>{collectionShareLabel(percent)}</option>
+                          ));
+                        })()}
+                      </select>
+                    </label>
+                    <label className="text-sm">Или число от 50 до 95
+                      <input
+                        type="number"
+                        min={50}
+                        max={95}
+                        step={1}
+                        className="ml-2 w-20 rounded border border-[#d9cdef] bg-white p-1.5"
+                        disabled={busy}
+                        value={shareDraft[entry.id] ?? String(shareById[entry.id] ?? entry.sharePercent)}
+                        onChange={(event) => setShareDraft((old) => ({ ...old, [entry.id]: event.target.value }))}
+                        onBlur={(event) => {
+                          const value = Number(event.target.value);
+                          if (Number.isInteger(value) && value >= 50 && value <= 95) {
+                            setShareById((old) => ({ ...old, [entry.id]: value }));
+                            setShareDraft((old) => ({ ...old, [entry.id]: String(value) }));
+                          } else {
+                            setShareDraft((old) => ({ ...old, [entry.id]: String(shareById[entry.id] ?? entry.sharePercent) }));
+                          }
+                        }}
+                      />
+                    </label>
+                    <button type="button" disabled={busy} className="underline" onClick={() => { void saveShare(entry.id); }}>
+                      Сохранить долю
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm leading-6">После оплаты: {entry.similar.length} похожих треков</p>
+                  {entry.similar.length ? (
+                    <details className="mt-1 text-sm leading-6">
+                      <summary>Какие треки подмешаются</summary>
+                      <ol className="mt-2 space-y-1">
+                        {entry.similar.map((track, index) => (
+                          <li key={track.audioItemId || `${track.title}-${index}`}>{track.title} – {track.albumTitle}</li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : (
+                    <p className="mt-1 text-sm leading-6 text-[#5f5484]">Похожих треков пока нет: в каталоге нет достаточно близких записей, или подборка только что создана – обновите страницу.</p>
+                  )}
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[#5f5484]">
                   Саму ссылку мы не храним. Получить её снова можно только через «Перевыпустить» – тогда прежняя перестанет открываться.
                 </p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

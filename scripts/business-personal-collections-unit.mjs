@@ -37,9 +37,21 @@ assert.equal(await selectPersonalVenuePool(ordinary, async () => []), ordinary, 
 assert.equal(await selectPersonalVenuePool(ordinary, async () => [], async () => false), ordinary, 'paid venue keeps playing after a revoke');
 assert.equal(await selectPersonalVenuePool(ordinary, async () => [], async () => true), 'collection_unavailable', 'unpaid link venue never gets the whole catalog');
 assert.equal(await selectPersonalVenuePool(ordinary, async () => [other], async () => true), 'collection_unavailable');
+const similar = [ordinary[20], ordinary[21]];
+const trialMix = await selectPersonalVenuePool(ordinary, async () => [tracks[3], tracks[7]], async () => true, async () => similar);
+assert.deepEqual(trialMix, [ordinary[3], ordinary[7]], 'trial never receives similar tracks');
+const paidMix = await selectPersonalVenuePool(ordinary, async () => [tracks[3], tracks[7]], async () => false, async () => similar);
+assert.deepEqual(paidMix, [ordinary[3], ordinary[7], ordinary[20], ordinary[21]], 'paid venue mixes collection then similar');
+const leaked = await selectPersonalVenuePool(ordinary, async () => [tracks[3]], async () => false, async () => [{ audioItemId: 'not-in-pool' }, ordinary[3], ordinary[8]]);
+assert.deepEqual(leaked, [ordinary[3], ordinary[8]], 'similar lookup cannot add ids outside the admitted pool or duplicates');
+const failedMix = await selectPersonalVenuePool(ordinary, async () => [tracks[3]], async () => false, async () => { throw new Error('mix'); });
+assert.deepEqual(failedMix, [ordinary[3]], 'failed similar lookup keeps the collection and does not widen');
+let similarCalls = 0;
+await selectPersonalVenuePool(ordinary, async () => [tracks[0]], async () => true, async () => { similarCalls++; return similar; });
+assert.equal(similarCalls, 0, 'unpaid venue never asks for similar tracks');
 let strictCalls = 0;
 await selectPersonalVenuePool(ordinary, async () => [tracks[0]], async () => { strictCalls++; return true; });
-assert.equal(strictCalls, 0, 'strict lookup only when the collection pool is empty');
+assert.equal(strictCalls, 1, 'paid/unpaid status is checked when the collection is live');
 await assert.rejects(selectPersonalVenuePool(ordinary, async () => { throw new Error('unavailable'); }), 'lookup failure cannot expand pool');
 await assert.rejects(selectPersonalVenuePool(ordinary, async () => [], async () => { throw new Error('unavailable'); }), 'strict failure cannot expand pool');
 
@@ -108,6 +120,7 @@ assert.match(source('src/components/business-app/profile/BusinessProfileSubscrip
 assert.match(demo, /redirect\("\/collection"\)/, 'link visitor never sees the public demo');
 const workspace = source('src/lib/business-workspace/load.server.ts');
 assert.match(workspace, /personalCollectionStrict\(db, locationId\)/);
+assert.match(workspace, /loadPaidSimilarMix\(db, locationId, selected, admitted\)/);
 assert.match(workspace, /collectionUnavailable: true/);
 assert.match(workspace, /business_venue_paid_until/);
 // Quiet cabinet (t1617u/t1618u): every pushy element is gated.
@@ -134,7 +147,7 @@ const admin = source('src/app/(platform)/admin/business-catalog/collections/acti
 assert.match(admin, /export async function regenerateCollection/);
 const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.meta.url));
 assert.ok(migrationFiles.includes('20270402120000_business_personal_collections.sql'));
-assert.ok(!migrationFiles.some((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), 'no new migration');
+assert.deepEqual(migrationFiles.filter((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), ['20270405120000_business_personal_collection_share_percent.sql'], 'only the share-percent collection migration was added');
 console.log('personal-collections: PASS – ordinary app limited to the collection, strict unpaid pool, calm entry, quiet cabinet, 10 per link');
 
 // Round 3: a venue created by a bound account after a revoke stays strict while unpaid; ordinary
@@ -202,7 +215,10 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.match(box, /Копировать ссылку/);
   assert.match(box, /value=\{fresh\.url\}/);
   assert.ok(box.indexOf('value={fresh.url}') < box.indexOf('Копировать ссылку'), 'copy button is inside the box next to the URL');
-  assert.match(adminPage, /select\("id,title,revoked_at,created_at"\)/);
+  assert.match(adminPage, /select\("id,title,revoked_at,created_at,collection_share_percent"\)/);
+  assert.match(adminPage, /loadCollectionSimilarPreviews/);
+  assert.match(adminPage, /chunkIds\(collectionIds\)/);
+  assert.match(adminPage, /business_personal_collection_items[\s\S]*?in\("collection_id", chunk\)[\s\S]*?order\("audio_item_id"[\s\S]*?range\(from, from \+ ACCOUNT_PAGE - 1\)/);
   assert.match(adminPage, /business_personal_collection_accounts"\)\.select\("collection_id"\)/);
   assert.match(adminPage, /\.order\("collection_id", \{ ascending: true \}\)/);
   assert.match(adminPage, /\.order\("user_id", \{ ascending: true \}\)/);
@@ -217,6 +233,27 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.doesNotMatch(adminActions, /p_token:\s*token|token_hash:\s*token(?!_)/, "raw token is never written");
   assert.doesNotMatch(adminPage, /token_hash/);
   const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.meta.url));
-  assert.ok(!migrationFiles.some((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), 'no new collection migration');
+  const collectionMigrations = migrationFiles.filter((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name));
+  assert.deepEqual(collectionMigrations, ['20270405120000_business_personal_collection_share_percent.sql'], 'only the share-percent collection migration was added');
+}
+
+{
+  const ui = source('src/app/(platform)/admin/business-catalog/collections/CollectionAdmin.tsx');
+  const adminPage = source('src/app/(platform)/admin/business-catalog/collections/page.tsx');
+  const adminActions = source('src/app/(platform)/admin/business-catalog/collections/actions.ts');
+  assert.match(adminActions, /export async function saveCollectionShare/);
+  assert.match(adminActions, /requirePlatformOwnerAccess\(COLLECTION_ADMIN_PATH\)/);
+  assert.match(adminActions, /collection_share_percent: percent/);
+  assert.match(ui, /Доля подборки после оплаты/);
+  assert.match(ui, /После оплаты: \{entry.similar.length\} похожих треков/);
+  assert.match(ui, /Какие треки подмешаются/);
+  assert.match(ui, /track.title\} – \{track.albumTitle/);
+  assert.match(ui, /Сохранить долю/);
+  assert.match(ui, /COLLECTION_SHARE_PRESETS/);
+  assert.doesNotMatch(ui, /—/, 'share UI uses en dash only');
+  assert.doesNotMatch(adminPage, /—/);
+  assert.doesNotMatch(adminActions, /—/);
+  assert.match(source('src/lib/business-workspace/load.server.ts'), /loadPaidSimilarMix\(db, locationId, selected, admitted\)/);
 }
 console.log('personal-collections admin links: PASS – named once-only box, in-row reissue, usage count, hash-only token');
+console.log('personal-collections similar mix admin: PASS – share selector, similar list, staff-only save');
