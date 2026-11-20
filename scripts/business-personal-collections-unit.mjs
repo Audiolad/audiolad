@@ -172,3 +172,51 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.match(studio, /\{offerGift && !quiet \? \(/);
   assert.match(studio, /\{guest && liveAccess && !quiet \? \(/);
 }
+
+// t1639u: the admin list must make it obvious which collection a fresh link belongs to.
+// The raw token is never stored; only token_hash, so a link cannot be shown again.
+{
+  const ui = source('src/app/(platform)/admin/business-catalog/collections/CollectionAdmin.tsx');
+  const adminPage = source('src/app/(platform)/admin/business-catalog/collections/page.tsx');
+  const adminActions = source('src/app/(platform)/admin/business-catalog/collections/actions.ts');
+  assert.match(ui, /Ссылка для подборки «\{fresh\.title\}»/);
+  assert.match(ui, /Ссылка показана только один раз – сейчас/);
+  assert.match(ui, /\{copied \? "Скопировано" : "Копировать ссылку"\}/);
+  assert.match(ui, /\{copied \? <p className="mt-2 text-sm font-medium text-\[#25135c\]">Скопировано<\/p> : null\}/);
+  assert.match(ui, /Ссылка действует, выдана \$\{text\}/);
+  assert.match(ui, /timeZone: "Europe\/Moscow"/);
+  assert.match(ui, /\{revokedNow \? "Ссылка отозвана" : issuedStatus\(entry\.created_at\)\}/);
+  assert.match(ui, /Воспользовались: \{entry\.usedCount\} из \{COLLECTION_ACCOUNT_LIMIT\}/);
+  assert.match(ui, /Саму ссылку мы не храним/);
+  assert.match(ui, /Перевыпустить/);
+  assert.match(ui, /fresh\?\.collectionId === entry\.id/);
+  assert.match(ui, /scrollIntoView/);
+  assert.match(ui, /rounded-xl border border-\[#eadff8\]/);
+  assert.doesNotMatch(ui, /—/);
+  assert.doesNotMatch(adminPage, /—/);
+  assert.doesNotMatch(adminActions, /—/);
+  // Copy button lives inside the fresh-link box, next to the URL.
+  const boxStart = ui.indexOf('function LinkBox');
+  const boxEnd = ui.indexOf('export default function CollectionAdmin');
+  const box = ui.slice(boxStart, boxEnd);
+  assert.match(box, /Копировать ссылку/);
+  assert.match(box, /value=\{fresh\.url\}/);
+  assert.ok(box.indexOf('value={fresh.url}') < box.indexOf('Копировать ссылку'), 'copy button is inside the box next to the URL');
+  assert.match(adminPage, /select\("id,title,revoked_at,created_at"\)/);
+  assert.match(adminPage, /business_personal_collection_accounts"\)\.select\("collection_id"\)/);
+  assert.match(adminPage, /\.order\("collection_id", \{ ascending: true \}\)/);
+  assert.match(adminPage, /\.order\("user_id", \{ ascending: true \}\)/);
+  assert.match(adminPage, /\.range\(from, from \+ ACCOUNT_PAGE - 1\)/);
+  assert.match(adminPage, /if \(used\.error \|\| !used\.data\) return null;/);
+  assert.match(adminPage, /usedCount: usedById \? \(usedById\.get\(row\.id\) \?\? 0\) : null/);
+  assert.match(adminActions, /p_token_hash: collectionTokenHash\(token\)/);
+  assert.match(adminActions, /update\(\{ token_hash: collectionTokenHash\(token\), revoked_at: null \}\)/);
+  assert.match(adminActions, /id: asCollectionId\(data\), title, createdAt:/);
+  assert.match(adminActions, /select\("id,title"\)/);
+  assert.doesNotMatch(adminActions, /token_plain|raw_token/);
+  assert.doesNotMatch(adminActions, /p_token:\s*token|token_hash:\s*token(?!_)/, "raw token is never written");
+  assert.doesNotMatch(adminPage, /token_hash/);
+  const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.meta.url));
+  assert.ok(!migrationFiles.some((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), 'no new collection migration');
+}
+console.log('personal-collections admin links: PASS – named once-only box, in-row reissue, usage count, hash-only token');
