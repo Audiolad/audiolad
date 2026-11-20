@@ -147,7 +147,7 @@ const admin = source('src/app/(platform)/admin/business-catalog/collections/acti
 assert.match(admin, /export async function regenerateCollection/);
 const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.meta.url));
 assert.ok(migrationFiles.includes('20270402120000_business_personal_collections.sql'));
-assert.deepEqual(migrationFiles.filter((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), ['20270405120000_business_personal_collection_share_percent.sql'], 'only the share-percent collection migration was added');
+assert.deepEqual(migrationFiles.filter((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name)), ['20270405120000_business_personal_collection_share_percent.sql', '20270406120000_business_personal_collection_delete_grants.sql'], 'share-percent and delete-grants collection migrations only');
 console.log('personal-collections: PASS – ordinary app limited to the collection, strict unpaid pool, calm entry, quiet cabinet, 10 per link');
 
 // Round 3: a venue created by a bound account after a revoke stays strict while unpaid; ordinary
@@ -234,7 +234,7 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.doesNotMatch(adminPage, /token_hash/);
   const migrationFiles = readdirSync(new URL('../supabase/migrations/', import.meta.url));
   const collectionMigrations = migrationFiles.filter((name) => name > '20270402120000_business_personal_collections.sql' && /collection/.test(name));
-  assert.deepEqual(collectionMigrations, ['20270405120000_business_personal_collection_share_percent.sql'], 'only the share-percent collection migration was added');
+  assert.deepEqual(collectionMigrations, ['20270405120000_business_personal_collection_share_percent.sql', '20270406120000_business_personal_collection_delete_grants.sql'], 'share-percent and delete-grants collection migrations only');
 }
 
 {
@@ -255,5 +255,103 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.doesNotMatch(adminActions, /—/);
   assert.match(source('src/lib/business-workspace/load.server.ts'), /loadPaidSimilarMix\(db, locationId, selected, admitted\)/);
 }
+
+{
+  const {
+    albumsFromTracks, planAddAlbum, planRemoveAlbum, planDeleteCollection,
+    nextPositions, isVenuePaid, applyCollectionTrackChange, COLLECTION_TRACK_LIMIT,
+  } = await import('../src/lib/business-collections/edit-collection.mjs');
+  const albumA = '00000000-0000-4000-8000-00000000aa01';
+  const albumB = '00000000-0000-4000-8000-00000000aa02';
+  const albumClosed = '00000000-0000-4000-8000-00000000aa03';
+  const catalog = [
+    { audioItemId: tracks[0], albumId: albumA, albumTitle: 'Альбом А', title: 'A1' },
+    { audioItemId: tracks[1], albumId: albumA, albumTitle: 'Альбом А', title: 'A2' },
+    { audioItemId: tracks[2], albumId: albumB, albumTitle: 'Альбом Б', title: 'B1' },
+    { audioItemId: tracks[3], albumId: albumB, albumTitle: 'Альбом Б', title: 'B2' },
+  ];
+  const startIds = [tracks[0], tracks[1]];
+  assert.deepEqual(albumsFromTracks(catalog, startIds), [{ albumId: albumA, albumTitle: 'Альбом А', trackCount: 2 }]);
+  const added = planAddAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumB, revoked: false });
+  assert.equal(added.ok, true);
+  if (!added.ok) throw new Error('add should succeed');
+  assert.deepEqual(added.addIds, [tracks[2], tracks[3]]);
+  const afterAdd = applyCollectionTrackChange(startIds, added);
+  assert.deepEqual(afterAdd, [tracks[0], tracks[1], tracks[2], tracks[3]]);
+  const paidPool = await selectPersonalVenuePool(ordinary, async () => afterAdd);
+  assert.deepEqual(paidPool, [ordinary[0], ordinary[1], ordinary[2], ordinary[3]], 'adding an album updates the venue pool');
+  const removed = planRemoveAlbum({ catalogTracks: catalog, collectionTrackIds: afterAdd, albumId: albumB, revoked: false });
+  assert.equal(removed.ok, true);
+  if (!removed.ok) throw new Error('remove should succeed');
+  const afterRemove = applyCollectionTrackChange(afterAdd, removed);
+  assert.deepEqual(afterRemove, startIds);
+  assert.deepEqual(await selectPersonalVenuePool(ordinary, async () => afterRemove), [ordinary[0], ordinary[1]], 'removing an album updates the venue pool');
+  assert.equal(planAddAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumClosed, revoked: false }).ok, false);
+  assert.equal(planAddAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumClosed, revoked: false }).reason, 'not_admitted');
+  assert.equal(planAddAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumB, revoked: true }).reason, 'revoked');
+  assert.equal(planRemoveAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumA, revoked: true }).reason, 'revoked');
+  assert.equal(planRemoveAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumA, revoked: false }).reason, 'last_album');
+  assert.equal(planAddAlbum({ catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumA, revoked: false }).reason, 'already_in');
+  assert.equal(planAddAlbum({
+    catalogTracks: catalog, collectionTrackIds: startIds, albumId: albumB, revoked: false, limit: 3,
+  }).reason, 'limit');
+  assert.equal(COLLECTION_TRACK_LIMIT, 500);
+  assert.deepEqual(nextPositions(4, 2), [5, 6]);
+  assert.deepEqual(nextPositions(-1, 2), [0, 1]);
+  assert.equal(planDeleteCollection({ confirmPaid: false, paidVenueCount: 0 }).ok, true);
+  assert.equal(planDeleteCollection({ confirmPaid: false, paidVenueCount: 1 }).reason, 'needs_paid_confirm');
+  assert.equal(planDeleteCollection({ confirmPaid: true, paidVenueCount: 1 }).ok, true);
+  assert.equal(isVenuePaid('2099-01-01T00:00:00.000Z', Date.parse('2026-11-20T09:00:00.000Z')), true);
+  assert.equal(isVenuePaid('2020-01-01T00:00:00.000Z', Date.parse('2026-11-20T09:00:00.000Z')), false);
+}
+
+{
+  const ui = source('src/app/(platform)/admin/business-catalog/collections/CollectionAdmin.tsx');
+  const adminPage = source('src/app/(platform)/admin/business-catalog/collections/page.tsx');
+  const adminActions = source('src/app/(platform)/admin/business-catalog/collections/actions.ts');
+  const migration = source('supabase/migrations/20270406120000_business_personal_collection_delete_grants.sql');
+  const rollback = source('supabase/rollbacks/20270406120000_business_personal_collection_delete_grants.rollback.sql');
+  assert.match(adminActions, /export async function addCollectionAlbum/);
+  assert.match(adminActions, /export async function removeCollectionAlbum/);
+  assert.match(adminActions, /export async function deleteCollection/);
+  assert.equal([...adminActions.matchAll(/requirePlatformOwnerAccess\(COLLECTION_ADMIN_PATH\)/g)].length, 7);
+  assert.match(adminActions, /planAddAlbum\(/);
+  assert.match(adminActions, /planRemoveAlbum\(/);
+  assert.match(adminActions, /planDeleteCollection\(/);
+  assert.match(adminActions, /business_venue_paid_until/);
+  assert.match(adminActions, /needsPaidConfirm: true/);
+  const itemsAt = adminActions.indexOf('.from("business_personal_collection_items").delete()');
+  const accountsAt = adminActions.indexOf('.from("business_personal_collection_accounts").delete()');
+  const locationsAt = adminActions.indexOf('.from("business_personal_collection_locations").delete()');
+  const collectionAt = adminActions.indexOf('.from("business_personal_collections").delete()');
+  assert.ok(itemsAt > 0 && itemsAt < accountsAt && accountsAt < locationsAt && locationsAt < collectionAt, 'delete order items → accounts → locations → collection');
+  assert.doesNotMatch(adminActions, /from\("audio_items"\)\.delete\(/);
+  assert.doesNotMatch(adminActions, /from\("practices"\)\.delete\(/);
+  assert.doesNotMatch(adminActions, /from\("business_locations"\)\.delete\(/);
+  assert.doesNotMatch(adminActions, /from\("business_payments"\)\.delete\(/);
+  assert.doesNotMatch(adminActions, /from\("business_orders"\)\.delete\(/);
+  assert.match(adminPage, /albumsFromTracks\(catalogTracks, itemsByCollection.get\(row.id\) \?\? \[\]\)/);
+  assert.match(ui, /Альбомы в подборке/);
+  assert.match(ui, /Добавить альбом/);
+  assert.match(ui, /Убрать альбом «\{confirmHere.albumTitle\}» из подборки «\{confirmHere.title\}»/);
+  assert.match(ui, /Удалить подборку/);
+  assert.match(ui, /Исчезнут только сама подборка, её ссылка и связи с кабинетами/);
+  assert.match(ui, /есть оплаченный период/);
+  assert.match(ui, /перейдёт на общий каталог/);
+  assert.match(migration, /GRANT DELETE ON TABLE/);
+  assert.match(migration, /business_personal_collections,/);
+  assert.match(migration, /business_personal_collection_items,/);
+  assert.match(migration, /business_personal_collection_accounts,/);
+  assert.match(migration, /business_personal_collection_locations/);
+  assert.doesNotMatch(migration, /ON DELETE CASCADE/);
+  assert.doesNotMatch(migration, /ALTER TABLE/);
+  assert.match(rollback, /REVOKE DELETE ON TABLE/);
+  assert.doesNotMatch(ui, /—/);
+  assert.doesNotMatch(adminPage, /—/);
+  assert.doesNotMatch(adminActions, /—/);
+  assert.doesNotMatch(migration, /—/);
+}
+
 console.log('personal-collections admin links: PASS – named once-only box, in-row reissue, usage count, hash-only token');
 console.log('personal-collections similar mix admin: PASS – share selector, similar list, staff-only save');
+console.log('personal-collections edit albums and delete: PASS – add/remove pool, rejects, paid confirm, delete order, grants');
