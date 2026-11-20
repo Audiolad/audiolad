@@ -23,6 +23,7 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import CabinetCoverImage from "@/components/business-app/CabinetCoverImage";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
@@ -334,8 +335,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             <div className="business-now__head">
               <span className="business-now__cover" data-has-image={nowCover && failedNowCover !== nowCover ? "true" : "false"} data-testid="biz-now-cover">
                 {nowCover && failedNowCover !== nowCover ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same file as the bottom bar
-                  <img src={nowCover} alt="" width={80} height={80} onError={() => setFailedNowCover(nowCover)} />
+                  <CabinetCoverImage src={nowCover} width={80} height={80} onError={() => setFailedNowCover(nowCover)} />
                 ) : null}
               </span>
               <div className="business-now__meta">

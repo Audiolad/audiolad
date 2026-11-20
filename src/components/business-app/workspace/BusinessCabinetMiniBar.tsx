@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import CabinetCoverImage from "@/components/business-app/CabinetCoverImage";
 
 /**
  * The thin cabinet player. The guest coffee page uses the same bar.
@@ -110,8 +111,7 @@ export default function BusinessCabinetMiniBar({
       <button type="button" className="business-cabinet-player__open business-app-focus-ring" data-testid={openTestId} onClick={onOpen}>
         <span className="business-cabinet-player__cover" data-has-image={coverSrc ? "true" : "false"}>
           {coverSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same as the cabinet bar
-            <img src={coverSrc} alt="" width={40} height={40} onError={onCoverError} />
+            <CabinetCoverImage src={coverSrc} width={40} height={40} onError={onCoverError} />
           ) : null}
         </span>
         <span className="business-cabinet-player__title">{title}</span>

@@ -348,7 +348,8 @@ assert.equal(guestCoffeeTrackClock(0), null);
   }
   const button = read("src/components/business-app/BusinessAtmosphereTrackButton.tsx");
   const css = read("src/components/business-app/business-app.css");
-  assert.match(button, /loading="lazy"/);
+  assert.doesNotMatch(button, /loading="lazy"/, "queue covers paint immediately on remount");
+  assert.match(button, /CabinetCoverImage/);
   assert.match(button, /width=\{46\}/);
   assert.match(button, /playing \? "♪"/);
   const coverRule = css.match(/\.business-atmosphere-track__cover \{[^}]*\}/)?.[0] ?? "";
