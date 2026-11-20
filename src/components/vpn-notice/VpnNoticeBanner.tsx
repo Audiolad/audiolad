@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 
 import { BUSINESS_POINT_COOKIE } from "@/lib/business-app/point-session";
@@ -34,6 +34,10 @@ function writeShownUntil(until: number): void {
   }
 }
 
+function subscribeNoop(): () => void {
+  return () => {};
+}
+
 export default function VpnNoticeBanner({
   country,
   hostname,
@@ -42,28 +46,29 @@ export default function VpnNoticeBanner({
   hostname: string;
 }) {
   const pathname = usePathname() ?? "/";
-  const [visible, setVisible] = useState(false);
+  // Server and the hydration pass stay hidden; after hydration we read localStorage / cookies.
+  const ready = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const decided = useRef<boolean | null>(null);
+  if (ready && decided.current === null) {
+    decided.current = shouldShowVpnNotice({
+      country,
+      hostname,
+      pathname,
+      shownUntil: readShownUntil(),
+      hallDevice: hasHallDeviceCookie(),
+    });
+  }
+
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (
-      !shouldShowVpnNotice({
-        country,
-        hostname,
-        pathname,
-        shownUntil: readShownUntil(),
-        hallDevice: hasHallDeviceCookie(),
-      })
-    ) {
-      setVisible(false);
-      return;
-    }
+    if (decided.current !== true) return;
     writeShownUntil(Date.now() + VPN_NOTICE_TTL_MS);
-    setVisible(true);
-    const hide = window.setTimeout(() => setVisible(false), VPN_NOTICE_VISIBLE_MS);
+    const hide = window.setTimeout(() => setDone(true), VPN_NOTICE_VISIBLE_MS);
     return () => window.clearTimeout(hide);
-  }, [country, hostname, pathname]);
+  }, [ready]);
 
-  if (!visible) return null;
+  if (decided.current !== true || done) return null;
 
   return (
     <div
@@ -104,7 +109,7 @@ export default function VpnNoticeBanner({
         <button
           type="button"
           aria-label="Закрыть"
-          onClick={() => setVisible(false)}
+          onClick={() => setDone(true)}
           style={{
             flex: "0 0 auto",
             width: 32,
