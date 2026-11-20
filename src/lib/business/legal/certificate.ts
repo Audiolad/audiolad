@@ -2,16 +2,36 @@ import { createHash } from "node:crypto";
 
 import { BUSINESS_LEGAL_OPERATOR } from "./section";
 
+import {
+  BUSINESS_CERTIFICATE_SITE,
+  certificateCheckUrl,
+  certificateDisplayNumber,
+  certificateUrlSlug,
+  isSampleCertificateNumber,
+  parseCertificateNumber,
+  certificateCanonicalNumber,
+} from "./certificate-number";
+
+
 /**
  * Сертификат заведения (оферта «АудиоЛад Кофейня», ред. 3, приложение 2; t1591u).
  * Снимок данных фиксируется при выдаче. Новый номер выдаётся, когда снимок меняется:
  * новый период доступа, адрес или название заведения, ИНН, принятая редакция договора.
- * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер>.
+ * Проверка: audiolad.ru/b/coffee/legal/sertifikat/<номер> (внутренний вид AL-483271;
+ * старые адреса ALK-2026-000002 продолжают открываться).
  */
 
-export const BUSINESS_CERTIFICATE_CATALOG = "каталог «АудиоЛад Кофейня»";
+export {
+  BUSINESS_CERTIFICATE_SITE,
+  certificateCheckUrl,
+  certificateDisplayNumber,
+  certificateUrlSlug,
+  isSampleCertificateNumber,
+  parseCertificateNumber,
+  certificateCanonicalNumber,
+};
+export const BUSINESS_CERTIFICATE_CATALOG = "закрытый каталог «АудиоЛад Кофейня»";
 export const BUSINESS_CERTIFICATE_GENERATORS = "MusicGPT и другие сервисы генерации музыки";
-export const BUSINESS_CERTIFICATE_SITE = "https://audiolad.ru";
 
 export type CertificatePeriodKind = "gift" | "subscription";
 
@@ -65,15 +85,6 @@ export function parseCertificateSnapshot(raw: unknown): CertificateSnapshot | nu
   return s;
 }
 
-/** ALK-2026-000002 → «АЛК-2026-000002» для печати (в адресе страницы – латиница). */
-export function certificateDisplayNumber(number: string): string {
-  return number.replace(/^ALK/, "АЛК");
-}
-
-export function certificateCheckUrl(number: string): string {
-  return `${BUSINESS_CERTIFICATE_SITE}/b/coffee/legal/sertifikat/${number}`;
-}
-
 const MOSCOW_DATE = new Intl.DateTimeFormat("ru-RU", {
   timeZone: "Europe/Moscow",
   day: "2-digit",
@@ -101,7 +112,7 @@ export function periodLine(s: CertificateSnapshot): string {
   return `${start ? `с ${start} ` : ""}по ${end}, ${periodKindLabel(s.period.kind)}`;
 }
 
-export const BUSINESS_CERTIFICATE_LICENSOR_LINE = `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip} – изготовитель и правообладатель фонограмм каталога`;
+export const BUSINESS_CERTIFICATE_LICENSOR_LINE = `${BUSINESS_LEGAL_OPERATOR.name}, ИНН ${BUSINESS_LEGAL_OPERATOR.inn}, ОГРНИП ${BUSINESS_LEGAL_OPERATOR.ogrnip} – изготовитель и правообладатель фонограмм закрытого каталога «АудиоЛад Кофейня»`;
 
 export function basisLine(s: CertificateSnapshot): string {
   return `Договор-оферта «АудиоЛад Кофейня», ${s.offer.label.toLowerCase()}, принята ${moscowDate(s.offer.acceptedAt) ?? ""}`;
@@ -118,7 +129,7 @@ export function certificateRows(input: { number: string; issuedAt: string; snaps
     ["Адрес заведения", s.venueAddress],
     ["Лицензиат", s.licensee.name],
     [`ИНН / ${ogrnLabel(s.licensee.kind)}`, `${s.licensee.inn} / ${s.licensee.ogrn}`],
-    ["Срок доступа", periodLine(s)],
+    ["Срок доступа к сервису", periodLine(s)],
     ["Каталог", BUSINESS_CERTIFICATE_CATALOG],
     ["Создание музыки", BUSINESS_CERTIFICATE_GENERATORS],
     ["Учётная запись", `№ ${s.accountCode}`],
@@ -155,7 +166,7 @@ export function certificateStatusLabel(status: CertificateCheckStatus): string {
     case "valid":
       return "Действует";
     case "expired":
-      return "Не действует: доступ к заведению закончился";
+      return "Не действует: закончился доступ к сервису «АудиоЛад Кофейня» для этого заведения";
     case "outdated":
       return "Не действует: данные заведения или лицензиата изменились";
     case "superseded":

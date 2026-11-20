@@ -140,8 +140,17 @@ assert.equal(normalizeBusinessLegalCertificateNumber("alk-2026-000001"), "ALK-20
 assert.equal(normalizeBusinessLegalCertificateNumber(encodeURIComponent("АЛК-2026-000001")), "ALK-2026-000001");
 assert.equal(normalizeBusinessLegalCertificateNumber("ALK-2026-1"), null);
 assert.equal(normalizeBusinessLegalCertificateNumber("%E0%A4%A"), null);
+assert.equal(normalizeBusinessLegalCertificateNumber("AL-483271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("al-483271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("АудиоЛад № 483 271"), "AL-483271");
+assert.equal(normalizeBusinessLegalCertificateNumber("АудиоЛад №\u00a0483\u202f271"), "AL-483271");
+assert.equal(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.number, "АудиоЛад № 483 271");
+assert.equal(BUSINESS_LEGAL_SAMPLE_CERTIFICATE.urlNumber, "AL-483271");
 assert.equal(findBusinessLegalCertificate("ALK-2026-000001"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
+assert.equal(findBusinessLegalCertificate("AL-483271"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
+assert.equal(findBusinessLegalCertificate("АудиоЛад № 483 271"), BUSINESS_LEGAL_SAMPLE_CERTIFICATE);
 assert.equal(findBusinessLegalCertificate("ALK-2026-000002"), null);
+assert.equal(findBusinessLegalCertificate("AL-000001"), null);
 assert.equal(findBusinessLegalCertificate("../../etc"), null);
 
 // ссылки в тексте документов открываются в новой вкладке; tel:/mailto: – нет
@@ -152,6 +161,12 @@ assert.match(indexPage, /в пяти шагах/, "модель в пяти ша
 assert.match(indexPage, /Пункт 4 статьи 1244 ГК РФ/, "шаг 3 – п. 4 ст. 1244 из модели");
 assert.match(indexPage, /18\.11\.2026 ИП Петров Сергей Сергеевич направил в РАО и ВОИС уведомления/, "уведомления 18.11.2026 на главной");
 assert.match(rightsPage, /18\.11\.2026 ИП Петров Сергей Сергеевич направил в РАО и ВОИС уведомления/, "уведомления 18.11.2026 в правах");
+assert.match(rightsPage, /Закон различает два вида прав на музыку:/, "права: два вида");
+assert.match(rightsPage, /<ol className=\{\`\$\{legalListClass\} business-legal__list--numbered\`\}>/, "права: нумерованный список");
+assert.match(rightsPage, /Само произведение – мелодия, гармония, аранжировка и стихи песни, если они есть/, "права: произведение");
+assert.match(rightsPage, /Фонограмма – запись звучания/, "права: фонограмма");
+assert.match(rightsPage, /На этом различии и построена наша модель/, "права: модель");
+assert.doesNotMatch(rightsPage, /Закон различает музыкальное произведение и фонограмму – запись звуков/, "старый лид прав убран");
 assert.match(protectionPage, /title: "Финансовое возмещение\."/, "шаг переименован в финансовое возмещение");
 assert.match(protectionPage, /выплаты по мировому соглашению, которое мы заранее письменно одобрили/, "в возмещение входит одобренное мировое");
 assert.match(protectionPage, /По нашему решению можем перечислить деньги заведению заранее или оплатить сумму напрямую получателю, когда это юридически допустимо; лимит от этого не меняется/, "аванс или прямая оплата получателю, лимит тот же");
@@ -168,14 +183,19 @@ assert.match(protectionPage, /Если заведение нанимает юр�
 assert.doesNotMatch(protectionPage, /Юридическая защита и возмещение – в пределах совокупного лимита/, "старый совокупный лимит убран");
 assert.doesNotMatch(protectionPage, /Возмещение по решению суда/, "старый заголовок шага убран");
 assert.match(indexPage, /в пределах 300 000 рублей на одно заведение за 12 месяцев\. Расходы на юридическую защиту\s+и юридическое сопровождение мы оплачиваем дополнительно, сверх этого лимита/, "на главной расходы на защиту сверх лимита");
-assert.match(indexPage, /Расходы на юридическую защиту и юридическое\s+сопровождение мы оплачиваем дополнительно, сверх этого лимита/, "в вопросе о стоимости защиты – та же короткая формулировка");
+assert.match(indexPage, /Расходы на\s+юридическую защиту в суде и юридическое сопровождение по таким требованиям мы оплачиваем дополнительно,\s+сверх этого лимита/, "в вопросе о стоимости защиты расходы на защиту сверх лимита");
 assert.doesNotMatch(indexPage, /не входят/, "на главной убрана формулировка «не входят»");
 assert.doesNotMatch(indexPage, /в четырёх шагах/, "старый заголовок четырёх шагов убран");
 // t1591u: пробная (подарочная) неделя – действующий доступ; начатая защита доводится до конца.
-assert.match(protectionPage, /доступ к этому заведению действует – оплаченный или подарочный период/, "подарочный период считается");
+assert.match(protectionPage, /период доступа к сервису «АудиоЛад Кофейня» для этого заведения – оплаченный или подарочный период/, "подарочный период считается");
+assert.match(protectionPage, /даже если клиент потом не продлит доступ к сервису/, "начатую защиту доводим, если доступ к сервису не продлён");
 assert.match(protectionPage, /Если защита уже\s+началась, доводим спор до конца/, "начатую защиту доводим");
 assert.match(protectionPage, /Ведём дело во всех инстанциях, в том числе административные дела по ч\. 1 ст\. 7\.12 КоАП РФ/);
 assert.doesNotMatch(protectionPage, /доступ к этому заведению оплачен/, "нет условия «только оплаченный доступ»");
+assert.doesNotMatch(protectionPage, /не лишает защиты|не лишают защиты/, "нет формулы «не лишает защиты»");
+assert.doesNotMatch(protectionPage, /доступа к заведению|доступ к этому заведению действует/, "нет «доступа к заведению»");
+assert.match(protectionPage, /не считается нарушением заведения\. По любому обращению, в том числе от РАО или ВОИС, мы бесплатно готовим ответ на претензию до суда с журналом воспроизведения и справкой/, "случайные звуки: не нарушение, ответ до суда");
+assert.match(protectionPage, /Юридическая защита в суде и финансовая гарантия – только если претензия о музыке закрытого каталога «АудиоЛад Кофейня»/, "суд и гарантия только по закрытому каталогу");
 const offerPage = readFileSync(join(SECTION_DIR, "oferta/page.tsx"), "utf8");
 assert.match(offerPage, /BUSINESS_OFFER_SOURCE\.markdown/, "оферта – тот же принятый текст");
 assert.match(offerPage, /BUSINESS_LEGAL_OFFER_PDF_PATH/);

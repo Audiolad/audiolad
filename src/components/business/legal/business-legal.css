@@ -226,6 +226,24 @@
   color: var(--legal-accent);
 }
 
+ol.business-legal__list--numbered {
+  list-style: decimal;
+}
+
+.business-legal__lead > p {
+  margin: 0;
+}
+
+.business-legal__lead > ol {
+  margin-top: 12px;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.business-legal__lead > ol + p {
+  margin-top: 12px;
+}
+
 .business-legal__link {
   color: var(--legal-accent);
   font-weight: 600;

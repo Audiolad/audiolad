@@ -102,8 +102,8 @@ assert.doesNotMatch(graceHtml, /—/);
 assert.match(graceHtml, /data-testid="biz-home-accept-note"/);
 assert.match(graceHtml, /один раз для всего аккаунта/);
 assert.match(graceHtml, /<a href="\/documents\/business-offer"(?![^>]*target=)[^>]*aria-haspopup="dialog"[^>]*>Договор-оферта «АудиоЛад Кофейня»<\/a>/);
-assert.match(graceHtml, /data-offer-version="offer-v4-2026-11-19"/);
-assert.match(graceHtml, /редакция 4 от 19\.11\.2026/);
+assert.match(graceHtml, /data-offer-version="offer-v5-2026-11-19"/);
+assert.match(graceHtml, /редакция 5 от 19\.11\.2026/);
 assert.match(graceHtml, /Перед первой оплатой примите договор-оферту/);
 assert.ok(graceHtml.indexOf("biz-home-accept-note") < graceHtml.indexOf('data-testid="biz-home-accept"'), "note above the button");
 

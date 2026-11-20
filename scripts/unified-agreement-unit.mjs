@@ -279,15 +279,15 @@ assert.match(read("supabase/migrations/20270109120000_unified_commercial_agreeme
   // r8 (8d9cd0af, edition 2.1): п. 5 – треки с подтверждёнными правами; r7 frozen in the archive.
   const r7a = read("docs/business/public/archive/program-terms-r7-2026-10-18.md");
   assert.equal(sha(r7a), "be3587394c9656d33a011db000d0958182d61ca879483a62c27bbdf4b7d213d5", "r7 archive byte-identical");
-  assert.deepEqual(r7.split("\n").filter((l, i) => l !== r6.split("\n")[i]).map((l) => l.slice(0, 3)), ["1. ", "5. "], "only п. 1 and п. 5 changed vs r6.1");
-  assert.deepEqual(r7.split("\n").filter((l, i) => l !== r7a.split("\n")[i]).map((l) => l.slice(0, 3)), ["5. "], "only п. 5 changed vs r7");
+  assert.deepEqual(r7.split("\n").filter((l, i) => l !== r6.split("\n")[i]).map((l) => l.slice(0, 3)), ["Раз", "1. ", "3. ", "4. ", "5. "], "r9 vs r6.1: header date, п. 1, п. 3 (способ), п. 4 (срок доступа к сервису) and п. 5");
+  assert.deepEqual(r7.split("\n").filter((l, i) => l !== r7a.split("\n")[i]).map((l) => l.slice(0, 3)), ["Раз", "3. ", "4. ", "5. "], "r9 vs r7 archive: header date, п. 3 (способ), п. 4 (срок доступа к сервису) and п. 5");
   assert.match(r7, /^5\. \*\*Только треки с подтверждёнными правами\*\* – /m);
   assert.doesNotMatch(r7, /подтверждение одного трека не распространяется на каталог/);
   const { programTermsDocument } = await import("../src/lib/business-rightsholder/program-documents.ts");
   const { clientDocumentSource } = await import("../src/lib/business-app/client-document-content.ts");
   assert.equal(programTermsDocument(true).markdown, r7);
   assert.equal(programTermsDocument(true).sha256, sha(r7));
-  assert.equal(programTermsDocument(true).version, "r8-2026-10-18");
+  assert.equal(programTermsDocument(true).version, "r9-2026-11-19");
   assert.equal(programTermsDocument(false).markdown, r6, "flag off: legacy consent flow keeps r6");
   assert.equal(programTermsDocument(false).version, "r6.1-2026-10-18");
   assert.equal(clientDocumentSource("b2b-terms", true).markdown, r7);
@@ -298,7 +298,7 @@ assert.match(read("supabase/migrations/20270109120000_unified_commercial_agreeme
 assert.match(read("src/components/author-dashboard/business/RightsholderVerificationForm.tsx"), /unified \? "author_business_verification_draft_v3" : "author_business_verification_draft_v2"/);
 {
   const { clientDocumentSource } = await import("../src/lib/business-app/client-document-content.ts");
-  assert.equal(clientDocumentSource("b2b-terms", true).version, "r8-2026-10-18");
+  assert.equal(clientDocumentSource("b2b-terms", true).version, "r9-2026-11-19");
   assert.equal(clientDocumentSource("b2b-terms", false).version, undefined);
   assert.match(read("src/app/business-app/documents/[id]/page.tsx"), /data-document-version=\{source\.version \?\? doc\.version\}/);
 }

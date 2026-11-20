@@ -34,8 +34,8 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение музыки в заведении",
-    version: "r7-2026-10-18",
-    versionDate: "2026-10-18",
+    version: "r8-2026-11-19",
+    versionDate: "2026-11-19",
     status: "approved",
     summary:
       "Документ заведения: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",

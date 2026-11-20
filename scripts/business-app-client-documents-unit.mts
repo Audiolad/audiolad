@@ -18,8 +18,8 @@ assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
   // venue-license r7 (18.10.2026, п. 7 offline player, task 8d9cd0af); the rest r6.1.
-  assert.equal(d.version, d.id === "privacy" ? "2026-11-09" : d.id === "venue-license" ? "r7-2026-10-18" : "r6.1-2026-10-18");
-  assert.equal(d.versionDate, d.id === "privacy" ? "2026-11-09" : "2026-10-18");
+  assert.equal(d.version, d.id === "privacy" ? "2026-11-09" : d.id === "venue-license" ? "r8-2026-11-19" : "r6.1-2026-10-18");
+  assert.equal(d.versionDate, d.id === "privacy" ? "2026-11-09" : d.id === "venue-license" ? "2026-11-19" : "2026-10-18");
   assert.doesNotMatch(d.version, /draft/);
 }
 assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 18.10.2026");
@@ -211,7 +211,11 @@ console.log("business-app-client-documents-unit OK");
     assert.ok(src.markdown.length > 500);
     const html = renderToStaticMarkup(createElement(SimpleMarkdown, { source: src.markdown }));
     assert.match(html, /<h1/);
-    assert.match(src.markdown, /Редакция от 18\.10\.2026/);
+    if (d.id === "venue-license" || d.id === "b2b-terms") {
+      assert.match(src.markdown, /Редакция от 19\.11\.2026/, `${d.id}: редакция 19.11.2026`);
+    } else {
+      assert.match(src.markdown, /Редакция от 18\.10\.2026/, `${d.id}: редакция 18.10.2026`);
+    }
     // r6.1 (Sergey 18.10.2026 13:17): en dashes only, never the em dash, in the full document text.
     assert.doesNotMatch(src.markdown, /\u2014/, `${d.id}: no em dash`);
     assert.match(src.markdown, /\u2013/, `${d.id}: en dashes present`);
