@@ -4,6 +4,7 @@ import VkAdsPixel from "@/components/analytics/VkAdsPixel";
 import { headers } from "next/headers";
 
 import BaseProviders from "@/components/providers/BaseProviders";
+import VpnNoticeHost from "@/components/vpn-notice/VpnNoticeHost";
 import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
@@ -73,6 +74,7 @@ export default async function RootLayout({
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
         {/* VK loads only after the separate advertising cookie consent is granted. */}
         <Suspense fallback={null}><VkAdsPixel /></Suspense>
+        <VpnNoticeHost />
         {isBusinessHost ? children : <BaseProviders>{children}</BaseProviders>}
       </body>
     </html>
