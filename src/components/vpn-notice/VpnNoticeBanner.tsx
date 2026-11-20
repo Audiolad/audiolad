@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 
 import { BUSINESS_POINT_COOKIE } from "@/lib/business-app/point-session";
@@ -48,27 +48,25 @@ export default function VpnNoticeBanner({
   const pathname = usePathname() ?? "/";
   // Server and the hydration pass stay hidden; after hydration we read localStorage / cookies.
   const ready = useSyncExternalStore(subscribeNoop, () => true, () => false);
-  const decided = useRef<boolean | null>(null);
-  if (ready && decided.current === null) {
-    decided.current = shouldShowVpnNotice({
+  const [done, setDone] = useState(false);
+  const allowed =
+    ready &&
+    shouldShowVpnNotice({
       country,
       hostname,
       pathname,
       shownUntil: readShownUntil(),
       hallDevice: hasHallDeviceCookie(),
     });
-  }
-
-  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (decided.current !== true) return;
+    if (!allowed) return;
     writeShownUntil(Date.now() + VPN_NOTICE_TTL_MS);
     const hide = window.setTimeout(() => setDone(true), VPN_NOTICE_VISIBLE_MS);
     return () => window.clearTimeout(hide);
-  }, [ready]);
+  }, [allowed]);
 
-  if (decided.current !== true || done) return null;
+  if (!allowed || done) return null;
 
   return (
     <div
