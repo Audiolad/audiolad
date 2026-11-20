@@ -1,4 +1,5 @@
 import "server-only";
+import { loadPaidSimilarMix } from "@/lib/business-collections/similar-mix.server";
 import { selectPersonalVenuePool } from "@/lib/business-collections/venue-pool.mjs";
 import { hasCollectionCookie, loadCollectionPermission } from "@/lib/business-collections/load.server";
 
@@ -557,7 +558,7 @@ export async function loadWorkspaceCatalog(input: {
         const { data, error } = await db.rpc("business_personal_collection_location_tracks", { p_location_id: locationId });
         if (error || !Array.isArray(data)) throw new Error("collection_venue_pool_unavailable");
         return (data as { audio_item_id: string }[]).map((row) => row.audio_item_id);
-      }, () => personalCollectionStrict(db, locationId));
+      }, () => personalCollectionStrict(db, locationId), (selected, admitted) => loadPaidSimilarMix(db, locationId, selected, admitted));
       if (pool === "collection_unavailable") return { tracks: [], unavailable: false, collectionUnavailable: true };
       tracks = pool;
     } catch { return { tracks: [], unavailable: true }; }

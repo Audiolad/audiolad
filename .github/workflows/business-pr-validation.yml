@@ -149,6 +149,7 @@ jobs:
           npm run test:business-venue-cafe-programs
           npm run test:business-spa-player-core
           npm run test:business-spa-player-engine
+          npm run test:business-personal-collections
 
       - name: Remove disposable onboarding SQL database
         if: always()
