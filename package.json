@@ -44,7 +44,7 @@
     "test:business-coffee-atlas": "npx tsx scripts/business-coffee-atlas-unit.mts",
     "test:business-coffee-guide": "npx tsx scripts/business-coffee-guide-unit.mts",
     "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts",
-    "test:business-guest-atmosphere": "npx tsx scripts/business-guest-atmosphere-unit.mts",
+    "test:business-guest-atmosphere": "npx tsx scripts/business-guest-atmosphere-unit.mts && npx tsx scripts/business-cabinet-cover-cache-unit.mts",
     "test:business-guest-passport": "npx tsx scripts/business-guest-passport-unit.mts",
     "test:business-guest-diversity": "npx tsx scripts/business-guest-atmosphere-diversity-unit.mts",
     "test:business-nav-active": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/business-nav-active-unit.tsx && npm run test:business-cabinet-mode",

@@ -23,6 +23,7 @@ import {
 } from "@/components/business-app/BusinessPointMode";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import CabinetCoverPreloader from "@/components/business-app/workspace/CabinetCoverPreloader";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
 import { BusinessGuestPlaybackProvider } from "@/components/business-app/sound/BusinessGuestPlayback";
@@ -113,6 +114,7 @@ function BusinessShellFrame({ children, pointReports, initialGuestLimit }: { chi
       <BusinessLiveRefresh enabled={signedIn || pointReports} />
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider pointReports={pointReports}>
+        <CabinetCoverPreloader />
         <BusinessGuestPlaybackProvider initialLimit={initialGuestLimit ?? "ok"}>
         <div className="business-app-main">
           <header className="business-app-topbar">

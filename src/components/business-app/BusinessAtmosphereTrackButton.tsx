@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import CabinetCoverImage from "@/components/business-app/CabinetCoverImage";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 
 type Props = {
@@ -61,18 +62,7 @@ export default function BusinessAtmosphereTrackButton({
         aria-hidden="true"
       >
         {showImage && src ? (
-          // Native img: the same public catalog file, lazy, fixed 46px. next/image would
-          // rewrite it through the optimizer and is not how cabinet covers are served.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt=""
-            width={46}
-            height={46}
-            loading="lazy"
-            decoding="async"
-            onError={() => setFailed(true)}
-          />
+          <CabinetCoverImage src={src} width={46} height={46} onError={() => setFailed(true)} />
         ) : null}
         {mark != null ? <span className="business-atmosphere-track__mark">{mark}</span> : null}
       </span>

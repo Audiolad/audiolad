@@ -1255,7 +1255,8 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(groupedHtml, /data-testid="biz-now-queue"/);
   assert.match(groupedHtml, /Дальше в очереди/);
   assert.match(groupedHtml, /business-atmosphere-track__cover/);
-  assert.match(groupedHtml, /loading="lazy"/);
+  assert.doesNotMatch(groupedHtml, /loading="lazy"/, "queue covers must not lazy-load");
+  assert.match(groupedHtml, /decoding="sync"/);
   assert.match(groupedHtml, /practice-covers\/night\/xs\.webp/);
   const queueStart = groupedHtml.indexOf('data-testid="biz-now-queue"');
   const queueHtml = groupedHtml.slice(queueStart, groupedHtml.indexOf('data-testid="biz-workspace-player"', queueStart));
@@ -1320,7 +1321,8 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(playing, /data-current="true"/);
   assert.match(playing, /data-playing="true"/);
   assert.match(playing, /♪/);
-  assert.match(playing, /loading="lazy"/);
+  assert.doesNotMatch(playing, /loading="lazy"/);
+  assert.match(playing, /decoding="sync"/);
   assert.doesNotMatch(playing, /\u2014/);
   assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
   assert.doesNotMatch(groupedHtml, /«Играть»/);
