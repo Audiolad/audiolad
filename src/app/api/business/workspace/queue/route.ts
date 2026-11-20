@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         spaceId: actor.space.id,
         locationId: actor.locationId,
         spaceEnabled: actor.space.enabled,
+        ownerBrowser: !actor.device,
       });
       if (catalog.unavailable) return null;
       return catalog.tracks.map((track) => ({

@@ -58,6 +58,8 @@ export type WorkspacePageModel = {
   tracks: WorkspaceTrack[];
   /** Trial or paid cabinet with no venue: rights stay UNKNOWN until a point exists. */
   needsVenue: boolean;
+  /** t1616u: the venue's personal collection is revoked or empty: «Подборка сейчас недоступна». */
+  collectionUnavailable?: boolean;
   playback: WorkspacePlaybackSnapshot | null;
   helpHref: string;
   rightsHref: string;

@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     spaceId: actor.space.id,
     locationId: actor.locationId,
     spaceEnabled: actor.space.enabled,
+    ownerBrowser: !actor.device,
   });
   if (!allowed) {
     return NextResponse.json({ ok: false, reason: "guest_unavailable" }, { status: 200, headers: NO_STORE });

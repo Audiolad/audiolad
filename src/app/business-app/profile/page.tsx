@@ -1,4 +1,5 @@
 import BusinessLoginAccess from "@/components/business-app/profile/BusinessLoginAccess";
+import { BusinessQuietHidden } from "@/components/business-app/BusinessQuietMode";
 import { businessPasswordState } from "@/lib/business-app/login-access";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -68,9 +69,11 @@ export default async function BusinessProfilePage() {
       ) : (
         <>
         {ownerSurname.trim() ? null : (
-          <div className="mb-4">
-            <BusinessOwnerSurnamePrompt />
-          </div>
+          <BusinessQuietHidden>
+            <div className="mb-4">
+              <BusinessOwnerSurnamePrompt />
+            </div>
+          </BusinessQuietHidden>
         )}
         {user && domain.status === "authenticated" && domain.canPay ? (
           <BusinessLoginAccess email={email} anonymous={user.is_anonymous === true} savedEmail={domain.savedReceiptEmail ?? null} passwordState={businessPasswordState(user)} />
@@ -119,14 +122,17 @@ export default async function BusinessProfilePage() {
           {domain.status === "authenticated" && domain.needsReceiptEmail && user?.is_anonymous !== true ? (
             <BusinessReceiptEmailForm receiptEmail={domain.savedReceiptEmail ?? null} />
           ) : null}
+          {/* t1618u: a quiet collection visitor finds this link only inside «Подключение и оплата». */}
           {domain.location ? null : (
-            <p>
-              <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href="/onboarding">
-                Подключить заведение
-              </Link>
-            </p>
+            <BusinessQuietHidden>
+              <p>
+                <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href="/onboarding">
+                  Подключить заведение
+                </Link>
+              </p>
+            </BusinessQuietHidden>
           )}
-          <BusinessProfileSubscription offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()}
+          <BusinessProfileSubscription connectVenueHref={domain.location ? undefined : "/onboarding"} offerAccepted={domain.offerAccepted} timezone={domain.location?.timezone || "Europe/Moscow"} nowIso={new Date().toISOString()}
             showPaymentHistory={membership?.role === "owner"} />
           {/* t1352u: «Выйти» in the bottom-right corner of this card, away from «История оплат». */}
           <div className="flex justify-end pt-3" data-testid="biz-profile-sign-out">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { CollectionTrack } from "@/lib/business-collections/model";
+import { COLLECTION_ACCOUNT_LIMIT, type CollectionTrack } from "@/lib/business-collections/model";
 import { createCollection, revokeCollection, regenerateCollection } from "./actions";
 
 type Entry = { id: string; title: string; revoked_at: string | null };
@@ -69,7 +69,7 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
       <button type="submit" className="rounded bg-violet-700 px-4 py-2 text-white" disabled={busy || !selected.length}>Создать подборку и ссылку</button>
     </form>
     {link ? <div role="status" className="rounded border p-4">
-      <p>Сохраните ссылку и отправьте владельцу и приглашённым слушателям. Она работает на нескольких устройствах. Новая ссылка показана только сейчас; при перевыпуске прежняя перестаёт работать.</p>
+      <p>Сохраните ссылку и отправьте владельцу. По ссылке открывается обычное приложение АудиоЛад Кофейня, в музыке – только эта подборка, без предложений подключиться и без цен. Открыть приложение по одной ссылке можно не более чем {COLLECTION_ACCOUNT_LIMIT} раз (каждый раз – своё заведение). Новая ссылка показана только сейчас; при перевыпуске прежняя перестаёт открываться, уже открытые приложения продолжают работать. После отзыва в них будет «Подборка сейчас недоступна».</p>
       <input aria-label="Персональная ссылка" className="w-full border p-2" readOnly value={link} onFocus={(event) => event.target.select()} />
     </div> : null}
     {link ? <button type="button" className="underline" onClick={() => { void copyLink(); }}>Копировать ссылку</button> : null}

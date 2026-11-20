@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessQuiet } from "@/components/business-app/BusinessQuietMode";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentType } from "react";
@@ -188,6 +189,7 @@ export default function BusinessSidebar() {
   // One table for every menu (cabinet-mode.ts): owner, preview «как видит точка», hall device.
   const cabinet = useBusinessCabinetMode();
   const access = resolveBusinessAccess(domain, cabinet.side === "venue");
+  const quiet = useBusinessQuiet();
   const sectionItems = businessNavItemsForSections(cabinet.sections);
   const primaryIds = new Set(BUSINESS_PRIMARY_NAV_ITEMS.map((item) => item.id));
   const primaryItems = sectionItems.filter((item) => primaryIds.has(item.id));
@@ -280,7 +282,7 @@ export default function BusinessSidebar() {
             </div>
           </div>
         )}
-        {access.level === "guest" && !access.pointDevice && !collapsed ? (
+        {access.level === "guest" && !access.pointDevice && !collapsed && !quiet ? (
           <Link
             href={BUSINESS_CONNECT_HREF}
             className="mt-3 business-app-btn business-app-btn-primary business-app-focus-ring w-full"

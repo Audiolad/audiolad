@@ -1,4 +1,5 @@
-import { rememberPersonalCollection } from "@/lib/business-collections/load.server";
+import { bindPersonalCollection, collectionHasRoom, collectionVisitorStrict, loadCollectionPermission, ownerCafeVenueCollections } from "@/lib/business-collections/load.server";
+import { COLLECTION_ENTRY_HEADER } from "@/lib/business-collections/entry";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -47,6 +48,35 @@ async function handle(request: Request) {
     return NextResponse.json({ ok: false, reason: "venue_device" }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
   const config = businessGuestStartConfig(process.env);
+  // t1616u: any start in a browser that holds a personal link (or by an account bound to one) is a
+  // collection start and fails closed. The link must still be live and have a free place (at most
+  // COLLECTION_ACCOUNT_LIMIT accounts); no venue of the account may hold another collection; the
+  // account is bound BEFORE its venue is created, so the venue inherits the collection in the same
+  // transaction; after the start every cafe venue of the account must hold this collection.
+  // It never ends as an ordinary guest with the whole catalog.
+  const collectionEntry = request.headers.get(COLLECTION_ENTRY_HEADER) === "1";
+  let entryCollectionId: string | null = null;
+  let startedUserId: string | null = null;
+  const json = (status: number, code: string, headers: Record<string, string> = { "Cache-Control": "no-store" }) =>
+    NextResponse.json({ ok: false, code }, { status, headers });
+  if (config.enabled && request.method === "POST") {
+    try {
+      const permission = await loadCollectionPermission();
+      const { data: { user } } = await (await createClient()).auth.getUser();
+      // A revoked link (cookie in this browser or an account once bound to a collection) never
+      // becomes an ordinary start with the whole catalog.
+      if (!permission && (collectionEntry || await collectionVisitorStrict(user?.id ?? null))) return json(410, "collection_unavailable");
+      if (permission) {
+        entryCollectionId = permission.id;
+        if (!await collectionHasRoom(permission.id, user?.id ?? null)) return json(409, "collection_full");
+        if (user && (await ownerCafeVenueCollections(user.id)).some((venue) => venue.collectionId !== null && venue.collectionId !== permission.id)) {
+          return json(409, "collection_other");
+        }
+      }
+    } catch {
+      return json(503, "guest_start_failed");
+    }
+  }
   // Lazy clients keep the disabled path independent of Auth and service credentials.
   const session = () => createClient();
   const result = await handleBusinessGuestStart({ method: request.method, headers: request.headers, text: () => boundedText(request) }, {
@@ -55,6 +85,7 @@ async function handle(request: Request) {
     currentUser: async () => {
       const { data, error } = await (await session()).auth.getUser();
       if (error && error.name !== "AuthSessionMissingError") throw new Error("guest_start_failed");
+      startedUserId = data.user?.id ?? null;
       return data.user;
     },
     ready: async (userId) => {
@@ -74,6 +105,9 @@ async function handle(request: Request) {
       return data.user;
     },
     bootstrap: async (input) => {
+      startedUserId = input.userId;
+      // Bound first: the venue the bootstrap creates inherits the collection (location trigger).
+      if (entryCollectionId && !await bindPersonalCollection(entryCollectionId, input.userId)) throw new Error("collection_full");
       const { data, error } = await createServiceRoleClient().rpc("business_guest_bootstrap", {
         p_user_id: input.userId, p_idempotency_hash: input.idempotencyHash, p_network_hash: input.networkHash,
         p_gift_seconds: input.giftSeconds, p_venue_name: input.venueName,
@@ -117,9 +151,16 @@ async function handle(request: Request) {
     },
     log: (code) => console.warn(code),
   });
-  if (result.body.ok) {
-    try { await rememberPersonalCollection(); }
-    catch { return NextResponse.json({ ok: false, code: "guest_start_failed" }, { status: 503, headers: result.headers }); }
+  if (result.body.ok && entryCollectionId) {
+    try {
+      // Fail closed: the account (also an already started one) holds the collection, and every cafe
+      // venue it owns plays exactly this collection.
+      if (!startedUserId || !await bindPersonalCollection(entryCollectionId, startedUserId)) {
+        return json(409, "collection_full", result.headers);
+      }
+      const venues = await ownerCafeVenueCollections(startedUserId);
+      if (venues.some((venue) => venue.collectionId !== entryCollectionId)) return json(503, "guest_start_failed", result.headers);
+    } catch { return json(503, "guest_start_failed", result.headers); }
   }
   return NextResponse.json(result.body, { status: result.status, headers: result.headers });
 }
