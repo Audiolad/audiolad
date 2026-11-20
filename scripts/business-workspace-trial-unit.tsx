@@ -1242,7 +1242,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
     tracks: [{ audioItemId: TRACK, title: "Тёплый вечер в Неаполе у моря и длинное название", durationSeconds: 180, authorId: null, authorName: "Кофейник", albumTitle: "Джаз", shelf: "cafe", coverUrl: "https://audiolad.ru/storage/v1/object/public/practice-covers/jazz/xs.webp" }],
   })} />);
   assert.match(covered, /business-now__cover" data-has-image="true" data-testid="biz-now-cover"/);
-  assert.match(covered, /practice-covers\/jazz\/xs\.webp/);
+  assert.doesNotMatch(covered, /<img/, "uncached covers stay on the placeholder; bytes load through the shared cap");
   const denied = renderToStaticMarkup(<BusinessWorkspace model={model({
     tracks: [{ audioItemId: TRACK, title: "Без обложки", durationSeconds: 90, authorId: null, authorName: null, albumTitle: null, shelf: "cafe", coverUrl: "https://example.supabase.co/storage/v1/object/sign/practice-audio/track.mp3?token=secret" }],
   })} />);
@@ -1256,8 +1256,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(groupedHtml, /Дальше в очереди/);
   assert.match(groupedHtml, /business-atmosphere-track__cover/);
   assert.doesNotMatch(groupedHtml, /loading="lazy"/, "queue covers must not lazy-load");
-  assert.match(groupedHtml, /decoding="sync"/);
-  assert.match(groupedHtml, /practice-covers\/night\/xs\.webp/);
+  assert.doesNotMatch(groupedHtml, /<img/, "queue covers are not raw <img> fetches before the cache has a blob");
   const queueStart = groupedHtml.indexOf('data-testid="biz-now-queue"');
   const queueHtml = groupedHtml.slice(queueStart, groupedHtml.indexOf('data-testid="biz-workspace-player"', queueStart));
   assert.match(queueHtml, /Сон/);
@@ -1322,7 +1321,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(playing, /data-playing="true"/);
   assert.match(playing, /♪/);
   assert.doesNotMatch(playing, /loading="lazy"/);
-  assert.match(playing, /decoding="sync"/);
+  assert.doesNotMatch(playing, /<img/, "uncached row has no raw image request");
   assert.doesNotMatch(playing, /\u2014/);
   assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
   assert.doesNotMatch(groupedHtml, /«Играть»/);

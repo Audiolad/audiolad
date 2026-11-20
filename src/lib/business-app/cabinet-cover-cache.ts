@@ -51,9 +51,10 @@ export function selectCabinetCoverPreloadUrls(
 ): string[] {
   const order = queueOrder && queueOrder.length > 0 ? queueOrder : tracks.map((_, index) => index);
   const start = Math.max(0, order.indexOf(currentIndex));
+  const windowSize = Math.min(limit, order.length);
   const urls: string[] = [];
   const seen = new Set<string>();
-  for (let step = 0; step < order.length && urls.length < limit; step += 1) {
+  for (let step = 0; step < windowSize; step += 1) {
     const index = order[(start + step) % order.length];
     const src = cabinetAlbumCoverUrl({ coverUrl: tracks[index]?.coverUrl });
     if (!src || seen.has(src)) continue;

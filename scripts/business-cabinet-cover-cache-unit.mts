@@ -64,6 +64,32 @@ assert.deepEqual(selected, [
 assert.equal(selected.length, cache.CABINET_COVER_PRELOAD_LIMIT);
 assert.equal(cache.selectCabinetCoverPreloadUrls(tracks, 2, [0, 1, 2, 3, 4, 5]).length, 4);
 assert.deepEqual(cache.selectCabinetCoverPreloadUrls(tracks, 2, [0, 1, 2, 3, 4, 5])[0], "https://cdn.example/covers/b.webp");
+const same = [
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/d.webp" },
+  { coverUrl: "https://cdn.example/covers/e.webp" },
+];
+assert.deepEqual(
+  cache.selectCabinetCoverPreloadUrls(same, 0, [0, 1, 2, 3, 4, 5]),
+  ["https://cdn.example/covers/now.webp"],
+  "the window is the current track and the next three, not four unique covers from later in the queue",
+);
+const sparse = [
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: null },
+  { coverUrl: "https://cdn.example/covers/b.webp" },
+  { coverUrl: null },
+  { coverUrl: "https://cdn.example/covers/d.webp" },
+];
+assert.deepEqual(
+  cache.selectCabinetCoverPreloadUrls(sparse, 0, [0, 1, 2, 3, 4]),
+  ["https://cdn.example/covers/now.webp", "https://cdn.example/covers/b.webp"],
+  "missing covers in the window are skipped, later tracks stay out",
+);
+
 
 const firstSet = cache.setCabinetCoverPreloadSet(tracks.map((track) => track.coverUrl));
 assert.equal(firstSet.length, 4);
@@ -126,8 +152,9 @@ assert.match(button, /CabinetCoverImage/);
 assert.match(image, /decoding="sync"/);
 assert.match(image, /fetchPriority="low"/);
 assert.doesNotMatch(image, /loading="lazy"/);
-assert.match(image, /const current = resolveCabinetCoverSrc\(src\) \?\? src/, "remount and track change both use the cached blob or the new src");
-assert.doesNotMatch(image, /useState\(/, "must not freeze the first src for the life of a mounted mini-player");
+assert.match(image, /isCabinetCoverCached\(src\) \? resolveCabinetCoverSrc\(src\) : null/);
+assert.match(image, /subscribeCabinetCoverCache/);
+assert.match(image, /if \(!current\) return null/, "uncached covers do not start a raw <img> fetch outside the cap");
 assert.match(image, /scheduleCabinetCoverPreload/);
 assert.match(preloader, /selectCabinetCoverPreloadUrls/);
 assert.match(preloader, /setCabinetCoverPreloadSet/);
