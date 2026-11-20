@@ -1,5 +1,6 @@
 // t1651u: VPN notice is shown only to a non-RU visitor, once, and never on hall routes.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   VPN_NOTICE_TEXT,
@@ -64,5 +65,11 @@ assert.equal(shouldShowVpnNotice({ ...base, pathname: "/music", hallDevice: true
 assert.equal(isVpnNoticeHost("coffee.audiolad.ru"), true);
 assert.equal(isVpnNoticeHost("school.audiolad.ru"), false);
 assert.equal(shouldShowVpnNotice({ ...base, hostname: "school.audiolad.ru" }), false);
+
+const hostSrc = readFileSync(new URL("../src/components/vpn-notice/VpnNoticeHost.tsx", import.meta.url), "utf8");
+const bannerSrc = readFileSync(new URL("../src/components/vpn-notice/VpnNoticeBanner.tsx", import.meta.url), "utf8");
+assert.match(hostSrc, /cookies\(\)/);
+assert.match(hostSrc, /BUSINESS_POINT_COOKIE/);
+assert.doesNotMatch(bannerSrc, /document\.cookie/, "al-point is HttpOnly; the client cannot see it");
 
 console.log("vpn-notice-unit: ok");
