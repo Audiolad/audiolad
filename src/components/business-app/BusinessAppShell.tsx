@@ -114,8 +114,8 @@ function BusinessShellFrame({ children, pointReports, initialGuestLimit }: { chi
       <BusinessLiveRefresh enabled={signedIn || pointReports} />
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider pointReports={pointReports}>
-        <CabinetCoverPreloader />
         <BusinessGuestPlaybackProvider initialLimit={initialGuestLimit ?? "ok"}>
+        <CabinetCoverPreloader />
         <div className="business-app-main">
           <header className="business-app-topbar">
             <BusinessBrandLockup testId="biz-brand-topbar" />
