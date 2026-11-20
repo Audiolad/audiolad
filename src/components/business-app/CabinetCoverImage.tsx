@@ -17,6 +17,10 @@ type Props = {
   onError?: () => void;
 };
 
+function cachedBlob(src: string): string | null {
+  return isCabinetCoverCached(src) ? resolveCabinetCoverSrc(src) : null;
+}
+
 /**
  * Cabinet / queue thumbnail. Bytes are fetched only through the shared
  * four-at-a-time scheduler (low priority, after idle). Until a blob is ready
@@ -24,12 +28,14 @@ type Props = {
  * A still-mounted mini-player follows a new src when the track changes.
  */
 export default function CabinetCoverImage({ src, width, height, onError }: Props) {
-  const [current, setCurrent] = useState<string | null>(() =>
-    isCabinetCoverCached(src) ? resolveCabinetCoverSrc(src) : null,
-  );
+  const [current, setCurrent] = useState<string | null>(() => cachedBlob(src));
+  const [seenSrc, setSeenSrc] = useState(src);
+  if (src !== seenSrc) {
+    setSeenSrc(src);
+    setCurrent(cachedBlob(src));
+  }
 
   useEffect(() => {
-    setCurrent(isCabinetCoverCached(src) ? resolveCabinetCoverSrc(src) : null);
     const unsubscribe = subscribeCabinetCoverCache((ready) => {
       if (ready !== src) return;
       setCurrent(resolveCabinetCoverSrc(src));
