@@ -72,7 +72,7 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [list, setList] = useState<CollectionEntry[]>(collections);
+  const [created, setCreated] = useState<CollectionEntry[]>([]);
   const [fresh, setFresh] = useState<FreshLink | null>(null);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -81,14 +81,8 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
   const [revoked, setRevoked] = useState<string[]>([]);
   const albums = [...new Map(tracks.map((track) => [track.albumId, track.albumTitle])).entries()];
   const toggle = (ids: string[], checked: boolean) => setSelected((old) => checked ? [...new Set([...old, ...ids])] : old.filter((id) => !ids.includes(id)));
-
-  useEffect(() => {
-    setList((prev) => {
-      const incomingIds = new Set(collections.map((entry) => entry.id));
-      const extras = prev.filter((entry) => !incomingIds.has(entry.id));
-      return [...extras, ...collections];
-    });
-  }, [collections]);
+  const incomingIds = new Set(collections.map((entry) => entry.id));
+  const list = [...created.filter((entry) => !incomingIds.has(entry.id)), ...collections];
 
   function resetFeedback() {
     setMessage(null);
@@ -110,7 +104,7 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
             created_at: result.createdAt,
             usedCount: 0,
           };
-          setList((old) => [entry, ...old.filter((item) => item.id !== entry.id)]);
+          setCreated((old) => [entry, ...old.filter((item) => item.id !== entry.id)]);
         }
         setFresh({ collectionId: result.id || "new", title: result.title, url: result.link });
         setSelected([]);
@@ -127,7 +121,6 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
       if ((await revokeCollection(id)).ok) {
         setRevoked((old) => [...old, id]);
         setRegenerated((old) => old.filter((value) => value !== id));
-        setList((old) => old.map((entry) => entry.id === id ? { ...entry, revoked_at: new Date().toISOString() } : entry));
         router.refresh();
       } else setMessage("Не удалось отозвать ссылку. Обновите страницу и повторите попытку.");
     } catch { setMessage("Не удалось отозвать ссылку."); }
@@ -141,7 +134,6 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
       if (result.ok) {
         setRegenerated((old) => [...old, id]);
         setRevoked((old) => old.filter((value) => value !== id));
-        setList((old) => old.map((entry) => entry.id === id ? { ...entry, revoked_at: null } : entry));
         setFresh({ collectionId: id, title: result.title || name, url: result.link });
         router.refresh();
       } else setMessage(result.error);
