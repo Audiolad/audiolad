@@ -855,6 +855,7 @@ function testSourceContracts() {
   const queries = read("src/lib/admin/analytics-queries.ts");
   const funnel = read("src/components/admin/AdminAnalyticsFunnelPanel.tsx");
   const chart = read("src/components/admin/AdminAnalyticsTimeseriesChart.tsx");
+  const listeningPath = read("src/lib/admin/timeseries-tooltip.ts");
   const breakdown = read("src/components/admin/AdminAnalyticsBreakdownPanel.tsx");
   const dictionary = read("src/lib/admin/analytics-metrics-dictionary.ts");
   const tracker = read("src/components/analytics/ListenAnalyticsTracker.tsx");
@@ -931,7 +932,8 @@ function testSourceContracts() {
   assert.match(funnel, /Среднее время на запуск/);
   assert.match(chart, /Время прослушивания/);
   assert.match(chart, /formatListeningDuration/);
-  assert.match(chart, /minutes == null/);
+  assert.match(chart, /buildTimeseriesListeningPath/);
+  assert.match(listeningPath, /minutes == null/);
   assert.match(breakdown, /Топ практик по времени прослушивания/);
   assert.match(breakdown, /listened_ms/);
   assert.match(queries, /measured_listeners/);
