@@ -30,8 +30,17 @@ import {
   type CourseCompletionCtaDto,
   type CoursePublishContentSnapshot,
   COURSE_BUILDER_AUDIO_ACCEPT,
+  COURSE_BUILDER_AUDIO_RETRY_LABEL,
 } from "@/lib/author-products/course-builder-shared";
-import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
+import {
+  AUTHOR_AUDIO_UPLOAD_INTERRUPTED,
+  uploadAuthorProductAudioDirect,
+  type AuthorAudioUploadProgress,
+} from "@/lib/author-products/direct-audio-upload-client";
+import {
+  formatAuthorAudioUploadButtonLabel,
+  formatAuthorAudioUploadLabel,
+} from "@/lib/author-products/audio-upload-progress-label";
 import {
   AUDIO_PREPARE_FAILED_MESSAGE,
   AUDIO_PREPARE_PROCESSING_HINT,
@@ -50,6 +59,13 @@ import {
   COURSE_STOREFRONT_PREVIEW_START_LABEL,
   resolveCourseStorefrontPreviewDto,
 } from "@/lib/author-products/course-storefront-preview";
+
+/** Upload state of one lesson audio block, kept above the lesson editor. */
+type CourseAudioUploadState =
+  | { status: "uploading"; progress: AuthorAudioUploadProgress | null }
+  | { status: "failed"; message: string; retryFile: File | null };
+
+type CourseAudioUploads = Record<string, CourseAudioUploadState>;
 
 type AuthorCourseBuilderProps = {
   practiceId: string | null;
@@ -118,8 +134,25 @@ export default function AuthorCourseBuilder({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioUploads, setAudioUploads] = useState<CourseAudioUploads>({});
   const loadedForIdRef = useRef<string | null>(null);
   const multiLevel = accessLevels.length > 0;
+  const audioUploadActive = Object.values(audioUploads).some(
+    (upload) => upload.status === "uploading",
+  );
+
+  useEffect(() => {
+    if (!audioUploadActive) {
+      return;
+    }
+
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [audioUploadActive]);
 
   const selectedLesson = useMemo(
     () => lessons.find((lesson) => lesson.id === selectedLessonId) ?? null,
@@ -160,6 +193,99 @@ export default function AuthorCourseBuilder({
       });
     },
     [emitSnapshot],
+  );
+
+  const uploadLessonAudio = useCallback(
+    async (block: CourseBuilderBlockDto, file: File) => {
+      const audioId = block.asset_id;
+      if (!practiceId || !audioId) {
+        return;
+      }
+
+      const clientError = validateCourseBuilderAudioFile(file);
+      if (clientError) {
+        setAudioUploads((current) => ({
+          ...current,
+          [block.id]: { status: "failed", message: clientError, retryFile: null },
+        }));
+        return;
+      }
+
+      setAudioUploads((current) => ({
+        ...current,
+        [block.id]: { status: "uploading", progress: null },
+      }));
+
+      const result = await uploadAuthorProductAudioDirect({
+        practiceId,
+        audioId,
+        file,
+        onProgress: (progress) => {
+          setAudioUploads((current) =>
+            current[block.id]?.status === "uploading"
+              ? { ...current, [block.id]: { status: "uploading", progress } }
+              : current,
+          );
+        },
+      });
+
+      if (!result.ok) {
+        setAudioUploads((current) => ({
+          ...current,
+          [block.id]: {
+            status: "failed",
+            message: getCourseBuilderAudioUploadError(
+              result.error,
+              result.status,
+              result.message,
+            ),
+            retryFile:
+              result.error === AUTHOR_AUDIO_UPLOAD_INTERRUPTED ? file : null,
+          },
+        }));
+        return;
+      }
+
+      setAudioUploads((current) => {
+        const next = { ...current };
+        delete next[block.id];
+        return next;
+      });
+      const uploaded = result.product.audio_items.find(
+        (item) => item.id === audioId,
+      );
+      setLessons((current) => {
+        const next = current.map((lesson) =>
+          lesson.blocks.some((item) => item.id === block.id)
+            ? {
+                ...lesson,
+                blocks: lesson.blocks.map((item) =>
+                  item.id === block.id && item.audio
+                    ? {
+                        ...item,
+                        audio: {
+                          ...item.audio,
+                          duration_seconds:
+                            uploaded?.duration_seconds ??
+                            item.audio.duration_seconds,
+                          audio_path:
+                            uploaded?.audio_path ?? item.audio.audio_path,
+                          original_file_name:
+                            uploaded?.original_file_name ?? file.name,
+                          audio_prepare_status:
+                            uploaded?.audio_prepare_status ?? null,
+                        },
+                      }
+                    : item,
+                ),
+              }
+            : lesson,
+        );
+        emitSnapshot(next);
+        return next;
+      });
+    },
+    [emitSnapshot, practiceId],
   );
 
   const loadSnapshot = useCallback(
@@ -602,6 +728,8 @@ export default function AuthorCourseBuilder({
                 }}
                 onSnapshot={applySnapshot}
                 onError={setError}
+                audioUploads={audioUploads}
+                onUploadAudio={(block, file) => void uploadLessonAudio(block, file)}
               />
             ) : (
               <p className="hidden text-sm text-[#7d70a2] lg:block">
@@ -642,6 +770,8 @@ function AuthorCourseLessonEditor({
   onLessonChange,
   onSnapshot,
   onError,
+  audioUploads,
+  onUploadAudio,
 }: {
   practiceId: string | null;
   lesson: CourseBuilderLessonDto;
@@ -653,6 +783,8 @@ function AuthorCourseLessonEditor({
   onLessonChange: (lesson: CourseBuilderLessonDto) => void;
   onSnapshot: (snapshot: CourseBuilderSnapshot) => void;
   onError: (message: string | null) => void;
+  audioUploads: CourseAudioUploads;
+  onUploadAudio: (block: CourseBuilderBlockDto, file: File) => void;
 }) {
   const [title, setTitle] = useState(lesson.title);
 
@@ -835,59 +967,6 @@ function AuthorCourseLessonEditor({
     onSnapshot(payload);
   }
 
-  async function uploadAudio(block: CourseBuilderBlockDto, file: File) {
-    if (!practiceId || !block.asset_id) {
-      return;
-    }
-
-    const clientError = validateCourseBuilderAudioFile(file);
-
-    if (clientError) {
-      onError(clientError);
-      return;
-    }
-
-    const result = await uploadAuthorProductAudioDirect({
-      practiceId,
-      audioId: block.asset_id,
-      file,
-    });
-    if (!result.ok) {
-      onError(
-        getCourseBuilderAudioUploadError(
-          result.error,
-          result.status,
-          result.message,
-        ),
-      );
-      return;
-    }
-    const uploaded = result.product.audio_items.find(
-      (item) => item.id === block.asset_id,
-    );
-    onLessonChange({
-      ...lesson,
-      blocks: lesson.blocks.map((item) =>
-        item.id === block.id
-          ? {
-              ...item,
-              audio: item.audio
-                ? {
-                    ...item.audio,
-                    duration_seconds:
-                      uploaded?.duration_seconds ?? item.audio.duration_seconds,
-                    audio_path: uploaded?.audio_path ?? item.audio.audio_path,
-                    original_file_name:
-                      uploaded?.original_file_name ?? file.name,
-                    audio_prepare_status: uploaded?.audio_prepare_status ?? null,
-                  }
-                : item.audio,
-            }
-          : item,
-      ),
-    });
-  }
-
   async function openPdf(block: CourseBuilderBlockDto) {
     if (!practiceId || !block.asset_id) {
       return;
@@ -1040,25 +1119,72 @@ function AuthorCourseLessonEditor({
                     {AUDIO_PREPARE_PROCESSING_HINT}
                   </p>
                 ) : null}
-                <label className="inline-flex cursor-pointer rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">
-                  {block.audio?.audio_path ||
-                  isAudioPrepareInFlight(block.audio?.audio_prepare_status)
-                    ? "Заменить аудио"
-                    : "Загрузить аудио"}
-                  <input
-                    type="file"
-                    accept={COURSE_BUILDER_AUDIO_ACCEPT}
-                    className="hidden"
-                    disabled={disabled}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (file) {
-                        void uploadAudio(block, file);
-                      }
-                    }}
-                  />
-                </label>
+                {(() => {
+                  const upload = audioUploads[block.id];
+                  const uploading = upload?.status === "uploading";
+                  const progress = uploading ? upload.progress : null;
+                  return (
+                    <div className="space-y-2" data-course-audio-upload>
+                      <label
+                        className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
+                          uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                        }`}
+                      >
+                        {uploading
+                          ? formatAuthorAudioUploadButtonLabel(progress)
+                          : block.audio?.audio_path ||
+                              isAudioPrepareInFlight(block.audio?.audio_prepare_status)
+                            ? "Заменить аудио"
+                            : "Загрузить аудио"}
+                        <input
+                          type="file"
+                          accept={COURSE_BUILDER_AUDIO_ACCEPT}
+                          className="hidden"
+                          disabled={disabled || uploading}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            if (file) {
+                              onUploadAudio(block, file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {uploading ? (
+                        <div role="status" aria-live="polite" className="space-y-1">
+                          <p className="text-sm text-[#5b4a85]">
+                            {formatAuthorAudioUploadLabel(progress)}
+                          </p>
+                          <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-[#eee6f7]">
+                            <div
+                              className="h-full rounded-full bg-[#7042c5] transition-[width] duration-300"
+                              style={{ width: `${Math.max(2, progress?.percent ?? 0)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                      {upload?.status === "failed" ? (
+                        <div role="alert" className="space-y-2">
+                          <p className="text-sm text-[#9b3d3d]">{upload.message}</p>
+                          {upload.retryFile ? (
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => {
+                                if (upload.retryFile) {
+                                  onUploadAudio(block, upload.retryFile);
+                                }
+                              }}
+                              className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                            >
+                              {COURSE_BUILDER_AUDIO_RETRY_LABEL}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
               </div>
             ) : null}
 

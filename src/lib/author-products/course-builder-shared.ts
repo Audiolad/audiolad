@@ -94,6 +94,10 @@ export function validateCourseBuilderAudioFile(file: File): string | null {
   return validateProductAudioFileClient(file);
 }
 
+export const COURSE_BUILDER_AUDIO_INTERRUPTED =
+  "Связь с сервером прервалась. Нажмите «Повторить» – загрузка продолжится с того же места.";
+export const COURSE_BUILDER_AUDIO_RETRY_LABEL = "Повторить";
+
 export function getCourseBuilderAudioUploadError(
   code: string | undefined,
   status: number,
@@ -105,6 +109,10 @@ export function getCourseBuilderAudioUploadError(
 
   if (code === "invalid_file_type") {
     return COURSE_BUILDER_AUDIO_WRONG_TYPE;
+  }
+
+  if (code === "upload_interrupted") {
+    return COURSE_BUILDER_AUDIO_INTERRUPTED;
   }
 
   return getAudioUploadErrorMessage(code, status, message);

@@ -160,7 +160,11 @@ import {
   resolveCreateClassification,
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
-import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
+import {
+  uploadAuthorProductAudioDirect,
+  type AuthorAudioUploadProgress,
+} from "@/lib/author-products/direct-audio-upload-client";
+import { formatAuthorAudioUploadButtonLabel } from "@/lib/author-products/audio-upload-progress-label";
 import {
   MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE,
   uploadMusicMasterDirect,
@@ -1055,6 +1059,8 @@ export default function AuthorProductForm({
   const [publishing, setPublishing] = useState(false);
   const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
+  const [uploadingAudioProgress, setUploadingAudioProgress] =
+    useState<AuthorAudioUploadProgress | null>(null);
   const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
   const [albumDropActive, setAlbumDropActive] = useState(false);
   const [albumBatchNotice, setAlbumBatchNotice] = useState<string | null>(null);
@@ -1259,6 +1265,19 @@ export default function AuthorProductForm({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [form.productKind, musicQueue]);
+
+  useEffect(() => {
+    if (!uploadingAudioId) {
+      return;
+    }
+
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [uploadingAudioId]);
 
   useEffect(() => {
     const audioId = pendingFocusAudioIdRef.current;
@@ -3623,6 +3642,7 @@ export default function AuthorProductForm({
     }
 
     setUploadingAudioId(audioId);
+    setUploadingAudioProgress(null);
     setAudioUploadErrors((current) => {
       const next = { ...current };
       delete next[audioId];
@@ -3681,6 +3701,7 @@ export default function AuthorProductForm({
             practiceId: id,
             audioId: targetAudioId,
             file,
+            onProgress: setUploadingAudioProgress,
           });
 
       if (!result.ok) {
@@ -3719,6 +3740,7 @@ export default function AuthorProductForm({
       }));
     } finally {
       setUploadingAudioId(null);
+      setUploadingAudioProgress(null);
     }
   }
 
@@ -6010,7 +6032,7 @@ export default function AuthorProductForm({
                       }`}
                     >
                       {uploadingAudioId === audioItem.id
-                        ? "Загрузка…"
+                        ? formatAuthorAudioUploadButtonLabel(uploadingAudioProgress)
                         : audioItem.audio_path || isAudioPrepareInFlight(audioItem.audio_prepare_status)
                           ? "Заменить аудио"
                           : "Загрузить аудио"}
