@@ -101,6 +101,7 @@ jobs:
           npm run test:business-no-grace-copy
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
+          npm run test:vpn-notice
           npm run test:business-guest-passport
           npm run test:business-guest-diversity
           npm run test:business-brand-icons
