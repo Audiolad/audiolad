@@ -160,7 +160,14 @@ import {
   resolveCreateClassification,
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
-import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
+import {
+  uploadAuthorProductAudioDirect,
+  type AuthorAudioUploadProgress,
+} from "@/lib/author-products/direct-audio-upload-client";
+import {
+  formatAuthorAudioUploadButtonLabel,
+  formatAuthorAudioUploadLabel,
+} from "@/lib/author-products/audio-upload-progress-label";
 import {
   MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE,
   uploadMusicMasterDirect,
@@ -1055,6 +1062,11 @@ export default function AuthorProductForm({
   const [publishing, setPublishing] = useState(false);
   const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
+  const [uploadingAudioProgress, setUploadingAudioProgress] =
+    useState<AuthorAudioUploadProgress | null>(null);
+  const [musicUploadProgress, setMusicUploadProgress] = useState<
+    Record<string, AuthorAudioUploadProgress>
+  >({});
   const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
   const [albumDropActive, setAlbumDropActive] = useState(false);
   const [albumBatchNotice, setAlbumBatchNotice] = useState<string | null>(null);
@@ -1259,6 +1271,19 @@ export default function AuthorProductForm({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [form.productKind, musicQueue]);
+
+  useEffect(() => {
+    if (!uploadingAudioId) {
+      return;
+    }
+
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [uploadingAudioId]);
 
   useEffect(() => {
     const audioId = pendingFocusAudioIdRef.current;
@@ -3358,6 +3383,15 @@ export default function AuthorProductForm({
               audioId,
               file,
               signal: controller.signal,
+              onProgress: (progress) => {
+                if (controller.signal.aborted) {
+                  return;
+                }
+                setMusicUploadProgress((current) => ({
+                  ...current,
+                  [audioId]: progress,
+                }));
+              },
             });
       const after = musicQueueEntry(musicQueueRef.current, audioId);
       if (!after || after.generation !== generation || controller.signal.aborted) {
@@ -3421,6 +3455,14 @@ export default function AuthorProductForm({
     } finally {
       if (musicAbortRef.current.get(audioId) === controller) {
         musicAbortRef.current.delete(audioId);
+        setMusicUploadProgress((current) => {
+          if (!(audioId in current)) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[audioId];
+          return next;
+        });
       }
     }
   }
@@ -3623,6 +3665,7 @@ export default function AuthorProductForm({
     }
 
     setUploadingAudioId(audioId);
+    setUploadingAudioProgress(null);
     setAudioUploadErrors((current) => {
       const next = { ...current };
       delete next[audioId];
@@ -3681,6 +3724,7 @@ export default function AuthorProductForm({
             practiceId: id,
             audioId: targetAudioId,
             file,
+            onProgress: setUploadingAudioProgress,
           });
 
       if (!result.ok) {
@@ -3719,6 +3763,7 @@ export default function AuthorProductForm({
       }));
     } finally {
       setUploadingAudioId(null);
+      setUploadingAudioProgress(null);
     }
   }
 
@@ -5916,6 +5961,13 @@ export default function AuthorProductForm({
                     </p>
                   ) : null}
                   {form.productKind === PRODUCT_KIND.MUSIC &&
+                  musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading" &&
+                  musicUploadProgress[audioItem.id] ? (
+                    <p className="mt-2" role="status" aria-live="polite">
+                      {formatAuthorAudioUploadLabel(musicUploadProgress[audioItem.id])}
+                    </p>
+                  ) : null}
+                  {form.productKind === PRODUCT_KIND.MUSIC &&
                   musicQueueEntry(musicQueue, audioItem.id)?.fileName &&
                   musicQueueEntry(musicQueue, audioItem.id)?.phase !== "uploading" ? (
                     <p className="mt-2">
@@ -5977,10 +6029,13 @@ export default function AuthorProductForm({
                             : "cursor-pointer"
                         }`}
                       >
-                        {uploadingAudioId === audioItem.id ||
-                        musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
-                          ? "Загрузка…"
-                          : MUSIC_DELIVERY_REPLACE_LABEL}
+                        {uploadingAudioId === audioItem.id
+                          ? formatAuthorAudioUploadButtonLabel(uploadingAudioProgress)
+                          : musicQueueEntry(musicQueue, audioItem.id)?.phase === "uploading"
+                            ? formatAuthorAudioUploadButtonLabel(
+                                musicUploadProgress[audioItem.id],
+                              )
+                            : MUSIC_DELIVERY_REPLACE_LABEL}
                         <input
                           type="file"
                           accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
@@ -6010,7 +6065,7 @@ export default function AuthorProductForm({
                       }`}
                     >
                       {uploadingAudioId === audioItem.id
-                        ? "Загрузка…"
+                        ? formatAuthorAudioUploadButtonLabel(uploadingAudioProgress)
                         : audioItem.audio_path || isAudioPrepareInFlight(audioItem.audio_prepare_status)
                           ? "Заменить аудио"
                           : "Загрузить аудио"}

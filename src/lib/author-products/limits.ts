@@ -44,6 +44,12 @@ export function getAudioUploadErrorMessage(
       return "Загрузка заняла слишком много времени. Попробуйте ещё раз – лучше по одному треку.";
     case "upload_failed":
       return "Не удалось загрузить аудио в хранилище. Попробуйте ещё раз.";
+    case "upload_interrupted":
+      return "Связь с сервером прервалась. Загрузите тот же файл ещё раз – загрузка продолжится с того же места.";
+    case "upload_network":
+      return "Не удалось связаться с сервером. Проверьте интернет и попробуйте ещё раз.";
+    case "upload_in_progress":
+      return message?.trim() || "Аудио уже загружается – дождитесь окончания.";
     case "invalid_audio_duration":
       return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
     case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":
