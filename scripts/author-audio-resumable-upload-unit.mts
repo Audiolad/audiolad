@@ -281,6 +281,31 @@ function setup(failPatches?: Set<number>, retryDelaysMs: number[] = [1, 1], part
   setAuthorAudioResumableUploadTestOverrides(null);
 }
 
+// 5b. Finalize body cut mid-read → upload_network with guarded abandon, no repeat.
+{
+  const { api } = setup();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (String(url).endsWith("/upload/finalize")) {
+      api.finalizes += 1;
+      const body = new ReadableStream({
+        start(controller) {
+          controller.error(new TypeError("network error"));
+        },
+      });
+      return new Response(body, { status: 200 });
+    }
+    return realFetch(url, init);
+  }) as typeof fetch;
+  const file = makeFile();
+  const result = await uploadAuthorProductAudioDirect({ practiceId: PRACTICE, audioId: AUDIO, file });
+  assert.equal(!result.ok && result.error, "upload_network");
+  assert.equal(api.finalizes, 1);
+  assert.equal(api.abandons.length, 1);
+  assert.equal(hasAuthorAudioResumeSession({ practiceId: PRACTICE, audioId: AUDIO, file }), false);
+  setAuthorAudioResumableUploadTestOverrides(null);
+}
+
 // 6b. Network error on /upload/start resolves (never rejects) as upload_network.
 {
   setup();
@@ -321,5 +346,7 @@ assert.match(builder, /AUTHOR_AUDIO_UPLOAD_INTERRUPTED/);
 assert.match(builder, /catch \{\s*result = \{ ok: false, error: AUTHOR_AUDIO_UPLOAD_NETWORK/);
 const form = await readFile("src/components/author-dashboard/AuthorProductForm.tsx", "utf8");
 assert.match(form, /onProgress: setUploadingAudioProgress/);
+assert.match(form, /setMusicUploadProgress\(\(current\) => \(\{/);
+assert.match(form, /formatAuthorAudioUploadButtonLabel\(\s*musicUploadProgress\[audioItem\.id\]/);
 
 console.log("author-audio-resumable-upload-unit: ok");

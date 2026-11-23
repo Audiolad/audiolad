@@ -497,6 +497,7 @@ async function uploadWithSession(input: {
     resumeSessions.delete(key);
     reportFinalizing(input.file, input.onProgress);
     let finalizeResponse: Response;
+    let finalized: FinalizePayload | null;
     try {
       finalizeResponse = await fetch(
         `/api/author/products/${input.practiceId}/audio/${input.audioId}/upload/finalize`,
@@ -511,6 +512,7 @@ async function uploadWithSession(input: {
           signal: input.signal,
         },
       );
+      finalized = await readJson<FinalizePayload>(finalizeResponse);
     } catch (error) {
       if (isStudioAbortError(error) || input.signal?.aborted) throw error;
       // Finalize is not repeated blindly: it may have applied the file on the
@@ -518,7 +520,6 @@ async function uploadWithSession(input: {
       await dropSession();
       return { ok: false, error: AUTHOR_AUDIO_UPLOAD_NETWORK, status: 0 };
     }
-    const finalized = await readJson<FinalizePayload>(finalizeResponse);
     if (!finalizeResponse.ok || !finalized?.product) {
       forgetSession(session);
       if (finalized?.error !== "stale_music_upload") {
