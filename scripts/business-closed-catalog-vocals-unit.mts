@@ -66,4 +66,9 @@ assert.equal(SET_ALBUM_VOCALS_ROUTE, '/api/admin/business-catalog/albums/vocals'
 assert.match(read('src/app/api/admin/business-catalog/albums/vocals/route.ts'), /setBusinessAlbumHasVocals/);
 assert.match(read('src/lib/business-track-passports/admin.server.ts'), /p_has_vocals: hasVocals === true/);
 
+const similarPreview = read('src/lib/business-collections/similar-mix.server.ts');
+assert.match(similarPreview, /const pool = applyClosedCatalogVocalPolicy\(catalog, false\)/);
+assert.doesNotMatch(similarPreview, /pool: catalog/);
+assert.match(read('src/app/(platform)/admin/business-catalog/collections/page.tsx'), /tracks=\{catalogTracks\}/);
+
 console.log('business-closed-catalog-vocals: PASS (manual album label, pool policy, no analyzer, no hall engine)');
