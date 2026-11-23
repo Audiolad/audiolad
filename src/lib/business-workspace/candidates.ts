@@ -29,6 +29,7 @@ export type WorkspaceCatalogSourceRow = {
   hasActiveDelivery: boolean;
   /** Public album cover. Audio paths stay on this gate row and are not sent to the browser. */
   coverUrl?: string | null;
+  hasVocals?: boolean;
 };
 
 export type WorkspaceCatalogCandidate = {
@@ -41,6 +42,7 @@ export type WorkspaceCatalogCandidate = {
   position: number;
   shelf: WorkspaceTrackShelf;
   coverUrl?: string | null;
+  hasVocals?: boolean;
 };
 
 export function isWorkspaceMusicPractice(row: {

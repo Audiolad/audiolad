@@ -119,13 +119,13 @@ assert.ok(
 );
 
 // 5. Cabinet create route: stable JSON API, success / reuse / flag-off 403, no cross-site.
-type CreateImpl = (author: string, title: string) => Promise<{ id: string; reused: boolean }>;
+type CreateImpl = (author: string, title: string, hasVocals?: boolean) => Promise<{ id: string; reused: boolean }>;
 let createImpl: CreateImpl = async () => ({ id: albumId, reused: false });
-const createCalls: [string, string][] = [];
+const createCalls: [string, string, boolean?][] = [];
 mock('../src/lib/business-track-passports/cabinet.server.ts', {
-  createClosedBusinessAlbumFromCabinet: async (author: string, title: string) => {
-    createCalls.push([author, title]);
-    return createImpl(author, title);
+  createClosedBusinessAlbumFromCabinet: async (author: string, title: string, hasVocals?: boolean) => {
+    createCalls.push([author, title, hasVocals === true]);
+    return createImpl(author, title, hasVocals);
   },
 });
 const cabinetRoute = require('../src/app/api/author/closed-albums/route.ts') as typeof import('../src/app/api/author/closed-albums/route');
@@ -138,7 +138,10 @@ let response: Response;
 try {
   response = await postCabinet({ author_id: authorId, title: 'Утро без суеты' });
   assert.equal(response.status, 201);
-  assert.deepEqual(createCalls.at(-1), [authorId, 'Утро без суеты']);
+  assert.deepEqual(createCalls.at(-1), [authorId, 'Утро без суеты', false]);
+  response = await postCabinet({ author_id: authorId, title: 'Вечер с вокалом', has_vocals: true });
+  assert.equal(response.status, 201);
+  assert.deepEqual(createCalls.at(-1), [authorId, 'Вечер с вокалом', true]);
   assert.deepEqual(await response.json(), { ok: true, albumId, reused: false, editHref: closedAlbumEditHref(albumId) });
 
   createImpl = async () => ({ id: albumId, reused: true });
@@ -265,6 +268,9 @@ assert.deepEqual(visibleClosedCatalogOnlySettingsAuthors([houseOff]).map((item) 
 // 7. UI: cabinet form and admin toggle use fixed routes, not server actions. Russian copy, en dash only.
 const cabinetForm = read('src/components/author-dashboard/CreateClosedAlbumCabinet.tsx');
 assert.match(cabinetForm, /fetch\(CREATE_CLOSED_ALBUM_CABINET_ROUTE/);
+assert.match(cabinetForm, /name="has_vocals"/);
+assert.match(cabinetForm, /С вокалом/);
+assert.match(cabinetForm, /has_vocals: form\.get\('has_vocals'\) === 'on'/);
 assert.match(cabinetForm, /router\.push\(result\.editHref\)/);
 assert.match(cabinetForm, /event\.preventDefault\(\)/);
 assert.doesNotMatch(cabinetForm, /use server|closedCatalogAction/);

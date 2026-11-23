@@ -17,6 +17,7 @@ import {
   findRecentClosedAlbumDuplicate,
   normalizeClosedAlbumTitle,
   parseCreateClosedAlbumResponse,
+  closedBusinessAlbumInsertRow,
 } from '../src/lib/business-track-passports/create-album';
 import { publishedBusinessEditHref } from '../src/lib/business-admission/published-catalog';
 import {
@@ -69,11 +70,11 @@ assert.deepEqual(parseCreateClosedAlbumResponse({ status: 200, contentType: json
   { ok: false, message: CREATE_CLOSED_ALBUM_FALLBACK_ERROR }, 'no album id is never a success');
 
 // 3. Route handler: same-origin JSON only, success/reuse/error statuses, guard redirects rethrown.
-type CreateImpl = (author: string, title: string) => Promise<{ id: string; reused: boolean }>;
+type CreateImpl = (author: string, title: string, hasVocals?: boolean) => Promise<{ id: string; reused: boolean }>;
 let createImpl: CreateImpl = async () => ({ id: albumId, reused: false });
-const createCalls: [string, string][] = [];
+const createCalls: [string, string, boolean?][] = [];
 mock('../src/lib/business-track-passports/admin.server.ts', {
-  createClosedBusinessAlbum: async (author: string, title: string) => { createCalls.push([author, title]); return createImpl(author, title); },
+  createClosedBusinessAlbum: async (author: string, title: string, hasVocals?: boolean) => { createCalls.push([author, title, hasVocals === true]); return createImpl(author, title, hasVocals); },
 });
 const route = require('../src/app/api/admin/business-catalog/albums/route.ts') as typeof import('../src/app/api/admin/business-catalog/albums/route');
 const post = (body: unknown, headers: Record<string, string> = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }) =>
@@ -85,7 +86,11 @@ try {
   assert.equal(response.status, 201);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.deepEqual(await response.json(), { ok: true, albumId, reused: false, editHref: closedAlbumEditHref(albumId) });
-  assert.deepEqual(createCalls.at(-1), [authorId, 'Утро без суеты']);
+  assert.deepEqual(createCalls.at(-1), [authorId, 'Утро без суеты', false]);
+
+  response = await post({ author_id: authorId, title: 'Вечер с вокалом', has_vocals: true });
+  assert.equal(response.status, 201);
+  assert.deepEqual(createCalls.at(-1), [authorId, 'Вечер с вокалом', true]);
 
   createImpl = async () => ({ id: otherAlbumId, reused: true });
   response = await post({ author_id: authorId, title: 'Утро без суеты' });
@@ -125,6 +130,9 @@ assert.doesNotMatch(createFormSrc, /closedCatalogAction/);
 assert.match(createFormSrc, /fetch\(CREATE_CLOSED_ALBUM_ROUTE/);
 assert.match(createFormSrc, /router\.push\(result\.editHref\)/);
 assert.match(createFormSrc, /event\.preventDefault\(\)/);
+assert.match(createFormSrc, /name="has_vocals"/);
+assert.match(createFormSrc, /С вокалом/);
+assert.match(createFormSrc, /has_vocals: form\.get\('has_vocals'\) === 'on'/);
 assert.match(createFormSrc, /role=\{ok === false \? 'alert' : 'status'\}/);
 assert.match(createFormSrc, /bg-\[#fff5f5\][^']*text-\[#9b3d3d\]/);
 assert.doesNotMatch(read('src/app/(platform)/admin/business-catalog/actions.ts'), /createClosedBusinessAlbum/);
@@ -153,5 +161,7 @@ const dashboardSrc = read('src/components/author-dashboard/AuthorDashboardClient
 assert.match(dashboardSrc, /privateCoverSrc=\{authorProductListPrivateCoverSrc\(product\)\}/);
 // The preview route keeps the album edit access check (owner/editor of the author, or admin support mode).
 assert.match(read('src/app/api/author/products/[id]/cover/private-preview/route.ts'), /requirePracticeMutationAccess\(id\)/);
+assert.equal(closedBusinessAlbumInsertRow(authorId, 'A', albumId).business_has_vocals, false);
+assert.equal(closedBusinessAlbumInsertRow(authorId, 'A', albumId, true).business_has_vocals, true);
 
 console.log('business-closed-album-create: PASS (stable create route, redirect to album, red errors, no duplicates, private cabinet covers)');

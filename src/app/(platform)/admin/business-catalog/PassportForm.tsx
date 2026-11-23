@@ -35,7 +35,7 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
           credentials: 'same-origin',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ author_id: String(form.get('author_id') ?? ''), title: String(form.get('title') ?? '') }),
+          body: JSON.stringify({ author_id: String(form.get('author_id') ?? ''), title: String(form.get('title') ?? ''), has_vocals: form.get('has_vocals') === 'on' }),
         });
         result = parseCreateClosedAlbumResponse({
           status: response.status,
@@ -69,6 +69,13 @@ export function CreateClosedAlbum({ authors }: { authors: { id: string; name: st
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-[#25135c]">Название</span>
         <input name="title" required maxLength={300} placeholder="Название альбома" className={fieldClassName} />
+      </label>
+      <label className="mt-4 flex items-start gap-3">
+        <input type="checkbox" name="has_vocals" className="mt-1 h-5 w-5 shrink-0 rounded border-[#c6afe6] text-[#7042c5]" />
+        <span>
+          <span className="block text-sm font-medium text-[#25135c]">С вокалом</span>
+          <span className="mt-1 block text-sm leading-6 text-[#5f5484]">Все треки этого альбома будут помечены как музыка с вокалом. Анализатор эту метку не меняет.</span>
+        </span>
       </label>
       {!authors.length && (
         <p className="mt-4 text-sm leading-6 text-[#7d70a2]">Для загрузки нужен доступ владельца или редактора к автору.</p>
