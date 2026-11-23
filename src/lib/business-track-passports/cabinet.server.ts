@@ -21,6 +21,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function createClosedBusinessAlbumFromCabinet(
   authorId: string,
   title: string,
+  hasVocals = false,
 ): Promise<{ id: string; reused: boolean }> {
   const { user } = await requireAuthenticatedUser();
   if (!UUID.test(authorId)) throw new Error('Некорректный идентификатор.');
@@ -40,7 +41,7 @@ export async function createClosedBusinessAlbumFromCabinet(
   const existing = findRecentClosedAlbumDuplicate((recent.data ?? []) as RecentClosedAlbumRow[], title);
   if (existing) return { id: existing, reused: true };
   const id = crypto.randomUUID();
-  const { error } = await service.from('practices').insert(closedBusinessAlbumInsertRow(authorId, title.trim(), id));
+  const { error } = await service.from('practices').insert(closedBusinessAlbumInsertRow(authorId, title.trim(), id, hasVocals === true));
   if (error) {
     console.error('cabinet_create_closed_album_failed', { authorId, message: error.message });
     throw new Error('Не удалось создать альбом. Обновите страницу и попробуйте ещё раз.');

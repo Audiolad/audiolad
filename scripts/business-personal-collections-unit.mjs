@@ -120,7 +120,7 @@ assert.match(source('src/components/business-app/profile/BusinessProfileSubscrip
 assert.match(demo, /redirect\("\/collection"\)/, 'link visitor never sees the public demo');
 const workspace = source('src/lib/business-workspace/load.server.ts');
 assert.match(workspace, /personalCollectionStrict\(db, locationId\)/);
-assert.match(workspace, /loadPaidSimilarMix\(db, locationId, selected, admitted\)/);
+assert.match(workspace, /loadPaidSimilarMix\(db, locationId, selected, general\)/);
 assert.match(workspace, /collectionUnavailable: true/);
 assert.match(workspace, /business_venue_paid_until/);
 // Quiet cabinet (t1617u/t1618u): every pushy element is gated.
@@ -248,12 +248,15 @@ assert.match(source('src/components/business-app/BusinessHomePage.tsx'), /\? qui
   assert.match(ui, /После оплаты: \{entry.similar.length\} похожих треков/);
   assert.match(ui, /Какие треки подмешаются/);
   assert.match(ui, /track.title\} – \{track.albumTitle/);
+  assert.match(ui, /VOCAL_ALBUM_LABEL/);
+  assert.match(ui, /hasVocals === true/);
+  assert.match(adminPage, /business_has_vocals/);
   assert.match(ui, /Сохранить долю/);
   assert.match(ui, /COLLECTION_SHARE_PRESETS/);
   assert.doesNotMatch(ui, /—/, 'share UI uses en dash only');
   assert.doesNotMatch(adminPage, /—/);
   assert.doesNotMatch(adminActions, /—/);
-  assert.match(source('src/lib/business-workspace/load.server.ts'), /loadPaidSimilarMix\(db, locationId, selected, admitted\)/);
+  assert.match(source('src/lib/business-workspace/load.server.ts'), /loadPaidSimilarMix\(db, locationId, selected, general\)/);
 }
 
 {

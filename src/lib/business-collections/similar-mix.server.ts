@@ -9,6 +9,7 @@ import {
 import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { applyClosedCatalogVocalPolicy } from "@/lib/business-catalog/vocals";
 import {
   normalizeCollectionSharePercent,
   pickSimilarTracks,
@@ -148,7 +149,7 @@ export type CollectionSimilarPreview = {
   similar: { audioItemId: string; title: string; albumTitle: string }[];
 };
 
-/** Admin preview: same picker as the paid venue pool, against the admitted cafe catalog. */
+/** Admin preview: same picker as the paid venue pool. Selected rows stay as-is (including vocal albums); similar tracks come from the instrumental general pool. */
 export async function loadCollectionSimilarPreviews<T extends MixTrack & { title: string; albumTitle: string }>(
   rows: readonly { id: string; collection_share_percent?: unknown }[],
   catalog: readonly T[],
@@ -160,6 +161,7 @@ export async function loadCollectionSimilarPreviews<T extends MixTrack & { title
   for (const ids of itemsByCollection.values()) for (const id of ids) needed.add(id);
   const signals = await loadMixSignals([...needed]);
   const byId = new Map(catalog.map((track) => [track.audioItemId, track]));
+  const pool = applyClosedCatalogVocalPolicy(catalog, false);
   for (const row of rows) {
     const share = normalizeCollectionSharePercent(row.collection_share_percent);
     const selected = (itemsByCollection.get(row.id) ?? []).flatMap((id) => {
@@ -171,7 +173,7 @@ export async function loadCollectionSimilarPreviews<T extends MixTrack & { title
         collectionId: row.id,
         sharePercent: share,
         selected,
-        pool: catalog,
+        pool,
         signals,
       })
       : [];

@@ -78,7 +78,7 @@ export async function loadClosedBusinessCatalog() {
   const authors = await listAuthorWorkspacesForUser(admin.userId);
   const db = createServiceRoleClient();
   const albums = await db.from('practices')
-    .select('id,title,author_id,status,cover_url,cover_image,updated_at')
+    .select('id,title,author_id,status,cover_url,cover_image,updated_at,business_has_vocals')
     .eq('business_only', true).is('deleted_at', null).order('created_at', { ascending: false });
   if (albums.error) throw new Error('Не удалось загрузить закрытый каталог.');
   const albumIds = (albums.data ?? []).map((album) => String(album.id));
@@ -131,7 +131,7 @@ function createAlbumRpcError(error: { message: string } | null) {
  * t1504u: returns the new album id, or the id of the same author's album with the same title
  * created in the last minutes (repeated click / repeated submit after a reload – no duplicate).
  */
-export async function createClosedBusinessAlbum(authorId: string, title: string): Promise<{ id: string; reused: boolean }> {
+export async function createClosedBusinessAlbum(authorId: string, title: string, hasVocals = false): Promise<{ id: string; reused: boolean }> {
   const admin = await requireAdminPanelAccess();
   id(authorId);
   const authors = await listAuthorWorkspacesForUser(admin.userId);
@@ -146,10 +146,26 @@ export async function createClosedBusinessAlbum(authorId: string, title: string)
   const existing = findRecentClosedAlbumDuplicate((recent.data ?? []) as RecentClosedAlbumRow[], title);
   if (existing) return { id: existing, reused: true };
   const db = await createClient();
-  const { data, error } = await db.rpc('admin_create_business_album', { p_author_id: authorId, p_title: title.trim() });
+  const { data, error } = await db.rpc('admin_create_business_album', {
+    p_author_id: authorId, p_title: title.trim(), p_has_vocals: hasVocals === true,
+  });
   createAlbumRpcError(error);
   if (typeof data !== 'string' || !UUID.test(data)) throw new Error('Не удалось создать альбом. Обновите страницу и попробуйте ещё раз.');
   return { id: data, reused: false };
+}
+export async function setBusinessAlbumHasVocals(albumId: string, hasVocals: boolean): Promise<void> {
+  await requireAdminPanelAccess();
+  id(albumId);
+  const db = await createClient();
+  const { error } = await db.rpc('admin_set_business_album_has_vocals', {
+    p_practice_id: albumId, p_has_vocals: hasVocals === true,
+  });
+  if (!error) return;
+  if (error.message.includes('permission_denied')) throw new Error('Нужен доступ администратора к закрытому каталогу.');
+  if (error.message.includes('album_not_found') || error.message.includes('invalid_album')) {
+    throw new Error('Не удалось найти закрытый альбом.');
+  }
+  throw new Error('Не удалось изменить метку «С вокалом». Обновите страницу и попробуйте ещё раз.');
 }
 export async function saveBusinessPassport(audioItemId: string, fields: Record<string, unknown>, options?: { keys?: readonly string[] }) {
   await requireAdminPanelAccess();

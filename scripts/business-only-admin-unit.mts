@@ -67,7 +67,7 @@ for (const operation of [() => server.createClosedBusinessAlbum(authorId, 'Ал�
 admin = true;
 await assert.rejects(() => server.createClosedBusinessAlbum(assetId, 'Альбом'), /Нет доступа/);
 assert.deepEqual(await server.createClosedBusinessAlbum(authorId, ' Альбом '), { id: createdAlbumId, reused: false });
-assert.deepEqual(calls.at(-1), { name: 'admin_create_business_album', args: { p_author_id: authorId, p_title: 'Альбом' } });
+assert.deepEqual(calls.at(-1), { name: 'admin_create_business_album', args: { p_author_id: authorId, p_title: 'Альбом', p_has_vocals: false } });
 // t1504u: the duplicate lookup is scoped to this author's live closed albums.
 const lookup = recentLookups.at(-1)!;
 assert.deepEqual(lookup.slice(0, 3), [['eq', 'author_id', authorId], ['eq', 'business_only', true], ['is', 'deleted_at', null]]);

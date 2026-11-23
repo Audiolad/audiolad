@@ -44,9 +44,20 @@ export default async function PersonalCollectionsAdminPage() {
   if (entries.error) throw new Error("Не удалось загрузить подборки.");
   const rows = entries.data ?? [];
   const usedById = await loadUsedCounts(db, rows.map((row) => row.id));
+  const albumIds = [...new Set(tracks.map((track) => track.album_id).filter(Boolean))];
+  const vocalByAlbum = new Map<string, boolean>();
+  for (let index = 0; index < albumIds.length; index += 100) {
+    const flags = await db.from("practices").select("id, business_has_vocals")
+      .in("id", albumIds.slice(index, index + 100));
+    if (flags.error) throw new Error("Не удалось загрузить метки вокала.");
+    for (const row of (flags.data ?? []) as { id: string; business_has_vocals?: boolean }[]) {
+      vocalByAlbum.set(row.id, row.business_has_vocals === true);
+    }
+  }
   const catalogTracks = tracks.map((track) => ({
     audioItemId: track.audio_item_id, albumId: track.album_id, title: track.title,
     albumTitle: track.album_title, durationSeconds: track.duration_seconds, coverUrl: "",
+    hasVocals: vocalByAlbum.get(track.album_id) === true,
   }));
   const itemsByCollection = new Map<string, string[]>();
   if (rows.length) {

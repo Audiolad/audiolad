@@ -17,6 +17,8 @@ export type WorkspaceTrack = {
   shelf: WorkspaceTrackShelf;
   /** Public album cover already shown in the catalog. Absent or null shows the placeholder. */
   coverUrl?: string | null;
+  /** Manual closed-catalog «С вокалом» label. Absent/false is instrumental. */
+  hasVocals?: boolean;
 };
 
 export type WorkspacePlaybackSnapshot = {

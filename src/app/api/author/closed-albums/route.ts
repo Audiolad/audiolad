@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isSameOriginJsonRequest } from '@/lib/business-app/spa-player-report';
 import { createClosedBusinessAlbumFromCabinet } from '@/lib/business-track-passports/cabinet.server';
 import { closedAlbumEditHref } from '@/lib/business-track-passports/create-album';
+import { parseHasVocalsFlag } from '@/lib/business-catalog/vocals';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,9 @@ export async function POST(request: Request) {
   }
   const authorId = typeof body.author_id === 'string' ? body.author_id : '';
   const title = typeof body.title === 'string' ? body.title : '';
+  const hasVocals = parseHasVocalsFlag(body.has_vocals);
   try {
-    const { id, reused } = await createClosedBusinessAlbumFromCabinet(authorId, title);
+    const { id, reused } = await createClosedBusinessAlbumFromCabinet(authorId, title, hasVocals);
     return NextResponse.json({ ok: true, albumId: id, reused, editHref: closedAlbumEditHref(id) }, { status: reused ? 200 : 201, headers: NO_STORE });
   } catch (error) {
     const message = error instanceof Error && /[А-Яа-яЁё]/.test(error.message)

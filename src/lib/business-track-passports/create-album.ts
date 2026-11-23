@@ -73,7 +73,7 @@ export function parseCreateClosedAlbumResponse(input: {
 }
 
 /** Same row the admin RPC admin_create_business_album inserts. */
-export function closedBusinessAlbumInsertRow(authorId: string, title: string, albumId: string) {
+export function closedBusinessAlbumInsertRow(authorId: string, title: string, albumId: string, hasVocals = false) {
   return {
     id: albumId,
     author_id: authorId,
@@ -88,6 +88,7 @@ export function closedBusinessAlbumInsertRow(authorId: string, title: string, al
     music_usage_permission: 'listen_only',
     format: 'Музыка',
     business_only: true,
+    business_has_vocals: hasVocals === true,
     catalog_visibility: 'selected_users',
     is_catalog_listed: false,
   };
