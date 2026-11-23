@@ -18,6 +18,7 @@ import {
   placeTimeseriesTooltipBox,
   pointerClientToSvgX,
   timeseriesPlotY,
+  timeseriesPointsSignature,
 } from "@/lib/admin/timeseries-tooltip";
 import AdminAnalyticsTimeseriesTooltip from "@/components/admin/AdminAnalyticsTimeseriesTooltip";
 
@@ -71,7 +72,7 @@ export default function AdminAnalyticsTimeseriesChart({
     return years.size > 1;
   }, [points]);
 
-  const pointsSignature = `${granularity}:${points.length}:${points[0]?.bucket ?? ""}:${points[points.length - 1]?.bucket ?? ""}`;
+  const pointsSignature = timeseriesPointsSignature(points, granularity);
   const activeIndex =
     hover && hover.signature === pointsSignature ? hover.index : null;
   const sticky = Boolean(hover && hover.signature === pointsSignature && hover.sticky);
@@ -162,7 +163,7 @@ export default function AdminAnalyticsTimeseriesChart({
       axis.width,
       axis.height,
       x,
-      markers.map((marker) => marker.y),
+      markers,
     );
     return { model, markers, box, x };
   }, [

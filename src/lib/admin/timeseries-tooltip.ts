@@ -112,9 +112,34 @@ export function timeseriesPlotY(
   plotHeight = TIMESERIES_PLOT_HEIGHT,
   padY = TIMESERIES_PAD_Y,
 ): number {
-  const max = Math.max(maxValue, 1);
+  // Listening peaks can be a fraction of a minute; only fall back to 1 when
+  // the scale is missing or not positive. Count series still pass max >= 1.
+  const max = maxValue > 0 ? maxValue : 1;
   const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
   return plotHeight - padY - (safe / max) * (plotHeight - padY * 2);
+}
+
+/** Fingerprint of the plotted series; hover is ignored when this changes. */
+export function timeseriesPointsSignature(
+  points: readonly AdminAnalyticsTimeseriesPoint[],
+  granularity: "day" | "week",
+): string {
+  const body = points
+    .map((point) =>
+      [
+        point.bucket,
+        point.visitors,
+        point.registrations,
+        point.practiceViews,
+        point.playStarts,
+        point.listeners,
+        point.completions,
+        point.saves,
+        point.listenedMs ?? "",
+      ].join(","),
+    )
+    .join(";");
+  return `${granularity}:${body}`;
 }
 
 export function buildTimeseriesTooltip(options: {
@@ -219,25 +244,90 @@ export function measureTimeseriesTooltipBox(
   return { width, height };
 }
 
-/** Keep the box near the active markers and inside the SVG. */
+function tooltipBoxFits(
+  x: number,
+  y: number,
+  box: { width: number; height: number },
+  chartWidth: number,
+  chartHeight: number,
+): boolean {
+  return (
+    x >= 4 &&
+    y >= 4 &&
+    x + box.width <= chartWidth - 4 &&
+    y + box.height <= chartHeight - 4
+  );
+}
+
+function tooltipBoxOverlapsMarkers(
+  x: number,
+  y: number,
+  box: { width: number; height: number },
+  markers: readonly { x: number; y: number }[],
+  pad = 10,
+): boolean {
+  const left = x - pad;
+  const right = x + box.width + pad;
+  const top = y - pad;
+  const bottom = y + box.height + pad;
+  return markers.some(
+    (marker) =>
+      marker.x >= left && marker.x <= right && marker.y >= top && marker.y <= bottom,
+  );
+}
+
+/** Keep the box near the active markers, inside the SVG, and clear of the dots. */
 export function placeTimeseriesTooltipBox(
   box: { width: number; height: number },
   chartWidth: number,
   chartHeight: number,
   anchorX: number,
-  anchorsY: readonly number[],
+  markers: readonly { x: number; y: number }[],
 ): TimeseriesTooltipBox {
   const gap = 10;
+  const clearance = 12;
   const minX = 4;
   const maxX = Math.max(minX, chartWidth - box.width - 4);
-  const x = Math.max(minX, Math.min(maxX, anchorX - box.width / 2));
+  const minY = 4;
+  const maxY = Math.max(minY, chartHeight - box.height - 4);
+  const anchorsY = markers.map((marker) => marker.y);
   const highest = anchorsY.length > 0 ? Math.min(...anchorsY) : TIMESERIES_PAD_Y;
   const lowest = anchorsY.length > 0 ? Math.max(...anchorsY) : TIMESERIES_PLOT_HEIGHT / 2;
-  const above = highest - box.height - gap;
-  const below = lowest + gap;
-  let y = above >= 4 ? above : below;
-  y = Math.max(4, Math.min(y, Math.max(4, chartHeight - box.height - 4)));
-  return { x, y, width: box.width, height: box.height };
+  const centeredX = Math.max(minX, Math.min(maxX, anchorX - box.width / 2));
+  const rightX = Math.max(minX, Math.min(maxX, anchorX + clearance));
+  const leftX = Math.max(minX, Math.min(maxX, anchorX - box.width - clearance));
+  const aboveY = highest - box.height - gap;
+  const belowY = lowest + gap;
+  const midY = Math.max(minY, Math.min(maxY, (highest + lowest) / 2 - box.height / 2));
+
+  const candidates = [
+    { x: centeredX, y: aboveY },
+    { x: rightX, y: midY },
+    { x: leftX, y: midY },
+    { x: rightX, y: minY },
+    { x: leftX, y: minY },
+    { x: rightX, y: aboveY },
+    { x: leftX, y: aboveY },
+    { x: maxX, y: midY },
+    { x: minX, y: midY },
+    { x: maxX, y: minY },
+    { x: minX, y: minY },
+    { x: centeredX, y: belowY },
+    { x: centeredX, y: minY },
+  ];
+
+  for (const candidate of candidates) {
+    const x = Math.max(minX, Math.min(maxX, candidate.x));
+    const y = Math.max(minY, Math.min(maxY, candidate.y));
+    if (
+      tooltipBoxFits(x, y, box, chartWidth, chartHeight) &&
+      !tooltipBoxOverlapsMarkers(x, y, box, markers)
+    ) {
+      return { x, y, width: box.width, height: box.height };
+    }
+  }
+
+  return { x: maxX, y: minY, width: box.width, height: box.height };
 }
 
 export function pointerClientToSvgX(

@@ -27,6 +27,7 @@ import {
   nearestTimeseriesIndex,
   placeTimeseriesTooltipBox,
   timeseriesPlotY,
+  timeseriesPointsSignature,
 } from "../src/lib/admin/timeseries-tooltip";
 
 const EM_DASH = "\u2014";
@@ -182,6 +183,10 @@ assert.equal(nearestTimeseriesIndex(TIMESERIES_PAD_X, layout.xAt, 1), 0);
 const plotMax = 503;
 assert.equal(timeseriesPlotY(0, plotMax), 200);
 assert.equal(timeseriesPlotY(plotMax, plotMax), 20);
+// Listening scale under a minute must not be stretched as if the max were 1 minute.
+assert.equal(timeseriesPlotY(0.5, 0.5), 20);
+assert.equal(timeseriesPlotY(0, 0.5), 200);
+assert.equal(timeseriesPlotY(0, 0), 200);
 const markers = buildTimeseriesMarkers({
   point: peak,
   x: layout.xAt(6),
@@ -211,19 +216,54 @@ assert.deepEqual(
   ["visitors"],
 );
 
-// 6. Tooltip box stays inside the chart: left, right, and near the top.
+// 6. Tooltip box stays inside the chart and does not cover active markers.
 const measured = measureTimeseriesTooltipBox(visitorsOnly!);
 assert.ok(measured.width >= 128);
 assert.ok(measured.height >= 24);
-const leftBox = placeTimeseriesTooltipBox(measured, 640, 260, 28, [40]);
-assert.ok(leftBox.x >= 4);
-assert.ok(leftBox.x + leftBox.width <= 640 - 4);
-const rightBox = placeTimeseriesTooltipBox(measured, 640, 260, 612, [40]);
-assert.ok(rightBox.x + rightBox.width <= 640 - 4);
-assert.ok(rightBox.x >= 4);
-const topBox = placeTimeseriesTooltipBox(measured, 640, 260, 320, [24]);
-assert.ok(topBox.y >= 4);
-assert.ok(topBox.y + 1 >= 24, "near the top the box flips below the marker");
+
+function assertBoxInside(box: { x: number; y: number; width: number; height: number }) {
+  assert.ok(box.x >= 4);
+  assert.ok(box.y >= 4);
+  assert.ok(box.x + box.width <= 640 - 4);
+  assert.ok(box.y + box.height <= 260 - 4);
+}
+
+function assertBoxMisses(
+  box: { x: number; y: number; width: number; height: number },
+  marks: Array<{ x: number; y: number }>,
+) {
+  const pad = 10;
+  for (const mark of marks) {
+    const hits =
+      mark.x >= box.x - pad &&
+      mark.x <= box.x + box.width + pad &&
+      mark.y >= box.y - pad &&
+      mark.y <= box.y + box.height + pad;
+    assert.equal(hits, false, `tooltip covers marker at ${mark.x},${mark.y}`);
+  }
+}
+
+const leftMarks = [{ x: 28, y: 40 }];
+const leftBox = placeTimeseriesTooltipBox(measured, 640, 260, 28, leftMarks);
+assertBoxInside(leftBox);
+assertBoxMisses(leftBox, leftMarks);
+const rightMarks = [{ x: 612, y: 40 }];
+const rightBox = placeTimeseriesTooltipBox(measured, 640, 260, 612, rightMarks);
+assertBoxInside(rightBox);
+assertBoxMisses(rightBox, rightMarks);
+const topMarks = [{ x: 320, y: 24 }];
+const topBox = placeTimeseriesTooltipBox(measured, 640, 260, 320, topMarks);
+assertBoxInside(topBox);
+assertBoxMisses(topBox, topMarks);
+
+// Reviewer case: a high visitors peak and a low playStarts point on the same day.
+const splitMarks = [
+  { x: 612, y: 20 },
+  { x: 612, y: timeseriesPlotY(10, 503) },
+];
+const splitBox = placeTimeseriesTooltipBox(measured, 640, 260, 612, splitMarks);
+assertBoxInside(splitBox);
+assertBoxMisses(splitBox, splitMarks);
 
 // 7. Rendered annotation shows the date, the formatted value, a marker, and no em dash.
 const annotation = renderToStaticMarkup(
@@ -244,7 +284,25 @@ assert.match(annotation, /data-series="visitors"/);
 assert.equal(annotation.includes(EM_DASH), false);
 assert.equal(annotation.includes(TIMESERIES_EN_DASH), true);
 
-// 8. Idle chart has no tooltip (it appears only on hover or tap).
+// 8. A filter change that keeps the same date range still changes the signature.
+const weekPoints = week.map((bucket, index) => point(bucket, [180, 205, 160, 140, 175, 200, 503][index]));
+const sameRangeOtherFilter = weekPoints.map((item, index) =>
+  index === 3 ? { ...item, visitors: item.visitors + 15 } : item,
+);
+assert.equal(
+  timeseriesPointsSignature(weekPoints, "day"),
+  timeseriesPointsSignature(weekPoints, "day"),
+);
+assert.notEqual(
+  timeseriesPointsSignature(weekPoints, "day"),
+  timeseriesPointsSignature(sameRangeOtherFilter, "day"),
+);
+assert.notEqual(
+  timeseriesPointsSignature(weekPoints, "day"),
+  timeseriesPointsSignature(weekPoints, "week"),
+);
+
+// 9. Idle chart has no tooltip (it appears only on hover or tap).
 const idle = renderToStaticMarkup(
   <AdminAnalyticsTimeseriesChart
     points={week.map((bucket, index) => point(bucket, [180, 205, 160, 140, 175, 200, 503][index]))}
