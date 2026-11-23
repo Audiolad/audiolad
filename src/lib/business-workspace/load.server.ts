@@ -1,6 +1,7 @@
 import "server-only";
 import { loadPaidSimilarMix } from "@/lib/business-collections/similar-mix.server";
 import { selectPersonalVenuePool } from "@/lib/business-collections/venue-pool.mjs";
+import { applyClosedCatalogVocalPolicy } from "@/lib/business-catalog/vocals";
 import { hasCollectionCookie, loadCollectionPermission } from "@/lib/business-collections/load.server";
 
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
@@ -135,6 +136,7 @@ type PracticeRow = {
   cover_url?: string | null;
   cover_image?: unknown;
   updated_at?: string | null;
+  business_has_vocals?: boolean;
 };
 
 type AudioRow = {
@@ -152,18 +154,36 @@ type AudioRow = {
 async function attachPracticeCovers(db: ServiceDb, practices: PracticeRow[]): Promise<PracticeRow[] | "error"> {
   const missing = practices.filter((row) => !("cover_url" in row) && row.id);
   if (missing.length === 0) return practices;
-  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at" | "business_only">>();
+  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at" | "business_only" | "business_has_vocals">>();
   for (let index = 0; index < missing.length; index += ID_CHUNK) {
     const chunk = missing.slice(index, index + ID_CHUNK).flatMap((row) => row.id ? [row.id] : []);
-    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at, business_only").in("id", chunk);
+    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at, business_only, business_has_vocals").in("id", chunk);
     if (page.error || !Array.isArray(page.data)) return "error";
-    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null; business_only?: boolean }[]) {
+    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null; business_only?: boolean; business_has_vocals?: boolean }[]) {
       covers.set(row.id, row);
     }
   }
   return practices.map((row) => {
     const cover = row.id ? covers.get(row.id) : undefined;
     return cover ? { ...row, ...cover } : row;
+  });
+}
+
+
+async function attachPracticeVocalFlags(db: ServiceDb, practices: PracticeRow[]): Promise<PracticeRow[] | "error"> {
+  const ids = practices.flatMap((row) => row.id ? [row.id] : []);
+  if (ids.length === 0) return practices;
+  const flags = new Map<string, { business_only?: boolean; business_has_vocals?: boolean }>();
+  for (let index = 0; index < ids.length; index += ID_CHUNK) {
+    const page = await db.from("practices").select("id, business_only, business_has_vocals").in("id", ids.slice(index, index + ID_CHUNK));
+    if (page.error || !Array.isArray(page.data)) return "error";
+    for (const row of page.data as { id: string; business_only?: boolean; business_has_vocals?: boolean }[]) {
+      flags.set(row.id, row);
+    }
+  }
+  return practices.map((row) => {
+    const flag = row.id ? flags.get(row.id) : undefined;
+    return flag ? { ...row, ...flag } : row;
   });
 }
 
@@ -178,7 +198,9 @@ async function candidatesFromPractices(
 ): Promise<WorkspaceCatalogCandidate[] | "error"> {
   const withCovers = await attachPracticeCovers(db, practices);
   if (withCovers === "error") return "error";
-  practices = withCovers;
+  const withFlags = await attachPracticeVocalFlags(db, withCovers);
+  if (withFlags === "error") return "error";
+  practices = withFlags;
   // Service-only table. Ordinary albums do not issue any additional query.
   for (const practice of practices) {
     if (practice.business_only !== true) continue;
@@ -247,6 +269,7 @@ async function candidatesFromPractices(
       audioPath: audio.audio_path,
       hasActiveDelivery: playableIds.has(audio.id) && !audio.audio_path?.trim(),
       coverUrl: workspaceTrackCoverUrl(practice, audio.id, spaceId),
+      hasVocals: practice.business_has_vocals === true,
     };
     if (!acceptWorkspaceCatalogSourceRow(row, allowedAuthors)) continue;
     sourceRows.push({ ...row, shelf: source?.shelf ?? "cafe" });
@@ -263,6 +286,7 @@ async function candidatesFromPractices(
     position: row.position,
     shelf: row.shelf,
     coverUrl: row.coverUrl ?? null,
+    hasVocals: row.hasVocals === true,
   }));
   return candidates;
 }
@@ -330,6 +354,7 @@ function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {
     albumTitle: row.albumTitle.trim() || null,
     shelf: row.shelf,
     coverUrl: row.coverUrl ?? null,
+    hasVocals: row.hasVocals === true,
   });
 }
 
@@ -362,7 +387,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceI
     const chunk = ids.slice(index, index + ID_CHUNK);
     const joined = await db
       .from("audio_items")
-      .select("id, title, duration_seconds, practices(title, author_id, business_only, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
+      .select("id, title, duration_seconds, practices(title, author_id, business_only, business_has_vocals, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
       .in("id", chunk);
     if (joined.error || !Array.isArray(joined.data)) {
       const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
@@ -381,6 +406,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceI
         title?: string | null;
         author_id?: string | null;
         business_only?: boolean | null;
+        business_has_vocals?: boolean | null;
         cover_url?: string | null;
         cover_image?: unknown;
         updated_at?: string | null;
@@ -389,6 +415,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceI
         title?: string | null;
         author_id?: string | null;
         business_only?: boolean | null;
+        business_has_vocals?: boolean | null;
         cover_url?: string | null;
         cover_image?: unknown;
         updated_at?: string | null;
@@ -402,6 +429,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceI
         authorName: embeddedName(practice?.authors) || null,
         albumTitle: practice?.title?.trim() || null,
         coverUrl: workspaceTrackCoverUrl(practice, row.id, spaceId),
+        hasVocals: practice?.business_has_vocals === true,
       });
       if (named) byId.set(row.id, named);
     }
@@ -554,14 +582,20 @@ export async function loadWorkspaceCatalog(input: {
   if (input.spaceId === "cafe" && input.locationId) {
     const locationId = input.locationId;
     try {
+      const general = applyClosedCatalogVocalPolicy(tracks, false);
+      let collectionApplied = false;
       const pool = await selectPersonalVenuePool(tracks, async () => {
         const { data, error } = await db.rpc("business_personal_collection_location_tracks", { p_location_id: locationId });
         if (error || !Array.isArray(data)) throw new Error("collection_venue_pool_unavailable");
-        return (data as { audio_item_id: string }[]).map((row) => row.audio_item_id);
-      }, () => personalCollectionStrict(db, locationId), (selected, admitted) => loadPaidSimilarMix(db, locationId, selected, admitted));
+        const ids = (data as { audio_item_id: string }[]).map((row) => row.audio_item_id);
+        collectionApplied = ids.some((id) => tracks.some((track) => track.audioItemId === id));
+        return ids;
+      }, () => personalCollectionStrict(db, locationId), (selected, _admitted) => loadPaidSimilarMix(db, locationId, selected, general));
       if (pool === "collection_unavailable") return { tracks: [], unavailable: false, collectionUnavailable: true };
-      tracks = pool;
+      tracks = applyClosedCatalogVocalPolicy(pool, collectionApplied);
     } catch { return { tracks: [], unavailable: true }; }
+  } else {
+    tracks = applyClosedCatalogVocalPolicy(tracks, false);
   }
   return { tracks, unavailable: false };
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { isSameOriginJsonRequest } from '@/lib/business-app/spa-player-report';
 import { createClosedBusinessAlbum } from '@/lib/business-track-passports/admin.server';
 import { closedAlbumEditHref } from '@/lib/business-track-passports/create-album';
+import { parseHasVocalsFlag } from '@/lib/business-catalog/vocals';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
   }
   const authorId = typeof body.author_id === 'string' ? body.author_id : '';
   const title = typeof body.title === 'string' ? body.title : '';
+  const hasVocals = parseHasVocalsFlag(body.has_vocals);
   try {
-    const { id, reused } = await createClosedBusinessAlbum(authorId, title);
+    const { id, reused } = await createClosedBusinessAlbum(authorId, title, hasVocals);
     return NextResponse.json({ ok: true, albumId: id, reused, editHref: closedAlbumEditHref(id) }, { status: reused ? 200 : 201, headers: NO_STORE });
   } catch (error) {
     // redirect()/notFound() from the admin guard keep their Next.js behaviour.

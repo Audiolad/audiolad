@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COLLECTION_ACCOUNT_LIMIT, type CollectionTrack } from "@/lib/business-collections/model";
+import { VOCAL_ALBUM_LABEL } from "@/lib/business-catalog/vocals";
 import { COLLECTION_SHARE_PRESETS, collectionShareLabel, normalizeCollectionSharePercent } from "@/lib/business-collections/similar-mix.mjs";
 import { createCollection, revokeCollection, regenerateCollection, saveCollectionShare } from "./actions";
 
@@ -195,8 +196,9 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
       <p>Выбрано: {selected.length} треков. Альбом можно выбрать целиком или раскрыть и выбрать отдельные записи.</p>
       {albums.map(([id, name]) => {
         const rows = tracks.filter((track) => track.albumId === id);
+        const vocal = rows.some((track) => track.hasVocals === true);
         return <fieldset key={id} className="rounded-xl border p-4" disabled={busy}>
-          <legend>{name}</legend>
+          <legend>{name}{vocal ? ` – ${VOCAL_ALBUM_LABEL}` : ""}</legend>
           <label><input type="checkbox" checked={rows.every((track) => selected.includes(track.audioItemId))} onChange={(event) => toggle(rows.map((track) => track.audioItemId), event.target.checked)} /> Весь альбом ({rows.length})</label>
           <details><summary>Выбрать треки</summary>{rows.map((track) => <label key={track.audioItemId} className="block">
             <input type="checkbox" checked={selected.includes(track.audioItemId)} onChange={(event) => toggle([track.audioItemId], event.target.checked)} /> {track.title}

@@ -15,6 +15,7 @@ export type CollectionTrack = {
   albumTitle: string;
   durationSeconds: number | null;
   coverUrl: string;
+  hasVocals?: boolean;
 };
 
 export { resolveCollectionPermission } from "./permissions.mjs";
