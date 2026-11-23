@@ -1,27 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { AdminAnalyticsTimeseriesPoint } from "@/lib/admin/analytics-queries";
 import { formatListeningDuration } from "@/lib/admin/format-listening-time";
 import {
   TIMESERIES_PAD_X,
-  TIMESERIES_PAD_Y,
-  TIMESERIES_PLOT_HEIGHT,
   buildTimeseriesAxisLayout,
 } from "@/lib/admin/timeseries-axis";
+import {
+  TIMESERIES_COUNT_SERIES,
+  type TimeseriesCountSeriesKey,
+  buildTimeseriesMarkers,
+  buildTimeseriesTooltip,
+  measureTimeseriesTooltipBox,
+  nearestTimeseriesIndex,
+  placeTimeseriesTooltipBox,
+  pointerClientToSvgX,
+  timeseriesPlotY,
+} from "@/lib/admin/timeseries-tooltip";
+import AdminAnalyticsTimeseriesTooltip from "@/components/admin/AdminAnalyticsTimeseriesTooltip";
 
-const SERIES = [
-  { key: "visitors", label: "Посетители", color: "#7042c5" },
-  { key: "registrations", label: "Регистрации", color: "#2f7d4a" },
-  { key: "practiceViews", label: "Просмотры", color: "#c47a1a" },
-  { key: "playStarts", label: "Запуски", color: "#3b6fd4" },
-  { key: "listeners", label: "Слушатели", color: "#9b3d8a" },
-  { key: "completions", label: "Дослушивания", color: "#b34f63" },
-  { key: "saves", label: "Сохранения", color: "#4f7c6b" },
-] as const;
+const SERIES = TIMESERIES_COUNT_SERIES;
 
-type SeriesKey = (typeof SERIES)[number]["key"];
+type SeriesKey = TimeseriesCountSeriesKey;
+
+const DEFAULT_ENABLED: Record<SeriesKey, boolean> = {
+  visitors: true,
+  registrations: false,
+  practiceViews: false,
+  playStarts: true,
+  listeners: false,
+  completions: false,
+  saves: false,
+};
 
 export default function AdminAnalyticsTimeseriesChart({
   points,
@@ -34,18 +46,13 @@ export default function AdminAnalyticsTimeseriesChart({
   error: string | null;
   listeningTimeNotice?: string | null;
 }) {
-  const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>({
-    visitors: true,
-    registrations: false,
-    practiceViews: false,
-    playStarts: true,
-    listeners: false,
-    completions: false,
-    saves: false,
-  });
+  const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>(DEFAULT_ENABLED);
   const [listeningEnabled, setListeningEnabled] = useState(true);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [sticky, setSticky] = useState(false);
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
+  const enabledKeys = activeSeries.map((series) => series.key);
 
   const axis = useMemo(
     () =>
@@ -56,14 +63,22 @@ export default function AdminAnalyticsTimeseriesChart({
     [granularity, points],
   );
 
+  const withYear = useMemo(() => {
+    const years = new Set(points.map((point) => point.bucket.slice(0, 4)).filter(Boolean));
+    return years.size > 1;
+  }, [points]);
+
+  const pointsSignature = `${granularity}:${points.length}:${points[0]?.bucket ?? ""}:${points[points.length - 1]?.bucket ?? ""}`;
+
+  useEffect(() => {
+    setActiveIndex(null);
+    setSticky(false);
+  }, [pointsSignature]);
+
   const { max, pathMap } = useMemo(() => {
-    const height = TIMESERIES_PLOT_HEIGHT;
-    const padY = TIMESERIES_PAD_Y;
     const maxValue = Math.max(
       1,
-      ...points.flatMap((point) =>
-        activeSeries.map((series) => point[series.key]),
-      ),
+      ...points.flatMap((point) => activeSeries.map((series) => point[series.key])),
     );
 
     const paths = Object.fromEntries(
@@ -75,10 +90,7 @@ export default function AdminAnalyticsTimeseriesChart({
         const d = points
           .map((point, index) => {
             const x = axis.xAt(index);
-            const y =
-              height -
-              padY -
-              (point[series.key] / maxValue) * (height - padY * 2);
+            const y = timeseriesPlotY(point[series.key], maxValue);
             return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
           })
           .join(" ");
@@ -97,12 +109,9 @@ export default function AdminAnalyticsTimeseriesChart({
       ...samples.filter((value): value is number => value != null),
     );
     if (!listeningEnabled || maxMinutes <= 0) {
-      return { d: "", maxMinutes, titles: [] as Array<{ x: number; y: number; label: string }> };
+      return { d: "", maxMinutes };
     }
 
-    const height = TIMESERIES_PLOT_HEIGHT;
-    const padY = TIMESERIES_PAD_Y;
-    const titles: Array<{ x: number; y: number; label: string }> = [];
     let segmentStart = true;
     const d = samples
       .map((minutes, index) => {
@@ -111,12 +120,7 @@ export default function AdminAnalyticsTimeseriesChart({
           segmentStart = true;
           return "";
         }
-        const y = height - padY - (minutes / maxMinutes) * (height - padY * 2);
-        titles.push({
-          x,
-          y,
-          label: `${points[index]?.bucket}: ${formatListeningDuration(points[index]?.listenedMs ?? 0)}`,
-        });
+        const y = timeseriesPlotY(minutes, maxMinutes);
         const command = `${segmentStart ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
         segmentStart = false;
         return command;
@@ -124,8 +128,92 @@ export default function AdminAnalyticsTimeseriesChart({
       .filter(Boolean)
       .join(" ");
 
-    return { d, maxMinutes, titles };
+    return { d, maxMinutes };
   }, [axis, listeningEnabled, points]);
+
+  const tooltip = useMemo(() => {
+    if (activeIndex == null || activeIndex < 0 || activeIndex >= points.length) {
+      return null;
+    }
+    const point = points[activeIndex];
+    const model = buildTimeseriesTooltip({
+      point,
+      index: activeIndex,
+      granularity,
+      withYear,
+      listeningEnabled,
+      enabledSeries: enabledKeys,
+    });
+    if (!model) {
+      return null;
+    }
+    const x = axis.xAt(activeIndex);
+    const markers = buildTimeseriesMarkers({
+      point,
+      x,
+      listeningEnabled,
+      listeningMaxMinutes: listeningPath.maxMinutes,
+      enabledSeries: enabledKeys,
+      countMax: max,
+    });
+    const box = placeTimeseriesTooltipBox(
+      measureTimeseriesTooltipBox(model),
+      axis.width,
+      axis.height,
+      x,
+      markers.map((marker) => marker.y),
+    );
+    return { model, markers, box, x };
+  }, [
+    activeIndex,
+    axis,
+    enabledKeys,
+    granularity,
+    listeningEnabled,
+    listeningPath.maxMinutes,
+    max,
+    points,
+    withYear,
+  ]);
+
+  function readIndex(event: ReactPointerEvent<SVGSVGElement>): number | null {
+    const svgX = pointerClientToSvgX(event.clientX, event.currentTarget);
+    if (svgX == null) {
+      return null;
+    }
+    return nearestTimeseriesIndex(svgX, axis.xAt, points.length);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    if (sticky) {
+      return;
+    }
+    setActiveIndex(readIndex(event));
+  }
+
+  function onPointerLeave(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "mouse" || sticky) {
+      return;
+    }
+    setActiveIndex(null);
+  }
+
+  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+      return;
+    }
+    const index = readIndex(event);
+    if (index == null) {
+      return;
+    }
+    if (sticky && activeIndex === index) {
+      setSticky(false);
+      setActiveIndex(null);
+      return;
+    }
+    setSticky(true);
+    setActiveIndex(index);
+  }
 
   return (
     <section
@@ -208,6 +296,9 @@ export default function AdminAnalyticsTimeseriesChart({
             role="img"
             aria-label="Динамика показателей"
             data-testid="admin-timeseries-svg"
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
+            onPointerDown={onPointerDown}
           >
             <line
               x1={TIMESERIES_PAD_X}
@@ -246,15 +337,6 @@ export default function AdminAnalyticsTimeseriesChart({
                 strokeLinejoin="round"
               />
             ) : null}
-            {listeningEnabled
-              ? listeningPath.titles.map((title) => (
-                  <g key={`${title.x}-${title.label}`}>
-                    <circle cx={title.x} cy={title.y} r="6" fill="transparent">
-                      <title>{title.label}</title>
-                    </circle>
-                  </g>
-                ))
-              : null}
             <g data-testid="admin-timeseries-x-axis">
               {axis.ticks.map((tick) => (
                 <g key={`${tick.index}-${tick.label}`} data-bucket={points[tick.index]?.bucket}>
@@ -284,6 +366,15 @@ export default function AdminAnalyticsTimeseriesChart({
                 </g>
               ))}
             </g>
+            {tooltip ? (
+              <AdminAnalyticsTimeseriesTooltip
+                model={tooltip.model}
+                box={tooltip.box}
+                anchorX={tooltip.x}
+                axisY={axis.axisY}
+                markers={tooltip.markers}
+              />
+            ) : null}
           </svg>
         </div>
       )}
