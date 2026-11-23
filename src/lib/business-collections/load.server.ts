@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { COLLECTION_ACCOUNT_LIMIT, COLLECTION_COOKIE, COLLECTION_TOKEN, resolveCollectionPermission } from "./model";
+import { chunkIds } from "@/lib/supabase/chunk";
+import { COLLECTION_ACCOUNT_LIMIT, COLLECTION_COOKIE, COLLECTION_TOKEN, COLLECTION_UUID, resolveCollectionPermission } from "./model";
 
 export function collectionTokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -66,6 +67,36 @@ export async function loadCollectionCatalog(collectionId: string | null, trackId
   const { data, error } = await query;
   if (error || !Array.isArray(data)) throw new Error("collection_catalog_unavailable");
   return data as CatalogCollectionTrack[];
+}
+
+export type LinkedCollectionTrack = { audioItemId: string; albumId: string; albumTitle: string };
+
+/**
+ * Album membership of linked collection tracks, ignoring admission.
+ * Admission still applies when adding albums and during playback.
+ */
+export async function loadLinkedCollectionTracks(
+  db: ReturnType<typeof createServiceRoleClient>,
+  audioItemIds: string[],
+): Promise<LinkedCollectionTrack[]> {
+  const unique = [...new Set(audioItemIds.filter((id) => typeof id === "string" && COLLECTION_UUID.test(id)))];
+  const linked: LinkedCollectionTrack[] = [];
+  for (const chunk of chunkIds(unique)) {
+    const rows = await db.from("audio_items")
+      .select("id, practice_id, practices(title)")
+      .in("id", chunk)
+      .order("id", { ascending: true });
+    if (rows.error || !rows.data) throw new Error("collection_linked_tracks_unavailable");
+    for (const row of rows.data) {
+      const albumId = typeof row.practice_id === "string" ? row.practice_id : "";
+      if (!albumId) continue;
+      const practice = Array.isArray(row.practices) ? row.practices[0] : row.practices;
+      const rawTitle = practice && typeof practice === "object" && "title" in practice ? practice.title : null;
+      const albumTitle = typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : "Альбом без названия";
+      linked.push({ audioItemId: row.id as string, albumId, albumTitle });
+    }
+  }
+  return linked;
 }
 
 /** True when this account is already on the link, or the link has fewer than the limit. */

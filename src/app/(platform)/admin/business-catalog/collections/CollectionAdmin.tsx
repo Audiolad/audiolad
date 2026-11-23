@@ -4,9 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COLLECTION_ACCOUNT_LIMIT, type CollectionTrack } from "@/lib/business-collections/model";
 import { COLLECTION_SHARE_PRESETS, collectionShareLabel, normalizeCollectionSharePercent } from "@/lib/business-collections/similar-mix.mjs";
-import { createCollection, revokeCollection, regenerateCollection, saveCollectionShare } from "./actions";
+import {
+  addCollectionAlbum,
+  createCollection,
+  deleteCollection,
+  regenerateCollection,
+  removeCollectionAlbum,
+  revokeCollection,
+  saveCollectionShare,
+} from "./actions";
 
 export type CollectionSimilarTrack = { audioItemId?: string; title: string; albumTitle: string };
+
+export type CollectionAlbum = { albumId: string; albumTitle: string; trackCount: number };
 
 export type CollectionEntry = {
   id: string;
@@ -16,9 +26,15 @@ export type CollectionEntry = {
   usedCount: number | null;
   sharePercent: number;
   similar: CollectionSimilarTrack[];
+  albums: CollectionAlbum[];
 };
 
 type FreshLink = { collectionId: string; title: string; url: string };
+
+type ConfirmState =
+  | { kind: "remove"; id: string; title: string; albumId: string; albumTitle: string }
+  | { kind: "delete"; id: string; title: string }
+  | { kind: "delete-paid"; id: string; title: string; paidVenueCount: number };
 
 function issuedStatus(createdAt: string): string {
   const date = new Date(createdAt);
@@ -84,26 +100,46 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
   const [busy, setBusy] = useState(false);
   const [regenerated, setRegenerated] = useState<string[]>([]);
   const [revoked, setRevoked] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
   const [shareById, setShareById] = useState<Record<string, number>>({});
   const [shareDraft, setShareDraft] = useState<Record<string, string>>({});
-  const albums = [...new Map(tracks.map((track) => [track.albumId, track.albumTitle])).entries()];
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addAlbumId, setAddAlbumId] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const catalogAlbums = [...new Map(tracks.map((track) => [track.albumId, track.albumTitle])).entries()];
   const toggle = (ids: string[], checked: boolean) => setSelected((old) => checked ? [...new Set([...old, ...ids])] : old.filter((id) => !ids.includes(id)));
   const incomingIds = new Set(collections.map((entry) => entry.id));
-  const list = [...created.filter((entry) => !incomingIds.has(entry.id)), ...collections];
+  const list = [...created.filter((entry) => !incomingIds.has(entry.id) && !removed.includes(entry.id)), ...collections.filter((entry) => !removed.includes(entry.id))];
+
+  function albumsOf(entry: CollectionEntry): CollectionAlbum[] {
+    if (entry.albums?.length) return entry.albums;
+    const ids = new Set(tracks.filter((track) => selected.includes(track.audioItemId)).map((track) => track.albumId));
+    return catalogAlbums.filter(([id]) => ids.has(id)).map(([albumId, albumTitle]) => ({
+      albumId, albumTitle, trackCount: tracks.filter((track) => track.albumId === albumId).length,
+    }));
+  }
 
   function resetFeedback() {
     setMessage(null);
     setCopied(false);
     setFresh(null);
+    setConfirm(null);
   }
 
   async function create() {
     const name = title.trim();
     setBusy(true); resetFeedback();
     try {
-      const result = await createCollection({ title: name, tracks: tracks.filter((track) => selected.includes(track.audioItemId)).map((track) => track.audioItemId) });
+      const chosen = tracks.filter((track) => selected.includes(track.audioItemId));
+      const result = await createCollection({ title: name, tracks: chosen.map((track) => track.audioItemId) });
       if (result.ok) {
         if (result.id) {
+          const byAlbum = new Map<string, CollectionAlbum>();
+          for (const track of chosen) {
+            const current = byAlbum.get(track.albumId);
+            if (current) current.trackCount += 1;
+            else byAlbum.set(track.albumId, { albumId: track.albumId, albumTitle: track.albumTitle, trackCount: 1 });
+          }
           const entry: CollectionEntry = {
             id: result.id,
             title: result.title,
@@ -112,6 +148,7 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
             usedCount: 0,
             sharePercent: 50,
             similar: [],
+            albums: [...byAlbum.values()],
           };
           setCreated((old) => [entry, ...old.filter((item) => item.id !== entry.id)]);
         }
@@ -175,6 +212,49 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
     finally { setBusy(false); }
   }
 
+  async function addAlbum(id: string) {
+    if (!addAlbumId) return;
+    setBusy(true); setMessage(null);
+    try {
+      const result = await addCollectionAlbum({ id, albumId: addAlbumId });
+      if (result.ok) {
+        setAddingId(null);
+        setAddAlbumId("");
+        router.refresh();
+      } else setMessage(result.error);
+    } catch { setMessage("Не удалось добавить альбом. Повторите попытку."); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmRemove() {
+    if (!confirm || confirm.kind !== "remove") return;
+    setBusy(true); setMessage(null);
+    try {
+      const result = await removeCollectionAlbum({ id: confirm.id, albumId: confirm.albumId });
+      if (result.ok) {
+        setConfirm(null);
+        router.refresh();
+      } else setMessage(result.error);
+    } catch { setMessage("Не удалось убрать альбом. Повторите попытку."); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmDelete(confirmPaid: boolean) {
+    if (!confirm || (confirm.kind !== "delete" && confirm.kind !== "delete-paid")) return;
+    setBusy(true); setMessage(null);
+    try {
+      const result = await deleteCollection({ id: confirm.id, confirmPaid });
+      if (result.ok) {
+        setRemoved((old) => [...old, confirm.id]);
+        setConfirm(null);
+        router.refresh();
+      } else if ("needsPaidConfirm" in result && result.needsPaidConfirm) {
+        setConfirm({ kind: "delete-paid", id: confirm.id, title: confirm.title, paidVenueCount: result.paidVenueCount });
+      } else setMessage("error" in result ? result.error : "Не удалось удалить подборку. Повторите попытку.");
+    } catch { setMessage("Не удалось удалить подборку. Повторите попытку."); }
+    finally { setBusy(false); }
+  }
+
   function isRevoked(entry: CollectionEntry): boolean {
     return (Boolean(entry.revoked_at) && !regenerated.includes(entry.id)) || revoked.includes(entry.id);
   }
@@ -193,7 +273,7 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
         />
       </label>
       <p>Выбрано: {selected.length} треков. Альбом можно выбрать целиком или раскрыть и выбрать отдельные записи.</p>
-      {albums.map(([id, name]) => {
+      {catalogAlbums.map(([id, name]) => {
         const rows = tracks.filter((track) => track.albumId === id);
         return <fieldset key={id} className="rounded-xl border p-4" disabled={busy}>
           <legend>{name}</legend>
@@ -221,6 +301,10 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
           {list.map((entry) => {
             const revokedNow = isRevoked(entry);
             const linkForRow = fresh?.collectionId === entry.id ? fresh : null;
+            const entryAlbums = albumsOf(entry);
+            const inAlbumIds = new Set(entryAlbums.map((album) => album.albumId));
+            const availableAlbums = catalogAlbums.filter(([albumId]) => !inAlbumIds.has(albumId));
+            const confirmHere = confirm && confirm.id === entry.id ? confirm : null;
             return (
               <li key={entry.id} className="rounded-xl border border-[#eadff8] bg-white p-4">
                 <p className="text-base font-semibold text-[#25135c]">{entry.title}</p>
@@ -228,6 +312,72 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
                 {entry.usedCount !== null ? (
                   <p className="mt-1 text-sm leading-6">Воспользовались: {entry.usedCount} из {COLLECTION_ACCOUNT_LIMIT}</p>
                 ) : null}
+                <div className="mt-3 rounded-lg bg-[#faf6ff] p-3">
+                  <p className="text-sm font-medium text-[#25135c]">Альбомы в подборке</p>
+                  {entryAlbums.length ? (
+                    <ul className="mt-2 space-y-2">
+                      {entryAlbums.map((album) => (
+                        <li key={album.albumId} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0 text-sm leading-6">{album.albumTitle} – {album.trackCount} треков</span>
+                          {revokedNow ? null : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              className="self-start underline"
+                              onClick={() => { setMessage(null); setConfirm({ kind: "remove", id: entry.id, title: entry.title, albumId: album.albumId, albumTitle: album.albumTitle }); }}
+                            >
+                              Убрать
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-sm leading-6 text-[#5f5484]">В подборке пока нет альбомов.</p>
+                  )}
+                  {revokedNow ? (
+                    <p className="mt-2 text-sm leading-6 text-[#5f5484]">Подборка отозвана, альбомы в ней менять нельзя.</p>
+                  ) : addingId === entry.id ? (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <label className="text-sm">Альбом
+                        <select
+                          className="mt-1 w-full min-w-0 rounded border border-[#d9cdef] bg-white p-1.5 sm:mt-0 sm:ml-2 sm:w-auto"
+                          disabled={busy}
+                          value={addAlbumId}
+                          onChange={(event) => setAddAlbumId(event.target.value)}
+                        >
+                          <option value="">Выберите альбом</option>
+                          {availableAlbums.map(([albumId, albumTitle]) => (
+                            <option key={albumId} value={albumId}>{albumTitle}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <button type="button" disabled={busy || !addAlbumId} className="underline self-start" onClick={() => { void addAlbum(entry.id); }}>
+                          Добавить
+                        </button>
+                        <button type="button" disabled={busy} className="underline self-start" onClick={() => { setAddingId(null); setAddAlbumId(""); }}>
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : availableAlbums.length ? (
+                    <button type="button" disabled={busy} className="mt-3 underline" onClick={() => { setAddingId(entry.id); setAddAlbumId(""); setConfirm(null); }}>
+                      Добавить альбом
+                    </button>
+                  ) : (
+                    <p className="mt-2 text-sm leading-6 text-[#5f5484]">Все допущенные альбомы уже в подборке.</p>
+                  )}
+                  {confirmHere?.kind === "remove" ? (
+                    <div role="dialog" aria-label="Подтверждение" className="mt-3 rounded-xl border border-[#c9b4e8] bg-white p-3">
+                      <p className="text-sm leading-6">Убрать альбом «{confirmHere.albumTitle}» из подборки «{confirmHere.title}»? Треки останутся в каталоге, из этой подборки они исчезнут.</p>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <button type="button" disabled={busy} className="underline self-start" onClick={() => { void confirmRemove(); }}>Убрать</button>
+                        <button type="button" disabled={busy} className="underline self-start" onClick={() => setConfirm(null)}>Не убирать</button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <div className="mt-3 rounded-lg bg-[#faf6ff] p-3">
                   <p className="text-sm font-medium text-[#25135c]">Доля подборки после оплаты</p>
                   <p className="mt-1 text-sm leading-6 text-[#5f5484]">
@@ -305,7 +455,32 @@ export default function CollectionAdmin({ tracks, collections }: { tracks: Colle
                   <button type="button" disabled={busy} className="underline" onClick={() => { void regenerate(entry.id, entry.title); }}>
                     Перевыпустить ссылку
                   </button>
+                  <button type="button" disabled={busy} className="underline" onClick={() => { setMessage(null); setAddingId(null); setConfirm({ kind: "delete", id: entry.id, title: entry.title }); }}>
+                    Удалить подборку
+                  </button>
                 </div>
+                {confirmHere?.kind === "delete" ? (
+                  <div role="dialog" aria-label="Подтверждение удаления" className="mt-3 rounded-xl border border-[#c9b4e8] bg-[#faf6ff] p-3">
+                    <p className="text-sm leading-6">Удалить подборку «{confirmHere.title}»? Исчезнут только сама подборка, её ссылка и связи с кабинетами. Треки, альбомы, заведения и оплаты не удаляются.</p>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button type="button" disabled={busy} className="underline self-start" onClick={() => { void confirmDelete(false); }}>Удалить подборку</button>
+                      <button type="button" disabled={busy} className="underline self-start" onClick={() => setConfirm(null)}>Не удалять</button>
+                    </div>
+                  </div>
+                ) : null}
+                {confirmHere?.kind === "delete-paid" ? (
+                  <div role="dialog" aria-label="Повторное подтверждение удаления" className="mt-3 rounded-xl border border-[#c45c5c] bg-[#fff6f6] p-3">
+                    <p className="text-sm leading-6">
+                      {confirmHere.paidVenueCount > 1
+                        ? `У заведений, которые пользуются этой подборкой, есть оплаченный период. Если удалить подборку, они потеряют основу из подборки и перейдут на общий каталог. Удалить подборку «${confirmHere.title}»?`
+                        : `У заведения, которое пользуется этой подборкой, есть оплаченный период. Если удалить подборку, оно потеряет основу из подборки и перейдёт на общий каталог. Удалить подборку «${confirmHere.title}»?`}
+                    </p>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button type="button" disabled={busy} className="underline self-start" onClick={() => { void confirmDelete(true); }}>Удалить подборку</button>
+                      <button type="button" disabled={busy} className="underline self-start" onClick={() => setConfirm(null)}>Не удалять</button>
+                    </div>
+                  </div>
+                ) : null}
                 {linkForRow ? <LinkBox fresh={linkForRow} copied={copied} onCopy={() => { void copyLink(); }} /> : null}
               </li>
             );
