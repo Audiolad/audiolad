@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { AdminAnalyticsTimeseriesPoint } from "@/lib/admin/analytics-queries";
 import { formatListeningDuration } from "@/lib/admin/format-listening-time";
@@ -48,8 +48,11 @@ export default function AdminAnalyticsTimeseriesChart({
 }) {
   const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>(DEFAULT_ENABLED);
   const [listeningEnabled, setListeningEnabled] = useState(true);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [sticky, setSticky] = useState(false);
+  const [hover, setHover] = useState<{
+    index: number;
+    sticky: boolean;
+    signature: string;
+  } | null>(null);
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
   const enabledKeys = activeSeries.map((series) => series.key);
@@ -69,11 +72,9 @@ export default function AdminAnalyticsTimeseriesChart({
   }, [points]);
 
   const pointsSignature = `${granularity}:${points.length}:${points[0]?.bucket ?? ""}:${points[points.length - 1]?.bucket ?? ""}`;
-
-  useEffect(() => {
-    setActiveIndex(null);
-    setSticky(false);
-  }, [pointsSignature]);
+  const activeIndex =
+    hover && hover.signature === pointsSignature ? hover.index : null;
+  const sticky = Boolean(hover && hover.signature === pointsSignature && hover.sticky);
 
   const { max, pathMap } = useMemo(() => {
     const maxValue = Math.max(
@@ -188,14 +189,15 @@ export default function AdminAnalyticsTimeseriesChart({
     if (sticky) {
       return;
     }
-    setActiveIndex(readIndex(event));
+    const index = readIndex(event);
+    setHover(index == null ? null : { index, sticky: false, signature: pointsSignature });
   }
 
   function onPointerLeave(event: ReactPointerEvent<SVGSVGElement>) {
     if (event.pointerType !== "mouse" || sticky) {
       return;
     }
-    setActiveIndex(null);
+    setHover(null);
   }
 
   function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -207,12 +209,10 @@ export default function AdminAnalyticsTimeseriesChart({
       return;
     }
     if (sticky && activeIndex === index) {
-      setSticky(false);
-      setActiveIndex(null);
+      setHover(null);
       return;
     }
-    setSticky(true);
-    setActiveIndex(index);
+    setHover({ index, sticky: true, signature: pointsSignature });
   }
 
   return (
