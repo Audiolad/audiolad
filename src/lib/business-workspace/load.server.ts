@@ -390,10 +390,14 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[], spaceI
       .select("id, title, duration_seconds, practices(title, author_id, business_only, business_has_vocals, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
       .in("id", chunk);
     if (joined.error || !Array.isArray(joined.data)) {
-      const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
+      const plain = await db.from("audio_items").select("id, title, duration_seconds, business_has_vocals").in("id", chunk);
       if (plain.error || !Array.isArray(plain.data)) return null;
-      for (const row of plain.data as { id: string; title: string | null; duration_seconds: number | null }[]) {
-        const track = workspaceTrackWithDisplayTitle(plainTrack(row.id, row.title, row.duration_seconds));
+      for (const row of plain.data as { id: string; title: string | null; duration_seconds: number | null; business_has_vocals?: boolean | null }[]) {
+        if (typeof row.business_has_vocals !== "boolean") return null;
+        const track = workspaceTrackWithDisplayTitle({
+          ...plainTrack(row.id, row.title, row.duration_seconds),
+          hasVocals: row.business_has_vocals === true,
+        });
         if (track) byId.set(row.id, track);
       }
       continue;
