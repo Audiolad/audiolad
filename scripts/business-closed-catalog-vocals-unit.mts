@@ -38,6 +38,7 @@ assert.match(migration, /admin_create_business_album\(/);
 assert.match(migration, /p_has_vocals boolean DEFAULT false/);
 assert.match(migration, /admin_set_business_album_has_vocals/);
 assert.match(migration, /sync_audio_item_business_has_vocals/);
+assert.match(migration, /WHERE id = NEW\.practice_id\s+FOR SHARE/);
 assert.match(migration, /propagate_practice_business_has_vocals/);
 assert.doesNotMatch(migration.split('CREATE FUNCTION')[0], /UPDATE public\.(practices|audio_items)/, 'migration has no backfill UPDATE');
 assert.doesNotMatch(migration.replace(/--[^\n]*/g, ''), /\bvocal_role\b/);

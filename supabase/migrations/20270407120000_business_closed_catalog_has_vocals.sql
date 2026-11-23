@@ -38,10 +38,12 @@ BEGIN
     NEW.business_has_vocals := false;
     RETURN NEW;
   END IF;
+  -- Serialize with a concurrent album-flag toggle so a new track cannot commit a stale copy.
   SELECT CASE WHEN business_only THEN business_has_vocals ELSE false END
     INTO v_flag
     FROM public.practices
-   WHERE id = NEW.practice_id;
+   WHERE id = NEW.practice_id
+   FOR SHARE;
   NEW.business_has_vocals := coalesce(v_flag, false);
   RETURN NEW;
 END;
