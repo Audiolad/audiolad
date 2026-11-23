@@ -75,6 +75,10 @@ import { studioRenderExportErrorMessage } from "@/lib/studio/render/ffmpeg-stall
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
+  aggregateStudioAssetUploadProgress,
+  formatStudioAssetUploadLabel,
+} from "@/lib/studio/upload-progress-label";
+import {
   isDesktopEnvironment,
   isInAppBrowser,
   isStandaloneMode,
@@ -617,6 +621,7 @@ export default function StudioEditorShell({
     replaceTrackAudio,
     ingestCatalogAsset,
     retryTrackAssetUpload,
+    assetUploadProgress,
     restoreEditingState,
     seek,
     seekRelative,
@@ -769,15 +774,22 @@ export default function StudioEditorShell({
     return () => controller?.dispose();
   }, []);
 
+  const audioUploadActive = tracks.some(
+    (track) =>
+      track.assetPersistenceStatus === "pending" ||
+      track.assetPersistenceStatus === "uploading",
+  );
+  const shouldWarnBeforeLeaving = Boolean(autosaveState?.canWarnBeforeUnload) || audioUploadActive;
+
   useEffect(() => {
-    if (!autosaveState?.canWarnBeforeUnload) return;
+    if (!shouldWarnBeforeLeaving) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [autosaveState?.canWarnBeforeUnload]);
+  }, [shouldWarnBeforeLeaving]);
 
   useEffect(() => {
     const projectId = persistedHydration?.project.id;
@@ -1581,7 +1593,7 @@ export default function StudioEditorShell({
                   {track.assetPersistenceStatus === "pending"
                     ? "Ожидает сохранения"
                     : track.assetPersistenceStatus === "uploading"
-                      ? "Сохранение аудио…"
+                      ? formatStudioAssetUploadLabel(assetUploadProgress[track.id])
                       : track.assetPersistenceStatus === "saved"
                         ? "Аудио сохранено"
                         : "Не удалось сохранить аудио"}
@@ -1839,12 +1851,16 @@ export default function StudioEditorShell({
 
   const guardNavigation = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (
-      autosaveState?.canWarnBeforeUnload &&
-      !window.confirm("Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.")
+      shouldWarnBeforeLeaving &&
+      !window.confirm(
+        audioUploadActive
+          ? "Аудио ещё загружается. Если выйти сейчас, загрузка прервётся."
+          : "Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.",
+      )
     ) {
       event.preventDefault();
     }
-  }, [autosaveState?.canWarnBeforeUnload]);
+  }, [audioUploadActive, shouldWarnBeforeLeaving]);
 
   useEffect(() => {
     if (!mobileOverflowOpen) {
@@ -1901,12 +1917,15 @@ export default function StudioEditorShell({
     }
   }, [router]);
 
+  const overallUploadLabel = formatStudioAssetUploadLabel(
+    aggregateStudioAssetUploadProgress(Object.values(assetUploadProgress)),
+  );
   const autosaveMessage = autosaveState?.status === "partial-disabled"
     ? "Проект открыт не полностью. Сохранение отключено."
     : autosaveState?.status === "conflict"
       ? "Проект изменён в другой вкладке. Обновите страницу, чтобы продолжить."
       : autosaveState?.status === "asset-uploading"
-        ? "Сохранение аудио…"
+        ? overallUploadLabel
         : autosaveState?.status === "error"
           ? "Ошибка сохранения"
           : autosaveState?.isInFlight
@@ -1950,7 +1969,7 @@ export default function StudioEditorShell({
         : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь";
   const createMp3Label = exportPhase === "flushing"
     ? (assetUploadInProgress || autosaveState?.status === "asset-uploading"
-      ? "Сохранение аудио…"
+      ? overallUploadLabel
       : "Сохраняем проект…")
     : renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ||
         exportPhase === "queuing"

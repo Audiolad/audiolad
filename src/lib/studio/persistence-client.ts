@@ -1,6 +1,15 @@
 "use client";
 
 import { canonicalizeStudioUploadMimeType } from "./recording-mime";
+import {
+  STUDIO_RESUMABLE_MIN_BYTES,
+  forgetStudioResumableUpload,
+  isStudioAbortError,
+  isStudioResumableUploadError,
+  uploadStudioFileResumable,
+  type StudioResumableProgress,
+  type StudioResumableUploadOptions,
+} from "./resumable-upload";
 
 import { STUDIO_ASSETS_BUCKET } from "@/lib/studio/limits";
 
@@ -45,7 +54,8 @@ export type StudioPersistenceClientErrorCode =
   | "invalid_catalog_audio_item"
   | "rate_limited"
   | "server_error"
-  | "network_error";
+  | "network_error"
+  | "upload_interrupted";
 
 const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   asset_too_large: "Размер одной дорожки превышает лимит Studio — 300 МБ.",
@@ -73,6 +83,8 @@ const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   rate_limited: "Слишком много попыток. Подождите немного и попробуйте снова.",
   server_error: "Сервер не смог сохранить аудио. Попробуйте ещё раз.",
   network_error: "Не удалось связаться с сервером. Проверьте подключение и повторите.",
+  upload_interrupted:
+    "Связь с сервером прервалась, загрузка приостановлена. Нажмите «Повторить» – продолжим с того же места.",
 };
 
 export class StudioPersistenceClientError extends Error {
@@ -619,6 +631,118 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+export type StudioAssetUploadProgress = {
+  phase: "uploading" | "reconnecting" | "finalizing";
+  uploadedBytes: number;
+  totalBytes: number;
+  percent: number;
+  retryInSeconds: number | null;
+};
+
+export type StudioAssetUploadProgressHandler = (progress: StudioAssetUploadProgress) => void;
+
+type StudioResumableTestOverrides = Partial<
+  Pick<
+    StudioResumableUploadOptions,
+    "transport" | "sleep" | "waitForOnline" | "retryDelaysMs" | "store" | "chunkBytes"
+  >
+>;
+
+let studioResumableTestOverrides: StudioResumableTestOverrides | null = null;
+
+/** Test hook: route resumable uploads through a fake transport/timers. */
+export function setStudioResumableUploadTestOverrides(overrides: StudioResumableTestOverrides | null) {
+  studioResumableTestOverrides = overrides;
+}
+
+function toAssetProgress(progress: StudioResumableProgress): StudioAssetUploadProgress {
+  return {
+    phase: progress.phase,
+    uploadedBytes: progress.uploadedBytes,
+    totalBytes: progress.totalBytes,
+    // 100% only after the server has checked the file (finalize).
+    percent: Math.min(99, progress.percent),
+    retryInSeconds:
+      progress.retryInMs == null ? null : Math.max(0, Math.ceil(progress.retryInMs / 1000)),
+  };
+}
+
+function reportFinalizing(file: Blob, onProgress?: StudioAssetUploadProgressHandler) {
+  onProgress?.({
+    phase: "finalizing",
+    uploadedBytes: file.size,
+    totalBytes: file.size,
+    percent: 99,
+    retryInSeconds: null,
+  });
+}
+
+/**
+ * Sends the file bytes for a signed Studio upload. Files of one chunk or more
+ * go through resumable TUS (chunks, resume, auto-retry); small files and
+ * servers without TUS keep the single signed PUT.
+ */
+async function transferFileToSignedUpload(
+  signedUpload: StudioSignedUpload,
+  file: Blob,
+  contentType: string,
+  signal?: AbortSignal,
+  onProgress?: StudioAssetUploadProgressHandler,
+) {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  if (base && file.size >= STUDIO_RESUMABLE_MIN_BYTES) {
+    try {
+      await uploadStudioFileResumable({
+        supabaseUrl: base,
+        bucket: STUDIO_ASSETS_BUCKET,
+        signedUpload,
+        file,
+        contentType,
+        signal,
+        ...(studioResumableTestOverrides ?? {}),
+        onProgress: onProgress ? (progress) => onProgress(toAssetProgress(progress)) : undefined,
+      });
+      reportFinalizing(file, onProgress);
+      return;
+    } catch (error) {
+      if (isStudioAbortError(error) || signal?.aborted) throw error;
+      if (!isStudioResumableUploadError(error)) throw error;
+      if (error.kind === "already_exists") {
+        // A previous attempt already stored the object; finalize verifies it.
+        reportFinalizing(file, onProgress);
+        return;
+      }
+      if (error.kind === "network") {
+        throw new StudioPersistenceClientError("upload_interrupted", error.status ?? undefined);
+      }
+      if (error.kind === "too_large") {
+        throw new StudioPersistenceClientError("asset_too_large", 413);
+      }
+      if (error.kind === "rejected") {
+        throw new StudioPersistenceClientError("server_error", error.status ?? undefined);
+      }
+      // "unsupported": fall back to the single PUT below.
+    }
+  }
+  onProgress?.({
+    phase: "uploading",
+    uploadedBytes: 0,
+    totalBytes: file.size,
+    percent: 0,
+    retryInSeconds: null,
+  });
+  await putFileToSignedUpload(signedUpload, file, contentType, signal);
+  reportFinalizing(file, onProgress);
+}
+
+function forgetSignedUpload(signedUpload: StudioSignedUpload) {
+  forgetStudioResumableUpload(
+    STUDIO_ASSETS_BUCKET,
+    signedUpload.path.replace(/^\/+/, ""),
+    studioResumableTestOverrides?.store,
+  );
+}
+
 async function putFileToSignedUpload(
   signedUpload: StudioSignedUpload,
   file: Blob,
@@ -698,19 +822,121 @@ export async function abandonStudioProjectAssetReplacement({
   ).catch(() => undefined);
 }
 
+const ASSET_RESUME_PREFIX = "audiolad:studio-asset-resume:v1:";
+const ASSET_RESUME_TTL_MS = 100 * 60 * 1000;
+const activeResumableAssetIds = new Set<string>();
+
+function assetResumeStore(): Pick<Storage, "getItem" | "setItem" | "removeItem"> | null {
+  if (studioResumableTestOverrides?.store !== undefined) return studioResumableTestOverrides.store;
+  try {
+    return typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function assetResumeKey(projectId: string, file: File, sourceType: StudioAssetSourceType): string {
+  return [
+    ASSET_RESUME_PREFIX,
+    projectId,
+    sourceType,
+    String(file.size),
+    String(file.lastModified),
+    encodeURIComponent(file.name).slice(0, 300),
+  ].join(":");
+}
+
+function readAssetResume(projectId: string, file: File, sourceType: StudioAssetSourceType): string | null {
+  const store = assetResumeStore();
+  if (!store) return null;
+  const key = assetResumeKey(projectId, file, sourceType);
+  try {
+    const raw = store.getItem(key);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as { assetId?: unknown; savedAt?: unknown };
+    if (
+      typeof value.assetId !== "string" ||
+      !/^[0-9a-f-]{36}$/i.test(value.assetId) ||
+      typeof value.savedAt !== "number" ||
+      Date.now() - value.savedAt > ASSET_RESUME_TTL_MS
+    ) {
+      store.removeItem(key);
+      return null;
+    }
+    return value.assetId;
+  } catch {
+    return null;
+  }
+}
+
+function writeAssetResume(projectId: string, file: File, sourceType: StudioAssetSourceType, assetId: string) {
+  if (file.size < STUDIO_RESUMABLE_MIN_BYTES) return;
+  try {
+    assetResumeStore()?.setItem(
+      assetResumeKey(projectId, file, sourceType),
+      JSON.stringify({ assetId, savedAt: Date.now() }),
+    );
+  } catch {
+    // Resume after reload is best effort.
+  }
+}
+
+function forgetAssetResume(projectId: string, file: File, sourceType: StudioAssetSourceType) {
+  try {
+    assetResumeStore()?.removeItem(assetResumeKey(projectId, file, sourceType));
+  } catch {
+    // ignore
+  }
+}
+
+function isConnectionError(error: unknown): boolean {
+  return (
+    error instanceof StudioPersistenceClientError &&
+    (error.code === "network_error" || error.code === "upload_interrupted")
+  );
+}
+
 export async function uploadStudioProjectAsset({
   projectId,
   file,
   sourceType,
   signal,
   onReserved,
+  onProgress,
 }: {
   projectId: string;
   file: File;
   sourceType: StudioAssetSourceType;
   signal?: AbortSignal;
   onReserved?: (assetId: string) => void;
+  onProgress?: StudioAssetUploadProgressHandler;
 }): Promise<StudioUploadedAsset> {
+  if (file.size >= STUDIO_RESUMABLE_MIN_BYTES && sourceType !== "catalog") {
+    // Same file picked again (e.g. after a page reload): continue the
+    // unfinished upload of the asset reserved for it instead of restarting.
+    const resumeAssetId = readAssetResume(projectId, file, sourceType);
+    if (resumeAssetId && !activeResumableAssetIds.has(resumeAssetId)) {
+      onReserved?.(resumeAssetId);
+      try {
+        const resumed = await retryStudioProjectAssetUpload({
+          projectId,
+          assetId: resumeAssetId,
+          file,
+          signal,
+          onProgress,
+          resumeSourceType: sourceType,
+        });
+        forgetAssetResume(projectId, file, sourceType);
+        return resumed;
+      } catch (error) {
+        if (isStudioAbortError(error) || signal?.aborted) throw error;
+        if (isConnectionError(error)) throw error;
+        // The old reservation is gone or unusable: start a fresh one.
+        forgetAssetResume(projectId, file, sourceType);
+      }
+    }
+  }
+
   const reserveResponse = await studioFetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}/assets`,
     {
@@ -746,19 +972,34 @@ export async function uploadStudioProjectAsset({
   }
 
   const assetId = reserved.asset.id;
+  const signedUpload = reserved.signedUpload;
   onReserved?.(assetId);
+  writeAssetResume(projectId, file, sourceType, assetId);
+  activeResumableAssetIds.add(assetId);
   try {
-    await putFileToSignedUpload(reserved.signedUpload, file, reserved.asset.mimeType, signal);
-  } catch (error) {
-    if (isAbortError(error) || signal?.aborted) {
-      await abandonStudioProjectAssetUpload({ projectId, assetId });
+    try {
+      await transferFileToSignedUpload(signedUpload, file, reserved.asset.mimeType, signal, onProgress);
+    } catch (error) {
+      if (isStudioAbortError(error) || signal?.aborted) {
+        forgetAssetResume(projectId, file, sourceType);
+        forgetSignedUpload(signedUpload);
+        await abandonStudioProjectAssetUpload({ projectId, assetId });
+        throw error;
+      }
+      const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+      if (ready) {
+        forgetAssetResume(projectId, file, sourceType);
+        return ready;
+      }
+      if (!isConnectionError(error)) forgetAssetResume(projectId, file, sourceType);
       throw error;
     }
-    const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
-    if (ready) return ready;
-    throw error;
+    const finalized = await finalizeStudioAsset(projectId, assetId, signal);
+    forgetAssetResume(projectId, file, sourceType);
+    return finalized;
+  } finally {
+    activeResumableAssetIds.delete(assetId);
   }
-  return await finalizeStudioAsset(projectId, assetId, signal);
 }
 
 export async function retryStudioProjectAssetUpload({
@@ -766,46 +1007,76 @@ export async function retryStudioProjectAssetUpload({
   assetId,
   file,
   signal,
+  onProgress,
+  resumeSourceType,
 }: {
   projectId: string;
   assetId: string;
   file: File;
   signal?: AbortSignal;
+  onProgress?: StudioAssetUploadProgressHandler;
+  /** Set when resuming a reservation remembered for this file. */
+  resumeSourceType?: StudioAssetSourceType;
 }): Promise<StudioUploadedAsset> {
-  const retryResponse = await studioFetch(
-    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/retry`,
-    { method: "POST", signal },
-  );
-  if (!retryResponse.ok) {
-    throw await toStudioFetchError(retryResponse);
-  }
-  let retried: unknown;
+  activeResumableAssetIds.add(assetId);
   try {
-    retried = await retryResponse.json();
-  } catch {
-    throw new StudioPersistenceClientError("server_error", retryResponse.status);
-  }
-  if (!retried || typeof retried !== "object") {
-    throw new StudioPersistenceClientError("server_error", retryResponse.status);
-  }
-  if ("alreadyUploaded" in retried && retried.alreadyUploaded === true) {
-    return await finalizeStudioAsset(projectId, assetId, signal);
-  }
-  if (!("signedUpload" in retried) || !isSignedUpload(retried.signedUpload)) {
-    throw new StudioPersistenceClientError("server_error", retryResponse.status);
-  }
-  try {
-    await putFileToSignedUpload(retried.signedUpload, file, canonicalizeStudioUploadMimeType(file), signal);
-  } catch (error) {
-    if (isAbortError(error) || signal?.aborted) {
-      await abandonStudioProjectAssetUpload({ projectId, assetId });
+    const retryResponse = await studioFetch(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/retry`,
+      { method: "POST", signal },
+    );
+    if (!retryResponse.ok) {
+      throw await toStudioFetchError(retryResponse);
+    }
+    let retried: unknown;
+    try {
+      retried = await retryResponse.json();
+    } catch {
+      throw new StudioPersistenceClientError("server_error", retryResponse.status);
+    }
+    if (!retried || typeof retried !== "object") {
+      throw new StudioPersistenceClientError("server_error", retryResponse.status);
+    }
+    if (resumeSourceType && "asset" in retried && isUploadedAsset(retried.asset)) {
+      const asset = retried.asset;
+      if (
+        asset.sizeBytes !== file.size ||
+        asset.sourceType !== resumeSourceType
+      ) {
+        // Not the reservation for this file: do not resume into it.
+        throw new StudioPersistenceClientError("invalid_upload", 409);
+      }
+    }
+    if ("alreadyUploaded" in retried && retried.alreadyUploaded === true) {
+      reportFinalizing(file, onProgress);
+      return await finalizeStudioAsset(projectId, assetId, signal);
+    }
+    if (!("signedUpload" in retried) || !isSignedUpload(retried.signedUpload)) {
+      throw new StudioPersistenceClientError("server_error", retryResponse.status);
+    }
+    const signedUpload = retried.signedUpload;
+    try {
+      await transferFileToSignedUpload(
+        signedUpload,
+        file,
+        canonicalizeStudioUploadMimeType(file),
+        signal,
+        onProgress,
+      );
+    } catch (error) {
+      if (isStudioAbortError(error) || signal?.aborted) {
+        if (resumeSourceType) forgetAssetResume(projectId, file, resumeSourceType);
+        forgetSignedUpload(signedUpload);
+        await abandonStudioProjectAssetUpload({ projectId, assetId });
+        throw error;
+      }
+      const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+      if (ready) return ready;
       throw error;
     }
-    const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
-    if (ready) return ready;
-    throw error;
+    return await finalizeStudioAsset(projectId, assetId, signal);
+  } finally {
+    activeResumableAssetIds.delete(assetId);
   }
-  return await finalizeStudioAsset(projectId, assetId, signal);
 }
 
 export async function replaceStudioProjectAsset({
@@ -813,11 +1084,13 @@ export async function replaceStudioProjectAsset({
   assetId,
   file,
   signal,
+  onProgress,
 }: {
   projectId: string;
   assetId: string;
   file: File;
   signal?: AbortSignal;
+  onProgress?: StudioAssetUploadProgressHandler;
 }): Promise<StudioUploadedAsset> {
   const reserveResponse = await studioFetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
@@ -849,8 +1122,15 @@ export async function replaceStudioProjectAsset({
   ) {
     throw new StudioPersistenceClientError("server_error", reserveResponse.status);
   }
+  const signedUpload = reserved.signedUpload;
   try {
-    await putFileToSignedUpload(reserved.signedUpload, file, canonicalizeStudioUploadMimeType(file), signal);
+    await transferFileToSignedUpload(
+      signedUpload,
+      file,
+      canonicalizeStudioUploadMimeType(file),
+      signal,
+      onProgress,
+    );
     const finalizeResponse = await studioFetch(
       `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
       { method: "POST", signal },
@@ -860,6 +1140,7 @@ export async function replaceStudioProjectAsset({
     }
     return await readAssetResponse(finalizeResponse);
   } catch (error) {
+    forgetSignedUpload(signedUpload);
     if (!isAbortError(error) && !signal?.aborted) {
       const finalizeResponse = await studioFetch(
         `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
