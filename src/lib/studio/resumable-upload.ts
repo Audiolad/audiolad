@@ -18,6 +18,8 @@ export const STUDIO_RESUMABLE_RETRY_DELAYS_MS: readonly number[] = [
 ];
 /** A chunk with no upload progress for this long is aborted and retried. */
 export const STUDIO_RESUMABLE_STALL_TIMEOUT_MS = 60_000;
+/** POST/HEAD without any answer for this long are aborted and retried. */
+export const STUDIO_RESUMABLE_REQUEST_TIMEOUT_MS = 30_000;
 /** Stored upload URLs older than this are ignored (signed tokens live 2 h). */
 export const STUDIO_RESUMABLE_STORE_TTL_MS = 100 * 60 * 1000;
 
@@ -95,6 +97,7 @@ export type StudioResumableUploadOptions = {
   chunkBytes?: number;
   retryDelaysMs?: readonly number[];
   stallTimeoutMs?: number;
+  requestTimeoutMs?: number;
 };
 
 type StoredUpload = { id: string; size: number; savedAt: number };
@@ -345,16 +348,31 @@ function xhrTransport(request: StudioTusRequest): Promise<StudioTusResponse> {
 
 async function fetchTransport(request: StudioTusRequest): Promise<StudioTusResponse> {
   let response: Response;
+  const controller = new AbortController();
+  let timedOut = false;
+  const onAbort = () => controller.abort();
+  request.signal.addEventListener("abort", onAbort, { once: true });
+  const timer = request.stallTimeoutMs
+    ? setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, request.stallTimeoutMs)
+    : null;
   try {
     response = await fetch(request.url, {
       method: request.method,
       headers: request.headers,
       body: request.body,
-      signal: request.signal,
+      signal: controller.signal,
     });
   } catch (error) {
-    if (isStudioAbortError(error) || request.signal.aborted) throw abortError();
+    if (request.signal.aborted) throw abortError();
+    if (timedOut) throw new StudioTusNetworkError("stalled");
+    if (isStudioAbortError(error)) throw abortError();
     throw new StudioTusNetworkError("network");
+  } finally {
+    if (timer) clearTimeout(timer);
+    request.signal.removeEventListener("abort", onAbort);
   }
   if (request.body) request.onUploadProgress?.(request.body.size);
   // Drain so keep-alive sockets are reused.
@@ -396,6 +414,7 @@ export async function uploadStudioFileResumable(
   const chunkBytes = Math.max(1, options.chunkBytes ?? STUDIO_RESUMABLE_CHUNK_BYTES);
   const retryDelays = options.retryDelaysMs ?? STUDIO_RESUMABLE_RETRY_DELAYS_MS;
   const stallTimeoutMs = options.stallTimeoutMs ?? STUDIO_RESUMABLE_STALL_TIMEOUT_MS;
+  const requestTimeoutMs = options.requestTimeoutMs ?? STUDIO_RESUMABLE_REQUEST_TIMEOUT_MS;
   const signal = options.signal ?? new AbortController().signal;
   const { file, bucket } = options;
   const path = options.signedUpload.path.replace(/^\/+/, "");
@@ -452,6 +471,7 @@ export async function uploadStudioFileResumable(
         "x-upsert": "false",
       },
       signal,
+      stallTimeoutMs: requestTimeoutMs,
     });
     if (response.status === 201) {
       const id = studioTusUploadIdFromLocation(response.header("Location"));
@@ -477,6 +497,7 @@ export async function uploadStudioFileResumable(
       url: studioTusUploadUrl(options.supabaseUrl, id),
       headers: baseHeaders(),
       signal,
+      stallTimeoutMs: requestTimeoutMs,
     });
     if (response.status === 200 || response.status === 204) {
       const serverOffset = readOffset(response);

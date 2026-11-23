@@ -781,7 +781,17 @@ async function finalizeStudioAsset(
 async function reconcileAfterAmbiguousPut(
   projectId: string,
   assetId: string,
+  uploadError?: unknown,
 ): Promise<StudioUploadedAsset | null> {
+  if (uploadError !== undefined && isConnectionError(uploadError)) {
+    // Keep the "paused, will resume" error when the server is still unreachable.
+    try {
+      return await reconcileAfterAmbiguousPut(projectId, assetId);
+    } catch (error) {
+      if (isConnectionError(error)) return null;
+      throw error;
+    }
+  }
   const finalizeResponse = await studioFetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/finalize`,
     { method: "POST" },
@@ -986,7 +996,7 @@ export async function uploadStudioProjectAsset({
         await abandonStudioProjectAssetUpload({ projectId, assetId });
         throw error;
       }
-      const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+      const ready = await reconcileAfterAmbiguousPut(projectId, assetId, error);
       if (ready) {
         forgetAssetResume(projectId, file, sourceType);
         return ready;
@@ -1069,7 +1079,7 @@ export async function retryStudioProjectAssetUpload({
         await abandonStudioProjectAssetUpload({ projectId, assetId });
         throw error;
       }
-      const ready = await reconcileAfterAmbiguousPut(projectId, assetId);
+      const ready = await reconcileAfterAmbiguousPut(projectId, assetId, error);
       if (ready) return ready;
       throw error;
     }
@@ -1140,12 +1150,22 @@ export async function replaceStudioProjectAsset({
     }
     return await readAssetResponse(finalizeResponse);
   } catch (error) {
+    // The server re-reserves a replacement on a new path on every call, so a
+    // replacement cannot be resumed across calls: within this call TUS already
+    // retried with backoff. Forget the TUS id and release the reservation.
     forgetSignedUpload(signedUpload);
     if (!isAbortError(error) && !signal?.aborted) {
-      const finalizeResponse = await studioFetch(
-        `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
-        { method: "POST" },
-      );
+      let finalizeResponse: Response;
+      try {
+        finalizeResponse = await studioFetch(
+          `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
+          { method: "POST" },
+        );
+      } catch (finalizeError) {
+        if (!isConnectionError(finalizeError)) throw finalizeError;
+        await abandonStudioProjectAssetReplacement({ projectId, assetId });
+        throw error;
+      }
       if (finalizeResponse.ok) {
         return await readAssetResponse(finalizeResponse);
       }

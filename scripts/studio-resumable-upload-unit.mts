@@ -6,6 +6,7 @@ import {
   StudioResumableUploadError,
   StudioTusNetworkError,
   buildStudioTusMetadata,
+  defaultStudioTusTransport,
   studioTusUploadIdFromLocation,
   uploadStudioFileResumable,
   type StudioResumableProgress,
@@ -342,6 +343,64 @@ for (const [status, kind] of [[404, "unsupported"], [413, "too_large"], [400, "r
   assert.equal(server.requests.filter((r) => r.method === "PATCH").length, 1);
 }
 
+// 8b. POST/HEAD carry a timeout; a hung HEAD is aborted and retried, not stuck forever.
+{
+  const store = new MemoryStore();
+  store.setItem(
+    `audiolad:studio-tus:v1:${BUCKET}/${signedUpload.path}`,
+    JSON.stringify({ id: UPLOAD_ID, size: 41, savedAt: Date.now() }),
+  );
+  const { server, transport } = fakeTusServer();
+  server.exists = true;
+  server.length = 41;
+  let hung = 0;
+  const seenTimeouts: Array<[string, number | undefined]> = [];
+  await uploadStudioFileResumable({
+    supabaseUrl: BASE, bucket: BUCKET, signedUpload, file, contentType: "audio/mp4",
+    store, sleep, waitForOnline: online, chunkBytes: 100, requestTimeoutMs: 20,
+    transport: async (request) => {
+      seenTimeouts.push([request.method, request.stallTimeoutMs]);
+      if (request.method === "HEAD" && hung++ === 0) {
+        // Simulate a request that never answers: the transport's own timeout fires.
+        assert.equal(request.stallTimeoutMs, 20);
+        throw new StudioTusNetworkError("stalled");
+      }
+      return transport(request);
+    },
+  });
+  assert.equal(server.offset, 41);
+  assert(seenTimeouts.filter(([m]) => m === "HEAD").every(([, t]) => t === 20));
+  assert(seenTimeouts.filter(([m]) => m === "PATCH").every(([, t]) => typeof t === "number" && t > 0));
+}
+
+// 8c. The fetch transport enforces the timeout itself.
+{
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = ((_url: string | URL | Request, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    })) as typeof fetch;
+  try {
+    const transport = defaultStudioTusTransport();
+    await assert.rejects(
+      transport({
+        method: "HEAD",
+        url: `${BASE}/x`,
+        headers: {},
+        signal: new AbortController().signal,
+        stallTimeoutMs: 30,
+      }),
+      (error: unknown) => error instanceof Error && error.name === "StudioTusNetworkError",
+    );
+    const controller = new AbortController();
+    const pending = transport({ method: "HEAD", url: `${BASE}/x`, headers: {}, signal: controller.signal, stallTimeoutMs: 5_000 });
+    controller.abort();
+    await assert.rejects(pending, (error: unknown) => error instanceof Error && error.name === "AbortError");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
 // 9. Labels: Russian, en dash only.
 {
   assert.equal(formatStudioAssetUploadLabel(null), "Сохранение аудио…");
@@ -438,6 +497,20 @@ for (const [status, kind] of [[404, "unsupported"], [413, "too_large"], [400, "r
     const interrupted = new StudioPersistenceClientError("upload_interrupted").message;
     assert(interrupted.includes("–") && !interrupted.includes("\u2014"));
     assert(progress.includes("reconnecting"));
+    // Server still unreachable during the reconcile finalize: keep upload_interrupted.
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/finalize")) throw new TypeError("Failed to fetch");
+      return savedFetch(url, init);
+    }) as typeof fetch;
+    try {
+      await assert.rejects(
+        uploadStudioProjectAsset({ projectId, file: big, sourceType: "upload" }),
+        (error: unknown) => error instanceof StudioPersistenceClientError && error.code === "upload_interrupted",
+      );
+    } finally {
+      globalThis.fetch = savedFetch;
+    }
     assert(!calls.some((c) => c.includes("/storage/v1/object/upload/sign/")), "large file does not use single PUT");
     // Page reload: same file picked again -> resume the same reservation, no new reserve.
     tusMode = "ok";
