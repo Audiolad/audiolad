@@ -12,6 +12,7 @@ import { assertNoForbiddenGiftText, visibleLines } from "./business-gift-copy-gu
 import { formatMoscowDateTime } from "../src/lib/access-grants/policy";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
+import { businessEarlyPayCarryoverNote } from "../src/lib/business/subscription-period";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-home-signals";
 
@@ -80,7 +81,11 @@ for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostic
   } else assert.match(html, /Нет данных о плеерах/);
 }
 assert.doesNotMatch(render(), /data-testid="biz-home-access"/, "no trial card without a live or ended period");
-const trialEnds = "2026-11-22T14:11:37.762Z";
+// Keep the live-trial fixture in the future so the early-pay carryover note stays visible.
+const trialEnds = new Date(Date.now() + 3 * 86_400_000).toISOString();
+const endedTrialAt = "2026-11-22T14:11:37.762Z";
+const earlyPayNote = businessEarlyPayCarryoverNote({ mode: "trial", endsAt: trialEnds });
+assert.ok(earlyPayNote, "live trial must still show the early-pay carryover note");
 const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string | null }) => renderToStaticMarkup(
   <AppRouterContext.Provider value={fakeRouter}>
     <BusinessDomainProvider value={context}>
@@ -122,8 +127,7 @@ assert.deepEqual(visibleLines(trialCard), [
   "Оплата по договору:",
   BUSINESS_OFFER_TITLE,
   `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Принят один раз для всего аккаунта.`,
-  // t1313u: early-pay stack note (trialEnds 2026-11-22 + 30d → 22 декабря 2026 МСК)
-  "Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 22 декабря 2026.",
+  earlyPayNote,
   "Оплатить",
 ]);
 // Every «Оплатить» links exactly the accepted edition.
@@ -165,7 +169,7 @@ const paidHome = withAccess({ mode: "paid", endsAt: "2026-12-31T10:00:00.000Z" }
 assert.match(paidHome, /data-mode="paid"/);
 assert.match(stepOf(paidHome, "pay"), /data-done="true"/);
 assert.ok(paidHome.includes(`Подписка до ${formatMoscowDateTime(new Date("2026-12-31T10:00:00.000Z"))}`));
-const endedHome = withAccess({ mode: "offer", endsAt: trialEnds });
+const endedHome = withAccess({ mode: "offer", endsAt: endedTrialAt });
 assert.match(endedHome, /id="dostup"/);
 assert.match(endedHome, /Подарочный период закончился/);
 assert.match(endedHome, new RegExp(formatBusinessMonthlyPrice().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(" ", "\\s")));

@@ -45,6 +45,8 @@ type GuestPlayback = {
   flush: (keepalive?: boolean) => Promise<void>;
   atmosphere: GuestCoffeeAtmosphere | null;
   setAtmosphere: (value: GuestCoffeeAtmosphere | null) => void;
+  /** Cover/title for every track of the assembled atmosphere, used to cap cover preload. */
+  barTracks: GuestBarTracks | null;
   /** The music page draws its own bar while mounted; the shell draws it everywhere else. */
   attachStudio: () => () => void;
   setBarMeta: (tracks: GuestBarTracks | null) => void;
@@ -58,8 +60,12 @@ function isLimit(value: unknown): value is GuestCoffeeLimitState {
 
 const GuestPlaybackContext = createContext<GuestPlayback | null>(null);
 
+export function useBusinessGuestPlaybackOptional(): GuestPlayback | null {
+  return useContext(GuestPlaybackContext);
+}
+
 export function useBusinessGuestPlayback(): GuestPlayback {
-  const value = useContext(GuestPlaybackContext);
+  const value = useBusinessGuestPlaybackOptional();
   if (!value) throw new Error("BusinessGuestPlaybackProvider missing");
   return value;
 }
@@ -238,8 +244,8 @@ export function BusinessGuestPlaybackProvider({ children, initialLimit = "ok" }:
 
   const value = useMemo<GuestPlayback>(() => ({
     audioRef, ctlRef, fadeRef, view, clock, volume, setVolume, seek, barDismissed, setBarDismissed, dismiss,
-    limit, seedLimit, flush, atmosphere, setAtmosphere, attachStudio, setBarMeta,
-  }), [view, clock, volume, setVolume, seek, barDismissed, dismiss, limit, seedLimit, flush, atmosphere, attachStudio]);
+    limit, seedLimit, flush, atmosphere, setAtmosphere, barTracks, attachStudio, setBarMeta,
+  }), [view, clock, volume, setVolume, seek, barDismissed, dismiss, limit, seedLimit, flush, atmosphere, barTracks, attachStudio]);
 
   const status = view.status;
   const barMeta: GuestBarMeta | null = barTracks && view.current

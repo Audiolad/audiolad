@@ -113,8 +113,12 @@ mock('../src/lib/business-workspace/load.server.ts', {
   loadWorkspaceActor: async () => actor,
   loadWorkspaceAllowedIds: async () => allowed,
 });
+const allowedCache = require('../src/lib/business-workspace/allowed-ids-cache.ts') as typeof import('../src/lib/business-workspace/allowed-ids-cache');
 const ws = require('../src/app/api/business/workspace/cover/route.ts') as typeof import('../src/app/api/business/workspace/cover/route');
-const wsGet = () => ws.GET(new Request(`https://audiolad.ru${routeUrl}`));
+const wsGet = () => {
+  allowedCache.resetWorkspaceAllowedIdsCacheForTests();
+  return ws.GET(new Request(`https://audiolad.ru${routeUrl}`));
+};
 const hall = { ok: true, device: true, playerOpen: true, locationId: 'loc', space: { id: 'cafe', enabled: true } };
 
 rows = { audio_items: { practice_id: ALBUM, practices: { business_only: true, cover_url: REF } } }; // a valid closed cover exists

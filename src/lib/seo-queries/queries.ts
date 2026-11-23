@@ -3,6 +3,7 @@ import "server-only";
 import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
 
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import { chunkIds } from "@/lib/supabase/chunk";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -149,20 +150,28 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
       now,
     ),
   );
-  const productIds = allReservations
-    .map((item) => item.product_id)
-    .filter((id): id is string => Boolean(id));
-  const { data: products, error: productError } = productIds.length
-    ? await supabase
-        .from("practices")
-        .select("business_only, id, title, status, moderation_status")
-        .eq(BUSINESS_ONLY_COLUMN, false)
-        .in("id", productIds)
-    : { data: [], error: null };
-  if (productError) throw new Error("seo_query_products_load_failed");
+  const productIds = [
+    ...new Set(
+      allReservations
+        .map((item) => item.product_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  // Unchunked PostgREST `.in(id, …)` over all reservation product IDs
+  // exceeds the URI length limit (HTTP 414 in production). Chunk UUIDs.
+  const products = [];
+  for (const chunk of chunkIds(productIds)) {
+    const { data, error: productError } = await supabase
+      .from("practices")
+      .select("business_only, id, title, status, moderation_status")
+      .eq(BUSINESS_ONLY_COLUMN, false)
+      .in("id", chunk);
+    if (productError) throw new Error("seo_query_products_load_failed");
+    products.push(...(data ?? []));
+  }
 
   const reservationByQuery = new Map(allReservations.map((item) => [item.query_id, item]));
-  const productById = new Map((products ?? []).map((item) => [item.id as string, item]));
+  const productById = new Map(products.map((item) => [item.id as string, item]));
   const occupancyByQueryId = await loadPublishedSeoOccupancyForQueries(
     supabase,
     (queries ?? []).map((row) => ({
