@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { useBusinessGuestPlaybackOptional } from "@/components/business-app/sound/BusinessGuestPlayback";
 import { useCabinetPlayerOptional } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import {
   scheduleCabinetCoverPreload,
@@ -14,16 +15,27 @@ import {
  * on every tab change; the tab-lifetime cache keeps those four instant on return.
  * Starts after the track is playing, otherwise after a short idle, so covers
  * never jump the queue ahead of audio and UI requests.
+ * The guest coffee demo uses BusinessGuestPlayback (not the cabinet player);
+ * an empty allowed set must not open the floodgates.
  */
 export default function CabinetCoverPreloader() {
   const player = useCabinetPlayerOptional();
-  const tracks = player?.accessModel?.tracks;
-  const index = player?.view.index ?? 0;
-  const order = player?.queueOrder ?? null;
-  const playing = player?.view.status === "playing";
+  const guest = useBusinessGuestPlaybackOptional();
+  const cabinetTracks = player?.accessModel?.tracks;
+  const useCabinet = (cabinetTracks?.length ?? 0) > 0;
+  const guestAtmosphere = guest?.atmosphere;
+  const guestBarTracks = guest?.barTracks;
+  const index = useCabinet ? (player?.view.index ?? 0) : Math.max(0, guest?.view.index ?? 0);
+  const order = useCabinet ? (player?.queueOrder ?? null) : null;
+  const playing = (useCabinet ? player?.view.status : guest?.view.status) === "playing";
 
   useEffect(() => {
-    const urls = selectCabinetCoverPreloadUrls(tracks ?? [], index, order);
+    const tracks = useCabinet
+      ? (cabinetTracks ?? [])
+      : (guestAtmosphere?.tracks ?? []).map((track) => ({
+          coverUrl: guestBarTracks?.get(track.audioItemId)?.coverSrc ?? null,
+        }));
+    const urls = selectCabinetCoverPreloadUrls(tracks, index, order);
     const apply = () => {
       setCabinetCoverPreloadSet(urls);
     };
@@ -32,7 +44,7 @@ export default function CabinetCoverPreloader() {
       return;
     }
     return scheduleCabinetCoverPreload(apply);
-  }, [tracks, index, order, playing]);
+  }, [useCabinet, cabinetTracks, guestAtmosphere, guestBarTracks, index, order, playing]);
 
   return null;
 }

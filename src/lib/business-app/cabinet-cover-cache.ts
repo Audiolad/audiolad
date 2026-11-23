@@ -90,8 +90,7 @@ function remember(url: string, blob: Blob) {
 function pump() {
   while (inflight.size < CABINET_COVER_MAX_CONCURRENT && queue.length > 0) {
     const url = queue.shift();
-    if (!url || blobs.has(url) || inflight.has(url)) continue;
-    if (desired.size > 0 && !desired.has(url)) continue;
+    if (!url || blobs.has(url) || inflight.has(url) || !desired.has(url)) continue;
     startFetch(url);
   }
 }
@@ -126,14 +125,14 @@ function startFetch(url: string) {
 }
 
 function enqueue(url: string) {
-  if (!url || blobs.has(url) || inflight.has(url) || queue.includes(url)) return;
+  if (!url || blobs.has(url) || inflight.has(url) || queue.includes(url) || !desired.has(url)) return;
   queue.push(url);
   pump();
 }
 
 export function preloadCabinetCover(src: string | null | undefined): Promise<void> {
   const url = src?.trim() ?? "";
-  if (!url || blobs.has(url)) return Promise.resolve();
+  if (!url || blobs.has(url) || !desired.has(url)) return Promise.resolve();
   const pending = inflight.get(url);
   if (pending) return pending.promise;
   if (typeof window === "undefined" || typeof fetch !== "function" || typeof URL.createObjectURL !== "function") {
@@ -147,7 +146,7 @@ export function preloadCabinetCover(src: string | null | undefined): Promise<voi
         now.promise.then(resolve, resolve);
         return;
       }
-      if (blobs.has(url) || (desired.size > 0 && !desired.has(url) && !queue.includes(url))) {
+      if (blobs.has(url) || !desired.has(url) || (!queue.includes(url) && !inflight.has(url))) {
         resolve();
         return;
       }

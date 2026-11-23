@@ -114,17 +114,58 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 assert.ok(cache.cabinetCoverInflightCountForTests() <= cache.CABINET_COVER_MAX_CONCURRENT);
 assert.ok(fetchLog.length <= 4);
 
-// Drain and fill the LRU past the cap: evicted blob URLs are revoked.
+// Drain and fill the LRU past the cap through successive 4-cover windows.
+// An empty allowed set must not open the floodgate, so we only fetch the current window.
 cache.resetCabinetCoverCacheForTests();
 fetchLog.length = 0;
 gates.length = 0;
-const many = Array.from({ length: cache.CABINET_COVER_CACHE_LIMIT + 2 }, (_, i) => `https://cdn.example/covers/n${i}.webp`);
-for (const url of many) void cache.preloadCabinetCover(url);
+void cache.preloadCabinetCover("https://cdn.example/covers/outside-empty.webp");
 await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 0, "an empty allowed set denies cover loads");
+assert.equal(cache.cabinetCoverInflightCountForTests(), 0);
+
+const guestAtmosphere = Array.from({ length: 12 }, (_, i) => ({
+  coverUrl: `https://cdn.example/covers/guest-${i}.webp`,
+}));
+const guestWindow = cache.selectCabinetCoverPreloadUrls(guestAtmosphere, 0, null);
+assert.deepEqual(
+  guestWindow,
+  [
+    "https://cdn.example/covers/guest-0.webp",
+    "https://cdn.example/covers/guest-1.webp",
+    "https://cdn.example/covers/guest-2.webp",
+    "https://cdn.example/covers/guest-3.webp",
+  ],
+  "guest atmosphere warms only the current track and the next three",
+);
+const guestSet = cache.setCabinetCoverPreloadSet(guestWindow);
+assert.equal(guestSet.length, 4);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 4);
+for (const track of guestAtmosphere.slice(4)) {
+  void cache.preloadCabinetCover(track.coverUrl);
+}
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 4, "covers outside the guest 4-cover window are not loaded");
+assert.ok(fetchLog.every((entry) => guestWindow.includes(entry.url)));
 while (gates.length > 0) {
   const batch = gates.splice(0, gates.length);
   for (const gate of batch) gate.open();
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+cache.resetCabinetCoverCacheForTests();
+fetchLog.length = 0;
+gates.length = 0;
+const many = Array.from({ length: cache.CABINET_COVER_CACHE_LIMIT + 2 }, (_, i) => `https://cdn.example/covers/n${i}.webp`);
+for (let offset = 0; offset < many.length; offset += cache.CABINET_COVER_PRELOAD_LIMIT) {
+  cache.setCabinetCoverPreloadSet(many.slice(offset, offset + cache.CABINET_COVER_PRELOAD_LIMIT));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  while (gates.length > 0) {
+    const batch = gates.splice(0, gates.length);
+    for (const gate of batch) gate.open();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
 assert.equal(cache.cabinetCoverCacheSizeForTests(), cache.CABINET_COVER_CACHE_LIMIT);
 assert.ok(revoked.length >= 2);
@@ -156,9 +197,14 @@ assert.match(image, /isCabinetCoverCached\(src\) \? resolveCabinetCoverSrc\(src\
 assert.match(image, /subscribeCabinetCoverCache/);
 assert.match(image, /if \(!current\) return null/, "uncached covers do not start a raw <img> fetch outside the cap");
 assert.match(image, /scheduleCabinetCoverPreload/);
+const cacheSource = read("src/lib/business-app/cabinet-cover-cache.ts");
+const guestPlayback = read("src/components/business-app/sound/BusinessGuestPlayback.tsx");
 assert.match(preloader, /selectCabinetCoverPreloadUrls/);
 assert.match(preloader, /setCabinetCoverPreloadSet/);
 assert.match(preloader, /scheduleCabinetCoverPreload/);
+assert.match(preloader, /useBusinessGuestPlaybackOptional/);
+assert.match(guestPlayback, /export function useBusinessGuestPlaybackOptional/);
+assert.doesNotMatch(cacheSource, /desired\.size > 0/, "an empty allowed set must deny loads, not open the floodgate");
 assert.doesNotMatch(preloader, /preloadCabinetCovers/);
 assert.doesNotMatch(preloader, /tracks\.map\(\(track\) => cabinetAlbumCoverUrl/);
 assert.match(shell, /<CabinetCoverPreloader \/>/);
