@@ -306,6 +306,7 @@ function TimeseriesPlotBody({
       type: "move",
       index,
       signature: pointsSignature,
+      pointerType: event.pointerType,
     }));
   }
 

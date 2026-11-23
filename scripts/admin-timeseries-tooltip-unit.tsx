@@ -305,6 +305,15 @@ hover = reduceTimeseriesHover(hover, { type: "move", index: 3, signature: sigA }
 assert.equal(hover?.index, 1, "a sticky tap ignores later mouse moves");
 hover = reduceTimeseriesHover(hover, { type: "tap", index: 1, signature: sigA });
 assert.equal(hover, null, "a second tap on the same point hides the tooltip");
+hover = reduceTimeseriesHover(hover, {
+  type: "move",
+  index: 1,
+  signature: sigA,
+  pointerType: "touch",
+});
+assert.equal(hover, null, "a touch move after the second tap must not revive the tooltip");
+hover = reduceTimeseriesHover(hover, { type: "leave-mouse" });
+assert.equal(hover, null);
 
 // 9. A filter change that keeps the same date range still changes the signature.
 const weekPoints = week.map((bucket, index) => point(bucket, [180, 205, 160, 140, 175, 200, 503][index]));

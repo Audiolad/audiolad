@@ -338,7 +338,7 @@ export type TimeseriesHover = {
 };
 
 export type TimeseriesHoverEvent =
-  | { type: "move"; index: number | null; signature: string }
+  | { type: "move"; index: number | null; signature: string; pointerType?: string }
   | { type: "leave-mouse" }
   | { type: "tap"; index: number; signature: string }
   | { type: "reset" };
@@ -355,6 +355,10 @@ export function reduceTimeseriesHover(
     return null;
   }
   if (event.type === "move") {
+    // Touch/pen moves must not revive a tooltip after a second tap (or during a tap).
+    if (event.pointerType && event.pointerType !== "mouse") {
+      return hover;
+    }
     if (hover?.sticky && hover.signature === event.signature) {
       return hover;
     }
