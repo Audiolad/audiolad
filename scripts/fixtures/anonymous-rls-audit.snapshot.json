@@ -6756,6 +6756,11 @@
       "statement": "GRANT EXECUTE ON FUNCTION public.business_offer_acceptance_for_caller() TO authenticated, service_role;"
     },
     {
+      "file": "supabase/migrations/20270406120000_business_personal_collection_delete_grants.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.remove_business_personal_collection_album(uuid, uuid) TO service_role;"
+    },
+    {
       "file": "supabase/migrations/20270407120000_business_closed_catalog_has_vocals.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.admin_create_business_album(uuid, text, boolean) TO authenticated;"
