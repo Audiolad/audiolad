@@ -17,6 +17,7 @@ import {
 import {
   TIMESERIES_EN_DASH,
   TIMESERIES_LISTENING_SERIES,
+  buildTimeseriesListeningPath,
   buildTimeseriesMarkers,
   buildTimeseriesTooltip,
   formatTimeseriesCount,
@@ -68,6 +69,7 @@ assert.equal(formatTimeseriesTooltipDate("2026-12-29", "week", true), "неде�
 assert.equal(formatTimeseriesListeningValue(12 * 3_600_000 + 30 * 60_000), "12 ч 30 мин");
 assert.equal(formatTimeseriesListeningValue(12 * 3_600_000 + 30 * 60_000), formatListeningDuration(12 * 3_600_000 + 30 * 60_000));
 assert.equal(formatTimeseriesListeningValue(5 * 60_000 + 4_000), "5 мин 4 сек");
+assert.equal(formatTimeseriesListeningValue(0), "0 мин 0 сек");
 assert.equal(formatTimeseriesListeningValue(null), "нет данных");
 assert.equal(formatTimeseriesListeningValue(Number.NaN), "нет данных");
 assert.equal(formatTimeseriesCount(503), "503");
@@ -216,6 +218,46 @@ assert.deepEqual(
   noListeningMarker.map((marker) => marker.key),
   ["visitors"],
 );
+
+// Measured zeros over the whole period still show «0 мин 0 сек» and a baseline marker.
+const zeroListeningPoint = point("2026-11-22", 10, { listenedMs: 0, listenedMinutes: 0 });
+const zeroListeningTooltip = buildTimeseriesTooltip({
+  point: zeroListeningPoint,
+  index: 6,
+  granularity: "day",
+  listeningEnabled: true,
+  enabledSeries: [],
+});
+assert.ok(zeroListeningTooltip);
+assert.equal(zeroListeningTooltip.lines[0].value, "0 мин 0 сек");
+const zeroListeningMarkers = buildTimeseriesMarkers({
+  point: zeroListeningPoint,
+  x: layout.xAt(6),
+  listeningEnabled: true,
+  listeningMaxMinutes: 0,
+  enabledSeries: [],
+  countMax: 1,
+});
+assert.deepEqual(
+  zeroListeningMarkers.map((marker) => marker.key),
+  ["listening"],
+);
+assert.equal(zeroListeningMarkers[0].y, timeseriesPlotY(0, 0));
+assert.equal(zeroListeningMarkers[0].x, layout.xAt(6));
+
+const zeroListeningPath = buildTimeseriesListeningPath(
+  [0, 0, 0],
+  (index) => layout.xAt(index),
+);
+assert.equal(zeroListeningPath.maxMinutes, 0);
+assert.match(zeroListeningPath.d, /^M/);
+assert.match(zeroListeningPath.d, new RegExp(`,${timeseriesPlotY(0, 0).toFixed(1)}`));
+const missingListeningPath = buildTimeseriesListeningPath(
+  [null, null],
+  (index) => layout.xAt(index),
+);
+assert.equal(missingListeningPath.d, "");
+assert.equal(missingListeningPath.maxMinutes, 0);
 
 // 6. Tooltip box stays inside the chart and does not cover active markers.
 const measured = measureTimeseriesTooltipBox(visitorsOnly!);

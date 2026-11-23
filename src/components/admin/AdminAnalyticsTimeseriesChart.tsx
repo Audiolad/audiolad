@@ -11,6 +11,7 @@ import {
 import {
   TIMESERIES_COUNT_SERIES,
   type TimeseriesCountSeriesKey,
+  buildTimeseriesListeningPath,
   buildTimeseriesMarkers,
   buildTimeseriesTooltip,
   measureTimeseriesTooltipBox,
@@ -99,32 +100,14 @@ export default function AdminAnalyticsTimeseriesChart({
   }, [activeSeries, axis, points]);
 
   const listeningPath = useMemo(() => {
-    const samples = points.map((point) => point.listenedMinutes);
-    const maxMinutes = Math.max(
-      0,
-      ...samples.filter((value): value is number => value != null),
+    const computed = buildTimeseriesListeningPath(
+      points.map((point) => point.listenedMinutes),
+      axis.xAt,
     );
-    if (!listeningEnabled || maxMinutes <= 0) {
-      return { d: "", maxMinutes };
+    if (!listeningEnabled) {
+      return { d: "", maxMinutes: computed.maxMinutes };
     }
-
-    let segmentStart = true;
-    const d = samples
-      .map((minutes, index) => {
-        const x = axis.xAt(index);
-        if (minutes == null) {
-          segmentStart = true;
-          return "";
-        }
-        const y = timeseriesPlotY(minutes, maxMinutes);
-        const command = `${segmentStart ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-        segmentStart = false;
-        return command;
-      })
-      .filter(Boolean)
-      .join(" ");
-
-    return { d, maxMinutes };
+    return computed;
   }, [axis, listeningEnabled, points]);
 
   return (

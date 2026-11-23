@@ -198,11 +198,10 @@ export function buildTimeseriesMarkers(options: {
 }): TimeseriesMarker[] {
   const markers: TimeseriesMarker[] = [];
 
-  if (
-    options.listeningEnabled &&
-    options.point.listenedMinutes != null &&
-    options.listeningMaxMinutes > 0
-  ) {
+  // A measured zero still gets a marker even when the period max is 0;
+  // timeseriesPlotY already falls back to a unit scale and sits on the baseline.
+  // A missing sample (listenedMinutes == null) still has no listening marker.
+  if (options.listeningEnabled && options.point.listenedMinutes != null) {
     markers.push({
       key: TIMESERIES_LISTENING_SERIES.key,
       x: options.x,
@@ -224,6 +223,35 @@ export function buildTimeseriesMarkers(options: {
   }
 
   return markers;
+}
+
+export function buildTimeseriesListeningPath(
+  samples: readonly (number | null)[],
+  xAt: (index: number) => number,
+): { d: string; maxMinutes: number } {
+  const measured = samples.filter((value): value is number => value != null);
+  const maxMinutes = measured.length === 0 ? 0 : Math.max(0, ...measured);
+  if (measured.length === 0) {
+    return { d: "", maxMinutes };
+  }
+
+  let segmentStart = true;
+  const d = samples
+    .map((minutes, index) => {
+      const x = xAt(index);
+      if (minutes == null) {
+        segmentStart = true;
+        return "";
+      }
+      const y = timeseriesPlotY(minutes, maxMinutes);
+      const command = `${segmentStart ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      segmentStart = false;
+      return command;
+    })
+    .filter(Boolean)
+    .join(" ");
+
+  return { d, maxMinutes };
 }
 
 export function measureTimeseriesTooltipBox(
