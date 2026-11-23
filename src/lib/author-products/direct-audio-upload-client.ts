@@ -143,8 +143,8 @@ type ResumeSession = {
  * resumes from the confirmed offset. Tokens never leave this map.
  */
 const resumeSessions = new Map<string, ResumeSession>();
-/** Audio ids with an upload in progress in this tab. */
-const activeUploadAudioIds = new Set<string>();
+/** Audio ids with an upload in progress in this tab (value: its signal). */
+const activeUploadAudioIds = new Map<string, { signal?: AbortSignal }>();
 
 type ResumableTestOverrides = Partial<
   Pick<
@@ -211,7 +211,8 @@ async function discardOtherSessions(input: {
 
 /** True while this tab uploads audio for the given item. */
 export function isAuthorAudioUploadActive(audioId: string): boolean {
-  return activeUploadAudioIds.has(audioId);
+  const running = activeUploadAudioIds.get(audioId);
+  return Boolean(running && !running.signal?.aborted);
 }
 
 /** True when a repeat with the same file would continue an interrupted upload. */
@@ -364,7 +365,9 @@ export async function uploadAuthorProductAudioDirect(input: {
     };
   }
 
-  if (activeUploadAudioIds.has(input.audioId)) {
+  const running = activeUploadAudioIds.get(input.audioId);
+  // An aborted upload (cancel, replaced file) no longer blocks a new one.
+  if (running && !running.signal?.aborted) {
     return {
       ok: false,
       error: "upload_in_progress",
@@ -372,11 +375,14 @@ export async function uploadAuthorProductAudioDirect(input: {
       status: 409,
     };
   }
-  activeUploadAudioIds.add(input.audioId);
+  const entry = { signal: input.signal };
+  activeUploadAudioIds.set(input.audioId, entry);
   try {
     return await uploadWithSession(input);
   } finally {
-    activeUploadAudioIds.delete(input.audioId);
+    if (activeUploadAudioIds.get(input.audioId) === entry) {
+      activeUploadAudioIds.delete(input.audioId);
+    }
   }
 }
 
@@ -396,20 +402,27 @@ async function uploadWithSession(input: {
 
   let session = resumeSessions.get(key) ?? null;
   if (!session) {
-    const startResponse = await fetch(
-      `/api/author/products/${input.practiceId}/audio/${input.audioId}/upload/start`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          file_name: input.file.name,
-          file_size: input.file.size,
-          mime_type: input.file.type,
-        }),
-        signal: input.signal,
-      },
-    );
-    const started = await readJson<StartPayload>(startResponse);
+    let startResponse: Response;
+    let started: StartPayload | null;
+    try {
+      startResponse = await fetch(
+        `/api/author/products/${input.practiceId}/audio/${input.audioId}/upload/start`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_name: input.file.name,
+            file_size: input.file.size,
+            mime_type: input.file.type,
+          }),
+          signal: input.signal,
+        },
+      );
+      started = await readJson<StartPayload>(startResponse);
+    } catch (error) {
+      if (isStudioAbortError(error) || input.signal?.aborted) throw error;
+      return { ok: false, error: AUTHOR_AUDIO_UPLOAD_NETWORK, status: 0 };
+    }
     if (
       !startResponse.ok ||
       !started?.upload_path ||

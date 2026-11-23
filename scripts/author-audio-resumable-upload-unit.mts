@@ -269,6 +269,29 @@ function setup(failPatches?: Set<number>, retryDelaysMs: number[] = [1, 1], part
   setAuthorAudioResumableUploadTestOverrides(null);
 }
 
+// 6a. An aborted upload does not block the next one for the same audio.
+{
+  setup();
+  const controller = new AbortController();
+  const first = uploadAuthorProductAudioDirect({ practiceId: PRACTICE, audioId: AUDIO, file: makeFile("x.mp3"), signal: controller.signal });
+  controller.abort();
+  const second = await uploadAuthorProductAudioDirect({ practiceId: PRACTICE, audioId: AUDIO, file: makeFile("y.mp3", 3000) });
+  await first.catch(() => null);
+  assert.equal(second.ok, true);
+  setAuthorAudioResumableUploadTestOverrides(null);
+}
+
+// 6b. Network error on /upload/start resolves (never rejects) as upload_network.
+{
+  setup();
+  globalThis.fetch = (async () => {
+    throw new TypeError("Failed to fetch");
+  }) as typeof fetch;
+  const result = await uploadAuthorProductAudioDirect({ practiceId: PRACTICE, audioId: AUDIO, file: makeFile() });
+  assert.equal(!result.ok && result.error, "upload_network");
+  setAuthorAudioResumableUploadTestOverrides(null);
+}
+
 // 7. Russian labels, en dash only.
 const labels = [
   formatAuthorAudioUploadLabel(null),
@@ -295,6 +318,7 @@ assert.match(builder, /formatAuthorAudioUploadLabel/);
 assert.match(builder, /COURSE_BUILDER_AUDIO_RETRY_LABEL/);
 assert.match(builder, /beforeunload/);
 assert.match(builder, /AUTHOR_AUDIO_UPLOAD_INTERRUPTED/);
+assert.match(builder, /catch \{\s*result = \{ ok: false, error: AUTHOR_AUDIO_UPLOAD_NETWORK/);
 const form = await readFile("src/components/author-dashboard/AuthorProductForm.tsx", "utf8");
 assert.match(form, /onProgress: setUploadingAudioProgress/);
 

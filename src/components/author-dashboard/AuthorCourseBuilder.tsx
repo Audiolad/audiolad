@@ -34,6 +34,7 @@ import {
 } from "@/lib/author-products/course-builder-shared";
 import {
   AUTHOR_AUDIO_UPLOAD_INTERRUPTED,
+  AUTHOR_AUDIO_UPLOAD_NETWORK,
   uploadAuthorProductAudioDirect,
   type AuthorAudioUploadProgress,
 } from "@/lib/author-products/direct-audio-upload-client";
@@ -216,18 +217,23 @@ export default function AuthorCourseBuilder({
         [block.id]: { status: "uploading", progress: null },
       }));
 
-      const result = await uploadAuthorProductAudioDirect({
-        practiceId,
-        audioId,
-        file,
-        onProgress: (progress) => {
-          setAudioUploads((current) =>
-            current[block.id]?.status === "uploading"
-              ? { ...current, [block.id]: { status: "uploading", progress } }
-              : current,
-          );
-        },
-      });
+      let result: Awaited<ReturnType<typeof uploadAuthorProductAudioDirect>>;
+      try {
+        result = await uploadAuthorProductAudioDirect({
+          practiceId,
+          audioId,
+          file,
+          onProgress: (progress) => {
+            setAudioUploads((current) =>
+              current[block.id]?.status === "uploading"
+                ? { ...current, [block.id]: { status: "uploading", progress } }
+                : current,
+            );
+          },
+        });
+      } catch {
+        result = { ok: false, error: AUTHOR_AUDIO_UPLOAD_NETWORK, status: 0 };
+      }
 
       if (!result.ok) {
         setAudioUploads((current) => ({
