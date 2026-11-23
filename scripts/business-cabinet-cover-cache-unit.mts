@@ -1,4 +1,4 @@
-// t1647u: cabinet covers stay in a tab-lifetime cache so a music-tab remount paints immediately.
+// t1654u: at most four cabinet covers preload at once; remount still paints from the tab cache.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
@@ -20,62 +20,163 @@ URL.revokeObjectURL = ((url: string) => {
   revoked.push(url);
 }) as typeof URL.revokeObjectURL;
 
-const bodies = new Map<string, Uint8Array>([
-  ["/api/business/workspace/cover?space=cafe&track=aaa", new Uint8Array([1, 2, 3])],
-  ["https://cdn.example/practice-covers/album/xs.webp", new Uint8Array([4, 5, 6, 7])],
-]);
-
-globalThis.fetch = (async (input: RequestInfo | URL) => {
-  const url = String(input);
-  const body = bodies.get(url);
-  if (!body) return new Response(null, { status: 404 });
-  return new Response(Buffer.from(body), { status: 200, headers: { "Content-Type": "image/webp" } });
-}) as typeof fetch;
-
-// preload() is a browser helper; Node unit tests get a stub window.
 (globalThis as unknown as { window: unknown }).window = globalThis;
+
+type Gate = { url: string; open: (body?: Uint8Array) => void; fail: () => void };
+const gates: Gate[] = [];
+const fetchLog: { url: string; priority: string | undefined }[] = [];
+
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = String(input);
+  fetchLog.push({ url, priority: (init as { priority?: string } | undefined)?.priority });
+  return new Promise<Response>((resolve, reject) => {
+    const onAbort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    init?.signal?.addEventListener("abort", onAbort);
+    gates.push({
+      url,
+      open: (body = new Uint8Array([1, 2, 3])) => {
+        init?.signal?.removeEventListener("abort", onAbort);
+        resolve(new Response(Buffer.from(body), { status: 200, headers: { "Content-Type": "image/webp" } }));
+      },
+      fail: () => reject(new Error("aborted")),
+    });
+  });
+}) as typeof fetch;
 
 const cache = await import("../src/lib/business-app/cabinet-cover-cache");
 cache.resetCabinetCoverCacheForTests();
 
-const privateSrc = "/api/business/workspace/cover?space=cafe&track=aaa";
-const publicSrc = "https://cdn.example/practice-covers/album/xs.webp";
-
-assert.equal(cache.resolveCabinetCoverSrc(privateSrc), privateSrc);
-assert.equal(cache.isCabinetCoverCached(privateSrc), false);
-
-const seen: string[] = [];
-const stop = cache.subscribeCabinetCoverCache((src) => seen.push(src));
-const first = cache.preloadCabinetCover(privateSrc);
-const second = cache.preloadCabinetCover(privateSrc); // same in-flight fetch
-assert.equal(first, second);
-await first;
-
-assert.equal(cache.isCabinetCoverCached(privateSrc), true);
-const blobSrc = cache.resolveCabinetCoverSrc(privateSrc);
-assert.ok(blobSrc && blobSrc.startsWith("blob:"));
-assert.deepEqual(seen, [privateSrc]);
-// A remount reads the same blob URL immediately, without another fetch.
-assert.equal(cache.resolveCabinetCoverSrc(privateSrc), blobSrc);
-await cache.preloadCabinetCover(privateSrc);
-assert.equal(cache.resolveCabinetCoverSrc(privateSrc), blobSrc);
-assert.equal(created.length, 1);
-
-await Promise.all([
-  cache.preloadCabinetCover(publicSrc),
-  cache.preloadCabinetCover(privateSrc),
-  cache.preloadCabinetCover(null),
-  cache.preloadCabinetCover(""),
+const tracks = [
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/a.webp" },
+  { coverUrl: "https://cdn.example/covers/b.webp" },
+  { coverUrl: "https://cdn.example/covers/c.webp" },
+  { coverUrl: "https://cdn.example/covers/d.webp" },
+  { coverUrl: "https://cdn.example/covers/e.webp" },
+];
+const selected = cache.selectCabinetCoverPreloadUrls(tracks, 0, [0, 1, 2, 3, 4, 5]);
+assert.deepEqual(selected, [
+  "https://cdn.example/covers/now.webp",
+  "https://cdn.example/covers/a.webp",
+  "https://cdn.example/covers/b.webp",
+  "https://cdn.example/covers/c.webp",
 ]);
-assert.equal(cache.isCabinetCoverCached(publicSrc), true);
-assert.notEqual(cache.resolveCabinetCoverSrc(publicSrc), publicSrc);
-assert.equal(created.length, 2);
+assert.equal(selected.length, cache.CABINET_COVER_PRELOAD_LIMIT);
+assert.equal(cache.selectCabinetCoverPreloadUrls(tracks, 2, [0, 1, 2, 3, 4, 5]).length, 4);
+assert.deepEqual(cache.selectCabinetCoverPreloadUrls(tracks, 2, [0, 1, 2, 3, 4, 5])[0], "https://cdn.example/covers/b.webp");
+const same = [
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: "https://cdn.example/covers/d.webp" },
+  { coverUrl: "https://cdn.example/covers/e.webp" },
+];
+assert.deepEqual(
+  cache.selectCabinetCoverPreloadUrls(same, 0, [0, 1, 2, 3, 4, 5]),
+  ["https://cdn.example/covers/now.webp"],
+  "the window is the current track and the next three, not four unique covers from later in the queue",
+);
+const sparse = [
+  { coverUrl: "https://cdn.example/covers/now.webp" },
+  { coverUrl: null },
+  { coverUrl: "https://cdn.example/covers/b.webp" },
+  { coverUrl: null },
+  { coverUrl: "https://cdn.example/covers/d.webp" },
+];
+assert.deepEqual(
+  cache.selectCabinetCoverPreloadUrls(sparse, 0, [0, 1, 2, 3, 4]),
+  ["https://cdn.example/covers/now.webp", "https://cdn.example/covers/b.webp"],
+  "missing covers in the window are skipped, later tracks stay out",
+);
 
-stop();
+
+const firstSet = cache.setCabinetCoverPreloadSet(tracks.map((track) => track.coverUrl));
+assert.equal(firstSet.length, 4);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(cache.cabinetCoverInflightCountForTests(), 4);
+assert.equal(fetchLog.length, 4);
+assert.ok(fetchLog.every((entry) => entry.priority === "low"));
+assert.ok(cache.cabinetCoverQueuedCountForTests() <= 0);
+
+// A later set of four must abort the previous inflight and not exceed the cap.
+fetchLog.length = 0;
+gates.length = 0;
+const moved = cache.setCabinetCoverPreloadSet([
+  "https://cdn.example/covers/d.webp",
+  "https://cdn.example/covers/e.webp",
+  "https://cdn.example/covers/now.webp",
+  "https://cdn.example/covers/a.webp",
+  "https://cdn.example/covers/b.webp",
+]);
+assert.equal(moved.length, 4);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.ok(cache.cabinetCoverInflightCountForTests() <= cache.CABINET_COVER_MAX_CONCURRENT);
+assert.ok(fetchLog.length <= 4);
+
+// Drain and fill the LRU past the cap through successive 4-cover windows.
+// An empty allowed set must not open the floodgate, so we only fetch the current window.
 cache.resetCabinetCoverCacheForTests();
-assert.equal(cache.isCabinetCoverCached(privateSrc), false);
-assert.equal(cache.resolveCabinetCoverSrc(privateSrc), privateSrc);
-assert.ok(revoked.includes(created[0]!));
+fetchLog.length = 0;
+gates.length = 0;
+void cache.preloadCabinetCover("https://cdn.example/covers/outside-empty.webp");
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 0, "an empty allowed set denies cover loads");
+assert.equal(cache.cabinetCoverInflightCountForTests(), 0);
+
+const guestAtmosphere = Array.from({ length: 12 }, (_, i) => ({
+  coverUrl: `https://cdn.example/covers/guest-${i}.webp`,
+}));
+const guestWindow = cache.selectCabinetCoverPreloadUrls(guestAtmosphere, 0, null);
+assert.deepEqual(
+  guestWindow,
+  [
+    "https://cdn.example/covers/guest-0.webp",
+    "https://cdn.example/covers/guest-1.webp",
+    "https://cdn.example/covers/guest-2.webp",
+    "https://cdn.example/covers/guest-3.webp",
+  ],
+  "guest atmosphere warms only the current track and the next three",
+);
+const guestSet = cache.setCabinetCoverPreloadSet(guestWindow);
+assert.equal(guestSet.length, 4);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 4);
+for (const track of guestAtmosphere.slice(4)) {
+  void cache.preloadCabinetCover(track.coverUrl);
+}
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(fetchLog.length, 4, "covers outside the guest 4-cover window are not loaded");
+assert.ok(fetchLog.every((entry) => guestWindow.includes(entry.url)));
+while (gates.length > 0) {
+  const batch = gates.splice(0, gates.length);
+  for (const gate of batch) gate.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+cache.resetCabinetCoverCacheForTests();
+fetchLog.length = 0;
+gates.length = 0;
+const many = Array.from({ length: cache.CABINET_COVER_CACHE_LIMIT + 2 }, (_, i) => `https://cdn.example/covers/n${i}.webp`);
+for (let offset = 0; offset < many.length; offset += cache.CABINET_COVER_PRELOAD_LIMIT) {
+  cache.setCabinetCoverPreloadSet(many.slice(offset, offset + cache.CABINET_COVER_PRELOAD_LIMIT));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  while (gates.length > 0) {
+    const batch = gates.splice(0, gates.length);
+    for (const gate of batch) gate.open();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+assert.equal(cache.cabinetCoverCacheSizeForTests(), cache.CABINET_COVER_CACHE_LIMIT);
+assert.ok(revoked.length >= 2);
+assert.equal(cache.isCabinetCoverCached(many[0]!), false);
+assert.equal(cache.isCabinetCoverCached(many[many.length - 1]!), true);
+const blobSrc = cache.resolveCabinetCoverSrc(many[many.length - 1]!);
+assert.ok(blobSrc && blobSrc.startsWith("blob:"));
+
+cache.resetCabinetCoverCacheForTests();
+assert.equal(cache.cabinetCoverCacheSizeForTests(), 0);
+assert.equal(cache.cabinetCoverInflightCountForTests(), 0);
 
 globalThis.fetch = originalFetch;
 URL.createObjectURL = originalCreate;
@@ -90,11 +191,22 @@ const now = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
 assert.doesNotMatch(button, /loading="lazy"/);
 assert.match(button, /CabinetCoverImage/);
 assert.match(image, /decoding="sync"/);
+assert.match(image, /fetchPriority="low"/);
 assert.doesNotMatch(image, /loading="lazy"/);
-assert.match(image, /const current = resolveCabinetCoverSrc\(src\) \?\? src/, "remount and track change both use the cached blob or the new src");
-assert.doesNotMatch(image, /useState\(/, "must not freeze the first src for the life of a mounted mini-player");
-assert.match(preloader, /preloadCabinetCovers/);
-assert.match(preloader, /accessModel\?\.tracks/);
+assert.match(image, /isCabinetCoverCached\(src\) \? resolveCabinetCoverSrc\(src\) : null/);
+assert.match(image, /subscribeCabinetCoverCache/);
+assert.match(image, /if \(!current\) return null/, "uncached covers do not start a raw <img> fetch outside the cap");
+assert.match(image, /scheduleCabinetCoverPreload/);
+const cacheSource = read("src/lib/business-app/cabinet-cover-cache.ts");
+const guestPlayback = read("src/components/business-app/sound/BusinessGuestPlayback.tsx");
+assert.match(preloader, /selectCabinetCoverPreloadUrls/);
+assert.match(preloader, /setCabinetCoverPreloadSet/);
+assert.match(preloader, /scheduleCabinetCoverPreload/);
+assert.match(preloader, /useBusinessGuestPlaybackOptional/);
+assert.match(guestPlayback, /export function useBusinessGuestPlaybackOptional/);
+assert.doesNotMatch(cacheSource, /desired\.size > 0/, "an empty allowed set must deny loads, not open the floodgate");
+assert.doesNotMatch(preloader, /preloadCabinetCovers/);
+assert.doesNotMatch(preloader, /tracks\.map\(\(track\) => cabinetAlbumCoverUrl/);
 assert.match(shell, /<CabinetCoverPreloader \/>/);
 assert.match(mini, /CabinetCoverImage/);
 assert.match(now, /CabinetCoverImage/);
