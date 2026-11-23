@@ -1,27 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { AdminAnalyticsTimeseriesPoint } from "@/lib/admin/analytics-queries";
 import { formatListeningDuration } from "@/lib/admin/format-listening-time";
 import {
   TIMESERIES_PAD_X,
-  TIMESERIES_PAD_Y,
-  TIMESERIES_PLOT_HEIGHT,
   buildTimeseriesAxisLayout,
 } from "@/lib/admin/timeseries-axis";
+import {
+  TIMESERIES_COUNT_SERIES,
+  type TimeseriesCountSeriesKey,
+  buildTimeseriesListeningPath,
+  buildTimeseriesMarkers,
+  buildTimeseriesTooltip,
+  measureTimeseriesTooltipBox,
+  nearestTimeseriesIndex,
+  placeTimeseriesTooltipBox,
+  pointerClientToSvgX,
+  reduceTimeseriesHover,
+  timeseriesPlotY,
+  timeseriesPointsSignature,
+  type TimeseriesHover,
+} from "@/lib/admin/timeseries-tooltip";
+import AdminAnalyticsTimeseriesTooltip from "@/components/admin/AdminAnalyticsTimeseriesTooltip";
 
-const SERIES = [
-  { key: "visitors", label: "Посетители", color: "#7042c5" },
-  { key: "registrations", label: "Регистрации", color: "#2f7d4a" },
-  { key: "practiceViews", label: "Просмотры", color: "#c47a1a" },
-  { key: "playStarts", label: "Запуски", color: "#3b6fd4" },
-  { key: "listeners", label: "Слушатели", color: "#9b3d8a" },
-  { key: "completions", label: "Дослушивания", color: "#b34f63" },
-  { key: "saves", label: "Сохранения", color: "#4f7c6b" },
-] as const;
+const SERIES = TIMESERIES_COUNT_SERIES;
 
-type SeriesKey = (typeof SERIES)[number]["key"];
+type SeriesKey = TimeseriesCountSeriesKey;
+
+const DEFAULT_ENABLED: Record<SeriesKey, boolean> = {
+  visitors: true,
+  registrations: false,
+  practiceViews: false,
+  playStarts: true,
+  listeners: false,
+  completions: false,
+  saves: false,
+};
 
 export default function AdminAnalyticsTimeseriesChart({
   points,
@@ -34,18 +50,11 @@ export default function AdminAnalyticsTimeseriesChart({
   error: string | null;
   listeningTimeNotice?: string | null;
 }) {
-  const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>({
-    visitors: true,
-    registrations: false,
-    practiceViews: false,
-    playStarts: true,
-    listeners: false,
-    completions: false,
-    saves: false,
-  });
+  const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>(DEFAULT_ENABLED);
   const [listeningEnabled, setListeningEnabled] = useState(true);
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
+  const enabledKeys = activeSeries.map((series) => series.key);
 
   const axis = useMemo(
     () =>
@@ -56,14 +65,17 @@ export default function AdminAnalyticsTimeseriesChart({
     [granularity, points],
   );
 
+  const withYear = useMemo(() => {
+    const years = new Set(points.map((point) => point.bucket.slice(0, 4)).filter(Boolean));
+    return years.size > 1;
+  }, [points]);
+
+  const pointsSignature = timeseriesPointsSignature(points, granularity);
+
   const { max, pathMap } = useMemo(() => {
-    const height = TIMESERIES_PLOT_HEIGHT;
-    const padY = TIMESERIES_PAD_Y;
     const maxValue = Math.max(
       1,
-      ...points.flatMap((point) =>
-        activeSeries.map((series) => point[series.key]),
-      ),
+      ...points.flatMap((point) => activeSeries.map((series) => point[series.key])),
     );
 
     const paths = Object.fromEntries(
@@ -75,10 +87,7 @@ export default function AdminAnalyticsTimeseriesChart({
         const d = points
           .map((point, index) => {
             const x = axis.xAt(index);
-            const y =
-              height -
-              padY -
-              (point[series.key] / maxValue) * (height - padY * 2);
+            const y = timeseriesPlotY(point[series.key], maxValue);
             return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
           })
           .join(" ");
@@ -91,40 +100,14 @@ export default function AdminAnalyticsTimeseriesChart({
   }, [activeSeries, axis, points]);
 
   const listeningPath = useMemo(() => {
-    const samples = points.map((point) => point.listenedMinutes);
-    const maxMinutes = Math.max(
-      0,
-      ...samples.filter((value): value is number => value != null),
+    const computed = buildTimeseriesListeningPath(
+      points.map((point) => point.listenedMinutes),
+      axis.xAt,
     );
-    if (!listeningEnabled || maxMinutes <= 0) {
-      return { d: "", maxMinutes, titles: [] as Array<{ x: number; y: number; label: string }> };
+    if (!listeningEnabled) {
+      return { d: "", maxMinutes: computed.maxMinutes };
     }
-
-    const height = TIMESERIES_PLOT_HEIGHT;
-    const padY = TIMESERIES_PAD_Y;
-    const titles: Array<{ x: number; y: number; label: string }> = [];
-    let segmentStart = true;
-    const d = samples
-      .map((minutes, index) => {
-        const x = axis.xAt(index);
-        if (minutes == null) {
-          segmentStart = true;
-          return "";
-        }
-        const y = height - padY - (minutes / maxMinutes) * (height - padY * 2);
-        titles.push({
-          x,
-          y,
-          label: `${points[index]?.bucket}: ${formatListeningDuration(points[index]?.listenedMs ?? 0)}`,
-        });
-        const command = `${segmentStart ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-        segmentStart = false;
-        return command;
-      })
-      .filter(Boolean)
-      .join(" ");
-
-    return { d, maxMinutes, titles };
+    return computed;
   }, [axis, listeningEnabled, points]);
 
   return (
@@ -196,6 +179,143 @@ export default function AdminAnalyticsTimeseriesChart({
         <p className="mt-4 text-sm text-[#9485b4]">Нет точек за выбранный период.</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
+          <TimeseriesPlotBody
+            key={pointsSignature}
+            pointsSignature={pointsSignature}
+            points={points}
+            granularity={granularity}
+            withYear={withYear}
+            axis={axis}
+            enabledKeys={enabledKeys}
+            listeningEnabled={listeningEnabled}
+            listeningMaxMinutes={listeningPath.maxMinutes}
+            countMax={max}
+            pathMap={pathMap}
+            listeningPathD={listeningPath.d}
+            activeSeries={activeSeries}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TimeseriesPlotBody({
+  pointsSignature,
+  points,
+  granularity,
+  withYear,
+  axis,
+  enabledKeys,
+  listeningEnabled,
+  listeningMaxMinutes,
+  countMax,
+  pathMap,
+  listeningPathD,
+  activeSeries,
+}: {
+  pointsSignature: string;
+  points: AdminAnalyticsTimeseriesPoint[];
+  granularity: "day" | "week";
+  withYear: boolean;
+  axis: ReturnType<typeof buildTimeseriesAxisLayout>;
+  enabledKeys: SeriesKey[];
+  listeningEnabled: boolean;
+  listeningMaxMinutes: number;
+  countMax: number;
+  pathMap: Record<SeriesKey, string>;
+  listeningPathD: string;
+  activeSeries: typeof SERIES[number][];
+}) {
+  const [hover, setHover] = useState<TimeseriesHover | null>(null);
+  const activeIndex = hover && hover.signature === pointsSignature ? hover.index : null;
+
+  const tooltip = useMemo(() => {
+    if (activeIndex == null || activeIndex < 0 || activeIndex >= points.length) {
+      return null;
+    }
+    const point = points[activeIndex];
+    const model = buildTimeseriesTooltip({
+      point,
+      index: activeIndex,
+      granularity,
+      withYear,
+      listeningEnabled,
+      enabledSeries: enabledKeys,
+    });
+    if (!model) {
+      return null;
+    }
+    const x = axis.xAt(activeIndex);
+    const markers = buildTimeseriesMarkers({
+      point,
+      x,
+      listeningEnabled,
+      listeningMaxMinutes,
+      enabledSeries: enabledKeys,
+      countMax,
+    });
+    const box = placeTimeseriesTooltipBox(
+      measureTimeseriesTooltipBox(model),
+      axis.width,
+      axis.height,
+      x,
+      markers,
+    );
+    return { model, markers, box, x };
+  }, [
+    activeIndex,
+    axis,
+    countMax,
+    enabledKeys,
+    granularity,
+    listeningEnabled,
+    listeningMaxMinutes,
+    points,
+    withYear,
+  ]);
+
+  function readIndex(event: ReactPointerEvent<SVGSVGElement>): number | null {
+    const svgX = pointerClientToSvgX(event.clientX, event.currentTarget);
+    if (svgX == null) {
+      return null;
+    }
+    return nearestTimeseriesIndex(svgX, axis.xAt, points.length);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const index = readIndex(event);
+    setHover((current) => reduceTimeseriesHover(current, {
+      type: "move",
+      index,
+      signature: pointsSignature,
+      pointerType: event.pointerType,
+    }));
+  }
+
+  function onPointerLeave(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "mouse") {
+      return;
+    }
+    setHover((current) => reduceTimeseriesHover(current, { type: "leave-mouse" }));
+  }
+
+  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+      return;
+    }
+    const index = readIndex(event);
+    if (index == null) {
+      return;
+    }
+    setHover((current) => reduceTimeseriesHover(current, {
+      type: "tap",
+      index,
+      signature: pointsSignature,
+    }));
+  }
+
+  return (
           <svg
             viewBox={`0 0 ${axis.width} ${axis.height}`}
             className="w-full"
@@ -208,6 +328,9 @@ export default function AdminAnalyticsTimeseriesChart({
             role="img"
             aria-label="Динамика показателей"
             data-testid="admin-timeseries-svg"
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
+            onPointerDown={onPointerDown}
           >
             <line
               x1={TIMESERIES_PAD_X}
@@ -218,11 +341,11 @@ export default function AdminAnalyticsTimeseriesChart({
               strokeWidth="1"
             />
             <text x="8" y="24" className="fill-[#9485b4]" fontSize="11">
-              {max.toLocaleString("ru-RU")}
+              {countMax.toLocaleString("ru-RU")}
             </text>
-            {listeningEnabled && listeningPath.maxMinutes > 0 ? (
+            {listeningEnabled && listeningMaxMinutes > 0 ? (
               <text x={axis.width - 140} y="24" className="fill-[#1f7a4d]" fontSize="11">
-                {formatListeningDuration(listeningPath.maxMinutes * 60_000)}
+                {formatListeningDuration(listeningMaxMinutes * 60_000)}
               </text>
             ) : null}
             {activeSeries.map((series) => (
@@ -236,9 +359,9 @@ export default function AdminAnalyticsTimeseriesChart({
                 strokeLinejoin="round"
               />
             ))}
-            {listeningEnabled && listeningPath.d ? (
+            {listeningEnabled && listeningPathD ? (
               <path
-                d={listeningPath.d}
+                d={listeningPathD}
                 fill="none"
                 stroke="#1f7a4d"
                 strokeWidth="2.5"
@@ -246,15 +369,6 @@ export default function AdminAnalyticsTimeseriesChart({
                 strokeLinejoin="round"
               />
             ) : null}
-            {listeningEnabled
-              ? listeningPath.titles.map((title) => (
-                  <g key={`${title.x}-${title.label}`}>
-                    <circle cx={title.x} cy={title.y} r="6" fill="transparent">
-                      <title>{title.label}</title>
-                    </circle>
-                  </g>
-                ))
-              : null}
             <g data-testid="admin-timeseries-x-axis">
               {axis.ticks.map((tick) => (
                 <g key={`${tick.index}-${tick.label}`} data-bucket={points[tick.index]?.bucket}>
@@ -284,9 +398,15 @@ export default function AdminAnalyticsTimeseriesChart({
                 </g>
               ))}
             </g>
+            {tooltip ? (
+              <AdminAnalyticsTimeseriesTooltip
+                model={tooltip.model}
+                box={tooltip.box}
+                anchorX={tooltip.x}
+                axisY={axis.axisY}
+                markers={tooltip.markers}
+              />
+            ) : null}
           </svg>
-        </div>
-      )}
-    </section>
   );
 }
