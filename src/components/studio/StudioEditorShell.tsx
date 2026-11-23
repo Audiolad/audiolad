@@ -75,6 +75,7 @@ import { studioRenderExportErrorMessage } from "@/lib/studio/render/ffmpeg-stall
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
+  STUDIO_LEAVE_DURING_UPLOAD_MESSAGE,
   aggregateStudioAssetUploadProgress,
   formatStudioAssetUploadLabel,
 } from "@/lib/studio/upload-progress-label";
@@ -780,6 +781,10 @@ export default function StudioEditorShell({
       track.assetPersistenceStatus === "uploading",
   );
   const shouldWarnBeforeLeaving = Boolean(autosaveState?.canWarnBeforeUnload) || audioUploadActive;
+  const audioUploadActiveRef = useRef(audioUploadActive);
+  useEffect(() => {
+    audioUploadActiveRef.current = audioUploadActive;
+  }, [audioUploadActive]);
 
   useEffect(() => {
     if (!shouldWarnBeforeLeaving) return;
@@ -1854,7 +1859,7 @@ export default function StudioEditorShell({
       shouldWarnBeforeLeaving &&
       !window.confirm(
         audioUploadActive
-          ? "Аудио ещё загружается. Если выйти сейчас, загрузка прервётся."
+          ? STUDIO_LEAVE_DURING_UPLOAD_MESSAGE
           : "Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.",
       )
     ) {
@@ -1889,6 +1894,12 @@ export default function StudioEditorShell({
   ) => {
     event.preventDefault();
     if (navigationInProgressRef.current) return;
+    if (
+      audioUploadActiveRef.current &&
+      !window.confirm(STUDIO_LEAVE_DURING_UPLOAD_MESSAGE)
+    ) {
+      return;
+    }
 
     const controller = controllerRef.current;
     const state = autosaveStateRef.current ?? controller?.getState();
@@ -2095,7 +2106,7 @@ export default function StudioEditorShell({
             >
               В АудиоЛад
             </Link>
-            <StudioGuestAuthLinks />
+            <StudioGuestAuthLinks onNavigate={guardNavigation} />
               </>
             )}
           </nav>
@@ -2217,7 +2228,7 @@ export default function StudioEditorShell({
                         В АудиоЛад
                       </Link>
                       <div className="border-t border-white/10 px-3 py-2">
-                        <StudioGuestAuthLinks />
+                        <StudioGuestAuthLinks onNavigate={guardNavigation} />
                       </div>
                     </>
                   )}
@@ -2506,7 +2517,7 @@ export default function StudioEditorShell({
           {exportAlert ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{exportAlert}</p> : null}
           {accessMode === "guest" && (showGuestRenderGate || guestRenderConsumed || renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? (
             <div className="mb-4">
-              <StudioGuestRenderGate compact />
+              <StudioGuestRenderGate compact onNavigate={guardNavigation} />
             </div>
           ) : null}
           {recordingError ? (

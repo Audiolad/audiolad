@@ -2,6 +2,9 @@ import type { StudioAssetUploadProgress } from "./persistence-client";
 
 const BASE_LABEL = "Сохранение аудио…";
 
+export const STUDIO_LEAVE_DURING_UPLOAD_MESSAGE =
+  "Аудио ещё загружается. Если выйти сейчас, загрузка прервётся.";
+
 /** Short Russian status for one audio upload. Uses the en dash only. */
 export function formatStudioAssetUploadLabel(
   progress: StudioAssetUploadProgress | null | undefined,

@@ -1,17 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, type MouseEvent } from "react";
 
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 
 const NEXT_PATH = "/studio/projects";
 
+type GuestNavigateHandler = (event: MouseEvent<HTMLAnchorElement>) => void;
+
 export function StudioGuestAuthLinks({
   className = "",
+  onNavigate,
 }: {
   className?: string;
+  /** Lets the editor confirm leaving (e.g. while audio is uploading). */
+  onNavigate?: GuestNavigateHandler;
 }) {
   const signInHref = buildAuthRouteHref("/auth/sign-in", NEXT_PATH);
   const signUpHref = buildAuthRouteHref("/auth/sign-up", NEXT_PATH);
@@ -19,7 +24,9 @@ export function StudioGuestAuthLinks({
     <div className={`flex flex-wrap gap-2 ${className}`.trim()}>
       <Link
         href={signInHref}
-        onClick={() => {
+        onClick={(event) => {
+          onNavigate?.(event);
+          if (event.defaultPrevented) return;
           void trackGuestStudioEvent("guest_auth_cta_clicked", NEXT_PATH, {
             cta: "sign_in",
           });
@@ -30,7 +37,9 @@ export function StudioGuestAuthLinks({
       </Link>
       <Link
         href={signUpHref}
-        onClick={() => {
+        onClick={(event) => {
+          onNavigate?.(event);
+          if (event.defaultPrevented) return;
           void trackGuestStudioEvent("guest_auth_cta_clicked", NEXT_PATH, {
             cta: "sign_up",
           });
@@ -64,8 +73,10 @@ export function StudioGuestProjectLimitGate() {
 
 export function StudioGuestRenderGate({
   compact = false,
+  onNavigate,
 }: {
   compact?: boolean;
+  onNavigate?: GuestNavigateHandler;
 }) {
   useEffect(() => {
     void trackGuestStudioEvent("guest_registration_gate_shown", NEXT_PATH, {
@@ -85,7 +96,7 @@ export function StudioGuestRenderGate({
         Хотите продолжить работу в Студии? Войдите или зарегистрируйтесь, чтобы
         создавать новые проекты и MP3.
       </p>
-      <StudioGuestAuthLinks className="mt-3" />
+      <StudioGuestAuthLinks className="mt-3" onNavigate={onNavigate} />
     </section>
   );
 }

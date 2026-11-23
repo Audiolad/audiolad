@@ -553,7 +553,13 @@ for (const [status, kind] of [[404, "unsupported"], [413, "too_large"], [400, "r
   const shell = await readFile("src/components/studio/StudioEditorShell.tsx", "utf8");
   assert(shell.includes("formatStudioAssetUploadLabel(assetUploadProgress[track.id])"));
   assert(shell.includes("shouldWarnBeforeLeaving"));
-  assert(shell.includes("Аудио ещё загружается. Если выйти сейчас, загрузка прервётся."));
+  assert(shell.includes("STUDIO_LEAVE_DURING_UPLOAD_MESSAGE"));
+  assert.equal((shell.match(/onNavigate=\{guardNavigation\}/g) ?? []).length, 3, "guest auth links are guarded");
+  assert(/audioUploadActiveRef\.current &&\s*!window\.confirm\(STUDIO_LEAVE_DURING_UPLOAD_MESSAGE\)/.test(shell));
+  const gate = await readFile("src/components/studio/StudioGuestGate.tsx", "utf8");
+  assert.equal((gate.match(/onNavigate\?\.\(event\);\s*if \(event\.defaultPrevented\) return;/g) ?? []).length, 2);
+  const labelsSource = await readFile("src/lib/studio/upload-progress-label.ts", "utf8");
+  assert(labelsSource.includes("Аудио ещё загружается. Если выйти сейчас, загрузка прервётся."));
   const provider = await readFile("src/components/studio/StudioAudioProvider.tsx", "utf8");
   assert.equal((provider.match(/onProgress: \(progress\) =>/g) ?? []).length, 2);
 }
