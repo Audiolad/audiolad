@@ -75,6 +75,11 @@ import { studioRenderExportErrorMessage } from "@/lib/studio/render/ffmpeg-stall
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
+  STUDIO_LEAVE_DURING_UPLOAD_MESSAGE,
+  aggregateStudioAssetUploadProgress,
+  formatStudioAssetUploadLabel,
+} from "@/lib/studio/upload-progress-label";
+import {
   isDesktopEnvironment,
   isInAppBrowser,
   isStandaloneMode,
@@ -617,6 +622,7 @@ export default function StudioEditorShell({
     replaceTrackAudio,
     ingestCatalogAsset,
     retryTrackAssetUpload,
+    assetUploadProgress,
     restoreEditingState,
     seek,
     seekRelative,
@@ -769,15 +775,26 @@ export default function StudioEditorShell({
     return () => controller?.dispose();
   }, []);
 
+  const audioUploadActive = tracks.some(
+    (track) =>
+      track.assetPersistenceStatus === "pending" ||
+      track.assetPersistenceStatus === "uploading",
+  );
+  const shouldWarnBeforeLeaving = Boolean(autosaveState?.canWarnBeforeUnload) || audioUploadActive;
+  const audioUploadActiveRef = useRef(audioUploadActive);
   useEffect(() => {
-    if (!autosaveState?.canWarnBeforeUnload) return;
+    audioUploadActiveRef.current = audioUploadActive;
+  }, [audioUploadActive]);
+
+  useEffect(() => {
+    if (!shouldWarnBeforeLeaving) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [autosaveState?.canWarnBeforeUnload]);
+  }, [shouldWarnBeforeLeaving]);
 
   useEffect(() => {
     const projectId = persistedHydration?.project.id;
@@ -1581,7 +1598,7 @@ export default function StudioEditorShell({
                   {track.assetPersistenceStatus === "pending"
                     ? "Ожидает сохранения"
                     : track.assetPersistenceStatus === "uploading"
-                      ? "Сохранение аудио…"
+                      ? formatStudioAssetUploadLabel(assetUploadProgress[track.id])
                       : track.assetPersistenceStatus === "saved"
                         ? "Аудио сохранено"
                         : "Не удалось сохранить аудио"}
@@ -1839,12 +1856,16 @@ export default function StudioEditorShell({
 
   const guardNavigation = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     if (
-      autosaveState?.canWarnBeforeUnload &&
-      !window.confirm("Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.")
+      shouldWarnBeforeLeaving &&
+      !window.confirm(
+        audioUploadActive
+          ? STUDIO_LEAVE_DURING_UPLOAD_MESSAGE
+          : "Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.",
+      )
     ) {
       event.preventDefault();
     }
-  }, [autosaveState?.canWarnBeforeUnload]);
+  }, [audioUploadActive, shouldWarnBeforeLeaving]);
 
   useEffect(() => {
     if (!mobileOverflowOpen) {
@@ -1873,6 +1894,12 @@ export default function StudioEditorShell({
   ) => {
     event.preventDefault();
     if (navigationInProgressRef.current) return;
+    if (
+      audioUploadActiveRef.current &&
+      !window.confirm(STUDIO_LEAVE_DURING_UPLOAD_MESSAGE)
+    ) {
+      return;
+    }
 
     const controller = controllerRef.current;
     const state = autosaveStateRef.current ?? controller?.getState();
@@ -1901,12 +1928,15 @@ export default function StudioEditorShell({
     }
   }, [router]);
 
+  const overallUploadLabel = formatStudioAssetUploadLabel(
+    aggregateStudioAssetUploadProgress(Object.values(assetUploadProgress)),
+  );
   const autosaveMessage = autosaveState?.status === "partial-disabled"
     ? "Проект открыт не полностью. Сохранение отключено."
     : autosaveState?.status === "conflict"
       ? "Проект изменён в другой вкладке. Обновите страницу, чтобы продолжить."
       : autosaveState?.status === "asset-uploading"
-        ? "Сохранение аудио…"
+        ? overallUploadLabel
         : autosaveState?.status === "error"
           ? "Ошибка сохранения"
           : autosaveState?.isInFlight
@@ -1950,7 +1980,7 @@ export default function StudioEditorShell({
         : "Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь";
   const createMp3Label = exportPhase === "flushing"
     ? (assetUploadInProgress || autosaveState?.status === "asset-uploading"
-      ? "Сохранение аудио…"
+      ? overallUploadLabel
       : "Сохраняем проект…")
     : renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ||
         exportPhase === "queuing"
@@ -2076,7 +2106,7 @@ export default function StudioEditorShell({
             >
               В АудиоЛад
             </Link>
-            <StudioGuestAuthLinks />
+            <StudioGuestAuthLinks onNavigate={guardNavigation} />
               </>
             )}
           </nav>
@@ -2198,7 +2228,7 @@ export default function StudioEditorShell({
                         В АудиоЛад
                       </Link>
                       <div className="border-t border-white/10 px-3 py-2">
-                        <StudioGuestAuthLinks />
+                        <StudioGuestAuthLinks onNavigate={guardNavigation} />
                       </div>
                     </>
                   )}
@@ -2487,7 +2517,7 @@ export default function StudioEditorShell({
           {exportAlert ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{exportAlert}</p> : null}
           {accessMode === "guest" && (showGuestRenderGate || guestRenderConsumed || renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? (
             <div className="mb-4">
-              <StudioGuestRenderGate compact />
+              <StudioGuestRenderGate compact onNavigate={guardNavigation} />
             </div>
           ) : null}
           {recordingError ? (

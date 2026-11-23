@@ -72,6 +72,7 @@ import {
   retryStudioProjectAssetUpload,
   uploadStudioProjectAsset,
   type StudioAssetSourceType,
+  type StudioAssetUploadProgress,
   type StudioUploadedAsset,
 } from "@/lib/studio/persistence-client";
 import {
@@ -190,6 +191,8 @@ type StudioAudioContextValue = {
     replaceTrackId?: string | null,
   ) => StudioLocalTrack | null;
   retryTrackAssetUpload: (trackId: string) => void;
+  /** Live progress of audio uploads by track id (only while uploading). */
+  assetUploadProgress: Readonly<Record<string, StudioAssetUploadProgress>>;
   hydratePersistedProject: (
     hydration: StudioProjectHydration,
   ) => { failedAssetIds: string[] };
@@ -638,6 +641,32 @@ export function StudioAudioProvider({
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
   const pendingReserveAssetIdsRef = useRef(new Map<string, string>());
+  const [assetUploadProgress, setAssetUploadProgress] = useState<
+    Record<string, StudioAssetUploadProgress>
+  >({});
+  const setTrackUploadProgress = useCallback(
+    (trackId: string, progress: StudioAssetUploadProgress | null) => {
+      setAssetUploadProgress((previous) => {
+        if (!progress) {
+          if (!(trackId in previous)) return previous;
+          const next = { ...previous };
+          delete next[trackId];
+          return next;
+        }
+        const current = previous[trackId];
+        if (
+          current &&
+          current.percent === progress.percent &&
+          current.phase === progress.phase &&
+          current.retryInSeconds === progress.retryInSeconds
+        ) {
+          return previous;
+        }
+        return { ...previous, [trackId]: progress };
+      });
+    },
+    [],
+  );
   const debugEnabledRef = useRef(debugEnabled);
 
   useEffect(() => {
@@ -1176,6 +1205,7 @@ export function StudioAudioProvider({
     );
     assetUploadControllersRef.current.get(trackId)?.abort();
     assetUploadControllersRef.current.delete(trackId);
+    setTrackUploadProgress(trackId, null);
     const reservedId = pendingReserveAssetIdsRef.current.get(trackId);
     if (reservedId && persistenceProjectId) {
       pendingReserveAssetIdsRef.current.delete(trackId);
@@ -1184,7 +1214,7 @@ export function StudioAudioProvider({
         assetId: reservedId,
       });
     }
-  }, [persistenceProjectId]);
+  }, [persistenceProjectId, setTrackUploadProgress]);
 
   const getTrackAsset = useCallback((trackId: string): TrackAsset | null => {
     const vault = assetVaultRef.current.get(trackId);
@@ -1276,6 +1306,15 @@ export function StudioAudioProvider({
       onReserved: (assetId) => {
         pendingReserveAssetIdsRef.current.set(trackId, assetId);
       },
+      onProgress: (progress) => {
+        if (
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        setTrackUploadProgress(trackId, progress);
+      },
     }).then(
       (uploadedAsset) => {
         if (
@@ -1286,6 +1325,7 @@ export function StudioAudioProvider({
         }
         pendingReserveAssetIdsRef.current.delete(trackId);
         assetUploadControllersRef.current.delete(trackId);
+        setTrackUploadProgress(trackId, null);
         bindSharedAssetState(trackId, (item) => ({
           ...item,
           assetId: uploadedAsset.id,
@@ -1302,6 +1342,7 @@ export function StudioAudioProvider({
           return;
         }
         assetUploadControllersRef.current.delete(trackId);
+        setTrackUploadProgress(trackId, null);
         const message = error instanceof StudioPersistenceClientError
           ? error.message
           : null;
@@ -1312,7 +1353,7 @@ export function StudioAudioProvider({
         }));
       },
     );
-  }, [bindSharedAssetState, cancelTrackAssetUpload, persistenceProjectId]);
+  }, [bindSharedAssetState, cancelTrackAssetUpload, persistenceProjectId, setTrackUploadProgress]);
 
   const retryTrackAssetUpload = useCallback((trackId: string) => {
     const track = tracksRef.current.find((item) => item.id === trackId);
@@ -1344,6 +1385,15 @@ export function StudioAudioProvider({
       assetId: reservedId,
       file: asset.file,
       signal: controller.signal,
+      onProgress: (progress) => {
+        if (
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        setTrackUploadProgress(trackId, progress);
+      },
     }).then(
       (uploadedAsset) => {
         if (
@@ -1354,6 +1404,7 @@ export function StudioAudioProvider({
         }
         pendingReserveAssetIdsRef.current.delete(trackId);
         assetUploadControllersRef.current.delete(trackId);
+        setTrackUploadProgress(trackId, null);
         bindSharedAssetState(trackId, (item) => ({
           ...item,
           assetId: uploadedAsset.id,
@@ -1370,6 +1421,7 @@ export function StudioAudioProvider({
           return;
         }
         assetUploadControllersRef.current.delete(trackId);
+        setTrackUploadProgress(trackId, null);
         const message = error instanceof StudioPersistenceClientError
           ? error.message
           : null;
@@ -1380,7 +1432,7 @@ export function StudioAudioProvider({
         }));
       },
     );
-  }, [bindSharedAssetState, persistenceProjectId, startTrackAssetUpload]);
+  }, [bindSharedAssetState, persistenceProjectId, setTrackUploadProgress, startTrackAssetUpload]);
 
   const hydratePersistedProject = useCallback(
     (hydration: StudioProjectHydration) => {
@@ -2896,6 +2948,7 @@ export function StudioAudioProvider({
       replaceTrackAudio,
       ingestCatalogAsset,
       retryTrackAssetUpload,
+      assetUploadProgress,
       hydratePersistedProject,
       play,
       pause,
@@ -2937,6 +2990,7 @@ export function StudioAudioProvider({
       audioDebugState,
       replaceTrackAudio,
       retryTrackAssetUpload,
+      assetUploadProgress,
       hydratePersistedProject,
       removeTrack,
       reset,
