@@ -12,6 +12,7 @@ import { assertNoForbiddenGiftText, visibleLines } from "./business-gift-copy-gu
 import { formatMoscowDateTime } from "../src/lib/access-grants/policy";
 import { BUSINESS_OFFER_EDITION, BUSINESS_OFFER_TITLE } from "../src/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
+import { businessEarlyPayCarryoverNote } from "../src/lib/business/subscription-period";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-home-signals";
 
@@ -80,7 +81,7 @@ for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostic
   } else assert.match(html, /Нет данных о плеерах/);
 }
 assert.doesNotMatch(render(), /data-testid="biz-home-access"/, "no trial card without a live or ended period");
-const trialEnds = "2026-11-22T14:11:37.762Z";
+const trialEnds = "2026-12-22T14:11:37.762Z";
 const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string | null }) => renderToStaticMarkup(
   <AppRouterContext.Provider value={fakeRouter}>
     <BusinessDomainProvider value={context}>
@@ -91,6 +92,7 @@ const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string |
   </AppRouterContext.Provider>,
 );
 const trialHome = withAccess({ mode: "trial", endsAt: trialEnds });
+assert.ok(businessEarlyPayCarryoverNote({ mode: "trial", endsAt: trialEnds }), "trial fixture must still be in the future so the early-pay note is shown");
 assert.match(trialHome, /data-testid="biz-home-access"/);
 assert.equal(BUSINESS_GIFT_TITLE, "7 дней в подарок");
 assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После 7 подарочных дней нужна оплата, чтобы музыка продолжала играть.");
@@ -122,8 +124,8 @@ assert.deepEqual(visibleLines(trialCard), [
   "Оплата по договору:",
   BUSINESS_OFFER_TITLE,
   `, ${BUSINESS_OFFER_EDITION.label.toLowerCase()}. Принят один раз для всего аккаунта.`,
-  // t1313u: early-pay stack note (trialEnds 2026-11-22 + 30d → 22 декабря 2026 МСК)
-  "Оставшиеся дни сохранятся, и к ним добавится ещё 30 дней – доступ будет до 22 декабря 2026.",
+  // Early-pay stack note from the live period end + 30 days, not a calendar-fixed day.
+  businessEarlyPayCarryoverNote({ mode: "trial", endsAt: trialEnds })!,
   "Оплатить",
 ]);
 // Every «Оплатить» links exactly the accepted edition.
