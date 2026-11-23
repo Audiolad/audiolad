@@ -135,6 +135,8 @@ jobs:
           npm run test:admin-overview-incident
           npm run test:admin-timeseries-dates
           npm run test:admin-timeseries-tooltip
+          npm run test:studio-resumable-upload
+          npm run test:studio-asset-persistence
           npm run test:company-control-cycle-evidence
           npm run test:admin-mailings
           npm run test:catalog-type-filter
