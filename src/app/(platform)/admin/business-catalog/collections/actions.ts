@@ -11,7 +11,6 @@ import {
   nextPositions,
   planAddAlbum,
   planDeleteCollection,
-  planRemoveAlbum,
 } from "@/lib/business-collections/edit-collection.mjs";
 
 function collectionLink(token: string): string {
@@ -155,6 +154,14 @@ export async function addCollectionAlbum(input: { id: string; albumId: string })
   } catch { return { ok: false, error: "Не удалось добавить альбом. Повторите попытку." }; }
 }
 
+function asRemoveAlbumResult(data: unknown): { ok: true; removed: number } | { ok: false; reason: string } | null {
+  if (!data || typeof data !== "object") return null;
+  const row = data as { ok?: unknown; removed?: unknown; reason?: unknown };
+  if (row.ok === true && Number.isInteger(row.removed)) return { ok: true, removed: row.removed as number };
+  if (row.ok === false && typeof row.reason === "string") return { ok: false, reason: row.reason };
+  return null;
+}
+
 export async function removeCollectionAlbum(input: { id: string; albumId: string }): Promise<{ ok: true; removed: number } | { ok: false; error: string }> {
   await requirePlatformOwnerAccess(COLLECTION_ADMIN_PATH);
   const id = asUuid(input?.id);
@@ -162,25 +169,18 @@ export async function removeCollectionAlbum(input: { id: string; albumId: string
   if (!id || !albumId) return { ok: false, error: REMOVE_ERRORS.invalid };
   try {
     const db = createServiceRoleClient();
-    const collection = await db.from("business_personal_collections").select("id,revoked_at").eq("id", id).maybeSingle();
-    if (collection.error || !collection.data) return { ok: false, error: "Подборка не найдена." };
-    const items = await loadCollectionItems(db, id);
-    if (!items) return { ok: false, error: "Не удалось загрузить треки подборки. Повторите попытку." };
-    const plan = planRemoveAlbum({
-      catalogTracks: catalogAsPlannerTracks(await loadCollectionCatalog(null)),
-      collectionTrackIds: items.map((row) => row.audio_item_id),
-      albumId,
-      revoked: Boolean(collection.data.revoked_at),
+    // Remaining-count check and DELETE run in one transaction, serialized per collection.
+    const { data, error } = await db.rpc("remove_business_personal_collection_album", {
+      p_collection_id: id, p_album_id: albumId,
     });
-    if (!plan.ok) return { ok: false, error: REMOVE_ERRORS[plan.reason] };
-    const { data, error } = await db.from("business_personal_collection_items")
-      .delete()
-      .eq("collection_id", id)
-      .in("audio_item_id", plan.removeIds)
-      .select("audio_item_id");
-    if (error || !data?.length) return { ok: false, error: "Не удалось убрать альбом. Обновите страницу и повторите попытку." };
+    const result = asRemoveAlbumResult(data);
+    if (error || !result) return { ok: false, error: "Не удалось убрать альбом. Обновите страницу и повторите попытку." };
+    if (!result.ok) {
+      if (result.reason === "not_found") return { ok: false, error: "Подборка не найдена." };
+      return { ok: false, error: REMOVE_ERRORS[result.reason] ?? "Не удалось убрать альбом. Обновите страницу и повторите попытку." };
+    }
     revalidatePath(COLLECTION_ADMIN_PATH);
-    return { ok: true, removed: data.length };
+    return { ok: true, removed: result.removed };
   } catch { return { ok: false, error: "Не удалось убрать альбом. Повторите попытку." }; }
 }
 

@@ -39,21 +39,43 @@ export function planAddAlbum(input) {
 }
 
 /**
- * @param {{ catalogTracks: { audioItemId: string, albumId: string }[], collectionTrackIds: string[], albumId: string, revoked: boolean }} input
+ * Existing albums come from every linked audio_item, including tracks that later
+ * lost admission. Admission is applied only when adding albums and during playback.
+ *
+ * @param {{ linkedTracks: { audioItemId: string, albumId: string }[], collectionTrackIds: string[], albumId: string, revoked: boolean }} input
  * @returns {{ ok: true, removeIds: string[] } | { ok: false, reason: "revoked" | "invalid" | "not_in" | "last_album" }}
  */
 export function planRemoveAlbum(input) {
   if (input.revoked) return { ok: false, reason: "revoked" };
   const albumId = typeof input.albumId === "string" ? input.albumId : "";
   if (!albumId) return { ok: false, reason: "invalid" };
-  const catalog = Array.isArray(input.catalogTracks) ? input.catalogTracks : [];
+  const linked = Array.isArray(input.linkedTracks) ? input.linkedTracks : [];
   const existing = new Set(Array.isArray(input.collectionTrackIds) ? input.collectionTrackIds : []);
-  const removeIds = [...new Set(catalog
-    .filter((track) => track && track.albumId === albumId && existing.has(track.audioItemId))
+  const removeIds = [...new Set(linked
+    .filter((track) => track && track.albumId === albumId && typeof track.audioItemId === "string" && existing.has(track.audioItemId))
     .map((track) => track.audioItemId))];
   if (!removeIds.length) return { ok: false, reason: "not_in" };
   if (existing.size - removeIds.length < 1) return { ok: false, reason: "last_album" };
   return { ok: true, removeIds };
+}
+
+/**
+ * Plan and apply in one step, the way the SQL function does under an advisory lock.
+ * @param {{ audioItemId: string, albumId: string }[]} linkedTracks
+ * @param {string} albumId
+ * @param {boolean} revoked
+ */
+export function applyRemoveAlbumExclusive(linkedTracks, albumId, revoked) {
+  const tracks = Array.isArray(linkedTracks) ? linkedTracks : [];
+  const plan = planRemoveAlbum({
+    linkedTracks: tracks,
+    collectionTrackIds: tracks.map((track) => track.audioItemId),
+    albumId,
+    revoked,
+  });
+  if (!plan.ok) return { ok: false, reason: plan.reason, tracks };
+  const drop = new Set(plan.removeIds);
+  return { ok: true, removeIds: plan.removeIds, tracks: tracks.filter((track) => !drop.has(track.audioItemId)) };
 }
 
 /** @param {number} maxPosition @param {number} count */
