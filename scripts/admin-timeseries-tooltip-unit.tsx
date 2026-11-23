@@ -28,6 +28,7 @@ import {
   placeTimeseriesTooltipBox,
   timeseriesPlotY,
   timeseriesPointsSignature,
+  reduceTimeseriesHover,
 } from "../src/lib/admin/timeseries-tooltip";
 
 const EM_DASH = "\u2014";
@@ -284,7 +285,28 @@ assert.match(annotation, /data-series="visitors"/);
 assert.equal(annotation.includes(EM_DASH), false);
 assert.equal(annotation.includes(TIMESERIES_EN_DASH), true);
 
-// 8. A filter change that keeps the same date range still changes the signature.
+// 8. Hover/tap reducer: data change A → B → A must not revive a sticky tooltip.
+const sigA = "period-A";
+const sigB = "period-B";
+let hover = reduceTimeseriesHover(null, { type: "tap", index: 6, signature: sigA });
+assert.deepEqual(hover, { index: 6, sticky: true, signature: sigA });
+hover = reduceTimeseriesHover(hover, { type: "reset" }); // period A → B
+assert.equal(hover, null);
+hover = reduceTimeseriesHover(hover, { type: "move", index: 0, signature: sigB });
+assert.equal(hover?.signature, sigB);
+hover = reduceTimeseriesHover(hover, { type: "reset" }); // period B → A
+assert.equal(hover, null, "returning to period A without a new tap stays hidden");
+hover = reduceTimeseriesHover(null, { type: "move", index: 2, signature: sigA });
+assert.deepEqual(hover, { index: 2, sticky: false, signature: sigA });
+hover = reduceTimeseriesHover(hover, { type: "leave-mouse" });
+assert.equal(hover, null);
+hover = reduceTimeseriesHover(null, { type: "tap", index: 1, signature: sigA });
+hover = reduceTimeseriesHover(hover, { type: "move", index: 3, signature: sigA });
+assert.equal(hover?.index, 1, "a sticky tap ignores later mouse moves");
+hover = reduceTimeseriesHover(hover, { type: "tap", index: 1, signature: sigA });
+assert.equal(hover, null, "a second tap on the same point hides the tooltip");
+
+// 9. A filter change that keeps the same date range still changes the signature.
 const weekPoints = week.map((bucket, index) => point(bucket, [180, 205, 160, 140, 175, 200, 503][index]));
 const sameRangeOtherFilter = weekPoints.map((item, index) =>
   index === 3 ? { ...item, visitors: item.visitors + 15 } : item,
@@ -302,7 +324,7 @@ assert.notEqual(
   timeseriesPointsSignature(weekPoints, "week"),
 );
 
-// 9. Idle chart has no tooltip (it appears only on hover or tap).
+// 10. Idle chart has no tooltip (it appears only on hover or tap).
 const idle = renderToStaticMarkup(
   <AdminAnalyticsTimeseriesChart
     points={week.map((bucket, index) => point(bucket, [180, 205, 160, 140, 175, 200, 503][index]))}

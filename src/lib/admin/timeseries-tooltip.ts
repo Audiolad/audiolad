@@ -330,6 +330,51 @@ export function placeTimeseriesTooltipBox(
   return { x: maxX, y: minY, width: box.width, height: box.height };
 }
 
+
+export type TimeseriesHover = {
+  index: number;
+  sticky: boolean;
+  signature: string;
+};
+
+export type TimeseriesHoverEvent =
+  | { type: "move"; index: number | null; signature: string }
+  | { type: "leave-mouse" }
+  | { type: "tap"; index: number; signature: string }
+  | { type: "reset" };
+
+/**
+ * Hover/tap state. A data or period change must send `reset` so a later
+ * return to the previous period does not revive a sticky tooltip.
+ */
+export function reduceTimeseriesHover(
+  hover: TimeseriesHover | null,
+  event: TimeseriesHoverEvent,
+): TimeseriesHover | null {
+  if (event.type === "reset") {
+    return null;
+  }
+  if (event.type === "move") {
+    if (hover?.sticky && hover.signature === event.signature) {
+      return hover;
+    }
+    if (event.index == null) {
+      return null;
+    }
+    return { index: event.index, sticky: false, signature: event.signature };
+  }
+  if (event.type === "leave-mouse") {
+    if (hover?.sticky) {
+      return hover;
+    }
+    return null;
+  }
+  if (hover?.sticky && hover.index === event.index && hover.signature === event.signature) {
+    return null;
+  }
+  return { index: event.index, sticky: true, signature: event.signature };
+}
+
 export function pointerClientToSvgX(
   clientX: number,
   svg: Pick<SVGSVGElement, "getScreenCTM" | "createSVGPoint">,

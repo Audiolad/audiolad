@@ -17,8 +17,10 @@ import {
   nearestTimeseriesIndex,
   placeTimeseriesTooltipBox,
   pointerClientToSvgX,
+  reduceTimeseriesHover,
   timeseriesPlotY,
   timeseriesPointsSignature,
+  type TimeseriesHover,
 } from "@/lib/admin/timeseries-tooltip";
 import AdminAnalyticsTimeseriesTooltip from "@/components/admin/AdminAnalyticsTimeseriesTooltip";
 
@@ -49,11 +51,6 @@ export default function AdminAnalyticsTimeseriesChart({
 }) {
   const [enabled, setEnabled] = useState<Record<SeriesKey, boolean>>(DEFAULT_ENABLED);
   const [listeningEnabled, setListeningEnabled] = useState(true);
-  const [hover, setHover] = useState<{
-    index: number;
-    sticky: boolean;
-    signature: string;
-  } | null>(null);
 
   const activeSeries = SERIES.filter((series) => enabled[series.key]);
   const enabledKeys = activeSeries.map((series) => series.key);
@@ -73,9 +70,6 @@ export default function AdminAnalyticsTimeseriesChart({
   }, [points]);
 
   const pointsSignature = timeseriesPointsSignature(points, granularity);
-  const activeIndex =
-    hover && hover.signature === pointsSignature ? hover.index : null;
-  const sticky = Boolean(hover && hover.signature === pointsSignature && hover.sticky);
 
   const { max, pathMap } = useMemo(() => {
     const maxValue = Math.max(
@@ -132,89 +126,6 @@ export default function AdminAnalyticsTimeseriesChart({
 
     return { d, maxMinutes };
   }, [axis, listeningEnabled, points]);
-
-  const tooltip = useMemo(() => {
-    if (activeIndex == null || activeIndex < 0 || activeIndex >= points.length) {
-      return null;
-    }
-    const point = points[activeIndex];
-    const model = buildTimeseriesTooltip({
-      point,
-      index: activeIndex,
-      granularity,
-      withYear,
-      listeningEnabled,
-      enabledSeries: enabledKeys,
-    });
-    if (!model) {
-      return null;
-    }
-    const x = axis.xAt(activeIndex);
-    const markers = buildTimeseriesMarkers({
-      point,
-      x,
-      listeningEnabled,
-      listeningMaxMinutes: listeningPath.maxMinutes,
-      enabledSeries: enabledKeys,
-      countMax: max,
-    });
-    const box = placeTimeseriesTooltipBox(
-      measureTimeseriesTooltipBox(model),
-      axis.width,
-      axis.height,
-      x,
-      markers,
-    );
-    return { model, markers, box, x };
-  }, [
-    activeIndex,
-    axis,
-    enabledKeys,
-    granularity,
-    listeningEnabled,
-    listeningPath.maxMinutes,
-    max,
-    points,
-    withYear,
-  ]);
-
-  function readIndex(event: ReactPointerEvent<SVGSVGElement>): number | null {
-    const svgX = pointerClientToSvgX(event.clientX, event.currentTarget);
-    if (svgX == null) {
-      return null;
-    }
-    return nearestTimeseriesIndex(svgX, axis.xAt, points.length);
-  }
-
-  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
-    if (sticky) {
-      return;
-    }
-    const index = readIndex(event);
-    setHover(index == null ? null : { index, sticky: false, signature: pointsSignature });
-  }
-
-  function onPointerLeave(event: ReactPointerEvent<SVGSVGElement>) {
-    if (event.pointerType !== "mouse" || sticky) {
-      return;
-    }
-    setHover(null);
-  }
-
-  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
-    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
-      return;
-    }
-    const index = readIndex(event);
-    if (index == null) {
-      return;
-    }
-    if (sticky && activeIndex === index) {
-      setHover(null);
-      return;
-    }
-    setHover({ index, sticky: true, signature: pointsSignature });
-  }
 
   return (
     <section
@@ -285,6 +196,142 @@ export default function AdminAnalyticsTimeseriesChart({
         <p className="mt-4 text-sm text-[#9485b4]">Нет точек за выбранный период.</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
+          <TimeseriesPlotBody
+            key={pointsSignature}
+            pointsSignature={pointsSignature}
+            points={points}
+            granularity={granularity}
+            withYear={withYear}
+            axis={axis}
+            enabledKeys={enabledKeys}
+            listeningEnabled={listeningEnabled}
+            listeningMaxMinutes={listeningPath.maxMinutes}
+            countMax={max}
+            pathMap={pathMap}
+            listeningPathD={listeningPath.d}
+            activeSeries={activeSeries}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TimeseriesPlotBody({
+  pointsSignature,
+  points,
+  granularity,
+  withYear,
+  axis,
+  enabledKeys,
+  listeningEnabled,
+  listeningMaxMinutes,
+  countMax,
+  pathMap,
+  listeningPathD,
+  activeSeries,
+}: {
+  pointsSignature: string;
+  points: AdminAnalyticsTimeseriesPoint[];
+  granularity: "day" | "week";
+  withYear: boolean;
+  axis: ReturnType<typeof buildTimeseriesAxisLayout>;
+  enabledKeys: SeriesKey[];
+  listeningEnabled: boolean;
+  listeningMaxMinutes: number;
+  countMax: number;
+  pathMap: Record<SeriesKey, string>;
+  listeningPathD: string;
+  activeSeries: typeof SERIES[number][];
+}) {
+  const [hover, setHover] = useState<TimeseriesHover | null>(null);
+  const activeIndex = hover && hover.signature === pointsSignature ? hover.index : null;
+
+  const tooltip = useMemo(() => {
+    if (activeIndex == null || activeIndex < 0 || activeIndex >= points.length) {
+      return null;
+    }
+    const point = points[activeIndex];
+    const model = buildTimeseriesTooltip({
+      point,
+      index: activeIndex,
+      granularity,
+      withYear,
+      listeningEnabled,
+      enabledSeries: enabledKeys,
+    });
+    if (!model) {
+      return null;
+    }
+    const x = axis.xAt(activeIndex);
+    const markers = buildTimeseriesMarkers({
+      point,
+      x,
+      listeningEnabled,
+      listeningMaxMinutes,
+      enabledSeries: enabledKeys,
+      countMax,
+    });
+    const box = placeTimeseriesTooltipBox(
+      measureTimeseriesTooltipBox(model),
+      axis.width,
+      axis.height,
+      x,
+      markers,
+    );
+    return { model, markers, box, x };
+  }, [
+    activeIndex,
+    axis,
+    countMax,
+    enabledKeys,
+    granularity,
+    listeningEnabled,
+    listeningMaxMinutes,
+    points,
+    withYear,
+  ]);
+
+  function readIndex(event: ReactPointerEvent<SVGSVGElement>): number | null {
+    const svgX = pointerClientToSvgX(event.clientX, event.currentTarget);
+    if (svgX == null) {
+      return null;
+    }
+    return nearestTimeseriesIndex(svgX, axis.xAt, points.length);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const index = readIndex(event);
+    setHover((current) => reduceTimeseriesHover(current, {
+      type: "move",
+      index,
+      signature: pointsSignature,
+    }));
+  }
+
+  function onPointerLeave(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "mouse") {
+      return;
+    }
+    setHover((current) => reduceTimeseriesHover(current, { type: "leave-mouse" }));
+  }
+
+  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+      return;
+    }
+    const index = readIndex(event);
+    if (index == null) {
+      return;
+    }
+    setHover((current) => reduceTimeseriesHover(current, {
+      type: "tap",
+      index,
+      signature: pointsSignature,
+    }));
+  }
+
+  return (
           <svg
             viewBox={`0 0 ${axis.width} ${axis.height}`}
             className="w-full"
@@ -310,11 +357,11 @@ export default function AdminAnalyticsTimeseriesChart({
               strokeWidth="1"
             />
             <text x="8" y="24" className="fill-[#9485b4]" fontSize="11">
-              {max.toLocaleString("ru-RU")}
+              {countMax.toLocaleString("ru-RU")}
             </text>
-            {listeningEnabled && listeningPath.maxMinutes > 0 ? (
+            {listeningEnabled && listeningMaxMinutes > 0 ? (
               <text x={axis.width - 140} y="24" className="fill-[#1f7a4d]" fontSize="11">
-                {formatListeningDuration(listeningPath.maxMinutes * 60_000)}
+                {formatListeningDuration(listeningMaxMinutes * 60_000)}
               </text>
             ) : null}
             {activeSeries.map((series) => (
@@ -328,9 +375,9 @@ export default function AdminAnalyticsTimeseriesChart({
                 strokeLinejoin="round"
               />
             ))}
-            {listeningEnabled && listeningPath.d ? (
+            {listeningEnabled && listeningPathD ? (
               <path
-                d={listeningPath.d}
+                d={listeningPathD}
                 fill="none"
                 stroke="#1f7a4d"
                 strokeWidth="2.5"
@@ -377,8 +424,5 @@ export default function AdminAnalyticsTimeseriesChart({
               />
             ) : null}
           </svg>
-        </div>
-      )}
-    </section>
   );
 }
