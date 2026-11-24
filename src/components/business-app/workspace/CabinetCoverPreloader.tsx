@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { useBusinessGuestPlaybackOptional } from "@/components/business-app/sound/BusinessGuestPlayback";
 import { useCabinetPlayerOptional } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import {
+  CABINET_COVER_PRELOAD_LIMIT,
+  GUEST_ATMOSPHERE_COVER_LIMIT,
   scheduleCabinetCoverPreload,
   selectCabinetCoverPreloadUrls,
   setCabinetCoverPreloadSet,
@@ -17,6 +19,8 @@ import {
  * never jump the queue ahead of audio and UI requests.
  * The guest coffee demo uses BusinessGuestPlayback (not the cabinet player);
  * an empty allowed set must not open the floodgates.
+ * t1674u: the guest atmosphere (12 rows on screen) allows all its covers, current first,
+ * so no row keeps the brown placeholder; still 4 fetches at a time.
  */
 export default function CabinetCoverPreloader() {
   const player = useCabinetPlayerOptional();
@@ -35,9 +39,10 @@ export default function CabinetCoverPreloader() {
       : (guestAtmosphere?.tracks ?? []).map((track) => ({
           coverUrl: guestBarTracks?.get(track.audioItemId)?.coverSrc ?? null,
         }));
-    const urls = selectCabinetCoverPreloadUrls(tracks, index, order);
+    const limit = useCabinet ? CABINET_COVER_PRELOAD_LIMIT : GUEST_ATMOSPHERE_COVER_LIMIT;
+    const urls = selectCabinetCoverPreloadUrls(tracks, index, order, limit);
     const apply = () => {
-      setCabinetCoverPreloadSet(urls);
+      setCabinetCoverPreloadSet(urls, limit);
     };
     if (playing) {
       apply();

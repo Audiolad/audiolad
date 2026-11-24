@@ -16,7 +16,7 @@ import {
   GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS,
   assembleGuestCoffeeAtmosphere,
   guestCoffeeAtmosphereKey,
-  guestCoffeeAtmosphereMatchLines,
+  guestCoffeeAtmosphereParams,
   guestCoffeeAtmosphereMeta,
   guestCoffeeAtmosphereName,
   guestCoffeeTrackClock,
@@ -106,7 +106,7 @@ for (const profile of all()) {
   assert.ok(total < GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS + 15 * 60, "about the target length");
   assert.deepEqual(a.sources.map((s) => s.tracksUsed).reduce((x, y) => x + y, 0), a.tracks.length);
   assert.deepEqual(assembleGuestCoffeeAtmosphere(shelf, profile), a, "deterministic");
-  for (const line of guestCoffeeAtmosphereMatchLines(a)) assert.doesNotMatch(line.text, /—/, "en dashes only");
+  for (const line of guestCoffeeAtmosphereParams(a)) assert.doesNotMatch(line.text, /—|«|альбом|ближайш|подход/, "plain parameter line");
 }
 
 // ---------------------------------------------------------------- piano + morning + cozy (Sergey's example)
@@ -123,10 +123,9 @@ for (const profile of all()) {
   // Honest: all 4 albums are morning + cozy albums.
   assert.deepEqual([a.match.daypart.state, a.match.daypart.matched, a.match.daypart.of], ["all", 4, 4]);
   assert.equal(a.match.character.state, "all");
-  const lines = guestCoffeeAtmosphereMatchLines(a);
-  assert.equal(lines[1].text, "Время суток «Утро» – подходит по звучанию всех альбомов подборки.");
-  assert.equal(lines[2].text, "Характер заведения «Уютная» – подходит по звучанию всех альбомов подборки.");
-  assert.match(guestCoffeeAtmosphereMeta(a), /^12 треков · \d+ мин · из 4 альбомов$/);
+  // t1673u: plain settings only, no album counts.
+  assert.deepEqual(guestCoffeeAtmosphereParams(a).map((l) => l.text), ["Тип звучания: Спокойный фон", "Время суток: Утро", "Характер: Уютная"]);
+  assert.match(guestCoffeeAtmosphereMeta(a), /^12 треков · \d+ мин$/);
 }
 
 // ---------------------------------------------------------------- jazz evening: only evening albums when they suffice
@@ -142,34 +141,22 @@ for (const profile of all()) {
   const a = assembleGuestCoffeeAtmosphere(noRhythm, { character: "cozy", direction: "rhythm", daypart: "day" })!;
   assert.equal(a.directionFallback, true);
   assert.equal(a.match.direction.state, "none");
-  const line = guestCoffeeAtmosphereMatchLines(a)[0];
-  assert.equal(line.state, "none");
-  assert.equal(line.text, "Тип звучания «Лёгкий ритм» – подходящих альбомов пока нет, собрали самое близкое по звучанию.");
+  // t1673u: even a fallback shows only the chosen setting – no «ближайшие по звучанию» note.
+  assert.equal(guestCoffeeAtmosphereParams(a)[0].text, "Тип звучания: Лёгкий ритм");
 
   const onlyLong = shelf.filter((p) => LONG_FORM.has(p.productSlug));
   const b = assembleGuestCoffeeAtmosphere(onlyLong, { character: "city", direction: "calm", daypart: "morning" })!;
   assert.equal(b.tracks.length, 2, "long-form tracks are used when nothing shorter exists");
   assert.equal(b.tracks[0].playlistId, "p-utrennyaya-muzyka-dlya-horoshego-nastroeniya", "city + morning first");
 
-  const none = guestCoffeeAtmosphereMatchLines({
-    directionFallback: false,
+  const params = guestCoffeeAtmosphereParams({
     match: {
-      direction: { state: "all", matched: 1, of: 1, label: "Джаз" },
-      daypart: { state: "none", matched: 0, of: 1, label: "Утро" },
-      character: { state: "none", matched: 0, of: 1, label: "Вечерняя" },
+      direction: { state: "all", matched: 4, of: 4, label: "Джаз" },
+      daypart: { state: "some", matched: 1, of: 4, label: "Весь день" },
+      character: { state: "none", matched: 0, of: 4, label: "Городская" },
     },
   });
-  assert.equal(none[1].text, "Время суток «Утро» – отдельных альбомов пока нет, взяли ближайшие по звучанию.");
-  const one = guestCoffeeAtmosphereMatchLines({
-    directionFallback: false,
-    match: {
-      direction: { state: "all", matched: 4, of: 4, label: "Спокойный фон" },
-      daypart: { state: "some", matched: 1, of: 4, label: "Вечер" },
-      character: { state: "some", matched: 2, of: 4, label: "Уютная" },
-    },
-  });
-  assert.equal(one[1].text, "Время суток «Вечер» – подходит 1 из 4 альбомов, остальные – ближайшие по звучанию.");
-  assert.match(one[2].text, /– подходят 2 из 4 альбомов/);
+  assert.deepEqual(params.map((l) => l.text), ["Тип звучания: Джаз", "Время суток: Весь день", "Характер: Городская"], "same plain lines whatever matched");
 
   assert.equal(assembleGuestCoffeeAtmosphere([], { character: "cozy", direction: "jazz", daypart: "day" }), null, "nothing to assemble");
   const empty = { ...shelf[0], tracks: [] };
@@ -186,13 +173,13 @@ for (const profile of all()) {
   const d = assembleGuestCoffeeAtmosphere([unknown], { character: "cozy", direction: "jazz", daypart: "allday" })!;
   assert.equal(d.tracks.length, 10, "unknown length counts as 4 min → 40-minute target");
   assert.equal(d.totalSeconds, 0);
-  assert.equal(guestCoffeeAtmosphereMeta(d), "10 треков · из 1 альбома");
+  assert.equal(guestCoffeeAtmosphereMeta(d), "10 треков");
   // Mixed known / unknown durations: no misleading partial total.
   const mixed = { ...shelf[0], tracks: [{ audioItemId: "k0", title: "k0", durationSeconds: 180 }, ...unknown.tracks.slice(0, 9)] };
   const e = assembleGuestCoffeeAtmosphere([mixed], { character: "cozy", direction: "jazz", daypart: "allday" })!;
   assert.equal(e.durationKnown, false);
   assert.equal(e.totalSeconds, 180);
-  assert.equal(guestCoffeeAtmosphereMeta(e), "10 треков · из 1 альбома");
+  assert.equal(guestCoffeeAtmosphereMeta(e), "10 треков");
 }
 
 // Automatic instrumental filter. The curated shelf omits the vocal map and is unchanged.
@@ -228,7 +215,7 @@ for (const profile of all()) {
 // ---------------------------------------------------------------- formatting
 assert.equal(guestCoffeeAtmosphereName({ character: "evening", direction: "melodic", daypart: "allday" }), "Вечерняя кофейня · Мелодичная музыка · Весь день");
 assert.deepEqual([1, 2, 5, 11, 21, 22, 112].map(guestCoffeeTracksWord), ["трек", "трека", "треков", "треков", "трек", "трека", "треков"]);
-assert.equal(guestCoffeeAtmosphereMeta({ tracks: new Array(21).fill(null), totalSeconds: 3600, durationKnown: true, sources: new Array(21).fill(null) }), "21 трек · 60 мин · из 21 альбома");
+assert.equal(guestCoffeeAtmosphereMeta({ tracks: new Array(21).fill(null), totalSeconds: 3600, durationKnown: true }), "21 трек · 60 мин");
 assert.equal(guestCoffeeTrackClock(185), "3:05");
 assert.equal(guestCoffeeTrackClock(null), null);
 assert.equal(guestCoffeeTrackClock(0), null);
@@ -267,7 +254,14 @@ assert.equal(guestCoffeeTrackClock(0), null);
   // Blocked starts are disabled; only pausing the playing track stays possible (review asm1).
   assert.match(studio, /disabled=\{!\(current && isPlaying\) && !canStart\}/);
   assert.match(studio, /data-testid="biz-atmosphere-tracks"/);
-  assert.match(studio, /data-testid="biz-atmosphere-match"/);
+  assert.match(studio, /data-testid="biz-atmosphere-params"/);
+  // t1673u (Sergey 24.11.2026): guests are not told how the music is picked.
+  {
+    const visible = (studio + read("src/lib/business-app/guest-coffee/copy.ts") + read("src/lib/business-app/guest-coffee/atmosphere.ts"))
+      .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    assert.doesNotMatch(visible, /ближайш|подходит по звучанию|подходят \$\{|описание альбомов|решает ваш слух|Собрано из альбомов|самые близкие|из \$\{a\.sources/);
+    assert.doesNotMatch(studio, /biz-atmosphere-match|biz-atmosphere-sources|"✓"/);
+  }
   assert.match(studio, /BusinessAtmosphereTrackButton/);
   assert.match(studio, /coverUrl=\{album\?\.coverUrl \?\? null\}/);
   assert.match(studio, /business-track-panel/);

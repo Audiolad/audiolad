@@ -5,8 +5,8 @@
  * No promise that a claim can never come – only that we defend the venue. Codex r1: no unconditional
  * «без платежей РАО и ВОИС» – the offer leaves art. 1326 to legal assessment, so the copy states the
  * contract terms only.
- * «Без повторов» follows the hall queue: recently played tracks go to the back of a new mix
- * (cafe-queue/auto-topup.ts) and the queue tops itself up.
+ * «Без повторов» follows the hall queue: it tops itself up from the venue settings
+ * (cafe-queue/auto-topup.ts). t1675u/t1676u (Sergey 24.11.2026 15:25): exact wording, no mention of recent tracks.
  */
 export const GUEST_COFFEE_BENEFITS = [
   {
@@ -17,7 +17,7 @@ export const GUEST_COFFEE_BENEFITS = [
   {
     id: "no-repeats",
     title: "Без надоедливых повторов",
-    text: "Очередь обновляется сама, недавние треки уходят в конец.",
+    text: "Очередь обновляется сама, исходя из ваших настроек и предпочтений.",
   },
   {
     id: "coffee",

@@ -321,17 +321,14 @@ export function guestCoffeeTracksWord(n: number): string {
   return "треков";
 }
 
-/** Genitive after «из»: из 1 альбома, из 3 альбомов, из 21 альбома. */
-function albumsGenitive(n: number): string {
-  return n % 10 === 1 && n % 100 !== 11 ? "альбома" : "альбомов";
-}
-
-/** «12 треков · 38 мин · из 3 альбомов» */
-export function guestCoffeeAtmosphereMeta(a: Pick<GuestCoffeeAtmosphere, "tracks" | "totalSeconds" | "durationKnown" | "sources">): string {
+/**
+ * «12 треков · 38 мин». t1673u (Sergey 24.11.2026 15:23): no album count – guests are not told
+ * how the playlist is put together.
+ */
+export function guestCoffeeAtmosphereMeta(a: Pick<GuestCoffeeAtmosphere, "tracks" | "totalSeconds" | "durationKnown">): string {
   const parts = [`${a.tracks.length} ${guestCoffeeTracksWord(a.tracks.length)}`];
   // A partial sum would understate the length: show minutes only when every duration is known.
   if (a.durationKnown && a.totalSeconds > 0) parts.push(`${Math.max(1, Math.round(a.totalSeconds / 60))} мин`);
-  parts.push(`из ${a.sources.length} ${albumsGenitive(a.sources.length)}`);
   return parts.join(" · ");
 }
 
@@ -342,28 +339,19 @@ export function guestCoffeeTrackClock(seconds: number | null | undefined): strin
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** Honest «что совпало» lines, one per setting (en dashes only). */
-export function guestCoffeeAtmosphereMatchLines(a: Pick<GuestCoffeeAtmosphere, "match" | "directionFallback">): {
+/**
+ * t1673u (Sergey 24.11.2026 15:23): the chosen settings as plain lines – «Тип звучания: Джаз»,
+ * «Время суток: Весь день», «Характер: Городская». No check marks, no album counts, no
+ * «ближайшие по звучанию» explanations of how the music was picked.
+ */
+export function guestCoffeeAtmosphereParams(a: Pick<GuestCoffeeAtmosphere, "match">): {
   id: "direction" | "daypart" | "character";
-  state: GuestCoffeeAxisMatch["state"];
   text: string;
 }[] {
   const { direction, daypart, character } = a.match;
-  const part = (m: GuestCoffeeAxisMatch, what: string, rest: string) =>
-    m.state === "all"
-      ? `${what} «${m.label}» – подходит по звучанию всех альбомов подборки.`
-      : m.state === "some"
-        ? `${what} «${m.label}» – ${m.matched % 10 === 1 && m.matched % 100 !== 11 ? "подходит" : "подходят"} ${m.matched} из ${m.of} альбомов, остальные – ${rest}.`
-        : `${what} «${m.label}» – отдельных альбомов пока нет, взяли ${rest}.`;
   return [
-    {
-      id: "direction",
-      state: a.directionFallback ? "none" : direction.state,
-      text: a.directionFallback
-        ? `Тип звучания «${direction.label}» – подходящих альбомов пока нет, собрали самое близкое по звучанию.`
-        : part(direction, "Тип звучания", "близкие по звучанию"),
-    },
-    { id: "daypart", state: daypart.state, text: part(daypart, "Время суток", "ближайшие по звучанию") },
-    { id: "character", state: character.state, text: part(character, "Характер заведения", "ближайшие по звучанию и времени суток") },
+    { id: "direction", text: `Тип звучания: ${direction.label}` },
+    { id: "daypart", text: `Время суток: ${daypart.label}` },
+    { id: "character", text: `Характер: ${character.label}` },
   ];
 }
