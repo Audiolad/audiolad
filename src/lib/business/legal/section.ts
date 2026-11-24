@@ -15,7 +15,7 @@ export { normalizeBusinessLegalCertificateNumber, BUSINESS_CERTIFICATE_SAMPLE_LE
  * Правовой раздел «АудиоЛад Кофейня» – audiolad.ru/b/coffee/legal (t1544u, t1567u).
  * Раздел скрыт от поиска: noindex, nofollow, нет в sitemap, нет ссылок из меню и подвала сайта.
  * Открывается по прямой ссылке; на него ссылается кабинет владельца (договор, сертификат заведения)
- * и QR-код сертификата (t1591u).
+ * и QR-код сертификата (t1591u), а также подвал гостевой страницы coffee.audiolad.ru (t1667u).
  */
 export const BUSINESS_LEGAL_HREF = "/b/coffee/legal";
 export const BUSINESS_LEGAL_RIGHTS_HREF = "/b/coffee/legal/prava";
