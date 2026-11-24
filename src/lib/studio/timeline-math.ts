@@ -138,3 +138,70 @@ export function formatTimelineTime(time: number): string {
   const seconds = Math.floor(safeTime % 60);
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+
+/** Playback clock drift tolerated before a position change counts as a seek. */
+export const TIMELINE_SEEK_JUMP_TOLERANCE_SECONDS = 1;
+
+/**
+ * True when the playhead moved differently from normal playback since the
+ * previous sample (a seek, a skip or a jump back), so "follow the playhead"
+ * may take over the view again. A slow frame is not a seek: the expected
+ * position advances with wall-clock time.
+ */
+export function isTimelineSeekJump({
+  previousTime,
+  elapsedSeconds,
+  currentTime,
+}: {
+  previousTime: number;
+  elapsedSeconds: number;
+  currentTime: number;
+}): boolean {
+  if (
+    !Number.isFinite(previousTime) ||
+    !Number.isFinite(currentTime) ||
+    !Number.isFinite(elapsedSeconds)
+  ) {
+    return false;
+  }
+  const expected = previousTime + Math.max(elapsedSeconds, 0);
+  return Math.abs(currentTime - expected) > TIMELINE_SEEK_JUMP_TOLERANCE_SECONDS;
+}
+
+/** Follow-the-playhead keeps the playhead inside these viewport margins. */
+export const TIMELINE_FOLLOW_LEADING_MARGIN_PX = 48;
+export const TIMELINE_FOLLOW_TRAILING_MARGIN_PX = 96;
+export const TIMELINE_FOLLOW_ANCHOR_RATIO = 0.35;
+
+/**
+ * One playback-frame decision for "follow the playhead".
+ * While suspended (the author scrolled by hand) the view never moves; follow
+ * comes back only once the playhead sits inside the follow zone, i.e. when
+ * resuming would not move the view. So a slow manual scroll that brings the
+ * playhead near an edge can never be snapped back mid-gesture.
+ */
+export function getTimelineFollowDecision({
+  playheadX,
+  scrollLeft,
+  viewportWidth,
+  suspended,
+}: {
+  playheadX: number;
+  scrollLeft: number;
+  viewportWidth: number;
+  suspended: boolean;
+}): { suspended: boolean; nextScrollLeft: number | null } {
+  const insideFollowZone =
+    playheadX >= scrollLeft + TIMELINE_FOLLOW_LEADING_MARGIN_PX &&
+    playheadX <= scrollLeft + viewportWidth - TIMELINE_FOLLOW_TRAILING_MARGIN_PX;
+  if (insideFollowZone) {
+    return { suspended: false, nextScrollLeft: null };
+  }
+  if (suspended) {
+    return { suspended: true, nextScrollLeft: null };
+  }
+  return {
+    suspended: false,
+    nextScrollLeft: Math.max(0, playheadX - viewportWidth * TIMELINE_FOLLOW_ANCHOR_RATIO),
+  };
+}
