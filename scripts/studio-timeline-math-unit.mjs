@@ -14,6 +14,7 @@ import {
   getRulerStepSeconds,
   getTimelineEditExtent,
   getTimelineWidth,
+  isTimelineSeekJump,
   pixelsPerSecondToSliderValue,
   sliderValueToPixelsPerSecond,
   stepPixelsPerSecond,
@@ -182,5 +183,18 @@ assert.match(editorSource, /stepPixelsPerSecond/);
 assert.match(editorSource, /TIMELINE_ZOOM_STEP|stepPixelsPerSecond\(current, 1\)/);
 assert.doesNotMatch(editorSource, /1\.25/);
 assert.doesNotMatch(editorSource, /clampPixelsPerSecond\(current \*/);
+
+// t1669u: normal playback (incl. a slow frame) is not a seek; skips and jumps are.
+assert.equal(isTimelineSeekJump({ previousTime: 20, elapsedSeconds: 0.016, currentTime: 20.016 }), false);
+assert.equal(isTimelineSeekJump({ previousTime: 20, elapsedSeconds: 2.5, currentTime: 22.4 }), false);
+assert.equal(isTimelineSeekJump({ previousTime: 20, elapsedSeconds: 0.016, currentTime: 35 }), true);
+assert.equal(isTimelineSeekJump({ previousTime: 600, elapsedSeconds: 0.016, currentTime: 0 }), true);
+assert.equal(isTimelineSeekJump({ previousTime: Number.NaN, elapsedSeconds: 0.016, currentTime: 5 }), false);
+
+// t1669u: a manual scroll during playback must not be overridden by follow-the-playhead.
+assert.match(timelineSource, /followSuspendedRef\.current = true/);
+assert.match(timelineSource, /isTimelineSeekJump\(/);
+assert.doesNotMatch(timelineSource, /Date\.now\(\) - lastManualScrollAtRef\.current < 1500/);
+assert.doesNotMatch(timelineSource, /isAutoScrollingRef/);
 
 console.log("studio-timeline-math-unit: ok");

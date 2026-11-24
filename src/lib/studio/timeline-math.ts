@@ -138,3 +138,32 @@ export function formatTimelineTime(time: number): string {
   const seconds = Math.floor(safeTime % 60);
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+
+/** Playback clock drift tolerated before a position change counts as a seek. */
+export const TIMELINE_SEEK_JUMP_TOLERANCE_SECONDS = 1;
+
+/**
+ * True when the playhead moved differently from normal playback since the
+ * previous sample (a seek, a skip or a jump back), so "follow the playhead"
+ * may take over the view again. A slow frame is not a seek: the expected
+ * position advances with wall-clock time.
+ */
+export function isTimelineSeekJump({
+  previousTime,
+  elapsedSeconds,
+  currentTime,
+}: {
+  previousTime: number;
+  elapsedSeconds: number;
+  currentTime: number;
+}): boolean {
+  if (
+    !Number.isFinite(previousTime) ||
+    !Number.isFinite(currentTime) ||
+    !Number.isFinite(elapsedSeconds)
+  ) {
+    return false;
+  }
+  const expected = previousTime + Math.max(elapsedSeconds, 0);
+  return Math.abs(currentTime - expected) > TIMELINE_SEEK_JUMP_TOLERANCE_SECONDS;
+}
