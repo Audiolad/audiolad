@@ -15,9 +15,9 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+      - name: Fetch the diagnostic script from this commit
+        shell: pwsh
+        run: Invoke-WebRequest "https://raw.githubusercontent.com/Audiolad/audiolad/$env:GITHUB_SHA/scripts/studio-scroll-windows.cjs" -OutFile studio-scroll-windows.cjs
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -27,4 +27,4 @@ jobs:
         shell: pwsh
         run: |
           $env:NODE_PATH = "$pwd\.studio-scroll-tools\node_modules"
-          node scripts/studio-scroll-windows.cjs
+          node studio-scroll-windows.cjs
