@@ -463,18 +463,19 @@ for (const file of [
   const route = read("src/app/api/business/guest/coffee/track-url/route.ts");
   assert.match(loader, /export async function isGuestCoffeeClosedTrackStillLive/);
   assert.match(loader, /if \(playlist\.closed !== true\) return false;/, "only closed preview albums are re-checked as live");
-  assert.match(loader, /\.from\("business_track_passports"\)[\s\S]*?\.eq\("status", "approved"\)/, "approved passports only");
-  assert.match(loader, /\.eq\("business_only", true\)[\s\S]*?\.eq\("status", "published"\)[\s\S]*?\.is\("deleted_at", null\)/, "published closed albums only");
+  // Source = the existing venue-less closed pool (approved passport, sound gate, no blocking review).
+  assert.match(loader, /const pool = await loadCollectionCatalog\(null\);/, "closed pool from business_personal_collection_tracks(NULL)");
+  assert.match(loader, /loadCollectionCatalog\(null, audioItemId\)[\s\S]*?row\.album_id === playlist\.id/, "fresh per-track re-check against the same pool");
+  const pool = read("supabase/migrations/20270402120000_business_personal_collections.sql");
+  assert.match(pool, /business_track_passport_approved\(a\.id\)[\s\S]*?business_sound_track_allowed\(a\.id, 'cafe'\)[\s\S]*?NOT IN \('blocked', 'proof_requested'\)/);
   assert.match(route, /isStillLive: isGuestCoffeeClosedTrackStillLive/, "uncached re-check right before signing");
   assert.match(route, /isStillAdmitted: isGuestCoffeeTrackStillAdmitted/, "uncached admission re-check right before signing");
   assert.match(route, /sign: \(\{ audioId \}\) => signGuestCoffeeClosedAudio\(audioId\)/, "hall signer, one preview track");
   assert.doesNotMatch(route, /signEntitledListenAudio/);
   assert.match(loader, /signWorkspaceAudio\(audioItemId, new Set\(\[audioItemId\]\), null\)/);
   assert.match(loader, /soundAllowedTrackIds\(\[audioItemId\], GUEST_COFFEE_BUSINESS_DIRECTION_KEY\)/);
-  assert.match(loader, /soundAllowedTrackIds\(playable\.map\(\(row\) => row\.id\), GUEST_COFFEE_BUSINESS_DIRECTION_KEY, db\)/);
   assert.match(loader, /export async function loadGuestCoffeeShelf\(\)[\s\S]*?\(await loadGuestCoffeePreview\(\)\)\.playlists/, "signing allow-list = trimmed preview");
   assert.doesNotMatch(loader, /audio_path[^\n]*coverUrl|storage_path/, "no storage paths in the preview model");
-  assert.match(loader, /\.from\("business_content_admissions"\)[\s\S]*?\.eq\("allowed", true\)/);
   assert.match(route, /issueLease: \(trackSeconds\) => issueGuestCoffeeLease\(request, trackSeconds\)/);
   assert.match(route, /peekUsage: peekGuestCoffeeUsage/);
 }

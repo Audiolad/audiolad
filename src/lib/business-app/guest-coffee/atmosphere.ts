@@ -162,8 +162,11 @@ export function assembleGuestCoffeeAtmosphere(
   plan?: GuestCoffeeRecommendationPlan | null,
   /** Automatic instrumental playlist. Omitted for the curated shelf, which does not read vocal_role. */
   vocalByAudioItemId?: BusinessVocalLookup | null,
-  /** t1670u: fewer tracks (the guest preview reserves places for vocal tracks). */
-  options?: { maxTracks?: number },
+  /**
+   * t1670u: fewer tracks (the guest preview reserves places for vocal tracks); byCount – fill up
+   * to maxTracks regardless of the ~40-minute target (the preview always has 12 tracks).
+   */
+  options?: { maxTracks?: number; byCount?: boolean },
 ): GuestCoffeeAtmosphere | null {
   const maxTracks = Math.max(1, Math.min(GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS, options?.maxTracks ?? GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS));
   const { albums, soundFallback } = guestCoffeeRecommendation(available, profile, plan);
@@ -236,7 +239,7 @@ export function assembleGuestCoffeeAtmosphere(
   let capLifted = false;
   let rotation = 0;
   let lastArtist: string | null = null;
-  const full = () => tracks.length >= maxTracks || planned >= GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS;
+  const full = () => tracks.length >= maxTracks || (!options?.byCount && planned >= GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS);
   const head = (lane: (typeof lanes)[number], tier: number): Item | undefined => {
     const q = lane.tiers[tier];
     while (q.length > 0 && seen.has(q[0].track.audioItemId)) q.shift();

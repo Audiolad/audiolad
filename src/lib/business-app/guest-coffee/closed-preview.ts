@@ -115,11 +115,11 @@ export function assembleGuestCoffeePreviewAtmosphere(
     ? guestCoffeeRecommendation(vocalPool, profile, plan).albums.filter((a) => a.fits.sound).map((a) => a.playlist)
     : [];
   const vocal = fittingVocal.length > 0
-    ? assembleGuestCoffeeAtmosphere(fittingVocal, profile, plan, null, { maxTracks: GUEST_COFFEE_PREVIEW_VOCAL_TRACKS })
+    ? assembleGuestCoffeeAtmosphere(fittingVocal, profile, plan, null, { maxTracks: GUEST_COFFEE_PREVIEW_VOCAL_TRACKS, byCount: true })
     : null;
   const vocalCount = vocal?.tracks.length ?? 0;
   const plain = plainPool.length > 0
-    ? assembleGuestCoffeeAtmosphere(plainPool, profile, plan, null, { maxTracks: GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS - vocalCount })
+    ? assembleGuestCoffeeAtmosphere(plainPool, profile, plan, null, { maxTracks: GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS - vocalCount, byCount: true })
     : null;
   if (!plain) return vocal;
   if (!vocal) return plain;
@@ -138,6 +138,8 @@ export function assembleGuestCoffeePreviewAtmosphere(
   return {
     ...plain,
     tracks,
+    // Vocal tracks come only from sound-fitting albums: with them the sound type is never a fallback.
+    directionFallback: plain.directionFallback && vocal.tracks.length === 0,
     sources: [...plain.sources, ...vocal.sources],
     totalSeconds: plain.totalSeconds + vocal.totalSeconds,
     durationKnown: plain.durationKnown && vocal.durationKnown,
@@ -213,6 +215,23 @@ export function buildGuestCoffeePreview(
   return { playlists, presets };
 }
 
+const isIndex = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const AXIS_STATES = new Set(["all", "some", "none"]);
+
+function validPreset(p: unknown): p is GuestCoffeePresetAtmosphere {
+  if (!p || typeof p !== "object") return false;
+  const x = p as Record<string, unknown>;
+  return (
+    Array.isArray(x.t) && x.t.length > 0 && x.t.every(isIndex) && new Set(x.t).size === x.t.length &&
+    Array.isArray(x.s) && x.s.every((e) => Array.isArray(e) && e.length === 2 && isIndex(e[0]) && isCount(e[1])) &&
+    isCount(x.ts) && isCount(x.a) &&
+    Array.isArray(x.f) && x.f.length === 3 && x.f.every((b) => b === 0 || b === 1) &&
+    Array.isArray(x.m) && x.m.length === 3 &&
+    x.m.every((e) => Array.isArray(e) && e.length === 3 && AXIS_STATES.has(e[0] as string) && isCount(e[1]) && isCount(e[2]))
+  );
+}
+
 /** Browser: the ready atmosphere of one setting (null when the preset is missing or broken). */
 export function guestCoffeeAtmosphereFromPreset(
   key: string,
@@ -220,7 +239,7 @@ export function guestCoffeeAtmosphereFromPreset(
   playlists: readonly GuestCoffeePlaylist[],
 ): GuestCoffeeAtmosphere | null {
   const profile = allGuestCoffeeProfiles().find((p) => guestCoffeeProfileKey(p) === key);
-  if (!profile || !preset || !Array.isArray(preset.t) || !Array.isArray(preset.s) || !Array.isArray(preset.m) || preset.m.length !== 3) return null;
+  if (!profile || !validPreset(preset)) return null;
   const flat = playlists.flatMap((p) =>
     p.tracks.map((t): GuestCoffeeAtmosphereTrack => ({ ...t, playlistId: p.id, albumTitle: p.title, authorName: p.authorName })),
   );

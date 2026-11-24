@@ -115,4 +115,31 @@ const profile: GuestCoffeeProfile = { character: "cozy", direction: "jazz", dayp
   assert.deepEqual(buildGuestCoffeePreview([], null), { playlists: [], presets: {} });
 }
 
+// ---- review r1: long tracks still give 12 (count-based), fallback flag, malformed presets
+{
+  const long = buildGuestCoffeeClosedShelf(Array.from({ length: 8 }, (_, i) => ({ ...album(i), tracks: album(i).tracks.map((t) => ({ ...t, durationSeconds: 300 })) })));
+  const a = assembleGuestCoffeePreviewAtmosphere(long, profile, null);
+  assert.equal(a?.tracks.length, 12, "5-minute tracks: still 12 (not cut at ~40 min)");
+
+  // Only a vocal album fits «Джаз»: the result is not reported as a sound fallback.
+  const onlyVocalJazz = buildGuestCoffeeClosedShelf([
+    ...Array.from({ length: 6 }, (_, i) => ({ ...album(i), title: `Спокойный фон ${i}` })),
+    { ...album(30, true), title: "Вечерний джаз с голосом" },
+  ]);
+  const b = assembleGuestCoffeePreviewAtmosphere(onlyVocalJazz, profile, null);
+  assert.ok(b);
+  if (b.tracks.some((t) => t.playlistId === onlyVocalJazz[6].id)) assert.equal(b.directionFallback, false);
+
+  const shelf = buildGuestCoffeeClosedShelf(Array.from({ length: 10 }, (_, i) => album(i)));
+  const preview = buildGuestCoffeePreview(shelf, null);
+  const key = "cozy|jazz|allday";
+  const good = preview.presets[key];
+  assert.ok(guestCoffeeAtmosphereFromPreset(key, good, preview.playlists));
+  const bad: unknown[] = [
+    null, {}, { ...good, f: undefined }, { ...good, s: [null] }, { ...good, m: [null, null, null] },
+    { ...good, t: [good.t[0], good.t[0]] }, { ...good, t: [] }, { ...good, t: [-1] }, { ...good, m: [["maybe", 1, 1], good.m[1], good.m[2]] },
+  ];
+  for (const p of bad) assert.equal(guestCoffeeAtmosphereFromPreset(key, p as never, preview.playlists), null, JSON.stringify(p)?.slice(0, 60));
+}
+
 console.log("business-guest-closed-preview-unit: ok");

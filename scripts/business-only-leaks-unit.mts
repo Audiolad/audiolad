@@ -190,8 +190,7 @@ for (const name of queryFiles) {
   assert.match(guest, /^import "server-only";/);
   assert.match(guest, /buildGuestCoffeePreview\(shelf, plan\)/, "browser gets the trimmed preview only");
   assert.match(guest, /\(await loadGuestCoffeePreview\(\)\)\.playlists/, "signing allow-list = trimmed preview");
-  assert.match(guest, /\.from\("business_track_passports"\)[\s\S]*?\.eq\("status", "approved"\)/);
-  assert.match(guest, /\.eq\("allowed", true\)/);
+  assert.match(guest, /loadCollectionCatalog\(null\)/, "venue-less closed pool (approved passport, sound gate, no blocking review)");
   assert.doesNotMatch(guest, /storage_path|createSignedUrl/, "no storage paths or own signing in the loader");
   const cover = read("src/app/api/business/guest/coffee/cover/route.ts");
   assert.match(cover, /shelf\.some\(\(p\) => p\.id === albumId && p\.closed === true\)/, "only covers of preview albums");
