@@ -29,7 +29,7 @@ import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } 
 import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
 import { voteCafeFeedback, type CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
 import { CAFE_QUEUE_TOPUP_NOTE } from "@/lib/business-app/cafe-queue/auto-topup";
-import { cafeQueueBuildKey, cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueBuildKey, cafeQueueIndices, cafeQueuePreviewIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
@@ -225,9 +225,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
   const playOrder = player.queueOrder ?? model.tracks.map((_, index) => index);
   const ahead = current ? cafeUniqueAhead(model.tracks, playOrder, currentIndex) : [];
-  const previewOrder = ahead.length > 0 || !current
-    ? ahead
-    : cafeUpcomingIndices(playOrder, currentIndex);
+  // t1677u: the same rows the cover preloader warms (cafeQueuePreviewIndices).
+  const previewOrder = cafeQueuePreviewIndices(model.tracks, playOrder, currentIndex);
   const upcoming = queueRows(model.tracks, previewOrder);
   const aheadTotal = typeof player.queueAheadCount === "number" && player.queueAheadCount >= ahead.length ? player.queueAheadCount : ahead.length;
   const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(aheadTotal));

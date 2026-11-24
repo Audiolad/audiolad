@@ -6,6 +6,7 @@
  */
 
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
+import { CAFE_QUEUE_PREVIEW, cafeQueuePreviewIndices } from "@/lib/business-app/cafe-queue/order";
 
 export const CABINET_COVER_PRELOAD_LIMIT = 4;
 /**
@@ -14,6 +15,14 @@ export const CABINET_COVER_PRELOAD_LIMIT = 4;
  * Fetches still go 4 at a time; the signed-in cabinet queue keeps the 4-cover window.
  */
 export const GUEST_ATMOSPHERE_COVER_LIMIT = 12;
+/**
+ * t1677u: the owner/hall «Музыка» screen – the playing track, the CAFE_QUEUE_PREVIEW rows of
+ * «Дальше в очереди» (exactly the rows on screen) and two rows of lookahead for the next move.
+ * t1654u froze the cabinet with ~25 simultaneous /api/business/workspace/cover requests (each
+ * rebuilt the catalog): the set stays small and fetches stay CABINET_COVER_MAX_CONCURRENT at a time.
+ */
+export const CABINET_QUEUE_COVER_LOOKAHEAD = 2;
+export const CABINET_QUEUE_COVER_LIMIT = 1 + CAFE_QUEUE_PREVIEW + CABINET_QUEUE_COVER_LOOKAHEAD;
 export const CABINET_COVER_MAX_CONCURRENT = 4;
 export const CABINET_COVER_CACHE_LIMIT = 30;
 export const CABINET_COVER_IDLE_TIMEOUT_MS = 800;
@@ -66,6 +75,32 @@ export function selectCabinetCoverPreloadUrls(
     if (!src || seen.has(src)) continue;
     seen.add(src);
     urls.push(src);
+  }
+  return urls;
+}
+
+/**
+ * t1677u: covers for the owner/hall queue screen, in the order they matter: the playing track,
+ * then the listed «Дальше в очереди» rows (same indices as the list), then the lookahead.
+ * Rows that share an album cover are fetched once.
+ */
+export function selectCabinetQueueCoverUrls(
+  tracks: readonly { audioItemId: string; coverUrl?: string | null }[],
+  currentIndex: number,
+  queueOrder: readonly number[] | null,
+): string[] {
+  if (tracks.length === 0) return [];
+  const order = queueOrder && queueOrder.length > 0 ? queueOrder : tracks.map((_, index) => index);
+  const current = tracks[currentIndex] ? currentIndex : 0;
+  const rows = [current, ...cafeQueuePreviewIndices(tracks, order, currentIndex).slice(0, CAFE_QUEUE_PREVIEW + CABINET_QUEUE_COVER_LOOKAHEAD)];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const index of rows) {
+    const src = cabinetAlbumCoverUrl({ coverUrl: tracks[index]?.coverUrl });
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    urls.push(src);
+    if (urls.length >= CABINET_QUEUE_COVER_LIMIT) break;
   }
   return urls;
 }

@@ -107,15 +107,33 @@ export async function readBusinessPrivateCover(
   storage: StorageOwner,
   coverRef: string | null | undefined,
   expected: { practiceId: string; audioItemId?: string | null },
+  options?: { variant?: "sm" },
 ): Promise<{ body: Uint8Array; contentType: string } | null> {
   const parsed = parseBusinessPrivateCoverRef(coverRef);
   if (!parsed || parsed.practiceId !== expected.practiceId.toLowerCase()) return null;
   if ((parsed.audioItemId ?? null) !== (expected.audioItemId?.toLowerCase() ?? null)) return null;
-  const { data, error } = await storage.storage
-    .from(BUSINESS_PRIVATE_COVERS_BUCKET)
-    .download(parsed.path);
-  if (error || !data) return null;
-  const body = new Uint8Array(await data.arrayBuffer());
-  if (body.byteLength === 0) return null;
-  return { body, contentType: coverContentType(parsed.path, data.type) };
+  const download = async (path: string) => {
+    const { data, error } = await storage.storage.from(BUSINESS_PRIVATE_COVERS_BUCKET).download(path);
+    if (error || !data) return null;
+    const body = new Uint8Array(await data.arrayBuffer());
+    if (body.byteLength === 0) return null;
+    return { body, contentType: coverContentType(path, data.type) };
+  };
+  // t1677u: player thumbnails (46–80 px, MediaSession) get the 320 px sm.webp of the same
+  // upload version (~26 KB) instead of the 1000 px lg.webp (~130 KB), like public covers.
+  const small = options?.variant === "sm" ? businessPrivateCoverVariantPath(parsed.path, "sm") : null;
+  if (small) {
+    const file = await download(small);
+    if (file) return file;
+  }
+  return download(parsed.path);
+}
+
+/**
+ * Sibling variant of a stored cover in the same version folder:
+ * practices/<id>/variants/<version>/lg.webp → …/<version>/sm.webp. Null for any other shape.
+ */
+export function businessPrivateCoverVariantPath(path: string, variant: "sm"): string | null {
+  const match = /^(.*\/variants\/[A-Za-z0-9_-]+\/)(?:xl|lg|md|sm)\.webp$/.exec(path);
+  return match ? `${match[1]}${variant}.webp` : null;
 }

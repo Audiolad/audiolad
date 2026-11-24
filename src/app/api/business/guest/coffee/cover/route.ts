@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     .maybeSingle();
   const practice = data as { id: string; business_only: boolean | null; cover_url: string | null } | null;
   if (error || !practice || practice.business_only !== true || !isBusinessPrivateCoverRef(practice.cover_url)) return notFound();
-  const file = await readBusinessPrivateCover(db, practice.cover_url, { practiceId: practice.id });
+  const file = await readBusinessPrivateCover(db, practice.cover_url, { practiceId: practice.id }, { variant: "sm" });
   if (!file) return notFound();
   return new NextResponse(Buffer.from(file.body), {
     status: 200,

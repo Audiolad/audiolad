@@ -65,7 +65,7 @@ export async function GET(request: Request) {
   if (error || !row?.practice_id || practice?.business_only !== true || !isBusinessPrivateCoverRef(practice.cover_url)) {
     return notFound();
   }
-  const file = await readBusinessPrivateCover(db, practice.cover_url, { practiceId: row.practice_id });
+  const file = await readBusinessPrivateCover(db, practice.cover_url, { practiceId: row.practice_id }, { variant: "sm" });
   if (!file) return notFound();
   return new NextResponse(Buffer.from(file.body), {
     status: 200,
