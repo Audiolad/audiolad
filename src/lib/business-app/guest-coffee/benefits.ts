@@ -2,7 +2,9 @@
  * t1666u (Sergey 24.11.2026 11:20): three key benefits on the guest first screen for Yandex Direct
  * traffic. Wording follows the coffee legal section («Правовая информация»): rights come directly from the
  * rightsholder, the offer collects nothing for rights organizations, and a claim is answered by us.
- * No promise that a claim can never come – only that we defend the venue.
+ * No promise that a claim can never come – only that we defend the venue. Codex r1: no unconditional
+ * «без платежей РАО и ВОИС» – the offer leaves art. 1326 to legal assessment, so the copy states the
+ * contract terms only.
  * «Без повторов» follows the hall queue: recently played tracks go to the back of a new mix
  * (cafe-queue/auto-topup.ts) and the queue tops itself up.
  */
@@ -10,7 +12,7 @@ export const GUEST_COFFEE_BENEFITS = [
   {
     id: "legal",
     title: "Полностью легально",
-    text: "Без платежей РАО и ВОИС. Права – напрямую от правообладателя, при претензии защищаем заведение.",
+    text: "Права – напрямую от правообладателя, договор без отчислений РАО и ВОИС. При претензии защищаем заведение.",
   },
   {
     id: "no-repeats",

@@ -19,6 +19,8 @@ for (const b of GUEST_COFFEE_BENEFITS) {
 const legal = GUEST_COFFEE_BENEFITS[0];
 assert.match(legal.text, /РАО и ВОИС/);
 assert.match(legal.text, /напрямую от правообладателя/, "same basis as the legal section");
+assert.match(legal.text, /договор без отчислений РАО и ВОИС/, "contract terms only");
+assert.doesNotMatch(legal.text, /без платежей|не нужно платить|без необходимости платить/i, "no unconditional promise about art. 1326 remuneration");
 assert.doesNotMatch(legal.text, /без претензий|никаких претензий|без штрафов/i, "no promise that a claim can never come");
 assert.equal(GUEST_COFFEE_LEGAL_FOOTER_TITLE, "Документы");
 
