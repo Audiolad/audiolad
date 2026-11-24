@@ -38,6 +38,8 @@ const CABINET_LINKERS = new Set([
   join(ROOT, "src/app/business-app/documents/business-offer/page.tsx"),
   join(ROOT, "src/app/business-app/documents/sertifikat/page.tsx"),
   join(ROOT, "src/components/business-app/legal/BusinessCertificateSetup.tsx"),
+  // t1667u: подвал гостевой страницы coffee.audiolad.ru (до регистрации «Документы» закрыты) – решение Сергея 24.11.2026.
+  join(ROOT, "src/components/business-app/sound/GuestCoffeeLegalFooter.tsx"),
 ]);
 
 function walk(dir: string): string[] {
