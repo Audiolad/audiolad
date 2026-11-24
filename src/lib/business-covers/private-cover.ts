@@ -64,7 +64,19 @@ export function businessWorkspaceCoverUrl(audioItemId: string, spaceId: string):
 }
 
 export function isBusinessWorkspaceCoverUrl(value: string | null | undefined): boolean {
-  return typeof value === "string" && value.trim().startsWith(`${BUSINESS_WORKSPACE_COVER_ROUTE}?`);
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  return v.startsWith(`${BUSINESS_WORKSPACE_COVER_ROUTE}?`) || v.startsWith(`${BUSINESS_GUEST_COFFEE_COVER_ROUTE}?`);
+}
+
+/**
+ * t1670u: cover of a closed album in the guest «Собрать атмосферу» preview. Token-free; the
+ * route serves only albums of the current guest preview (never an arbitrary closed album).
+ */
+export const BUSINESS_GUEST_COFFEE_COVER_ROUTE = "/api/business/guest/coffee/cover";
+
+export function businessGuestCoffeeCoverUrl(practiceId: string): string {
+  return `${BUSINESS_GUEST_COFFEE_COVER_ROUTE}?${new URLSearchParams({ album: practiceId }).toString()}`;
 }
 
 /** Editor preview of a private cover (album or one track). Requires album edit access. */

@@ -159,7 +159,7 @@ const queryFiles = [
   "authors/lookup", "authors/profile", "authors/public-page", "authors/public-list-data", "authors/similar-authors",
   "catalog/author-search", "history/queries", "home/listening-progress", "library/collection", "max/library-visibility", "max/storefront-preview",
   "mini-app/published-product-target", "topics/queries", "seo/sitemap-data", "seo/articles/load", "seo/indexnow/hooks",
-  "business-app/guest-coffee/load.server", "business-app/onboarding-preview.server", "promo-pages/eligible-products", "playlists/editorial-practices", "playlists/membership", "quick-offers/offers-api",
+  "business-app/onboarding-preview.server", "promo-pages/eligible-products", "playlists/editorial-practices", "playlists/membership", "quick-offers/offers-api",
 ];
 const staticVectors: Array<[string, string, string]> = [];
 for (const name of queryFiles) {
@@ -180,6 +180,21 @@ for (const name of queryFiles) {
     }
   }
   staticVectors.push([name, file, "eq(BUSINESS_ONLY_COLUMN, false)"]);
+}
+// t1670u (Sergey 24.11.2026): the guest coffee preview deliberately plays the closed catalogue
+// «АудиоЛад Кофейня». It is a sanctioned server-only consumer: closed rows are read with the
+// service role, only the 64 preset atmospheres' tracks reach the browser, and the guest route
+// signs only those tracks (hall signer) after a fresh re-check, under the 30-minute limit.
+{
+  const guest = read("src/lib/business-app/guest-coffee/load.server.ts");
+  assert.match(guest, /^import "server-only";/);
+  assert.match(guest, /buildGuestCoffeePreview\(shelf, plan\)/, "browser gets the trimmed preview only");
+  assert.match(guest, /\(await loadGuestCoffeePreview\(\)\)\.playlists/, "signing allow-list = trimmed preview");
+  assert.match(guest, /loadCollectionCatalog\(null\)/, "venue-less closed pool (approved passport, sound gate, no blocking review)");
+  assert.doesNotMatch(guest, /storage_path|createSignedUrl/, "no storage paths or own signing in the loader");
+  const cover = read("src/app/api/business/guest/coffee/cover/route.ts");
+  assert.match(cover, /shelf\.some\(\(p\) => p\.id === albumId && p\.closed === true\)/, "only covers of preview albums");
+  staticVectors.push(["business-app/guest-coffee/load.server", "src/lib/business-app/guest-coffee/load.server.ts", "sanctioned closed preview (t1670u)"]);
 }
 for (const [file, guard] of [
   ["src/app/(platform)/(listener)/practice/[...segments]/page.tsx", "getPracticeByAuthorAndSlug"],

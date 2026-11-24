@@ -45,7 +45,7 @@
     "test:coffee-test-account-reset": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/coffee-test-account-reset-unit.tsx",
     "test:business-coffee-atlas": "npx tsx scripts/business-coffee-atlas-unit.mts",
     "test:business-coffee-guide": "npx tsx scripts/business-coffee-guide-unit.mts",
-    "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts",
+    "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts && npx tsx scripts/business-guest-closed-preview-unit.mts",
     "test:business-guest-atmosphere": "npx tsx scripts/business-guest-atmosphere-unit.mts && npx tsx scripts/business-cabinet-cover-cache-unit.mts",
     "test:vpn-notice": "npx tsx scripts/vpn-notice-unit.mts",
     "test:business-guest-passport": "npx tsx scripts/business-guest-passport-unit.mts",

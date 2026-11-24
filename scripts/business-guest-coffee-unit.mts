@@ -78,7 +78,8 @@ assert.notEqual(pageWithoutGuestStart, page, "ready-guest branch is gated by the
 assert.doesNotMatch(pageWithoutGuestStart.replace(/^import BusinessWorkspace .*$/m, ""), /BusinessWorkspace/, "guest demo is not the member catalog");
 assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land straight in the cabinet");
 const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
-assert.match(musicSection, /loadGuestCoffeeShelf/);
+assert.match(musicSection, /loadGuestCoffeePreview/);
+assert.match(musicSection, /presets=\{presets\}/, "t1670u: ready closed-catalogue atmospheres");
 assert.match(musicSection, /peekGuestCoffeeUsage/);
 assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessWorkspace/, "owner /music is the cabinet player");
 assert.doesNotMatch(read("src/app/business-app/music/page.tsx"), /BusinessMusicSection/);
@@ -251,12 +252,12 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   const shelf = [sample[0]];
   let signed = 0;
   let leases: number[] = [];
-  let stillFree = true;
+  let stillLive = true;
   let stillAdmitted = true;
   let calls: string[] = [];
   const deps = (used: number | null, issued: number | null = used) => ({
     loadShelf: async () => shelf,
-    isStillFree: async () => stillFree,
+    isStillLive: async () => stillLive,
     isStillAdmitted: async () => stillAdmitted,
     peekUsage: async () => {
       calls.push("peek");
@@ -289,14 +290,14 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   assert.equal(guestCoffeeLeaseSeconds(null), 300);
   assert.equal(guestCoffeeLeaseSeconds(5000), 900);
   assert.equal(guestCoffeeLeaseSeconds(181.2), 182);
-  // Cached shelf says free, DB now says paid (even with guest access) → refused before any lease or signing.
-  stillFree = false;
+  // t1670u: cached preview has the track, DB now says the closed album / passport is withdrawn → refused.
+  stillLive = false;
   leases = [];
   const signedBefore = signed;
   assert.deepEqual(await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(0)), { ok: false, reason: "not_in_manifest" });
-  assert.equal(signed, signedBefore, "paid-now album is never signed");
+  assert.equal(signed, signedBefore, "withdrawn closed album is never signed");
   assert.deepEqual(leases, [], "and never charged");
-  stillFree = true;
+  stillLive = true;
   // Admission withdrawn after the shelf was cached → refused before any lease or signing.
   stillAdmitted = false;
   assert.deepEqual(await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(0)), { ok: false, reason: "not_in_manifest" });
@@ -456,17 +457,25 @@ for (const file of [
   assert.match(read("src/app/business-app/layout.tsx"), /data-biz-theme=\{theme\}/, "guest page renders inside the themed root");
 }
 
-// ---------------------------------------------------------------- fresh free check wiring
+// ---------------------------------------------------------------- t1670u closed-catalogue wiring
 {
   const loader = read("src/lib/business-app/guest-coffee/load.server.ts");
   const route = read("src/app/api/business/guest/coffee/track-url/route.ts");
-  assert.match(loader, /export async function isGuestCoffeePlaylistStillFree/);
-  assert.match(loader, /is_free === true && row\.status === "published" && row\.catalog_visibility === "listed"/);
-  assert.match(route, /isStillFree: isGuestCoffeePlaylistStillFree/, "uncached re-check right before signing");
+  assert.match(loader, /export async function isGuestCoffeeClosedTrackStillLive/);
+  assert.match(loader, /if \(playlist\.closed !== true\) return false;/, "only closed preview albums are re-checked as live");
+  // Source = the existing venue-less closed pool (approved passport, sound gate, no blocking review).
+  assert.match(loader, /const pool = await loadCollectionCatalog\(null\);/, "closed pool from business_personal_collection_tracks(NULL)");
+  assert.match(loader, /loadCollectionCatalog\(null, audioItemId\)[\s\S]*?row\.album_id === playlist\.id/, "fresh per-track re-check against the same pool");
+  const pool = read("supabase/migrations/20270402120000_business_personal_collections.sql");
+  assert.match(pool, /business_track_passport_approved\(a\.id\)[\s\S]*?business_sound_track_allowed\(a\.id, 'cafe'\)[\s\S]*?NOT IN \('blocked', 'proof_requested'\)/);
+  assert.match(route, /isStillLive: isGuestCoffeeClosedTrackStillLive/, "uncached re-check right before signing");
   assert.match(route, /isStillAdmitted: isGuestCoffeeTrackStillAdmitted/, "uncached admission re-check right before signing");
+  assert.match(route, /sign: \(\{ audioId \}\) => signGuestCoffeeClosedAudio\(audioId\)/, "hall signer, one preview track");
+  assert.doesNotMatch(route, /signEntitledListenAudio/);
+  assert.match(loader, /signWorkspaceAudio\(audioItemId, new Set\(\[audioItemId\]\), null\)/);
   assert.match(loader, /soundAllowedTrackIds\(\[audioItemId\], GUEST_COFFEE_BUSINESS_DIRECTION_KEY\)/);
-  assert.match(loader, /admittedTrackIds: \(ids\) => soundAllowedTrackIds\(ids, GUEST_COFFEE_BUSINESS_DIRECTION_KEY\)/);
-  assert.match(loader, /\.from\("business_content_admissions"\)[\s\S]*?\.eq\("allowed", true\)/);
+  assert.match(loader, /export async function loadGuestCoffeeShelf\(\)[\s\S]*?\(await loadGuestCoffeePreview\(\)\)\.playlists/, "signing allow-list = trimmed preview");
+  assert.doesNotMatch(loader, /audio_path[^\n]*coverUrl|storage_path/, "no storage paths in the preview model");
   assert.match(route, /issueLease: \(trackSeconds\) => issueGuestCoffeeLease\(request, trackSeconds\)/);
   assert.match(route, /peekUsage: peekGuestCoffeeUsage/);
 }

@@ -1,50 +1,156 @@
 import "server-only";
 
-import { BUSINESS_ONLY_COLUMN } from "@/lib/products/business-only";
-
+import { businessGuestCoffeeCoverUrl, isBusinessPrivateCoverRef } from "@/lib/business-covers/private-cover";
+import { loadCollectionCatalog } from "@/lib/business-collections/load.server";
 import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
-import { loadCatalogPlaySession } from "@/lib/catalog/catalog-playback";
-import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { signWorkspaceAudio } from "@/lib/business-workspace/sign.server";
+import { resolvePlayableAudioItemRows } from "@/lib/listen/validated-active-music-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { createClient } from "@supabase/supabase-js";
 
 import type { GuestCoffeePlaylist } from "./catalog";
-import { GUEST_COFFEE_BUSINESS_DIRECTION_KEY, buildGuestCoffeeShelf, guestCoffeeShelfArtistCount } from "./shelf";
+import { buildGuestCoffeeClosedShelf, buildGuestCoffeePreview, type GuestCoffeeClosedAlbum, type GuestCoffeePreview } from "./closed-preview";
+import { loadGuestCoffeeRecommendationPlan } from "./passport.server";
+import { GUEST_COFFEE_BUSINESS_DIRECTION_KEY } from "./shelf";
+
+/**
+ * t1670u (Sergey 24.11.2026): the guest coffee preview plays the CLOSED catalogue «АудиоЛад
+ * Кофейня». Source of truth: the existing venue-less closed-catalogue pool
+ * business_personal_collection_tracks(NULL) (personal-collection preview) – business-only
+ * albums, published, not deleted, approved Business passport, café sound gate (direction
+ * admission included) and no blocking moderator review (blocked / proof_requested). Public
+ * catalogue albums are no longer used here. Venue-specific commercial eligibility stays in the
+ * cabinet, like for the personal-collection preview.
+ *
+ * Closed rows are invisible to anon/authenticated by RLS, so this module reads them with the
+ * service role on the server only. The browser receives only the albums / tracks used by the 64
+ * preset atmospheres (titles, durations, ids – no storage paths, no URLs) and the stream-URL
+ * route signs only those tracks (short-lived, the same signer as the hall player), after a
+ * fresh re-check against the same pool and under the 30-minute guest limit.
+ */
 
 const CACHE_MS = 5 * 60 * 1000;
-let cache: { at: number; value: Promise<GuestCoffeePlaylist[]> } | null = null;
+const ID_CHUNK = 80;
+let cache: { at: number; value: Promise<GuestCoffeePreview> } | null = null;
 
-/** Cookieless anonymous client: the shelf is exactly what a guest sees, shared safely by all requests. */
-function createGuestClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+type ServiceDb = ReturnType<typeof createServiceRoleClient>;
+
+type ClosedPracticeRow = {
+  id: string;
+  business_only: boolean | null;
+  business_has_vocals: boolean | null;
+  authors?: { name?: string | null } | { name?: string | null }[] | null;
+};
+
+type ClosedAudioRow = {
+  id: string;
+  practice_id: string | null;
+  audio_path: string | null;
+  active_music_delivery_asset_id: string | null;
+};
+
+function embeddedName(value: ClosedPracticeRow["authors"]): string | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  return row?.name?.trim() || null;
 }
 
-type FreshPracticeRow = { id: string; is_free: boolean | null; status: string | null; catalog_visibility: string | null };
+/** Closed albums of the guest preview with their pool tracks that have playable audio. */
+async function loadClosedAlbums(db: ServiceDb): Promise<GuestCoffeeClosedAlbum[]> {
+  // Ordered by album title, album, track position (SQL). Throws on error = empty preview.
+  const pool = await loadCollectionCatalog(null);
+  if (pool.length === 0) return [];
+  const albumIds = [...new Set(pool.map((row) => row.album_id))];
+  const practices = new Map<string, ClosedPracticeRow>();
+  for (let i = 0; i < albumIds.length; i += ID_CHUNK) {
+    const { data, error } = await db
+      .from("practices")
+      .select("id, business_only, business_has_vocals, authors!practices_author_id_fkey(name)")
+      .eq("business_only", true)
+      .in("id", albumIds.slice(i, i + ID_CHUNK));
+    if (error || !Array.isArray(data)) throw new Error("guest_coffee_closed_albums_unavailable");
+    for (const row of data as ClosedPracticeRow[]) if (row.business_only === true) practices.set(row.id, row);
+  }
+  const trackIds = pool.map((row) => row.audio_item_id);
+  const audio: ClosedAudioRow[] = [];
+  for (let i = 0; i < trackIds.length; i += ID_CHUNK) {
+    const { data, error } = await db
+      .from("audio_items")
+      .select("id, practice_id, audio_path, active_music_delivery_asset_id")
+      .in("id", trackIds.slice(i, i + ID_CHUNK));
+    if (error || !Array.isArray(data)) throw new Error("guest_coffee_closed_tracks_unavailable");
+    audio.push(...(data as ClosedAudioRow[]));
+  }
+  const playable = new Set<string>();
+  for (let i = 0; i < audio.length; i += ID_CHUNK) {
+    for (const row of await resolvePlayableAudioItemRows(audio.slice(i, i + ID_CHUNK), "music", { serviceRole: db })) playable.add(row.id);
+  }
 
-/** Ids (of the given ones) that are RIGHT NOW published, listed and free — raw columns, no cache. */
-async function loadStillFreeIds(supabase: ReturnType<typeof createGuestClient>, ids: readonly string[]): Promise<Set<string>> {
-  if (ids.length === 0) return new Set();
-  const { data, error } = await supabase
-    .from("practices")
-    .select("business_only, id, is_free, status, catalog_visibility")
-    .eq(BUSINESS_ONLY_COLUMN, false)
-    .in("id", [...ids]);
-  if (error || !Array.isArray(data)) throw new Error("guest_coffee_free_check_unavailable");
-  return new Set(
-    (data as FreshPracticeRow[])
-      .filter((row) => row.is_free === true && row.status === "published" && row.catalog_visibility === "listed")
-      .map((row) => row.id),
-  );
+  const albums = new Map<string, GuestCoffeeClosedAlbum>();
+  for (const row of pool) {
+    const practice = practices.get(row.album_id);
+    const title = row.title?.trim();
+    if (!practice || !title || !playable.has(row.audio_item_id)) continue;
+    let album = albums.get(row.album_id);
+    if (!album) {
+      album = {
+        id: row.album_id,
+        title: row.album_title?.trim() || "",
+        authorName: embeddedName(practice.authors),
+        hasVocals: practice.business_has_vocals === true,
+        coverUrl: isBusinessPrivateCoverRef(row.cover_ref) ? businessGuestCoffeeCoverUrl(row.album_id) : null,
+        tracks: [],
+      };
+      albums.set(row.album_id, album);
+    }
+    const duration = Number(row.duration_seconds);
+    album.tracks.push({ audioItemId: row.audio_item_id, title, durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : null });
+  }
+  return [...albums.values()].filter((album) => album.title && album.tracks.length > 0);
+}
+
+async function loadUncached(): Promise<GuestCoffeePreview> {
+  const db = createServiceRoleClient();
+  const shelf = buildGuestCoffeeClosedShelf(await loadClosedAlbums(db));
+  if (shelf.length === 0) return { playlists: [], presets: {} };
+  const plan = await loadGuestCoffeeRecommendationPlan(shelf);
+  const preview = buildGuestCoffeePreview(shelf, plan);
+  const tracks = preview.playlists.reduce((sum, p) => sum + p.tracks.length, 0);
+  console.info(`[business-guest-coffee] closed preview albums=${preview.playlists.length}/${shelf.length} tracks=${tracks} presets=${Object.keys(preview.presets).length}`);
+  return preview;
 }
 
 /**
- * Called by the stream-URL route immediately before signing (uncached): fails closed.
+ * The guest coffee preview (closed catalogue): trimmed playlists + the 64 preset atmospheres.
+ * Short process cache (5 min) shared by the page, the stream-URL and the cover routes; an empty
+ * result is not cached so a transient failure heals on the next request.
  */
-export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlaylist): Promise<boolean> {
+export async function loadGuestCoffeePreview(): Promise<GuestCoffeePreview> {
+  const now = Date.now();
+  if (cache && now - cache.at < CACHE_MS) return cache.value;
+  const value = loadUncached().catch((error) => {
+    console.error("[business-guest-coffee] closed preview unavailable", error instanceof Error ? error.message : "unknown");
+    return { playlists: [], presets: {} } as GuestCoffeePreview;
+  });
+  cache = { at: now, value };
+  const result = await value;
+  if (result.playlists.length === 0) cache = null;
+  return result;
+}
+
+/** Signing allow-list of the guest stream-URL route: only tracks of the current preview. */
+export async function loadGuestCoffeeShelf(): Promise<GuestCoffeePlaylist[]> {
+  return (await loadGuestCoffeePreview()).playlists;
+}
+
+/**
+ * Called by the stream-URL route immediately before signing (uncached, fails closed): THIS track
+ * of THIS closed album is still in the venue-less closed-catalogue pool (published, approved
+ * passport, sound gate, no blocking moderator review).
+ */
+export async function isGuestCoffeeClosedTrackStillLive(playlist: GuestCoffeePlaylist, audioItemId: string): Promise<boolean> {
+  if (playlist.closed !== true) return false;
   try {
-    return (await loadStillFreeIds(createGuestClient(), [playlist.id])).has(playlist.id);
+    const rows = await loadCollectionCatalog(null, audioItemId);
+    return rows.some((row) => row.audio_item_id === audioItemId && row.album_id === playlist.id);
   } catch {
     return false;
   }
@@ -52,7 +158,7 @@ export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlayli
 
 /**
  * Called by the stream-URL route immediately before signing (uncached): the track is still
- * admitted to AudioLad Business for cafés. Fails closed.
+ * admitted to AudioLad Business for cafés by the sound gate. Fails closed.
  */
 export async function isGuestCoffeeTrackStillAdmitted(audioItemId: string): Promise<boolean> {
   try {
@@ -62,68 +168,9 @@ export async function isGuestCoffeeTrackStillAdmitted(audioItemId: string): Prom
   }
 }
 
-type AdmissionRow = { author_id: string | null; practice_id: string | null };
-
-/** Allowed café admissions (artists / albums) – narrows the candidates; the track gate decides. */
-async function loadCafeAdmissions(): Promise<{ authorIds: Set<string>; practiceIds: Set<string> }> {
-  const { data, error } = await createServiceRoleClient()
-    .from("business_content_admissions")
-    .select("author_id, practice_id")
-    .eq("direction_key", GUEST_COFFEE_BUSINESS_DIRECTION_KEY)
-    .eq("allowed", true);
-  if (error || !Array.isArray(data)) throw new Error("guest_coffee_admissions_unavailable");
-  const rows = data as AdmissionRow[];
-  return {
-    authorIds: new Set(rows.flatMap((r) => (r.author_id ? [r.author_id] : []))),
-    practiceIds: new Set(rows.flatMap((r) => (r.practice_id ? [r.practice_id] : []))),
-  };
-}
-
-async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
-  const supabase = createGuestClient();
-  const shelf = await buildGuestCoffeeShelf({
-    loadPublishedProducts: () => getPublishedCatalogProducts(supabase, { productKind: "music" }),
-    loadAdmissions: loadCafeAdmissions,
-    admittedTrackIds: (ids) => soundAllowedTrackIds(ids, GUEST_COFFEE_BUSINESS_DIRECTION_KEY),
-    loadFullTracks: async ({ authorSlug, productSlug }) => {
-      // Same loader as /api/catalog/play, as an anonymous guest (userId null).
-      const loaded = await loadCatalogPlaySession(supabase, authorSlug, productSlug, null);
-      if (!loaded.ok) return null;
-      if (loaded.session.playbackMode === "preview") return null;
-      return loaded.session.tracks.map((t) => ({
-        audioItemId: t.id,
-        title: t.title,
-        durationSeconds: t.durationSeconds,
-      }));
-    },
-  });
-  // The catalogue's isFree may include temporary promo pricing; the guest shelf keeps only
-  // albums that are free by their own is_free flag (same rule as the per-request re-check).
-  const free = await loadStillFreeIds(supabase, shelf.map((p) => p.id));
-  const result = shelf.filter((p) => free.has(p.id));
-  const artists = guestCoffeeShelfArtistCount(result);
-  if (result.length > 0 && artists < 3) {
-    // The atmosphere then falls back to fewer artists (best matches) – visible in the logs.
-    console.warn("[business-guest-coffee] admitted guest shelf has few artists", { artists, albums: result.length });
-  }
-  return result;
-}
-
-/**
- * The guest coffee shelf: free albums admitted to AudioLad Business for cafés (only their
- * admitted tracks), resolved against the live catalogue.
- * Short process cache (5 min) shared by the page and the stream-URL route; an empty
- * result is not cached so a transient failure heals on the next request.
- */
-export async function loadGuestCoffeeShelf(): Promise<GuestCoffeePlaylist[]> {
-  const now = Date.now();
-  if (cache && now - cache.at < CACHE_MS) return cache.value;
-  const value = loadUncached().catch((error) => {
-    console.error("[business-guest-coffee] shelf unavailable", error instanceof Error ? error.name : "unknown");
-    return [] as GuestCoffeePlaylist[];
-  });
-  cache = { at: now, value };
-  const result = await value;
-  if (result.length === 0) cache = null;
-  return result;
+/** Short-lived stream URL of one preview track – the hall player's signer (same TTL, no venue). */
+export async function signGuestCoffeeClosedAudio(audioItemId: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+  const signed = await signWorkspaceAudio(audioItemId, new Set([audioItemId]), null);
+  if (signed.ok) return signed;
+  return { ok: false, reason: signed.reason === "not_in_manifest" ? "not_found" : signed.reason };
 }

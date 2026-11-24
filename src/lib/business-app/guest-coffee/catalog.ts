@@ -142,6 +142,10 @@ export type GuestCoffeePlaylist = {
   dayparts: GuestCoffeeShelfRef["dayparts"];
   characters: readonly GuestCoffeeCharacter[];
   tracks: GuestCoffeeTrack[];
+  /** t1670u: album of the closed catalogue «АудиоЛад Кофейня» (no public page, private cover). */
+  closed?: boolean;
+  /** t1670u: closed album labelled «С вокалом» (practices.business_has_vocals). */
+  hasVocals?: boolean;
 };
 
 export function isGuestCoffeeProfileValue<T extends { id: string }>(

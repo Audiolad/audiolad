@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import {
-  isGuestCoffeePlaylistStillFree,
+  isGuestCoffeeClosedTrackStillLive,
   isGuestCoffeeTrackStillAdmitted,
   loadGuestCoffeeShelf,
+  signGuestCoffeeClosedAudio,
 } from "@/lib/business-app/guest-coffee/load.server";
 import { handleGuestCoffeeTrackUrl } from "@/lib/business-app/guest-coffee/routes";
 import { issueGuestCoffeeLease, peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
-import { signEntitledListenAudio } from "@/lib/listen/sign-entitled-audio";
 
 export const dynamic = "force-dynamic";
 
@@ -27,14 +27,12 @@ export async function POST(request: Request) {
   }
   const result = await handleGuestCoffeeTrackUrl(body, {
     loadShelf: loadGuestCoffeeShelf,
-    isStillFree: isGuestCoffeePlaylistStillFree,
+    isStillLive: isGuestCoffeeClosedTrackStillLive,
     isStillAdmitted: isGuestCoffeeTrackStillAdmitted,
     peekUsage: peekGuestCoffeeUsage,
     issueLease: (trackSeconds) => issueGuestCoffeeLease(request, trackSeconds),
-    sign: async ({ authorSlug, productSlug, audioId }) => {
-      const signed = await signEntitledListenAudio({ userId: null, authorSlug, productSlug, audioId });
-      return signed.ok ? { ok: true, url: signed.url } : { ok: false, reason: signed.reason };
-    },
+    // t1670u: closed catalogue – the hall player's signer, only for tracks of the guest preview.
+    sign: ({ audioId }) => signGuestCoffeeClosedAudio(audioId),
   });
   // Business outcomes are 200 with { ok:false, reason } so the player keeps its skip/deny logic.
   const status = !result.ok && result.reason === "invalid_request" ? 400 : 200;
