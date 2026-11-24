@@ -113,6 +113,7 @@ jobs:
           npm run test:business-app-client-documents
           npm run test:evidence-play-log
           npm run test:business-legal-section
+          npm run test:business-guest-coffee-benefits
           npm run test:business-app-onboarding-wizard
           npm run test:business-domain-core
           npm run test:business-location-sound-settings
