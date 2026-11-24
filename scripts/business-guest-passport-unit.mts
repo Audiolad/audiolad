@@ -433,14 +433,15 @@ for (const [name, plan] of plans) {
   }
   assert.doesNotMatch(studio + settings, /passport-features/, "client components never import the feature parser");
   assert.match(server, /^import "server-only";/, "the adapter is server-only");
-  assert.match(section, /plan=\{plan\}/);
-  assert.doesNotMatch(section, /features=|passport=\{/, "only the plan is passed to the client component");
+  // t1670u: the server assembles the 64 atmospheres (plan stays on the server); the client gets ready presets.
+  assert.match(section, /presets=\{presets\}/);
+  assert.doesNotMatch(section, /features=|passport=\{|plan=\{/, "only ready presets are passed to the client component");
   assert.match(studio, /plan\?: GuestCoffeeRecommendationPlan \| null/);
   // Rights / limit path unchanged: the stream URL is signed only for shelf tracks, after the fresh free check and the server meter.
   const routes = read("src/lib/business-app/guest-coffee/routes.ts");
   assert.doesNotMatch(route + routes, /recommend|passport/, "the passport never decides what may be played");
   assert.match(route, /loadShelf: loadGuestCoffeeShelf/);
-  assert.match(route, /isStillFree: isGuestCoffeePlaylistStillFree/);
+  assert.match(route, /isStillLive: isGuestCoffeeClosedTrackStillLive/);
   assert.match(routes, /findGuestCoffeeTrack\(await deps\.loadShelf\(\), audioItemId\)/, "shelf membership check unchanged");
   // Visible text: en dash only, no technical passport words in the UI copy.
   for (const f of ["src/lib/business-app/guest-coffee/copy.ts", "src/lib/business-app/guest-coffee/recommend.ts", "src/lib/business-app/guest-coffee/passport-features.ts", "src/lib/business-app/guest-coffee/passport.server.ts", "src/lib/business-app/guest-coffee/passport-query.ts", "src/lib/business-app/guest-coffee/catalog.ts"]) {

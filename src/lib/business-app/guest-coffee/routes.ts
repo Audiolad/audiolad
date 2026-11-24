@@ -12,11 +12,11 @@ export type GuestCoffeeTrackUrlResult =
 export type GuestCoffeeTrackUrlDeps = {
   loadShelf: () => Promise<GuestCoffeePlaylist[]>;
   /**
-   * Fresh (uncached) check right before signing: the album is still published, listed
-   * and FREE. The shelf is cached for minutes; the canonical signer alone would also allow
-   * paid products with guest access, so this re-check is what keeps paid audio out.
+   * Fresh (uncached) check right before signing (t1670u): the album is still a published closed
+   * album admitted for cafés and THIS track still has approved Business rights (closed-catalogue track card). The shelf
+   * is cached for minutes; this re-check stops a withdrawn album or track at once.
    */
-  isStillFree: (playlist: GuestCoffeePlaylist) => Promise<boolean>;
+  isStillLive: (playlist: GuestCoffeePlaylist, audioItemId: string) => Promise<boolean>;
   /**
    * Fresh (uncached) Business admission of THIS track for cafés (Sergey 29.10.2026: guests hear
    * only admitted music). A withdrawn admission stops playback at once; failure = refused.
@@ -30,7 +30,7 @@ export type GuestCoffeeTrackUrlDeps = {
    * Returns effective used seconds; null = unavailable.
    */
   issueLease: (trackSeconds: number) => Promise<number | null>;
-  sign: (input: { authorSlug: string; productSlug: string; audioId: string }) => Promise<
+  sign: (input: { audioId: string }) => Promise<
     { ok: true; url: string } | { ok: false; reason: string }
   >;
 };
@@ -56,11 +56,11 @@ export async function handleGuestCoffeeTrackUrl(
   const audioItemId = parseGuestCoffeeAudioItemId(body);
   if (!audioItemId) return { ok: false, reason: "invalid_request" };
 
-  // Only tracks of the admitted, currently playable free albums — never an arbitrary id.
+  // Only tracks of the current guest preview (closed catalogue, t1670u) — never an arbitrary id.
   const found = findGuestCoffeeTrack(await deps.loadShelf(), audioItemId);
   if (!found) return { ok: false, reason: "not_in_manifest" };
 
-  if (!(await deps.isStillFree(found.playlist))) return { ok: false, reason: "not_in_manifest" };
+  if (!(await deps.isStillLive(found.playlist, audioItemId))) return { ok: false, reason: "not_in_manifest" };
   if (!(await deps.isStillAdmitted(audioItemId))) return { ok: false, reason: "not_in_manifest" };
 
   // 1. Cheap read-only gate: no signing for a guest whose limit is already used up.
@@ -69,11 +69,7 @@ export async function handleGuestCoffeeTrackUrl(
   if (before === "exhausted") return { ok: false, reason: "no_access", limit: before };
 
   // 2. Sign first: a failed signing never opens or charges a lease.
-  const signed = await deps.sign({
-    authorSlug: found.playlist.authorSlug,
-    productSlug: found.playlist.productSlug,
-    audioId: audioItemId,
-  });
+  const signed = await deps.sign({ audioId: audioItemId });
   if (!signed.ok) {
     const skip = signed.reason === "not_found" || signed.reason === "forbidden" || signed.reason === "access_required" || signed.reason === "audio_missing";
     return { ok: false, reason: skip ? "not_in_manifest" : "sign_failed", limit: before };

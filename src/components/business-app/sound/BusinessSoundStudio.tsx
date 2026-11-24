@@ -55,6 +55,7 @@ import {
   type GuestCoffeeLimitState,
 } from "@/lib/business-app/guest-coffee/limit";
 import type { GuestCoffeeRecommendationPlan } from "@/lib/business-app/guest-coffee/recommend";
+import { guestCoffeeAtmosphereFromPreset, type GuestCoffeePresets } from "@/lib/business-app/guest-coffee/closed-preview";
 import {
   BUSINESS_SOUND_PROFILE_STORAGE_KEY,
   parseBusinessSoundProfile,
@@ -74,14 +75,16 @@ import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
  * free albums (src/lib/business-app/guest-coffee/atmosphere.ts). Changing the settings
  * afterwards only offers «Пересобрать атмосферу» – the assembled playlist stays as it is.
  *
- * The albums are free public catalogue albums for PRIVATE evaluation listening, metered on
- * the server (30 minutes, /api/business/guest/coffee/*). They are not the venue airplay
+ * t1670u: the albums are closed-catalogue albums «АудиоЛад Кофейня» for PRIVATE evaluation
+ * listening, metered on the server (30 minutes, /api/business/guest/coffee/*). They are not the venue airplay
  * catalogue: airplay is the point's program player with rights-confirmed tracks only.
  */
 type Props = {
   playlists: GuestCoffeePlaylist[];
   /** Server ranking for all 64 settings (ids, track positions, yes / no matches only). */
   plan?: GuestCoffeeRecommendationPlan | null;
+  /** t1670u: ready atmospheres of all 64 settings assembled on the server (closed catalogue). */
+  presets?: GuestCoffeePresets | null;
   initialLimit: GuestCoffeeLimitState;
 };
 
@@ -107,7 +110,7 @@ function readStoredProfile(): GuestCoffeeProfile {
   }
 }
 
-export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
+export default function BusinessSoundStudio({ playlists, plan = null, presets = null, initialLimit }: Props) {
   const hostname = useBusinessHostname();
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
@@ -165,7 +168,9 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const assemble = () => {
     if (!canAssemble) return;
     // Computed right away (pure); revealed after the short assembling moment.
-    const next = assembleGuestCoffeeAtmosphere(playlists, profile, plan);
+    const next = presets
+      ? guestCoffeeAtmosphereFromPreset(currentKey, presets[currentKey], playlists)
+      : assembleGuestCoffeeAtmosphere(playlists, profile, plan);
     const directionLabel = GUEST_COFFEE_DIRECTIONS.find((d) => d.id === profile.direction)?.label ?? "";
     const steps = atmosphereAssemblingSteps(directionLabel);
     const reduced = prefersReducedAtmosphereMotion();
