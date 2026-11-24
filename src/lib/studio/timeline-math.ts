@@ -167,3 +167,41 @@ export function isTimelineSeekJump({
   const expected = previousTime + Math.max(elapsedSeconds, 0);
   return Math.abs(currentTime - expected) > TIMELINE_SEEK_JUMP_TOLERANCE_SECONDS;
 }
+
+/** Follow-the-playhead keeps the playhead inside these viewport margins. */
+export const TIMELINE_FOLLOW_LEADING_MARGIN_PX = 48;
+export const TIMELINE_FOLLOW_TRAILING_MARGIN_PX = 96;
+export const TIMELINE_FOLLOW_ANCHOR_RATIO = 0.35;
+
+/**
+ * One playback-frame decision for "follow the playhead".
+ * While suspended (the author scrolled by hand) the view never moves; follow
+ * comes back only once the playhead sits inside the follow zone, i.e. when
+ * resuming would not move the view. So a slow manual scroll that brings the
+ * playhead near an edge can never be snapped back mid-gesture.
+ */
+export function getTimelineFollowDecision({
+  playheadX,
+  scrollLeft,
+  viewportWidth,
+  suspended,
+}: {
+  playheadX: number;
+  scrollLeft: number;
+  viewportWidth: number;
+  suspended: boolean;
+}): { suspended: boolean; nextScrollLeft: number | null } {
+  const insideFollowZone =
+    playheadX >= scrollLeft + TIMELINE_FOLLOW_LEADING_MARGIN_PX &&
+    playheadX <= scrollLeft + viewportWidth - TIMELINE_FOLLOW_TRAILING_MARGIN_PX;
+  if (insideFollowZone) {
+    return { suspended: false, nextScrollLeft: null };
+  }
+  if (suspended) {
+    return { suspended: true, nextScrollLeft: null };
+  }
+  return {
+    suspended: false,
+    nextScrollLeft: Math.max(0, playheadX - viewportWidth * TIMELINE_FOLLOW_ANCHOR_RATIO),
+  };
+}

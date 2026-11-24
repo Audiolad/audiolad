@@ -18,6 +18,7 @@ import {
   getAnchoredTimelineScrollLeft,
   getRulerStepSeconds,
   getTimelineEditExtent,
+  getTimelineFollowDecision,
   getTimelineWidth,
   isTimelineSeekJump,
   timeToTimelineX,
@@ -259,20 +260,15 @@ function StudioTimeline({
       return;
     }
 
-    const visibleStart = viewport.scrollLeft;
-    const visibleEnd = visibleStart + viewport.clientWidth;
-    if (followSuspendedRef.current) {
-      if (playheadX < visibleStart || playheadX > visibleEnd) {
-        // The author scrolled away on purpose – leave the view where it is.
-        return;
-      }
-      followSuspendedRef.current = false;
-    }
-    if (playheadX < visibleStart + 48 || playheadX > visibleEnd - 96) {
-      setViewportScrollLeft(
-        viewport,
-        playheadX - viewport.clientWidth * 0.35,
-      );
+    const decision = getTimelineFollowDecision({
+      playheadX,
+      scrollLeft: viewport.scrollLeft,
+      viewportWidth: viewport.clientWidth,
+      suspended: followSuspendedRef.current,
+    });
+    followSuspendedRef.current = decision.suspended;
+    if (decision.nextScrollLeft !== null) {
+      setViewportScrollLeft(viewport, decision.nextScrollLeft);
     }
   }, [currentTime, duration, isPlaying, playheadX, setViewportScrollLeft]);
 

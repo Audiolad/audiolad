@@ -13,6 +13,7 @@ import {
   getFitPixelsPerSecond,
   getRulerStepSeconds,
   getTimelineEditExtent,
+  getTimelineFollowDecision,
   getTimelineWidth,
   isTimelineSeekJump,
   pixelsPerSecondToSliderValue,
@@ -190,6 +191,30 @@ assert.equal(isTimelineSeekJump({ previousTime: 20, elapsedSeconds: 2.5, current
 assert.equal(isTimelineSeekJump({ previousTime: 20, elapsedSeconds: 0.016, currentTime: 35 }), true);
 assert.equal(isTimelineSeekJump({ previousTime: 600, elapsedSeconds: 0.016, currentTime: 0 }), true);
 assert.equal(isTimelineSeekJump({ previousTime: Number.NaN, elapsedSeconds: 0.016, currentTime: 5 }), false);
+
+// t1669u: behaviour of follow-the-playhead during playback.
+{
+  const follow = (playheadX, scrollLeft, suspended) =>
+    getTimelineFollowDecision({ playheadX, scrollLeft, viewportWidth: 1000, suspended });
+  // Not suspended: playhead past the trailing margin pages the view.
+  assert.deepEqual(follow(1000, 0, false), { suspended: false, nextScrollLeft: 650 });
+  assert.deepEqual(follow(500, 0, false), { suspended: false, nextScrollLeft: null });
+  // Author dragged far away (old bug: snapped back after 1.5 s) – view stays.
+  assert.deepEqual(follow(1600, 29000, true), { suspended: true, nextScrollLeft: null });
+  // Slow manual scroll toward the playhead: each scroll event re-suspends; the
+  // view must never be moved, even when the playhead enters the edge margins.
+  let suspended = false;
+  for (const scrollLeft of [750, 850, 925, 960, 990, 1010]) {
+    suspended = true; // onScroll from the author
+    const decision = follow(1000, scrollLeft, suspended);
+    assert.equal(decision.nextScrollLeft, null, `no snap at scrollLeft ${scrollLeft}`);
+    suspended = decision.suspended;
+  }
+  // Playhead comfortably in view → follow resumes without moving the view.
+  assert.deepEqual(follow(1000, 500, true), { suspended: false, nextScrollLeft: null });
+  // Then it pages normally once the playhead reaches the trailing margin.
+  assert.deepEqual(follow(1405, 500, false), { suspended: false, nextScrollLeft: 1055 });
+}
 
 // t1669u: a manual scroll during playback must not be overridden by follow-the-playhead.
 assert.match(timelineSource, /followSuspendedRef\.current = true/);
