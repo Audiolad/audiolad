@@ -30,6 +30,12 @@ export type BusinessDomainLocation = {
 export type BusinessDomainOwner = {
   userId: string;
   firstName: string;
+  /**
+   * Profile «Имя» without the email fallback used for the greeting.
+   * Empty when the field would be empty (t1678u). Optional on test fixtures:
+   * the prompt then falls back to firstName.
+   */
+  givenName?: string;
   /** Empty until the owner fills the required surname in the profile (t1305s9421). */
   lastName: string;
 };
@@ -79,6 +85,11 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   }
 
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const givenName = extractBusinessFirstName({
+    metadataFirstName:
+      typeof meta.first_name === "string" ? meta.first_name : null,
+    fullName: typeof meta.full_name === "string" ? meta.full_name : null,
+  });
   const firstName = extractBusinessFirstName({
     metadataFirstName:
       typeof meta.first_name === "string" ? meta.first_name : null,
@@ -126,7 +137,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   if (!membership?.organization_id) {
     return {
       status: "authenticated",
-      owner: { userId: user.id, firstName, lastName },
+      owner: { userId: user.id, firstName, givenName, lastName },
       location: null,
       organizationName: null,
       organizationId: null,
@@ -182,7 +193,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     });
     return {
       status: "authenticated",
-      owner: { userId: user.id, firstName, lastName },
+      owner: { userId: user.id, firstName, givenName, lastName },
       location: null,
       locations: locations ?? [],
       pilotSlots,
@@ -222,7 +233,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   return {
     status: "authenticated",
-    owner: { userId: user.id, firstName, lastName },
+    owner: { userId: user.id, firstName, givenName, lastName },
     locations: locations ?? [],
     pilotSlots,
     venueSlotLimit,

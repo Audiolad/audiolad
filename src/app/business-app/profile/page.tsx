@@ -71,7 +71,7 @@ export default async function BusinessProfilePage() {
         {ownerSurname.trim() ? null : (
           <BusinessQuietHidden>
             <div className="mb-4">
-              <BusinessOwnerSurnamePrompt />
+              <BusinessOwnerSurnamePrompt missingName={!ownerName.trim()} />
             </div>
           </BusinessQuietHidden>
         )}
