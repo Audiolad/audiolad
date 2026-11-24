@@ -1,0 +1,30 @@
+name: Studio scroll diagnosis on Windows
+
+on:
+  push:
+    branches: [diagnostics/studio-scroll-windows]
+    paths:
+      - '.github/workflows/studio-scroll-windows.yml'
+      - 'scripts/studio-scroll-windows.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  chrome:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install diagnostic tools
+        run: npm install --no-save --no-audit --no-fund --prefix .studio-scroll-tools playwright@1.61.1 ffmpeg-static@5.2.0
+      - name: Run diagnostic in headful Chrome
+        shell: pwsh
+        run: |
+          $env:NODE_PATH = "$pwd\.studio-scroll-tools\node_modules"
+          node scripts/studio-scroll-windows.cjs
