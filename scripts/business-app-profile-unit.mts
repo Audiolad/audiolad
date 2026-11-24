@@ -4,9 +4,11 @@ import { businessCalendarDaysLeft, businessProfileSubscription } from "../src/li
 import {
   BUSINESS_ORGANIZATION_NAME_HINT, BUSINESS_ORGANIZATION_NAME_PLACEHOLDER,
   BUSINESS_OWNER_NAME_PLACEHOLDER, BUSINESS_OWNER_SURNAME_HINT, BUSINESS_OWNER_SURNAME_PLACEHOLDER,
+  BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_CTA, BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_PROMPT,
   BUSINESS_OWNER_SURNAME_REQUIRED_CTA, BUSINESS_OWNER_SURNAME_REQUIRED_ERROR,
   BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT, BUSINESS_PROFILE_LIMITS_TEXT, BUSINESS_PROFILE_NAME_HREF,
-  BUSINESS_PROFILE_SURNAME_HREF, businessProfileOrganizationFieldValue, validateBusinessProfile,
+  BUSINESS_PROFILE_SURNAME_HREF, businessOwnerSurnamePromptCopy, businessProfileOrganizationFieldValue,
+  isBusinessOwnerGivenNameMissing, validateBusinessProfile,
   businessKindLabel, businessTimezoneLabel, DEFAULT_BUSINESS_ORGANIZATION,
 } from "../src/lib/business-app/profile";
 import { extractBusinessFirstName, extractBusinessLastName, formatBusinessOwnerDisplayName } from "../src/lib/business-app/domain-identity";
@@ -186,9 +188,26 @@ for (const cf of ["\\u202A-\\u202E", "\\u200B-\\u200F", "\\u2066-\\u206F", "\\uF
   assert.match(licence, /venue-name/);
 }
 
+assert.equal(BUSINESS_PROFILE_NAME_HREF, "/profile?edit=name");
 assert.equal(BUSINESS_PROFILE_SURNAME_HREF, "/profile?edit=surname");
 assert.equal(BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT, "Укажите фамилию – она нужна для подтверждения прав на музыку в заведении");
 assert.equal(BUSINESS_OWNER_SURNAME_REQUIRED_CTA, "Указать фамилию");
+assert.equal(BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_PROMPT, "Укажите имя и фамилию – они нужны для подтверждения прав на музыку в заведении");
+assert.equal(BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_CTA, "Указать имя и фамилию");
+assert.equal(isBusinessOwnerGivenNameMissing(""), true);
+assert.equal(isBusinessOwnerGivenNameMissing("   "), true);
+assert.equal(isBusinessOwnerGivenNameMissing(null), true);
+assert.equal(isBusinessOwnerGivenNameMissing("Анна"), false);
+assert.deepEqual(businessOwnerSurnamePromptCopy(false), {
+  prompt: BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT,
+  cta: BUSINESS_OWNER_SURNAME_REQUIRED_CTA,
+  href: BUSINESS_PROFILE_SURNAME_HREF,
+});
+assert.deepEqual(businessOwnerSurnamePromptCopy(true), {
+  prompt: BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_PROMPT,
+  cta: BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_CTA,
+  href: BUSINESS_PROFILE_NAME_HREF,
+});
 assert.equal(formatBusinessOwnerDisplayName({ firstName: "Анна", lastName: "Иванова" }), "Анна Иванова");
 assert.equal(formatBusinessOwnerDisplayName({ firstName: "Анна", lastName: "" }), "Анна");
 assert.equal(formatBusinessOwnerDisplayName({ firstName: "", lastName: "" }), null);
@@ -197,14 +216,24 @@ assert.equal(formatVenueOwnerLabel({ firstName: "Анна", lastName: null }), "
 assert.equal(formatVenueOwnerLabel({ firstName: null, lastName: null }), null);
 {
   const prompt = readFileSync("src/components/business-app/BusinessOwnerSurnamePrompt.tsx", "utf8");
-  assert.match(prompt, /BUSINESS_PROFILE_SURNAME_HREF/);
+  assert.match(prompt, /businessOwnerSurnamePromptCopy\(missingName\)/);
   assert.match(prompt, /biz-owner-surname-prompt-cta/);
   assert.doesNotMatch(prompt, /\u2014/);
   const home = readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8");
-  assert.match(home, /BusinessOwnerSurnamePrompt/);
+  assert.match(home, /BusinessOwnerSurnamePrompt missingName=\{isBusinessOwnerGivenNameMissing\(domain\.owner\.givenName \?\? domain\.owner\.firstName\)\}/);
   assert.match(home, /!domain\.owner\.lastName\.trim\(\)/);
+  const profilePage = readFileSync("src/app/business-app/profile/page.tsx", "utf8");
+  assert.match(profilePage, /<BusinessOwnerSurnamePrompt missingName=\{!ownerName\.trim\(\)\} \/>/);
+  assert.match(profilePage, /ownerSurname\.trim\(\) \? null/);
   const hall = readFileSync("src/components/business-app/BusinessHallHome.tsx", "utf8");
   assert.doesNotMatch(hall, /BusinessOwnerSurnamePrompt|ownerSurname|Фамилия/, "hall device must not see the surname prompt");
+  const pay = readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8");
+  const licence = readFileSync("src/components/business-app/venue-licence/VenueLicencePage.tsx", "utf8");
+  const sticker = readFileSync("src/components/business-app/venue-licence/VenueLicenceStickerCard.tsx", "utf8");
+  assert.doesNotMatch(pay + licence + sticker, /BusinessOwnerSurnamePrompt|Укажите фамилию|Указать фамилию/, "pay and QR rights have no surname prompt card");
+  const profileLib = readFileSync("src/lib/business-app/profile.ts", "utf8");
+  const form = readFileSync("src/components/business-app/profile/BusinessProfileForm.tsx", "utf8");
+  for (const src of [prompt, home, profilePage, profileLib, form]) assert.doesNotMatch(src, /\u2014/, "en dash only");
 }
 {
   const load = readFileSync("src/lib/business-app/venue-licence/load.server.ts", "utf8");
@@ -242,6 +271,22 @@ console.log("business-app-profile-unit: OK");
 const { createElement: h } = await import("react");
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { BusinessPayControls } = await import("../src/components/business-app/BusinessHomeAccessCard");
+const BusinessOwnerSurnamePrompt = (await import("../src/components/business-app/BusinessOwnerSurnamePrompt")).default;
+{
+  const both = renderToStaticMarkup(h(BusinessOwnerSurnamePrompt, { missingName: true }));
+  assert.match(both, /Укажите имя и фамилию – они нужны для подтверждения прав на музыку в заведении/);
+  assert.match(both, />Указать имя и фамилию</);
+  assert.match(both, /href="\/profile\?edit=name"/);
+  assert.match(both, /data-missing-name="true"/);
+  assert.doesNotMatch(both, /\u2014/);
+  const surnameOnly = renderToStaticMarkup(h(BusinessOwnerSurnamePrompt, { missingName: false }));
+  assert.match(surnameOnly, /Укажите фамилию – она нужна для подтверждения прав на музыку в заведении/);
+  assert.match(surnameOnly, />Указать фамилию</);
+  assert.match(surnameOnly, /href="\/profile\?edit=surname"/);
+  assert.match(surnameOnly, /data-missing-name="false"/);
+  assert.doesNotMatch(surnameOnly, /имя и фамилию/);
+  assert.doesNotMatch(surnameOnly, /\u2014/);
+}
 const controlsProps = { canPay: true, accepted: true, busy: false, error: null, onAccept() {}, onPay() {}, buttonVariant: "cta" as const };
 for (const payLabel of ["Оплатить заранее", "Продлить", "Оплатить"]) {
   const html = renderToStaticMarkup(h(BusinessPayControls, { ...controlsProps, payLabel }));

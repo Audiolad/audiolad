@@ -41,6 +41,30 @@ export const BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT =
   "Укажите фамилию – она нужна для подтверждения прав на музыку в заведении";
 export const BUSINESS_OWNER_SURNAME_REQUIRED_CTA = "Указать фамилию";
 export const BUSINESS_OWNER_SURNAME_REQUIRED_ERROR = "Введите фамилию.";
+/** Home/profile prompt when the given name is also empty (Sergey, t1678u). */
+export const BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_PROMPT =
+  "Укажите имя и фамилию – они нужны для подтверждения прав на музыку в заведении";
+export const BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_CTA = "Указать имя и фамилию";
+
+/** True when the profile «Имя» field would be empty. */
+export function isBusinessOwnerGivenNameMissing(name: string | null | undefined) {
+  return !(typeof name === "string" ? name.trim() : "");
+}
+
+/** Copy and profile focus target for the non-blocking identity prompt (surname still required). */
+export function businessOwnerSurnamePromptCopy(missingName: boolean) {
+  return missingName
+    ? {
+        prompt: BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_PROMPT,
+        cta: BUSINESS_OWNER_NAME_AND_SURNAME_REQUIRED_CTA,
+        href: BUSINESS_PROFILE_NAME_HREF,
+      }
+    : {
+        prompt: BUSINESS_OWNER_SURNAME_REQUIRED_PROMPT,
+        cta: BUSINESS_OWNER_SURNAME_REQUIRED_CTA,
+        href: BUSINESS_PROFILE_SURNAME_HREF,
+      };
+}
 export const BUSINESS_PROFILE_LIMITS_TEXT =
   "Имя и фамилия – до 80 символов, название – до 120 символов.";
 

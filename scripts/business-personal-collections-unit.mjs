@@ -130,7 +130,7 @@ const quietGates = {
   'src/components/business-app/BusinessHomePage.tsx': [/quiet \? null : <BusinessHomeAccessCard \/>/, /showAccess=\{!quiet\}/, /needsNewEdition && !quiet/],
   'src/components/business-app/BusinessPointSlots.tsx': [/multi && !quiet/],
   'src/components/business-app/workspace/BusinessWorkspace.tsx': [/model.status === "anonymous" && !quiet/, /cabinet.can\("payLink"\) && !quiet/, /Подборка сейчас недоступна/, /if \(model.collectionUnavailable\) return false;/],
-  'src/app/business-app/profile/page.tsx': [/<BusinessQuietHidden>\s*<div className="mb-4">\s*<BusinessOwnerSurnamePrompt \/>/],
+  'src/app/business-app/profile/page.tsx': [/<BusinessQuietHidden>\s*<div className="mb-4">\s*<BusinessOwnerSurnamePrompt missingName=\{!ownerName\.trim\(\)\} \/>/],
   'src/components/business-app/profile/BusinessProfileSubscription.tsx': [/<details>/, /Подключение и оплата/],
   'src/components/business-app/BusinessOnboardingWizardPage.tsx': [/step !== "done" && !quiet/, /\{quiet \? null : <p className="text-sm text-\[var\(--biz-text-muted\)\]">\s*\{GUEST_COFFEE_TERMS\}/],
 };

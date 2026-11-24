@@ -17,6 +17,7 @@ import { useBusinessCabinetMode } from "@/components/business-app/BusinessPointM
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
+import { isBusinessOwnerGivenNameMissing } from "@/lib/business-app/profile";
 import {
   buildBusinessGreeting,
   buildBusinessGreetingSubtitle,
@@ -158,7 +159,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
             {subtitle}
           </p>
         </header>
-        {needsSurname && !quiet ? <div className="mb-4 max-w-xl"><BusinessOwnerSurnamePrompt /></div> : null}
+        {needsSurname && !quiet ? <div className="mb-4 max-w-xl"><BusinessOwnerSurnamePrompt missingName={isBusinessOwnerGivenNameMissing(domain.owner.givenName ?? domain.owner.firstName)} /></div> : null}
         {quiet ? null : <BusinessHomeAccessCard />}
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
@@ -205,7 +206,7 @@ export default function BusinessHomePage({ playbackConfirmation, pointLinked = n
         </p>
       </header>
       <div className="business-app-owner-home space-y-4">
-        {needsSurname && !quiet ? <BusinessOwnerSurnamePrompt /> : null}
+        {needsSurname && !quiet ? <BusinessOwnerSurnamePrompt missingName={isBusinessOwnerGivenNameMissing(domain.owner.givenName ?? domain.owner.firstName)} /> : null}
         {needsNewEdition && !quiet ? <BusinessOfferReacceptPrompt newEdition /> : null}
         <BusinessHomeChecklist steps={steps} showAccess={!quiet} />
       </div>
