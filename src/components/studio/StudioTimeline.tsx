@@ -18,7 +18,9 @@ import {
   getAnchoredTimelineScrollLeft,
   getRulerStepSeconds,
   getTimelineEditExtent,
+  getTimelineFollowDecision,
   getTimelineWidth,
+  isTimelineSeekJump,
   timeToTimelineX,
   timelineXToTime,
 } from "@/lib/studio/timeline-math";
@@ -108,8 +110,14 @@ function StudioTimeline({
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const previousPixelsPerSecondRef = useRef(pixelsPerSecond);
-  const lastManualScrollAtRef = useRef(0);
-  const isAutoScrollingRef = useRef(false);
+  // Scroll position we set ourselves; the next scroll event that lands on it
+  // is ours, anything else is the author moving the timeline by hand.
+  const autoScrollTargetRef = useRef<number | null>(null);
+  // While playing, a manual scroll pauses "follow the playhead" until the
+  // playhead is back in view, the author seeks, or playback is restarted.
+  const followSuspendedRef = useRef(false);
+  const wasPlayingRef = useRef(isPlaying);
+  const followClockRef = useRef<{ time: number; at: number } | null>(null);
   const gestureRef = useRef<{
     track: StudioTimelineTrack;
     clip: StudioClip;
@@ -147,20 +155,28 @@ function StudioTimeline({
     viewportWidth + WAVEFORM_OVERSCAN_PIXELS * 2,
     Math.max(timelineWidth - renderStartX, 1),
   );
+  const setViewportScrollLeft = useCallback(
+    (viewport: HTMLDivElement, nextScrollLeft: number) => {
+      const previous = viewport.scrollLeft;
+      viewport.scrollLeft = Math.max(nextScrollLeft, 0);
+      // Read back: the browser clamps to the scrollable range.
+      autoScrollTargetRef.current =
+        viewport.scrollLeft !== previous ? viewport.scrollLeft : null;
+      return viewport.scrollLeft;
+    },
+    [],
+  );
+
   const scrollTo = useCallback((nextScrollLeft: number) => {
     const viewport = viewportRef.current;
     if (!viewport) {
       return;
     }
 
-    isAutoScrollingRef.current = true;
-    lastManualScrollAtRef.current = Date.now();
-    viewport.scrollLeft = Math.max(nextScrollLeft, 0);
-    setScrollLeft(viewport.scrollLeft);
-    window.setTimeout(() => {
-      isAutoScrollingRef.current = false;
-    }, 0);
-  }, []);
+    // Transport jumps ("to start" / "to end") are explicit navigation.
+    followSuspendedRef.current = false;
+    setScrollLeft(setViewportScrollLeft(viewport, nextScrollLeft));
+  }, [setViewportScrollLeft]);
 
   useImperativeHandle(
     ref,
@@ -215,34 +231,46 @@ function StudioTimeline({
       duration,
       viewportWidth: viewport.clientWidth,
     });
-    isAutoScrollingRef.current = true;
-    viewport.scrollLeft = nextScrollLeft;
-    setScrollLeft(nextScrollLeft);
+    setScrollLeft(setViewportScrollLeft(viewport, nextScrollLeft));
     previousPixelsPerSecondRef.current = pixelsPerSecond;
-    window.setTimeout(() => {
-      isAutoScrollingRef.current = false;
-    }, 0);
-  }, [duration, pixelsPerSecond]);
+  }, [duration, pixelsPerSecond, setViewportScrollLeft]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
-    if (!viewport || !isPlaying || duration <= 0) {
+    const startedPlaying = isPlaying && !wasPlayingRef.current;
+    wasPlayingRef.current = isPlaying;
+    if (!isPlaying) {
+      followClockRef.current = null;
       return;
     }
 
-    if (Date.now() - lastManualScrollAtRef.current < 1500) {
+    const now = performance.now();
+    const clock = followClockRef.current;
+    followClockRef.current = { time: currentTime, at: now };
+    const seeked = clock !== null && isTimelineSeekJump({
+      previousTime: clock.time,
+      elapsedSeconds: (now - clock.at) / 1000,
+      currentTime,
+    });
+    if (startedPlaying || seeked) {
+      followSuspendedRef.current = false;
+    }
+
+    if (!viewport || duration <= 0) {
       return;
     }
-    const visibleStart = viewport.scrollLeft;
-    const visibleEnd = visibleStart + viewport.clientWidth;
-    if (playheadX < visibleStart + 48 || playheadX > visibleEnd - 96) {
-      isAutoScrollingRef.current = true;
-      viewport.scrollLeft = Math.max(0, playheadX - viewport.clientWidth * 0.35);
-      window.setTimeout(() => {
-        isAutoScrollingRef.current = false;
-      }, 0);
+
+    const decision = getTimelineFollowDecision({
+      playheadX,
+      scrollLeft: viewport.scrollLeft,
+      viewportWidth: viewport.clientWidth,
+      suspended: followSuspendedRef.current,
+    });
+    followSuspendedRef.current = decision.suspended;
+    if (decision.nextScrollLeft !== null) {
+      setViewportScrollLeft(viewport, decision.nextScrollLeft);
     }
-  }, [duration, isPlaying, playheadX]);
+  }, [currentTime, duration, isPlaying, playheadX, setViewportScrollLeft]);
 
   const seekAtOffset = (offsetX: number) => {
     onSeek(Math.min(timelineXToTime(offsetX, pixelsPerSecond), editHorizon));
@@ -428,10 +456,14 @@ function StudioTimeline({
         ref={viewportRef}
         className="overflow-x-auto"
         onScroll={(event) => {
-          setScrollLeft(event.currentTarget.scrollLeft);
-          if (!isAutoScrollingRef.current) {
-            lastManualScrollAtRef.current = Date.now();
+          const nextScrollLeft = event.currentTarget.scrollLeft;
+          setScrollLeft(nextScrollLeft);
+          const autoTarget = autoScrollTargetRef.current;
+          autoScrollTargetRef.current = null;
+          if (autoTarget !== null && Math.abs(nextScrollLeft - autoTarget) <= 1) {
+            return;
           }
+          followSuspendedRef.current = true;
         }}
       >
         <div

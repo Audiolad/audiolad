@@ -624,7 +624,8 @@ function testStudioBoundariesAndCrossTabStop() {
     timeline,
     /timeToTimelineX\(projectExtent, pixelsPerSecond\) -\s*viewport\.clientWidth \* 0\.75/,
   );
-  assert.match(timeline, /lastManualScrollAtRef\.current = Date\.now\(\)/);
+  assert.match(timeline, /followSuspendedRef\.current = true/);
+  assert.doesNotMatch(timeline, /lastManualScrollAtRef/);
   assert.doesNotMatch(timeline, /querySelector/);
   assert.match(timeline, /overflow-x-auto/);
   assert.match(timeline, /WAVEFORM_OVERSCAN_PIXELS/);
@@ -707,7 +708,7 @@ function testStudioBoundariesAndCrossTabStop() {
     /clip\.fadeInDuration <= 0 && clip\.fadeOutDuration <= 0/,
   );
   assert.doesNotMatch(timeline, /track\.fade(?:In|Out)Duration/);
-  assert.match(timeline, /lastManualScrollAtRef/);
+  assert.match(timeline, /followSuspendedRef/);
   assert.match(timeline, /getAnchoredTimelineScrollLeft/);
   assert.match(timeline, /onSeek=\{\(clipX\)/);
   assert.doesNotMatch(timeline, /onToggleMuted|onVolumeChange/);
