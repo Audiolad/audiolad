@@ -43,7 +43,6 @@ export const GUEST_COFFEE_COPY = {
     "30 минут знакомства с подборками на этом устройстве использованы. Музыка в эфир кофейни идёт через плеер программы – только треки с подтверждёнными правами.",
   unavailable: "Гостевое прослушивание временно недоступно. Попробуйте, пожалуйста, позже.",
   emptyShelf: "Подборки для кофеен сейчас не загрузились. Обновите страницу чуть позже – мы показываем только настоящие треки каталога.",
-  directionFallback: "Для этого типа звучания пока нет подходящих подборок – показываем самые близкие.",
   settingsSaved: "Настройки сохраняются на этом устройстве и останутся в кабинете после подключения кофейни.",
   /** Gift starts after email confirmation. Payment is not charged from this cabinet. */
   connectNote:
@@ -53,8 +52,8 @@ export const GUEST_COFFEE_COPY = {
 
 /**
  * a8240527 (Sergey 17.10.2026 23:21): the explicit «Собрать атмосферу» step. The result is
- * ONE playlist assembled from real tracks of the curated free albums; the match is stated
- * honestly per album, without technical passport details.
+ * ONE playlist assembled from real tracks of the curated free albums. t1673u (Sergey 24.11.2026):
+ * the card shows only the chosen settings – no album counts or «как подбирали» notes.
  */
 export const GUEST_COFFEE_ATMOSPHERE_COPY = {
   assemble: "Собрать атмосферу",
@@ -71,9 +70,7 @@ export const GUEST_COFFEE_ATMOSPHERE_COPY = {
   dirty: "Настройки изменились. Нажмите «Пересобрать атмосферу» – до этого подборка остаётся прежней.",
   stale: "Собрано для прежних настроек.",
   play: "Слушать атмосферу",
-  matchTitle: "Что совпало с вашим выбором",
-  matchNote: "Подбор учитывает звучание треков и описание альбомов каталога. Это подсказка – окончательно решает ваш слух.",
-  sourcesTitle: "Собрано из альбомов",
+  paramsTitle: "Настройки атмосферы",
   playerIdle: "Соберите атмосферу и нажмите «Слушать атмосферу» – музыка заиграет здесь.",
   playerReady: "Атмосфера собрана. Нажмите «Слушать атмосферу» или выберите трек.",
 } as const;

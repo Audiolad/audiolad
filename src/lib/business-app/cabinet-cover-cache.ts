@@ -8,6 +8,12 @@
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 
 export const CABINET_COVER_PRELOAD_LIMIT = 4;
+/**
+ * t1674u: the guest «Собрать атмосферу» list shows at most 12 rows, all visible at once, so
+ * every row's album cover is allowed (current track first, then the rest in list order).
+ * Fetches still go 4 at a time; the signed-in cabinet queue keeps the 4-cover window.
+ */
+export const GUEST_ATMOSPHERE_COVER_LIMIT = 12;
 export const CABINET_COVER_MAX_CONCURRENT = 4;
 export const CABINET_COVER_CACHE_LIMIT = 30;
 export const CABINET_COVER_IDLE_TIMEOUT_MS = 800;
@@ -160,7 +166,10 @@ export function preloadCabinetCover(src: string | null | undefined): Promise<voi
  * Replace the only set of covers we may fetch: the playing track and the next three.
  * Anything in flight that is no longer in this set is aborted.
  */
-export function setCabinetCoverPreloadSet(urls: readonly (string | null | undefined)[]): string[] {
+export function setCabinetCoverPreloadSet(
+  urls: readonly (string | null | undefined)[],
+  limit = CABINET_COVER_PRELOAD_LIMIT,
+): string[] {
   const next: string[] = [];
   const seen = new Set<string>();
   for (const value of urls) {
@@ -168,7 +177,7 @@ export function setCabinetCoverPreloadSet(urls: readonly (string | null | undefi
     if (!url || seen.has(url)) continue;
     seen.add(url);
     next.push(url);
-    if (next.length >= CABINET_COVER_PRELOAD_LIMIT) break;
+    if (next.length >= limit) break;
   }
   desired = new Set(next);
   for (let i = queue.length - 1; i >= 0; i -= 1) {

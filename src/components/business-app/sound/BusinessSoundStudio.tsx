@@ -33,7 +33,7 @@ import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app
 import {
   assembleGuestCoffeeAtmosphere,
   guestCoffeeAtmosphereKey,
-  guestCoffeeAtmosphereMatchLines,
+  guestCoffeeAtmosphereParams,
   guestCoffeeAtmosphereMeta,
   guestCoffeeTrackClock,
   type GuestCoffeeAtmosphere,
@@ -410,14 +410,12 @@ export default function BusinessSoundStudio({ playlists, plan = null, presets = 
                     </span>
                   </button>
                 </div>
-                <ul className="business-atmosphere-match" aria-label={C.matchTitle} data-testid="biz-atmosphere-match">
-                  {guestCoffeeAtmosphereMatchLines(atmosphere).map((line) => (
-                    <li key={line.id} data-state={line.state}>
-                      <span aria-hidden="true">{line.state === "all" ? "✓" : "≈"}</span> {line.text}
-                    </li>
+                {/* t1673u: the chosen settings only – no explanation of how the music was picked. */}
+                <ul className="business-atmosphere-params" aria-label={C.paramsTitle} data-testid="biz-atmosphere-params">
+                  {guestCoffeeAtmosphereParams(atmosphere).map((line) => (
+                    <li key={line.id}>{line.text}</li>
                   ))}
                 </ul>
-                <p className="business-app-muted text-sm">{C.matchNote}</p>
                 <ol className="business-atmosphere-tracks" data-testid="biz-atmosphere-tracks">
                   {atmosphere.tracks.map((track, i) => {
                     const current = view.index === i && view.current?.audioItemId === track.audioItemId;
@@ -444,9 +442,6 @@ export default function BusinessSoundStudio({ playlists, plan = null, presets = 
                     );
                   })}
                 </ol>
-                <p className="business-app-muted text-sm" data-testid="biz-atmosphere-sources">
-                  {C.sourcesTitle}: {atmosphere.sources.map((s) => `«${s.title}»${s.authorName ? ` (${s.authorName})` : ""}`).join(", ")}.
-                </p>
               </article>
             )}
           </div>

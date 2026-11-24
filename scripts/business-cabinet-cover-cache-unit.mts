@@ -127,27 +127,32 @@ assert.equal(cache.cabinetCoverInflightCountForTests(), 0);
 const guestAtmosphere = Array.from({ length: 12 }, (_, i) => ({
   coverUrl: `https://cdn.example/covers/guest-${i}.webp`,
 }));
-const guestWindow = cache.selectCabinetCoverPreloadUrls(guestAtmosphere, 0, null);
+assert.equal(cache.GUEST_ATMOSPHERE_COVER_LIMIT, 12);
+// t1674u: the guest atmosphere shows all 12 rows at once – every distinct album cover is allowed,
+// the current track first, then the rest in list order (duplicates of one album counted once).
+guestAtmosphere[7] = { coverUrl: guestAtmosphere[2]!.coverUrl };
+const guestWindow = cache.selectCabinetCoverPreloadUrls(guestAtmosphere, 5, null, cache.GUEST_ATMOSPHERE_COVER_LIMIT);
 assert.deepEqual(
   guestWindow,
-  [
-    "https://cdn.example/covers/guest-0.webp",
-    "https://cdn.example/covers/guest-1.webp",
-    "https://cdn.example/covers/guest-2.webp",
-    "https://cdn.example/covers/guest-3.webp",
-  ],
-  "guest atmosphere warms only the current track and the next three",
+  [5, 6, 2, 8, 9, 10, 11, 0, 1, 3, 4].map((i) => `https://cdn.example/covers/guest-${i}.webp`),
+  "guest atmosphere: current first, then the rest, each album once",
 );
-const guestSet = cache.setCabinetCoverPreloadSet(guestWindow);
-assert.equal(guestSet.length, 4);
+const guestSet = cache.setCabinetCoverPreloadSet(guestWindow, cache.GUEST_ATMOSPHERE_COVER_LIMIT);
+assert.equal(guestSet.length, 11);
 await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(fetchLog.length, 4);
-for (const track of guestAtmosphere.slice(4)) {
-  void cache.preloadCabinetCover(track.coverUrl);
+assert.equal(fetchLog.length, cache.CABINET_COVER_MAX_CONCURRENT, "still 4 fetches at a time");
+assert.deepEqual(fetchLog.map((e) => e.url), guestWindow.slice(0, 4), "current and following rows first");
+for (const track of guestAtmosphere) void cache.preloadCabinetCover(track.coverUrl);
+let guard = 0;
+while (gates.length > 0 && guard++ < 20) {
+  const batch = gates.splice(0, gates.length);
+  for (const gate of batch) gate.open();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
-await new Promise((resolve) => setTimeout(resolve, 0));
-assert.equal(fetchLog.length, 4, "covers outside the guest 4-cover window are not loaded");
-assert.ok(fetchLog.every((entry) => guestWindow.includes(entry.url)));
+assert.deepEqual([...new Set(fetchLog.map((e) => e.url))].sort(), [...guestWindow].sort(), "every guest row cover is fetched");
+for (const url of guestWindow) assert.equal(cache.isCabinetCoverCached(url), true);
+// The signed-in cabinet queue keeps the 4-cover window (t1654u).
+assert.equal(cache.setCabinetCoverPreloadSet(guestAtmosphere.map((t) => t.coverUrl)).length, cache.CABINET_COVER_PRELOAD_LIMIT);
 while (gates.length > 0) {
   const batch = gates.splice(0, gates.length);
   for (const gate of batch) gate.open();
@@ -203,6 +208,7 @@ assert.match(preloader, /selectCabinetCoverPreloadUrls/);
 assert.match(preloader, /setCabinetCoverPreloadSet/);
 assert.match(preloader, /scheduleCabinetCoverPreload/);
 assert.match(preloader, /useBusinessGuestPlaybackOptional/);
+assert.match(preloader, /useCabinet \? CABINET_COVER_PRELOAD_LIMIT : GUEST_ATMOSPHERE_COVER_LIMIT/);
 assert.match(guestPlayback, /export function useBusinessGuestPlaybackOptional/);
 assert.doesNotMatch(cacheSource, /desired\.size > 0/, "an empty allowed set must deny loads, not open the floodgate");
 assert.doesNotMatch(preloader, /preloadCabinetCovers/);

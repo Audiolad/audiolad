@@ -16,6 +16,9 @@ for (const b of GUEST_COFFEE_BENEFITS) {
   assert.doesNotMatch(b.title + b.text, /—/, `${b.id}: en dash only`);
   assert.doesNotMatch(b.title + b.text, /https?:|www\./, `${b.id}: no links`);
 }
+// t1675u/t1676u (Sergey 24.11.2026): exact wording, nothing about recent tracks.
+assert.equal(GUEST_COFFEE_BENEFITS[1].title, "Без надоедливых повторов");
+assert.equal(GUEST_COFFEE_BENEFITS[1].text, "Очередь обновляется сама, исходя из ваших настроек и предпочтений.");
 const legal = GUEST_COFFEE_BENEFITS[0];
 assert.match(legal.text, /РАО и ВОИС/);
 assert.match(legal.text, /напрямую от правообладателя/, "same basis as the legal section");

@@ -1891,7 +1891,7 @@
   opacity: 0.6;
 }
 
-.business-atmosphere-match {
+.business-atmosphere-params {
   display: grid;
   gap: 0.3rem;
   margin: 0;
@@ -1903,8 +1903,6 @@
   color: var(--biz-text);
 }
 
-.business-atmosphere-match li[data-state="all"] > span { color: var(--biz-green); font-weight: 700; }
-.business-atmosphere-match li:not([data-state="all"]) > span { color: var(--biz-brass-ink); font-weight: 700; }
 
 .business-atmosphere-tracks {
   display: grid;
