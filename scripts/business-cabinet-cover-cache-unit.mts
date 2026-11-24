@@ -159,6 +159,40 @@ while (gates.length > 0) {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+// t1677u: owner/hall «Музыка» – the playing track, the 3 listed «Дальше в очереди» rows (unique
+// tracks ahead, the same indices as the list) and 2 rows of lookahead; never the whole queue.
+{
+  assert.equal(cache.CABINET_QUEUE_COVER_LIMIT, 6);
+  const q = Array.from({ length: 25 }, (_, i) => ({ audioItemId: `a${i}`, coverUrl: `https://cdn.example/covers/q-${i}.webp` }));
+  const qUrl = (i: number) => `https://cdn.example/covers/q-${i}.webp`;
+  assert.deepEqual(cache.selectCabinetQueueCoverUrls(q, 0, null), [0, 1, 2, 3, 4, 5].map(qUrl));
+  // A repeat of a heard track right after the playhead is not a listed row – the window skips it too.
+  const order = [7, 3, 7, 9, 3, 11, 12, 13, 14];
+  assert.deepEqual(cache.selectCabinetQueueCoverUrls(q, 3, order), [3, 9, 11, 12, 13, 14].map(qUrl));
+  const { cafeQueuePreviewIndices } = await import("../src/lib/business-app/cafe-queue/order");
+  assert.deepEqual(cafeQueuePreviewIndices(q, order, 3).slice(0, 3), [9, 11, 12], "listed rows");
+  // Shared album covers are fetched once; an unknown playhead falls back to the first track.
+  const shared = q.map((t, i) => ({ ...t, coverUrl: qUrl(i % 2) }));
+  assert.deepEqual(cache.selectCabinetQueueCoverUrls(shared, 0, null), [qUrl(0), qUrl(1)]);
+  assert.equal(cache.selectCabinetQueueCoverUrls(q, 99, null)[0], qUrl(0));
+  assert.deepEqual(cache.selectCabinetQueueCoverUrls([], 0, null), []);
+  cache.resetCabinetCoverCacheForTests();
+  fetchLog.length = 0;
+  gates.length = 0;
+  const set = cache.setCabinetCoverPreloadSet(cache.selectCabinetQueueCoverUrls(q, 0, null), cache.CABINET_QUEUE_COVER_LIMIT);
+  assert.equal(set.length, 6);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(fetchLog.length, cache.CABINET_COVER_MAX_CONCURRENT, "still 4 requests at a time (t1654u freeze guard)");
+  for (const track of q.slice(6)) void cache.preloadCabinetCover(track.coverUrl);
+  let guard = 0;
+  while (gates.length > 0 && guard++ < 20) {
+    const batch = gates.splice(0, gates.length);
+    for (const gate of batch) gate.open();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.deepEqual([...new Set(fetchLog.map((e) => e.url))].sort(), set.slice().sort(), "nothing beyond the 6 allowed covers");
+}
+
 cache.resetCabinetCoverCacheForTests();
 fetchLog.length = 0;
 gates.length = 0;
@@ -208,7 +242,9 @@ assert.match(preloader, /selectCabinetCoverPreloadUrls/);
 assert.match(preloader, /setCabinetCoverPreloadSet/);
 assert.match(preloader, /scheduleCabinetCoverPreload/);
 assert.match(preloader, /useBusinessGuestPlaybackOptional/);
-assert.match(preloader, /useCabinet \? CABINET_COVER_PRELOAD_LIMIT : GUEST_ATMOSPHERE_COVER_LIMIT/);
+assert.match(preloader, /useCabinet \? CABINET_QUEUE_COVER_LIMIT : GUEST_ATMOSPHERE_COVER_LIMIT/);
+assert.match(preloader, /selectCabinetQueueCoverUrls\(cabinetTracks \?\? \[\], index, order\)/);
+assert.match(now, /cafeQueuePreviewIndices\(model\.tracks, playOrder, currentIndex\)/, "the list and the preloader share the row selection");
 assert.match(guestPlayback, /export function useBusinessGuestPlaybackOptional/);
 assert.doesNotMatch(cacheSource, /desired\.size > 0/, "an empty allowed set must deny loads, not open the floodgate");
 assert.doesNotMatch(preloader, /preloadCabinetCovers/);

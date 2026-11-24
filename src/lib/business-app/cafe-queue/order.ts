@@ -164,6 +164,22 @@ export function cafeUniqueAhead(
 }
 
 /** Tracks after the current one, then the earlier ones, following `order`. */
+/**
+ * t1677u: the catalog indices the venue player lists under «Дальше в очереди» (before the
+ * CAFE_QUEUE_PREVIEW cut): unique tracks ahead, or the loop when nothing unique is left.
+ * Shared by the list itself and the cover preloader, so every listed row gets its cover.
+ */
+export function cafeQueuePreviewIndices(
+  tracks: readonly { audioItemId: string }[],
+  order: readonly number[],
+  currentIndex: number,
+): number[] {
+  const current = tracks[currentIndex] ?? tracks[0] ?? null;
+  if (!current) return [];
+  const ahead = cafeUniqueAhead(tracks, order, currentIndex);
+  return ahead.length > 0 ? ahead : cafeUpcomingIndices(order, currentIndex);
+}
+
 export function cafeUpcomingIndices(order: readonly number[], currentIndex: number): number[] {
   if (order.length <= 1) return [];
   const pos = order.indexOf(currentIndex);

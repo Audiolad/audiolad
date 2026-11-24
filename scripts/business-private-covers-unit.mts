@@ -61,6 +61,7 @@ let rows: Record<string, Row> = {};
 const updates: { table: string; patch: Record<string, unknown> }[] = [];
 const signCalls: { bucket: string; path: string; ttl: number }[] = [];
 const downloadCalls: { bucket: string; path: string }[] = [];
+const missingPaths = new Set<string>();
 const uploads: { bucket: string; profile: string }[] = [];
 const indexNow: unknown[] = [];
 let signSeq = 0;
@@ -84,6 +85,7 @@ const fakeDb = {
         },
         download: async (path: string) => {
           downloadCalls.push({ bucket, path });
+          if (missingPaths.has(path)) return { data: null, error: { message: 'Object not found' } };
           return { data: new Blob([COVER_BYTES], { type: 'image/webp' }), error: null };
         },
         list: async () => ({ data: [] }), remove: async () => ({ data: [] }), upload: async () => ({ error: null }),
@@ -144,12 +146,27 @@ assert.equal(first.headers.get('x-content-type-options'), 'nosniff');
 assert.equal(first.headers.get('location'), null);
 assert.deepEqual(new Uint8Array(await first.arrayBuffer()), COVER_BYTES);
 assert.equal(signCalls.length, 0, 'hall player never receives a short-lived signed URL');
-assert.deepEqual(downloadCalls.at(-1), { bucket: 'business-private-covers', path: `practices/${ALBUM}/variants/v1/md.webp` });
+// t1677u: the player thumbnail is the 320 px sm.webp of the same upload version, not md/lg.
+assert.deepEqual(downloadCalls.at(-1), { bucket: 'business-private-covers', path: `practices/${ALBUM}/variants/v1/sm.webp` });
 // Every uncached request re-checks the session and re-reads the private object.
 const second = await wsGet();
 assert.equal(second.status, 200);
 assert.deepEqual(new Uint8Array(await second.arrayBuffer()), COVER_BYTES);
 assert.equal(downloadCalls.length, 2);
+// No sm variant in storage: the referenced file is served instead.
+missingPaths.add(`practices/${ALBUM}/variants/v1/sm.webp`);
+assert.equal((await wsGet()).status, 200);
+assert.deepEqual(downloadCalls.slice(-2).map((c) => c.path), [`practices/${ALBUM}/variants/v1/sm.webp`, `practices/${ALBUM}/variants/v1/md.webp`]);
+missingPaths.clear();
+{
+  const { businessPrivateCoverVariantPath } = require('../src/lib/business-covers/private-cover.server.ts') as typeof import('../src/lib/business-covers/private-cover.server');
+  assert.equal(businessPrivateCoverVariantPath(`practices/${ALBUM}/variants/v9/lg.webp`, 'sm'), `practices/${ALBUM}/variants/v9/sm.webp`);
+  assert.equal(businessPrivateCoverVariantPath(`practices/${ALBUM}/track-covers/${TRACK}/variants/v9/xl.webp`, 'sm'), `practices/${ALBUM}/track-covers/${TRACK}/variants/v9/sm.webp`);
+  assert.equal(businessPrivateCoverVariantPath(`practices/${ALBUM}/variants/v9/original.png`, 'sm'), null, 'only the generated webp set has siblings');
+  assert.equal(businessPrivateCoverVariantPath(`practices/${ALBUM}/variants/lg.webp`, 'sm'), null);
+}
+const guestCoverRoute = readFileSync('src/app/api/business/guest/coffee/cover/route.ts', 'utf8');
+assert.match(guestCoverRoute, /readBusinessPrivateCover\(db, practice\.cover_url, \{ practiceId: practice\.id \}, \{ variant: "sm" \}\)/);
 actor = { ...hall, device: false, userId: 'owner' }; // owner session
 assert.equal((await wsGet()).status, 200);
 
