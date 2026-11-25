@@ -29,9 +29,20 @@ function storedAttribution(): { attribution?: Record<string, string> } {
   } catch { return {}; }
 }
 
+export function BusinessGuestIncludedServices({ className }: { className?: string }) {
+  return (
+    <p className={className}>
+      <strong>Всё включено.</strong> Музыка из каталога, плеер, лицензия на использование музыки в заведении, документы и правовая поддержка. Без доплат и скрытых платежей.
+    </p>
+  );
+}
+
 /** Disabled flag preserves the original anchor, including its classes and test id. */
-export default function BusinessGuestStartCta({ href, className, children, testId, enabledLabel }: {
+export default function BusinessGuestStartCta({
+  href, className, children, testId, enabledLabel, showIncludedServices = false,
+}: {
   href: string; className?: string; children: ReactNode; testId: string; enabledLabel?: string;
+  showIncludedServices?: boolean;
 }) {
   const enabled = useGuestStartEnabled();
   const attributionEnabled = useAttributionEnabled();
@@ -89,6 +100,7 @@ export default function BusinessGuestStartCta({ href, className, children, testI
     <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
     {open ? <div className="space-y-3 py-3" data-testid={`${testId}-confirmation`}>
       <p>{copy.terms}</p>
+      {showIncludedServices ? <BusinessGuestIncludedServices /> : null}
       <p><BusinessOfferDocumentLink testId={`${testId}-offer-link`} className={BUSINESS_OFFER_LINK_ATTR} /> ({BUSINESS_OFFER_EDITION.label}){" · "}<BusinessPrivacyDocumentLink testId={`${testId}-privacy-link`} className={BUSINESS_OFFER_LINK_ATTR} /></p>
       <label className="flex items-start gap-2">
         <input type="checkbox" checked={accepted} disabled={loading} onChange={(event) => setAccepted(event.target.checked)} data-testid={`${testId}-accept`} />
