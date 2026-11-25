@@ -338,9 +338,18 @@ const videoExport = read("src/components/author-dashboard/AuthorProductVideoExpo
 const postCalls = videoExport.match(/method: "POST"/g) ?? [];
 const createVideoBody = functionBody(videoExport, "async function createVideo(");
 const uploadCoverBody = functionBody(videoExport, "async function uploadCover(");
-assert.equal(postCalls.length, 2, "only cover upload and explicit createVideo POST");
+const uploadBackgroundBody = functionBody(
+  videoExport,
+  "async function uploadBackground(",
+);
+assert.equal(
+  postCalls.length,
+  3,
+  "only cover/background upload and explicit createVideo POST",
+);
 assert.match(createVideoBody, /method: "POST"/);
 assert.match(uploadCoverBody, /method: "POST"/);
+assert.match(uploadBackgroundBody, /method: "POST"/);
 assert.doesNotMatch(videoExport, /method: "DELETE"[\s\S]{0,80}\/video\//, "no render cancel");
 const effectBodies = videoExport
   .split("useEffect(")

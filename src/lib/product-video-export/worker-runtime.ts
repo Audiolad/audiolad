@@ -1,7 +1,9 @@
-import { createReadStream } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -10,6 +12,7 @@ import {
   PRODUCT_VIDEO_EXPORT_LEASE_SECONDS,
   PRODUCT_VIDEO_EXPORT_MAX_ATTEMPTS,
   PRODUCT_VIDEO_RENDER_RECIPE,
+  isProductVideoBackgroundStoragePath,
   PRODUCT_VIDEO_AUDIO_BUCKETS,
   parseProductVideoOrientation,
   type ProductVideoAudioBucket,
@@ -60,6 +63,27 @@ export type ProductVideoRenderWorkerPort = {
     error: unknown,
   ) => Promise<boolean>;
 };
+
+async function downloadStorageObjectToFile(
+  service: SupabaseClient,
+  bucket: string,
+  storagePath: string,
+  outputPath: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const { data, error } = await service.storage
+    .from(bucket)
+    .createSignedUrl(storagePath, 120);
+  if (error || !data?.signedUrl) throw new Error("source_unavailable");
+  const response = await fetch(data.signedUrl, { signal });
+  if (!response.ok || !response.body) throw new Error("source_unavailable");
+  await pipeline(
+    Readable.fromWeb(
+      response.body as import("node:stream/web").ReadableStream,
+    ),
+    createWriteStream(outputPath),
+  );
+}
 
 export function parseClaimedProductVideoRenderJob(
   raw: unknown,
@@ -167,29 +191,36 @@ export function createProductVideoRenderWorkerPort(
     async executeJob(job, signal) {
       const workspace = await mkdtemp(join(tmpdir(), "audiolad-product-video-"));
       try {
-        const [audioDownload, coverDownload] = await Promise.all([
-          service.storage
-            .from(job.source_audio_bucket)
-            .download(job.source_audio_path),
-          service.storage
-            .from(PRODUCT_VIDEO_EXPORT_BUCKET)
-            .download(job.source_cover_path),
-        ]);
-        if (signal.aborted) throw new ProductVideoRenderAbortedError();
-        if (audioDownload.error || !audioDownload.data) {
-          throw new Error("audio_source_unavailable");
-        }
-        if (coverDownload.error || !coverDownload.data) {
-          throw new Error("cover_source_unavailable");
-        }
-
         const audioPath = join(workspace, "source.audio");
-        const coverPath = join(workspace, "cover.webp");
+        const background = isProductVideoBackgroundStoragePath(
+          job.source_cover_path,
+        );
+        const visualExtension =
+          job.source_cover_path.match(/[.]([a-z0-9]+)$/i)?.[1] ?? "bin";
+        const coverPath = join(workspace, `visual.${visualExtension}`);
         const outputPath = join(workspace, "output.mp4");
-        await Promise.all([
-          writeFile(audioPath, Buffer.from(await audioDownload.data.arrayBuffer())),
-          writeFile(coverPath, Buffer.from(await coverDownload.data.arrayBuffer())),
-        ]);
+        try {
+          await Promise.all([
+            downloadStorageObjectToFile(
+              service,
+              job.source_audio_bucket,
+              job.source_audio_path,
+              audioPath,
+              signal,
+            ),
+            downloadStorageObjectToFile(
+              service,
+              PRODUCT_VIDEO_EXPORT_BUCKET,
+              job.source_cover_path,
+              coverPath,
+              signal,
+            ),
+          ]);
+        } catch (error) {
+          if (signal.aborted) throw new ProductVideoRenderAbortedError();
+          throw error;
+        }
+        if (signal.aborted) throw new ProductVideoRenderAbortedError();
         const persister = createProductVideoProgressPersister({
           minIntervalMs: PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS,
           write: async (percent) => {
@@ -208,6 +239,7 @@ export function createProductVideoRenderWorkerPort(
           coverPath,
           outputPath,
           orientation: job.orientation,
+          visualKind: background ? "video_background" : "static_cover",
           signal,
           onProgress: (percent) => persister.note(percent),
         });

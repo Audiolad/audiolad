@@ -2286,6 +2286,17 @@ MP4 export available to modern music albums whose `audio_items.audio_path` is
 NULL, without copying or changing their audio assets. RLS and worker
 claim/lease/progress behavior are unchanged.
 
+## Product video export: moving backgrounds
+
+Migration `20270410120100_product_video_backgrounds.sql` adds nullable
+`landscape_background_path` and `portrait_background_path` columns to
+`product_video_assets`. Their CHECK constraints accept only UUID-named MP4,
+MOV, or WebM objects in the corresponding private orientation directory. The
+shared `product-video-assets` bucket additionally allows `video/quicktime` and
+`video/webm`; its existing WebP covers and MP4 outputs remain valid. This
+migration follows the music-stream source migration and does not modify its
+`source_audio_bucket`, enqueue function, RLS, or worker queue semantics.
+
 
 ## Business SPA pilot PR1 — programs and player event log
 

@@ -8,6 +8,7 @@ export type ProductVideoAudioBucket =
   (typeof PRODUCT_VIDEO_AUDIO_BUCKETS)[number];
 
 export type ProductVideoOrientation = "landscape_16_9" | "portrait_9_16";
+export type ProductVideoVisualKind = "static_cover" | "video_background";
 
 export const PRODUCT_VIDEO_ORIENTATIONS: readonly ProductVideoOrientation[] = [
   "landscape_16_9",
@@ -43,6 +44,14 @@ export const PRODUCT_VIDEO_ORIENTATION_META: Record<
 };
 
 export const PRODUCT_VIDEO_EXPORT_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+export const PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES = 200 * 1024 * 1024;
+export const PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS = 60;
+export const PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_PIXELS = 3840 * 2160;
+export const PRODUCT_VIDEO_BACKGROUND_MIME_TYPES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+] as const;
 export const PRODUCT_VIDEO_EXPORT_LEASE_SECONDS = 1800;
 export const PRODUCT_VIDEO_EXPORT_MAX_ATTEMPTS = 3;
 export const PRODUCT_VIDEO_EXPORT_IDLE_INTERVAL_MS = 5_000;
@@ -135,12 +144,69 @@ export function productVideoCoverColumn(
     : "portrait_cover_path";
 }
 
+export function productVideoBackgroundColumn(
+  orientation: ProductVideoOrientation,
+): "landscape_background_path" | "portrait_background_path" {
+  return orientation === "landscape_16_9"
+    ? "landscape_background_path"
+    : "portrait_background_path";
+}
+
 export function productVideoCoverStoragePath(
   practiceId: string,
   orientation: ProductVideoOrientation,
   token: string,
 ): string {
   return `practices/${practiceId}/video-covers/${orientation}/${token}.webp`;
+}
+
+export type ProductVideoBackgroundExtension = "mp4" | "mov" | "webm";
+
+export function productVideoBackgroundExtension(
+  fileName: string,
+  mimeType: string,
+): ProductVideoBackgroundExtension | null {
+  const extension = fileName.trim().toLowerCase().match(/[.]([a-z0-9]+)$/)?.[1];
+  if (extension === "mp4" && (!mimeType || mimeType === "video/mp4")) return "mp4";
+  if (
+    extension === "mov" &&
+    (!mimeType || mimeType === "video/quicktime" || mimeType === "video/mp4")
+  ) {
+    return "mov";
+  }
+  if (extension === "webm" && (!mimeType || mimeType === "video/webm")) {
+    return "webm";
+  }
+  return null;
+}
+
+export function productVideoBackgroundMimeType(
+  extension: ProductVideoBackgroundExtension,
+): (typeof PRODUCT_VIDEO_BACKGROUND_MIME_TYPES)[number] {
+  if (extension === "mov") return "video/quicktime";
+  if (extension === "webm") return "video/webm";
+  return "video/mp4";
+}
+
+export function productVideoBackgroundStoragePath(
+  practiceId: string,
+  orientation: ProductVideoOrientation,
+  token: string,
+  extension: ProductVideoBackgroundExtension,
+): string {
+  return `practices/${practiceId}/video-backgrounds/${orientation}/${token}.${extension}`;
+}
+
+export function productVideoBackgroundPosterStoragePath(
+  backgroundPath: string,
+): string {
+  return backgroundPath.replace(/[.](mp4|mov|webm)$/i, ".poster.webp");
+}
+
+export function isProductVideoBackgroundStoragePath(path: string): boolean {
+  return /\/video-backgrounds\/(?:landscape_16_9|portrait_9_16)\/[0-9a-f-]{36}[.](?:mp4|mov|webm)$/i.test(
+    path,
+  );
 }
 
 export function productVideoOutputStoragePath(
