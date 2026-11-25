@@ -10,7 +10,9 @@ import {
   PRODUCT_VIDEO_EXPORT_LEASE_SECONDS,
   PRODUCT_VIDEO_EXPORT_MAX_ATTEMPTS,
   PRODUCT_VIDEO_RENDER_RECIPE,
+  PRODUCT_VIDEO_AUDIO_BUCKETS,
   parseProductVideoOrientation,
+  type ProductVideoAudioBucket,
   type ProductVideoOrientation,
 } from "./contract";
 import {
@@ -29,6 +31,7 @@ export type ClaimedProductVideoRenderJob = {
   author_id: string;
   audio_item_id: string;
   orientation: ProductVideoOrientation;
+  source_audio_bucket: ProductVideoAudioBucket;
   source_audio_path: string;
   source_cover_path: string;
   output_storage_path: string;
@@ -65,8 +68,14 @@ export function parseClaimedProductVideoRenderJob(
   if (!row || typeof row !== "object") return null;
   const rec = row as Record<string, unknown>;
   const orientation = parseProductVideoOrientation(rec.orientation);
+  const sourceAudioBucket = PRODUCT_VIDEO_AUDIO_BUCKETS.includes(
+    rec.source_audio_bucket as ProductVideoAudioBucket,
+  )
+    ? (rec.source_audio_bucket as ProductVideoAudioBucket)
+    : null;
   if (
     !orientation ||
+    !sourceAudioBucket ||
     typeof rec.id !== "string" ||
     typeof rec.practice_id !== "string" ||
     typeof rec.author_id !== "string" ||
@@ -84,6 +93,7 @@ export function parseClaimedProductVideoRenderJob(
     author_id: rec.author_id,
     audio_item_id: rec.audio_item_id,
     orientation,
+    source_audio_bucket: sourceAudioBucket,
     source_audio_path: rec.source_audio_path,
     source_cover_path: rec.source_cover_path,
     output_storage_path: rec.output_storage_path,
@@ -158,7 +168,9 @@ export function createProductVideoRenderWorkerPort(
       const workspace = await mkdtemp(join(tmpdir(), "audiolad-product-video-"));
       try {
         const [audioDownload, coverDownload] = await Promise.all([
-          service.storage.from("practice-audio").download(job.source_audio_path),
+          service.storage
+            .from(job.source_audio_bucket)
+            .download(job.source_audio_path),
           service.storage
             .from(PRODUCT_VIDEO_EXPORT_BUCKET)
             .download(job.source_cover_path),

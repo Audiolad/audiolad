@@ -14,6 +14,7 @@ import {
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATIONS,
   PRODUCT_VIDEO_ORIENTATION_META,
+  isProductVideoAudioReady,
   type ProductVideoOrientation,
 } from "@/lib/product-video-export/contract";
 import { productVideoRenderStatusView } from "@/lib/product-video-export/progress";
@@ -24,6 +25,7 @@ type VideoAudioItem = Pick<
   | "title"
   | "audio_path"
   | "audio_prepare_status"
+  | "music_master"
   | "position"
 >;
 
@@ -47,6 +49,7 @@ type Props = {
   audioItems: VideoAudioItem[];
   getPracticeId: () => Promise<string | null>;
   disabled?: boolean;
+  disabledReason?: string | null;
 };
 
 const EMPTY_COVER: CoverState = {
@@ -122,6 +125,7 @@ export function AuthorProductVideoExport({
   audioItems,
   getPracticeId,
   disabled = false,
+  disabledReason = null,
 }: Props) {
   const [resolvedPracticeId, setResolvedPracticeId] = useState(practiceId);
   const [covers, setCovers] = useState<
@@ -145,11 +149,12 @@ export function AuthorProductVideoExport({
   const playableItems = useMemo(
     () =>
       audioItems.filter(
-        (item) =>
-          !item.id.startsWith("temp-") &&
-          Boolean(item.audio_path) &&
-          item.audio_prepare_status !== "queued" &&
-          item.audio_prepare_status !== "processing",
+        (item) => isProductVideoAudioReady({
+          id: item.id,
+          audioPath: item.audio_path,
+          audioPrepareStatus: item.audio_prepare_status,
+          hasActiveMusicDelivery: item.music_master?.hasActiveDelivery,
+        }),
       ),
     [audioItems],
   );
@@ -167,7 +172,17 @@ export function AuthorProductVideoExport({
             hasCover?: boolean;
             previewUrl?: string | null;
           };
-          if (!response.ok) return;
+          if (!response.ok) {
+            setCovers((current) => ({
+              ...current,
+              [orientation]: {
+                ...current[orientation],
+                error:
+                  "Не удалось проверить видеообложку. Обновите страницу или обратитесь в поддержку.",
+              },
+            }));
+            return;
+          }
           setCovers((current) => ({
             ...current,
             [orientation]: {
@@ -178,7 +193,14 @@ export function AuthorProductVideoExport({
             },
           }));
         } catch {
-          // Keep the upload UI usable; a later refresh retries.
+          setCovers((current) => ({
+            ...current,
+            [orientation]: {
+              ...current[orientation],
+              error:
+                "Не удалось проверить видеообложку. Обновите страницу или обратитесь в поддержку.",
+            },
+          }));
         }
       }),
     );
@@ -530,11 +552,6 @@ export function AuthorProductVideoExport({
                 <p className="text-sm font-semibold text-[#3f3560]">
                   {item.title || `Аудио ${item.position}`}
                 </p>
-                {!playable ? (
-                  <p className="mt-2 text-sm text-[#7d70a2]">
-                    Аудио ещё не загружено или обрабатывается.
-                  </p>
-                ) : null}
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   {PRODUCT_VIDEO_ORIENTATIONS.map((orientation) => {
                     const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
@@ -549,12 +566,26 @@ export function AuthorProductVideoExport({
                       state &&
                       !state.stale &&
                       state.status === "completed";
-                    const canCreate =
-                      playable &&
-                      covers[orientation].hasCover &&
-                      !active &&
-                      !renderBusy[renderKey] &&
-                      !disabled;
+                    const blockedReason = !playable
+                      ? item.audio_prepare_status === "queued" ||
+                        item.audio_prepare_status === "processing"
+                        ? "Аудио обрабатывается. Создание видео станет доступно, когда обработка завершится."
+                        : "Нет готового аудио. Загрузите аудиофайл и дождитесь завершения обработки."
+                      : active
+                        ? "Видео уже создаётся. Дождитесь завершения."
+                        : renderBusy[renderKey]
+                          ? "Задание добавляется в очередь."
+                          : disabled
+                            ? disabledReason ||
+                              "Создание видео временно недоступно для этого продукта."
+                            : covers[orientation].busy
+                              ? "Видеообложка загружается. Дождитесь завершения."
+                              : covers[orientation].error
+                                ? covers[orientation].error
+                                : !covers[orientation].hasCover
+                                  ? `Сначала загрузите видеообложку ${meta.ratioLabel}.`
+                                  : null;
+                    const canCreate = blockedReason === null;
                     const recreate =
                       currentReady ||
                       Boolean(state?.stale) ||
@@ -590,9 +621,9 @@ export function AuthorProductVideoExport({
                             </a>
                           ) : null}
                         </div>
-                        {!covers[orientation].hasCover ? (
+                        {blockedReason ? (
                           <p className="mt-2 text-xs text-[#7d70a2]">
-                            Сначала загрузите видеообложку {meta.ratioLabel}.
+                            {blockedReason}
                           </p>
                         ) : null}
                         {state?.status === "failed" && !state.stale ? (
