@@ -276,6 +276,11 @@ assert.match(patch, /withPreservedRelatedListenSlugs/);
 assert.match(patch, /shouldRejectChangedAuthorRecommendations/);
 assert.match(patch, /related_products_limit/);
 assert.match(patch, /previousSeoContent\.relatedPracticeIds/);
+assert.match(
+  patch,
+  /const previousRelatedIds = previousSeoContent\?\.relatedPracticeIds \?\? \[\];[\s\S]*?relatedId\) => !previousRelatedIds\.includes\(relatedId\)[\s\S]*?if \(addedRelatedIds\.length > 0\)[\s\S]*?validateRelatedPracticeTargets\(\{[\s\S]*?relatedPracticeIds: addedRelatedIds/,
+  "only newly selected recommendations are checked when saving an album",
+);
 
 const searchRoute = read("src/app/api/author/seo/related-product-options/route.ts");
 assert.match(searchRoute, /shouldSearchRelatedProducts/);
