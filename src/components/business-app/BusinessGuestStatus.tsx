@@ -81,7 +81,7 @@ export function BusinessGuestStatusBar() {
           <>
             <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS} для одной точки.</p>
             <p className="business-app-guest-bar__terms">
-              <strong>Всё включено.</strong> Музыка из каталога, плеер, лицензия на использование музыки в заведении, документы и правовая поддержка. Доплат за это нет.
+              <strong>Всё включено.</strong> Музыка из каталога, плеер, лицензия на использование музыки в заведении, документы и правовая поддержка. Без доплат и скрытых платежей.
             </p>
           </>
         )}
