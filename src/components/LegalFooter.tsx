@@ -2,10 +2,17 @@ import Link from "next/link";
 
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
 import { legalLinkClassName } from "@/lib/legal/links";
+import { AUDIOLAD_MAX_BOT_URL } from "@/lib/max/startapp";
 import { getVisiblePublicFooterLinks } from "@/lib/navigation/public-footer-links";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function LegalFooter({ className }: { className?: string }) {
+export default async function LegalFooter({
+  className,
+  showMaxLink = false,
+}: {
+  className?: string;
+  showMaxLink?: boolean;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,6 +49,13 @@ export default async function LegalFooter({ className }: { className?: string })
               1@audiolad.ru
             </a>
           </p>
+          {showMaxLink ? (
+            <p className="mt-2 text-[15px]">
+              <a href={AUDIOLAD_MAX_BOT_URL} className={legalLinkClassName}>
+                Перейти в АудиоЛад в MAX
+              </a>
+            </p>
+          ) : null}
         </div>
       </div>
     </footer>

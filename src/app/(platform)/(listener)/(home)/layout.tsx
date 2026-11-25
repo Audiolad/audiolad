@@ -25,7 +25,7 @@ export default async function HomeListenerLayout({
           personal home renders LegalFooter inside PersonalHome instead. */}
       {!shellData.isAuthenticated ? (
         <div className="px-5 pb-6 lg:px-10 xl:px-6">
-          <LegalFooter className="mt-6" />
+          <LegalFooter className="mt-6" showMaxLink />
         </div>
       ) : null}
     </>
