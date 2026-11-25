@@ -172,6 +172,41 @@ export async function getPracticeByAuthorAndSlug(
   };
 }
 
+export async function resolvePracticeProjectRedirect(
+  supabase: SupabaseClient,
+  authorSlug: string,
+  productSlug: string,
+): Promise<{ authorSlug: string; productSlug: string } | null> {
+  const { data, error } = await supabase
+    .from("practice_project_redirects")
+    .select(
+      "practices!inner(slug, business_only, cover_image, authors!practices_author_id_fkey!inner(slug))",
+    )
+    .eq("author_slug", authorSlug)
+    .eq("product_slug", productSlug)
+    .maybeSingle();
+
+  if (error) {
+    console.error("practice_project_redirect_lookup_failed", error.code);
+    return null;
+  }
+
+  const practice = normalizeOne(data?.practices ?? null);
+  if (!practice || isBusinessOnlyPractice(practice) || shouldBlockPublicPracticeAccess(practice)) {
+    return null;
+  }
+
+  const targetAuthor = normalizeOne(practice.authors);
+  if (
+    !targetAuthor?.slug || !practice.slug ||
+    (targetAuthor.slug === authorSlug && practice.slug === productSlug)
+  ) {
+    return null;
+  }
+
+  return { authorSlug: targetAuthor.slug, productSlug: practice.slug };
+}
+
 export async function resolveLegacyPracticePath(
   supabase: SupabaseClient,
   legacySlug: string,

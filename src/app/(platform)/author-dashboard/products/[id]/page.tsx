@@ -7,6 +7,7 @@ import {
   loadAuthorDashboardProductEditData,
   mapAuthorDashboardProductEditError,
 } from "@/lib/author-products/dashboard-edit-page";
+import { musicAlbumSkipsDefaultAudioItem } from "@/lib/author-products/music-album-batch";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadEnabledAudioSprintQueryText } from "@/lib/seo-queries/list-audio-sprint-queries";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
@@ -120,6 +121,10 @@ export default async function EditAuthorProductPage({
       internalBackHref="/author-dashboard"
     >
       <AuthorProductForm
+        key={musicAlbumSkipsDefaultAudioItem({
+          productKind: product.practice.product_kind,
+          publicationClass: product.practice.publication_class,
+        }) ? product.practice.author_id : product.practice.id}
         authors={authors}
         relatedProductOptions={(relatedProducts ?? []).map((item) => ({
           value: item.id,

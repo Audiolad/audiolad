@@ -1056,8 +1056,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.author_id === "string" &&
       body.author_id.trim()
     ) {
+      const nextAuthorId = body.author_id.trim();
+      if (
+        nextAuthorId !== practice.author_id &&
+        (practice.product_kind === "music" || practice.publication_class === "release")
+      ) {
+        return NextResponse.json(
+          { error: "album_transfer_required", message: "Для переноса альбома используйте «Сменить проект»." },
+          { status: 409 },
+        );
+      }
       if (practice.status !== "published" && !practice.published_at) {
-        const nextAuthorId = body.author_id.trim();
         const assignment = await authorizePracticeAuthorAssignment({
           currentAuthorId: practice.author_id,
           nextAuthorId,

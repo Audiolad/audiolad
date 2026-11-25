@@ -1,8 +1,8 @@
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 
 import { renderListenPage } from "@/lib/listen/page-shared";
 import { parseListenAutoplayIntent } from "@/lib/listen/autoplay-intent";
-import { resolveLegacyPracticePath } from "@/lib/products/lookup";
+import { resolveLegacyPracticePath, resolvePracticeProjectRedirect } from "@/lib/products/lookup";
 import { buildListenPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -86,6 +86,15 @@ export default async function ListenPage({ params, searchParams }: PageProps) {
       route.productSlug,
     );
     if (!error && !practice) {
+      const moved = await resolvePracticeProjectRedirect(
+        supabase,
+        route.authorSlug,
+        route.productSlug,
+      );
+      if (moved) {
+        const { buildListenRedirectTarget } = await import("@/lib/authors/space-ops");
+        redirect(buildListenRedirectTarget(moved.authorSlug, moved.productSlug, query));
+      }
       const redirectTo = await resolveAuthorSlugListenRedirect(
         route.authorSlug,
         route.productSlug,
