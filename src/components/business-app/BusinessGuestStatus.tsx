@@ -78,7 +78,12 @@ export function BusinessGuestStatusBar() {
             {guestStartEnabled ? GUEST_COFFEE_COPY.exhaustedBannerGuestStart : GUEST_COFFEE_COPY.exhaustedBanner}
           </p>
         ) : (
-          <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS}.</p>
+          <>
+            <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS} для одной точки.</p>
+            <p className="business-app-guest-bar__terms">
+              <strong>Всё включено.</strong> Музыка из каталога, плеер, лицензия на использование музыки в заведении, документы и правовая поддержка. Доплат за это нет.
+            </p>
+          </>
         )}
       </div>
       {/* Present only after a locked section is tapped, so an empty line does not open a gap. */}
