@@ -266,20 +266,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     if ("seo_content" in body && !parsedSeoContent) {
       return NextResponse.json({ error: "invalid_seo_content" }, { status: 400 });
     }
-    if (parsedSeoContent) {
-      const isAdmin = await hasPermission(supabase, user.id, "admin_panel.access");
-      const relationError = await validateRelatedPracticeTargets({
-        supabase,
-        sourcePracticeId: id,
-        sourceAuthorId: practice.author_id,
-        relatedPracticeIds: parsedSeoContent.relatedPracticeIds,
-        isAdmin,
-      });
-      if (relationError) {
-        return NextResponse.json({ error: relationError }, { status: 400 });
-      }
-    }
-
     const updates: Record<string, unknown> = {};
 
     if ("title" in body && typeof body.title === "string") {
@@ -1153,6 +1139,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         { error: "related_products_limit" },
         { status: 400 },
       );
+    }
+    if (seoContent) {
+      // Existing recommendations can become temporarily unavailable after unpublishing.
+      // The public loader hides them. Only new selections need eligibility checks.
+      const previousRelatedIds = previousSeoContent?.relatedPracticeIds ?? [];
+      const addedRelatedIds = seoContent.relatedPracticeIds.filter(
+        (relatedId) => !previousRelatedIds.includes(relatedId),
+      );
+      if (addedRelatedIds.length > 0) {
+        const isAdmin = await hasPermission(supabase, user.id, "admin_panel.access");
+        const relationError = await validateRelatedPracticeTargets({
+          supabase,
+          sourcePracticeId: id,
+          sourceAuthorId: practice.author_id,
+          relatedPracticeIds: addedRelatedIds,
+          isAdmin,
+        });
+        if (relationError) {
+          return NextResponse.json({ error: relationError }, { status: 400 });
+        }
+      }
     }
     const seoContentChanged = Boolean(
       seoContent &&
