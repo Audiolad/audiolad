@@ -6,7 +6,7 @@ import {
 } from "@/lib/author-products/auth";
 import { buildAuthorProjectCookie } from "@/lib/author-projects/selection";
 import { isUuid } from "@/lib/author-stats/route-guard";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { callAuthorUserRpc } from "@/lib/author-support/context";
 import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
@@ -50,13 +50,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const execution = await peekAuthorExecutionContext();
-    if (execution?.isSupportMode) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
-    }
-
     const { supabase } = await requirePracticeMutationAccess(id);
-    const { data, error } = await supabase.rpc("transfer_author_music_album", {
+    const { data, error } = await callAuthorUserRpc<{
+      source_slug: string;
+      target_slug: string;
+      product_slug: string | null;
+      status: string;
+      scheduled_publish_at: string | null;
+      published_at: string | null;
+      catalog_visibility: string | null;
+      is_catalog_listed: boolean | null;
+    }>(supabase, "transfer_author_music_album", {
       p_practice_id: id,
       p_source_author_id: sourceId,
       p_target_author_id: targetId,
@@ -70,8 +74,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
+    if (!data) {
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    const productSlug = data.product_slug;
     if (
-      data.product_slug &&
+      productSlug &&
       isPracticePubliclyAvailable({
         status: data.status,
         scheduledPublishAt: data.scheduled_publish_at,
@@ -81,7 +90,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ) {
       scheduleIndexNowNotification(
         [data.source_slug, data.target_slug].map((slug) =>
-          buildPracticeCanonicalUrl(slug, data.product_slug),
+          buildPracticeCanonicalUrl(slug, productSlug),
         ),
         INDEXNOW_REASONS.practice_updated,
         { entityType: "practice", entityId: id },

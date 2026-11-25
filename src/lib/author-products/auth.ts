@@ -94,6 +94,41 @@ export async function requireAuthenticatedUser() {
   return { supabase, user };
 }
 
+export type AlbumTransferTarget = Pick<AuthorWorkspace, "id" | "name" | "slug">;
+
+export async function listSupportAlbumTransferTargets(
+  sourceAuthorId: string,
+): Promise<AlbumTransferTarget[] | undefined> {
+  const { peekAuthorExecutionContext } = await import("@/lib/author-support/context");
+  const execution = await peekAuthorExecutionContext();
+  if (!execution?.isSupportMode) return undefined;
+  if (execution.actingAuthorId !== sourceAuthorId || execution.membershipRole !== "owner") {
+    return [];
+  }
+
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const { data, error } = await createServiceRoleClient()
+    .from("author_members")
+    .select("authors!author_members_author_id_fkey(id,name,slug,access_status,closed_catalog_only)")
+    .eq("user_id", execution.actingUserId)
+    .eq("role", "owner")
+    .neq("author_id", sourceAuthorId);
+
+  if (error) {
+    console.error("support_album_transfer_targets_error", error.code);
+    return [];
+  }
+
+  return (data ?? []).flatMap(({ authors }) => {
+    const author = Array.isArray(authors) ? authors[0] : authors;
+    if (!author?.id || !author.name || !author.slug || author.closed_catalog_only ||
+        !authorAccessAllowsContentMutations(author.access_status)) {
+      return [];
+    }
+    return [{ id: author.id, name: author.name, slug: author.slug }];
+  }).sort((left, right) => left.name.localeCompare(right.name, "ru"));
+}
+
 export async function listAuthorWorkspacesForUser(
   userId: string,
   supabaseClient?: SupabaseClient,
