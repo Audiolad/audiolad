@@ -40,7 +40,7 @@ const transferErrors: Record<string, { status: number; message: string }> = {
   },
 };
 
-export async function POST(request: Request, { params }: RouteContext<"/api/author/products/[id]/transfer">) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await request.json().catch(() => null);
