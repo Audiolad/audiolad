@@ -9,6 +9,10 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { isCoursePublication } from "@/lib/author-products/publication-class";
+import {
+  resolveMusicListenSource,
+  type MusicStreamCandidate,
+} from "@/lib/listen/music-delivery";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
@@ -19,6 +23,7 @@ import {
   parseProductVideoOrientation,
   productVideoCoverColumn,
   productVideoCoverStoragePath,
+  type ProductVideoAudioBucket,
   type ProductVideoOrientation,
 } from "./contract";
 
@@ -34,6 +39,7 @@ export type ProductVideoRenderJobState = {
   author_id: string;
   audio_item_id: string;
   orientation: ProductVideoOrientation;
+  source_audio_bucket: ProductVideoAudioBucket;
   source_audio_path: string;
   source_cover_path: string;
   output_storage_path: string;
@@ -46,6 +52,54 @@ export type ProductVideoRenderJobState = {
   completed_at: string | null;
   render_recipe?: string | null;
 };
+
+type ProductVideoAudioItemSourceRow = {
+  id: string;
+  audio_path: string | null;
+  active_music_delivery_asset_id: string | null;
+};
+
+async function resolveProductVideoAudioSource(
+  service: ReturnType<typeof createServiceRoleClient>,
+  productKind: string,
+  audioItem: ProductVideoAudioItemSourceRow | null | undefined,
+): Promise<{ bucket: ProductVideoAudioBucket; path: string } | null> {
+  if (!audioItem) return null;
+
+  let activeStream: MusicStreamCandidate | null = null;
+  if (productKind === "music" && audioItem.active_music_delivery_asset_id) {
+    const { data, error } = await service
+      .from("music_audio_assets")
+      .select(
+        "id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path",
+      )
+      .eq("id", audioItem.active_music_delivery_asset_id)
+      .maybeSingle();
+    if (error) {
+      console.error("product_video_music_source_lookup_error", error.message);
+      throw new AuthorAccessError("internal_error", 500);
+    }
+    if (data) {
+      activeStream = {
+        audioItemId: data.audio_item_id,
+        assetRole: data.asset_role,
+        lifecycleState: data.lifecycle_state,
+        storageBucket: data.storage_bucket,
+        storagePath: data.storage_path ?? "",
+      };
+    }
+  }
+
+  const source = resolveMusicListenSource({
+    productKind,
+    audioItemId: audioItem.id,
+    audioPath: audioItem.audio_path,
+    activeStream,
+  });
+  return source.kind === "missing"
+    ? null
+    : { bucket: source.bucket, path: source.path };
+}
 
 export async function requireProductVideoExportAccess(practiceId: string) {
   const context = await requirePracticeMutationAccess(practiceId);
@@ -266,7 +320,9 @@ export async function enqueueProductVideoRender(params: {
     await Promise.all([
       service
         .from("audio_items")
-        .select("id, practice_id, audio_path")
+        .select(
+          "id, practice_id, audio_path, active_music_delivery_asset_id",
+        )
         .eq("id", audioItemId)
         .eq("practice_id", practiceId)
         .maybeSingle(),
@@ -284,7 +340,12 @@ export async function enqueueProductVideoRender(params: {
     );
     throw new AuthorAccessError("internal_error", 500);
   }
-  if (!audioItem?.audio_path) {
+  const audioSource = await resolveProductVideoAudioSource(
+    service,
+    practice.product_kind,
+    audioItem,
+  );
+  if (!audioSource) {
     throw new AuthorAccessError("audio_not_ready", 409);
   }
 
@@ -301,7 +362,7 @@ export async function enqueueProductVideoRender(params: {
     p_author_id: practice.author_id,
     p_audio_item_id: audioItemId,
     p_orientation: orientation,
-    p_source_audio_path: audioItem.audio_path,
+    p_source_audio_path: audioSource.path,
     p_source_cover_path: coverPath,
   });
   if (error || !data) {
@@ -317,13 +378,14 @@ export async function getProductVideoRenderStates(params: {
   audioItemId: string;
 }): Promise<Record<ProductVideoOrientation, (ProductVideoRenderJobState & { stale: boolean }) | null>> {
   const { practiceId, audioItemId } = params;
-  const { service } = await requireProductVideoExportAccess(practiceId);
+  const { practice, service } =
+    await requireProductVideoExportAccess(practiceId);
 
   const [{ data: item, error: itemError }, { data: assets, error: assetError }, { data: jobs, error: jobsError }] =
     await Promise.all([
       service
         .from("audio_items")
-        .select("id, audio_path")
+        .select("id, audio_path, active_music_delivery_asset_id")
         .eq("id", audioItemId)
         .eq("practice_id", practiceId)
         .maybeSingle(),
@@ -335,7 +397,7 @@ export async function getProductVideoRenderStates(params: {
       service
         .from("product_video_render_jobs")
         .select(
-          "id, practice_id, author_id, audio_item_id, orientation, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, progress_percent, created_at, completed_at, render_recipe",
+          "id, practice_id, author_id, audio_item_id, orientation, source_audio_bucket, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, progress_percent, created_at, completed_at, render_recipe",
         )
         .eq("practice_id", practiceId)
         .eq("audio_item_id", audioItemId)
@@ -350,6 +412,12 @@ export async function getProductVideoRenderStates(params: {
     );
     throw new AuthorAccessError("internal_error", 500);
   }
+
+  const currentAudioSource = await resolveProductVideoAudioSource(
+    service,
+    practice.product_kind,
+    item,
+  );
 
   const result: Record<
     ProductVideoOrientation,
@@ -372,10 +440,12 @@ export async function getProductVideoRenderStates(params: {
       orientation,
       stale: isProductVideoRenderJobStale({
         status: job.status,
+        sourceAudioBucket: job.source_audio_bucket,
         sourceAudioPath: job.source_audio_path,
         sourceCoverPath: job.source_cover_path,
         renderRecipe: job.render_recipe,
-        currentAudioPath: item?.audio_path,
+        currentAudioBucket: currentAudioSource?.bucket,
+        currentAudioPath: currentAudioSource?.path,
         currentCoverPath: currentCover,
       }),
     };

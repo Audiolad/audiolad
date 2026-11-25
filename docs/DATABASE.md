@@ -2274,6 +2274,18 @@ No Sonic DNA, dayparts, or Engine. No fingerprints. No rights grants, country se
 
 Migration `20261225120000_product_video_render_recipe.sql` adds a nullable `render_recipe text` to `public.product_video_render_jobs` (CHECK: NULL or `^[a-z0-9][a-z0-9-]{0,63}$`). The MP4 export worker writes `PRODUCT_VIDEO_RENDER_RECIPE` (`src/lib/product-video-export/contract.ts`, now `cover-audio-indicator-v1` = cover + bottom-right «это аудио» indicator) when it completes a job. A completed job with NULL or another recipe is shown to the author as «Нужно пересоздать» and is not downloadable as current; the old file stays in storage. No backfill, no re-render, no change to claim/lease/progress/recovery functions or RLS (table stays service_role only).
 
+## Product video export: music stream source
+
+Migration `20270410120000_product_video_music_stream_source.sql` adds required
+`source_audio_bucket` to `product_video_render_jobs`. Existing jobs are
+backfilled as `practice-audio`; new jobs may use only `practice-audio` or
+`music-streams`. `enqueue_product_video_render_job` derives the bucket on the
+server and accepts a `music-streams` path only when it is the audio item's
+current active `stream` asset with `lifecycle_state = 'verified'`. This makes
+MP4 export available to modern music albums whose `audio_items.audio_path` is
+NULL, without copying or changing their audio assets. RLS and worker
+claim/lease/progress behavior are unchanged.
+
 
 ## Business SPA pilot PR1 — programs and player event log
 
