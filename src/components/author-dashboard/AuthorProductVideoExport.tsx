@@ -14,7 +14,6 @@ import {
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATIONS,
   PRODUCT_VIDEO_ORIENTATION_META,
-  isProductVideoExportAuthorSlug,
   type ProductVideoOrientation,
 } from "@/lib/product-video-export/contract";
 import { productVideoRenderStatusView } from "@/lib/product-video-export/progress";
@@ -45,7 +44,6 @@ type RenderState = {
 
 type Props = {
   practiceId: string | null;
-  authorSlug: string | null;
   audioItems: VideoAudioItem[];
   getPracticeId: () => Promise<string | null>;
   disabled?: boolean;
@@ -119,14 +117,12 @@ export function ProductVideoJobStatus({ state }: { state: RenderState | null }) 
   );
 }
 
-export default function AuthorProductVideoExport({
+export function AuthorProductVideoExport({
   practiceId,
-  authorSlug,
   audioItems,
   getPracticeId,
   disabled = false,
 }: Props) {
-  const enabled = isProductVideoExportAuthorSlug(authorSlug);
   const [resolvedPracticeId, setResolvedPracticeId] = useState(practiceId);
   const [covers, setCovers] = useState<
     Record<ProductVideoOrientation, CoverState>
@@ -159,7 +155,7 @@ export default function AuthorProductVideoExport({
   );
 
   const loadCovers = useCallback(async () => {
-    if (!enabled || !resolvedPracticeId) return;
+    if (!resolvedPracticeId) return;
     await Promise.all(
       PRODUCT_VIDEO_ORIENTATIONS.map(async (orientation) => {
         try {
@@ -186,10 +182,10 @@ export default function AuthorProductVideoExport({
         }
       }),
     );
-  }, [enabled, resolvedPracticeId]);
+  }, [resolvedPracticeId]);
 
   const loadRenderStates = useCallback(async (onlyAudioIds?: readonly string[]) => {
-    if (!enabled || !resolvedPracticeId) return;
+    if (!resolvedPracticeId) return;
     const items = onlyAudioIds
       ? playableItems.filter((item) => onlyAudioIds.includes(item.id))
       : playableItems;
@@ -222,7 +218,7 @@ export default function AuthorProductVideoExport({
         }
       }),
     );
-  }, [enabled, playableItems, resolvedPracticeId]);
+  }, [playableItems, resolvedPracticeId]);
 
   useEffect(() => {
     void loadCovers();
@@ -420,8 +416,6 @@ export default function AuthorProductVideoExport({
       setRenderBusy((current) => ({ ...current, [renderKey]: false }));
     }
   }
-
-  if (!enabled) return null;
 
   return (
     <section className="mt-5 space-y-5 rounded-[20px] border border-[#e4d7f4] bg-[#fbf8ff] p-4">

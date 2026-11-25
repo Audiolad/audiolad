@@ -8,13 +8,13 @@ import {
   AuthorAccessError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
+import { isCoursePublication } from "@/lib/author-products/publication-class";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
   PRODUCT_VIDEO_EXPORT_BUCKET,
   PRODUCT_VIDEO_EXPORT_MAX_IMAGE_BYTES,
   PRODUCT_VIDEO_ORIENTATION_META,
-  isProductVideoExportAuthorSlug,
   isProductVideoRenderJobStale,
   parseProductVideoOrientation,
   productVideoCoverColumn,
@@ -49,23 +49,16 @@ export type ProductVideoRenderJobState = {
 
 export async function requireProductVideoExportAccess(practiceId: string) {
   const context = await requirePracticeMutationAccess(practiceId);
-  const { data: author, error } = await context.supabase
-    .from("authors")
-    .select("slug")
-    .eq("id", context.practice.author_id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("product_video_author_lookup_error", error.message);
-    throw new AuthorAccessError("internal_error", 500);
-  }
-  if (!isProductVideoExportAuthorSlug(author?.slug)) {
+  const { practice } = context;
+  if (
+    practice.business_only ||
+    isCoursePublication(practice.publication_class, practice.product_kind)
+  ) {
     throw new AuthorAccessError("forbidden", 403);
   }
 
   return {
     ...context,
-    authorSlug: author!.slug as string,
     service: createServiceRoleClient(),
   };
 }
