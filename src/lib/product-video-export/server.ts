@@ -61,7 +61,7 @@ type ProductVideoAudioItemSourceRow = {
 
 async function resolveProductVideoAudioSource(
   service: ReturnType<typeof createServiceRoleClient>,
-  productKind: string,
+  productKind: string | null | undefined,
   audioItem: ProductVideoAudioItemSourceRow | null | undefined,
 ): Promise<{ bucket: ProductVideoAudioBucket; path: string } | null> {
   if (!audioItem) return null;
@@ -91,7 +91,7 @@ async function resolveProductVideoAudioSource(
   }
 
   const source = resolveMusicListenSource({
-    productKind,
+    productKind: productKind ?? "",
     audioItemId: audioItem.id,
     audioPath: audioItem.audio_path,
     activeStream,
