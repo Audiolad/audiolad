@@ -6769,6 +6769,21 @@
       "file": "supabase/migrations/20270407120000_business_closed_catalog_has_vocals.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.admin_set_business_album_has_vocals(uuid, boolean) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270408120000_author_transfer_music_album.sql",
+      "kind": "policy",
+      "statement": "CREATE POLICY practice_project_redirects_select ON public.practice_project_redirects FOR SELECT TO anon, authenticated USING (EXISTS ( SELECT 1 FROM public.practices p WHERE p.id = practice_project_redirects.practice_id AND p.deleted_at IS NULL AND NOT p.business_only ));"
+    },
+    {
+      "file": "supabase/migrations/20270408120000_author_transfer_music_album.sql",
+      "kind": "table",
+      "statement": "GRANT SELECT ON public.practice_project_redirects TO anon, authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270408120000_author_transfer_music_album.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.transfer_author_music_album(uuid, uuid, uuid) TO authenticated;"
     }
   ]
 }

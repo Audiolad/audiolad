@@ -1,5 +1,5 @@
 import { productFirstPublicationAt } from "@/lib/products/publication-dates";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
@@ -50,6 +50,7 @@ import { shouldShowPromoConversionFlow } from "@/lib/promo/access";
 import {
   getPracticeAuthorSlug,
   getPracticeByAuthorAndSlug,
+  resolvePracticeProjectRedirect,
   resolveLegacyPracticePath,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
@@ -400,6 +401,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   }
 
   if (!practice) {
+    const moved = await resolvePracticeProjectRedirect(supabase, authorSlug, productSlug);
+    if (moved) {
+      const { buildPracticeRedirectTarget } = await import("@/lib/authors/space-ops");
+      redirect(buildPracticeRedirectTarget(moved.authorSlug, moved.productSlug, query));
+    }
     const redirectTo = await resolveAuthorSlugPracticeRedirect(
       route.authorSlug,
       route.productSlug,

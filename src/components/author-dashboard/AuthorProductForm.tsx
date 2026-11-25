@@ -263,6 +263,7 @@ import {
   type MusicQueueSnapshot,
 } from "@/lib/author-products/music-track-upload-queue";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
+import { withAuthorQuery } from "@/lib/author-projects/selection";
 import { buildMaxProductDeepLink } from "@/lib/max/startapp";
 import { copyTextToClipboard } from "@/lib/playlists/public-url";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
@@ -1057,6 +1058,8 @@ export default function AuthorProductForm({
   const [coverSubmitError, setCoverSubmitError] = useState<string | null>(null);
   const [maxLinkCopied, setMaxLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [courseContentSnapshot, setCourseContentSnapshot] =
     useState<CoursePublishContentSnapshot>({ lessonCount: 0, blockCount: 0 });
   const [publishing, setPublishing] = useState(false);
@@ -1548,6 +1551,22 @@ export default function AuthorProductForm({
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthorAccessStatus,
   );
+  const savedPractice = initialProduct?.practice;
+  const isSavedMusicAlbum = Boolean(savedPractice && musicAlbumSkipsDefaultAudioItem({
+    productKind: savedPractice.product_kind,
+    publicationClass: savedPractice.publication_class,
+  }));
+  const transferTargets = isSavedMusicAlbum &&
+    savedPractice && !savedPractice.business_only && canMutateContent &&
+    selectedAuthor?.role === "owner" && !isSubmitted &&
+    ["draft", "unpublished", "published"].includes(form.status)
+    ? authors.filter((author) =>
+        author.id !== savedPractice.author_id && author.role === "owner" &&
+        !author.closedCatalogOnly && authorAccessAllowsContentMutations(author.accessStatus),
+      )
+    : [];
+  const transferDisabled =
+    busy || publishing || Boolean(uploadingAudioId) || musicQueueHasLocalFile(musicQueue);
   const canEditPublicFields =
     canMutateContent &&
     (isDraft ||
@@ -2913,6 +2932,44 @@ export default function AuthorProductForm({
     }
   }
 
+  async function transferAlbum() {
+    const target = transferTargets.find((author) => author.id === transferTargetId);
+    if (!savedPractice || !target || transferDisabled) return;
+    if (editorDirty) {
+      setTransferError("Сначала сохраните изменения в карточке альбома.");
+      return;
+    }
+    if (!window.confirm(`Перенести альбом «${savedPractice.title}» в проект «${target.name}»?`)) {
+      return;
+    }
+
+    const fallback = "Не удалось сменить проект альбома.";
+    setBusy(true);
+    setTransferError(null);
+    try {
+      const response = await fetch(`/api/author/products/${savedPractice.id}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_author_id: savedPractice.author_id,
+          target_author_id: target.id,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        setTransferError(payload?.message ?? fallback);
+        return;
+      }
+      const currentPath = window.location.pathname + window.location.search;
+      window.history.replaceState(null, "", withAuthorQuery(currentPath, payload?.author_slug ?? target.slug));
+      router.refresh();
+    } catch {
+      setTransferError(fallback);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteProduct() {
     if (!practiceId) {
       return;
@@ -4204,7 +4261,7 @@ export default function AuthorProductForm({
             <span className="mb-2 block text-sm font-medium">Проект</span>
             <select
               value={form.authorId}
-              disabled={slugLocked}
+              disabled={slugLocked || isSavedMusicAlbum}
               onChange={(event) =>
                 setForm((current) =>
                   mergeFormWithCatalogSuggestion(current, {
@@ -4222,6 +4279,39 @@ export default function AuthorProductForm({
             </select>
           </label>
         )}
+
+        {transferTargets.length > 0 ? (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Перенести альбом в проект</span>
+              <select
+                value={transferTargetId}
+                disabled={transferDisabled}
+                onChange={(event) => {
+                  setTransferTargetId(event.target.value);
+                  setTransferError(null);
+                }}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              >
+                <option value="">Выберите проект</option>
+                {transferTargets.map((author) => (
+                  <option key={author.id} value={author.id}>{author.name}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={!transferTargetId || transferDisabled}
+              onClick={() => void transferAlbum()}
+              className="rounded-full border border-[#9a74d8] px-4 py-2 text-sm font-medium text-[#7042c5] disabled:opacity-50"
+            >
+              Сменить проект
+            </button>
+            {transferError ? (
+              <p role="alert" className="text-sm text-[#9b3d3d]">{transferError}</p>
+            ) : null}
+          </div>
+        ) : null}
 
 {!hideOpenCatalogFields ? (
         <fieldset className="block">
