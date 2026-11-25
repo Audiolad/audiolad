@@ -263,6 +263,7 @@ import {
   type MusicQueueSnapshot,
 } from "@/lib/author-products/music-track-upload-queue";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
+import type { AlbumTransferTarget } from "@/lib/author-products/auth";
 import { withAuthorQuery } from "@/lib/author-projects/selection";
 import { buildMaxProductDeepLink } from "@/lib/max/startapp";
 import { copyTextToClipboard } from "@/lib/playlists/public-url";
@@ -420,6 +421,7 @@ function AudioPostTypePicker({
 }
 
 type AuthorProductFormProps = {
+  supportAlbumTransferTargets?: AlbumTransferTarget[];
   authors: AuthorWorkspace[];
   relatedProductOptions?: Array<{ value: string; label: string }>;
   initialAuthorSlug?: string;
@@ -882,6 +884,7 @@ function buildProductSavePayload(
 
 export default function AuthorProductForm({
   authors,
+  supportAlbumTransferTargets,
   relatedProductOptions = [],
   initialAuthorSlug,
   initialProduct,
@@ -1560,7 +1563,7 @@ export default function AuthorProductForm({
     savedPractice && !savedPractice.business_only && canMutateContent &&
     selectedAuthor?.role === "owner" && !isSubmitted &&
     ["draft", "unpublished", "published"].includes(form.status)
-    ? authors.filter((author) =>
+    ? supportAlbumTransferTargets ?? authors.filter((author) =>
         author.id !== savedPractice.author_id && author.role === "owner" &&
         !author.closedCatalogOnly && authorAccessAllowsContentMutations(author.accessStatus),
       )
@@ -4256,12 +4259,18 @@ export default function AuthorProductForm({
             </span>
             .
           </p>
+        ) : slugLocked || isSavedMusicAlbum ? (
+          <div>
+            <span className="mb-2 block text-sm font-medium">Текущий проект</span>
+            <p className="rounded-[18px] border border-[#e4d7f4] bg-platform-surface px-4 py-3">
+              {selectedAuthor?.name}
+            </p>
+          </div>
         ) : (
           <label className="block">
             <span className="mb-2 block text-sm font-medium">Проект</span>
             <select
               value={form.authorId}
-              disabled={slugLocked || isSavedMusicAlbum}
               onChange={(event) =>
                 setForm((current) =>
                   mergeFormWithCatalogSuggestion(current, {

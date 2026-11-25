@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
-import { AuthorAccessError, listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { AuthorAccessError, listAuthorWorkspacesForUser, listSupportAlbumTransferTargets } from "@/lib/author-products/auth";
 import {
   loadAuthorDashboardProductEditData,
   mapAuthorDashboardProductEditError,
@@ -59,6 +59,14 @@ export default async function EditAuthorProductPage({
     }
     throw error;
   }
+
+  const isMusicAlbum = musicAlbumSkipsDefaultAudioItem({
+    productKind: product.practice.product_kind,
+    publicationClass: product.practice.publication_class,
+  });
+  const supportAlbumTransferTargets = isMusicAlbum && !product.practice.business_only
+    ? await listSupportAlbumTransferTargets(product.practice.author_id)
+    : undefined;
 
   let initialSeoReservationContext: SeoReservationProductFormContext | null =
     null;
@@ -121,11 +129,9 @@ export default async function EditAuthorProductPage({
       internalBackHref="/author-dashboard"
     >
       <AuthorProductForm
-        key={musicAlbumSkipsDefaultAudioItem({
-          productKind: product.practice.product_kind,
-          publicationClass: product.practice.publication_class,
-        }) ? product.practice.author_id : product.practice.id}
+        key={isMusicAlbum ? product.practice.author_id : product.practice.id}
         authors={authors}
+        supportAlbumTransferTargets={supportAlbumTransferTargets}
         relatedProductOptions={(relatedProducts ?? []).map((item) => ({
           value: item.id,
           label: item.title,

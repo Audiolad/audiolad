@@ -26,7 +26,10 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       group: "product",
       disposition: "allowed_audited",
       action: "product_updated",
-      routePatterns: ["src/app/api/author/products/[id]/route.ts"],
+      routePatterns: [
+        "src/app/api/author/products/[id]/route.ts",
+        "src/app/api/author/products/[id]/transfer/route.ts",
+      ],
     },
     {
       key: "product_topics",

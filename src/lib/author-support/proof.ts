@@ -4,6 +4,7 @@ export const AUTHOR_SUPPORT_PROOF_GUC = "audiolad.author_support_token_hash";
 export const AUTHOR_SUPPORT_PROOF_HEADER = "x-audiolad-support-proof";
 
 export const AUTHOR_SUPPORT_RPC_WRAPPERS = {
+  transfer_author_music_album: "transfer_author_music_album_with_support_proof",
   submit_practice_for_moderation: "submit_practice_for_moderation_with_support_proof",
   withdraw_practice_from_moderation:
     "withdraw_practice_from_moderation_with_support_proof",
