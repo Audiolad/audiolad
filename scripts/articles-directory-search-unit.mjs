@@ -67,7 +67,11 @@ function testNeuromusicGuidesListed() {
     assert(!hrefs.has(`/articles${path}`), `${path} not rewritten under /articles`);
   }
 
-  const standalone = listStandaloneArticleDirectoryCards();
+  const maxCard = data.articles.find((card) => card.href === "/audiolad-max");
+  assert(/^АудиоЛад Макс \(MAX\)/.test(maxCard?.title ?? ""), "MAX guide has a Russian title");
+  assert(maxCard?.topicTitle === "АудиоЛад", "MAX guide has the АудиоЛад topic");
+
+  const standalone = listStandaloneArticleDirectoryCards().filter((card) => card.topicSlug === "neyromuzyka");
   assert(
     standalone.length === EXPECTED_NEUROMUSIC_PATHS.length,
     `exactly ${EXPECTED_NEUROMUSIC_PATHS.length} standalone guides (got ${standalone.length})`,

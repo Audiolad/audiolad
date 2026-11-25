@@ -12,6 +12,7 @@ import * as kudaVykladyvatMuzykuIzSuno from "@/lib/seo/kuda-vykladyvat-muzyku-iz
 import * as mozhnoLiZarabotatNaIiMuzyke from "@/lib/seo/mozhno-li-zarabotat-na-ii-muzyke/content";
 import * as vKakoyNeyrosetiSozdatMuzyku from "@/lib/seo/v-kakoy-neyroseti-sozdat-muzyku/content";
 
+import { AUDIOLAD_MAX_ARTICLE } from "./audiolad-max";
 import type { ArticleDirectoryCard } from "./directory";
 
 /**
@@ -66,6 +67,7 @@ function neuromusicGuide(
 }
 
 const STANDALONE_ARTICLE_DEFINITIONS: readonly StandaloneArticleDefinition[] = [
+  AUDIOLAD_MAX_ARTICLE,
   neuromusicGuide(
     {
       path: distribyutorIiMuzyki.DISTRIBYUTOR_II_MUZYKI_PATH,

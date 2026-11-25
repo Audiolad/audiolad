@@ -17,6 +17,7 @@ import {
   buildArticlePath,
   listArticleDefinitions,
 } from "@/lib/seo/articles";
+import { AUDIOLAD_MAX_ARTICLE } from "@/lib/seo/articles/audiolad-max";
 import { buildListenPagePath } from "@/lib/seo/listens/paths";
 import { listIndexableListenPageDefinitions } from "@/lib/seo/listens/registry";
 import { isPlatformEditorialPublicPlaylist } from "@/lib/playlists/public-seo";
@@ -64,6 +65,12 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
   { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
+  {
+    path: AUDIOLAD_MAX_ARTICLE.path,
+    changeFrequency: "monthly",
+    priority: 0.7,
+    lastModified: AUDIOLAD_MAX_ARTICLE.publishedAt,
+  },
   { path: "/topics", changeFrequency: "weekly", priority: 0.8 },
   { path: "/about", changeFrequency: "monthly", priority: 0.7 },
   { path: "/philosophy", changeFrequency: "monthly", priority: 0.6 },
