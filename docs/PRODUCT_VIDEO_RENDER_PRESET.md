@@ -50,6 +50,28 @@ Freshness is tracked by `product_video_render_jobs.render_recipe` (migration `20
 
 Re-create only on owner request; there is no automatic mass re-render. In the author cabinet, open the product → «Видео для площадок» → press «Создать заново» for the wanted audio and orientation. The next normal export also gets the indicator.
 
+## Moving backgrounds
+
+Each orientation has two independent private assets: an optional cover and an
+optional MP4, MOV, or WebM background. A background takes precedence as the
+rendered visual; the cover remains the HTML `poster` for preview. Without a
+cover, upload finalization extracts the first background frame to a private
+WebP poster. Posters are never inserted before the video stream, so playback
+starts with the rendered music video immediately.
+
+Backgrounds are uploaded directly to Storage with a signed upload URL. The
+application then verifies the stored byte count and probes the real media
+before saving it: maximum 200 MiB, 60 seconds, and 3840×2160 total pixels
+(rotation may swap the sides). Invalid candidates and their generated posters
+are removed.
+
+The existing single-instance product video worker remains the load limiter.
+For a moving source FFmpeg uses `-stream_loop -1`; only `1:a:0` (the author's
+audio) is mapped, so any source-video audio is discarded. The same cover/crop
+filter produces 1920×1080 or 1080×1920 without stretching, and the existing
+packet-accurate audio-duration cap controls the final MP4 length. Static-cover
+jobs keep the original `-loop 1` / `-tune stillimage` path.
+
 ### Cost
 
 All numbers were measured on 2026-10-08 on a shared 8-vCPU box with FFmpeg 7.1. Other jobs kept the load average at 10–14, so single runs are noisy and the three measurements below do not agree exactly. Read them as a range, not one number. Main and this change were run interleaved.

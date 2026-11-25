@@ -11,11 +11,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS,
   PRODUCT_VIDEO_ORIENTATION_META,
   PRODUCT_VIDEO_RENDER_RECIPE,
   PRODUCT_VIDEO_X264_PRESET,
   isProductVideoRenderJobStale,
   isProductVideoRenderRecipeCurrent,
+  isProductVideoBackgroundStoragePath,
+  productVideoBackgroundExtension,
+  productVideoBackgroundPosterStoragePath,
+  productVideoBackgroundStoragePath,
   productVideoCoverStoragePath,
   productVideoOutputStoragePath,
 } from "../src/lib/product-video-export/contract";
@@ -26,7 +32,11 @@ import {
   productVideoAudioIndicatorSource,
   productVideoFilterComplex,
 } from "../src/lib/product-video-export/audio-indicator";
-import { renderProductVideo } from "../src/lib/product-video-export/ffmpeg";
+import {
+  extractProductVideoBackgroundPoster,
+  inspectProductVideoBackground,
+  renderProductVideo,
+} from "../src/lib/product-video-export/ffmpeg";
 import {
   PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS,
   consumeProductVideoFfmpegProgress,
@@ -91,6 +101,27 @@ assert.match(
   outputPath,
   /^practices\/[0-9a-f-]{36}\/video\/[0-9a-f-]{36}\/landscape_16_9\/[0-9a-f-]{36}\.mp4$/,
 );
+const backgroundPath = productVideoBackgroundStoragePath(
+  samplePractice,
+  "landscape_16_9",
+  sampleToken,
+  "webm",
+);
+assert.equal(
+  backgroundPath,
+  `practices/${samplePractice}/video-backgrounds/landscape_16_9/${sampleToken}.webm`,
+);
+assert.equal(isProductVideoBackgroundStoragePath(backgroundPath), true);
+assert.equal(
+  productVideoBackgroundPosterStoragePath(backgroundPath),
+  `practices/${samplePractice}/video-backgrounds/landscape_16_9/${sampleToken}.poster.webp`,
+);
+assert.equal(productVideoBackgroundExtension("clip.mp4", "video/mp4"), "mp4");
+assert.equal(productVideoBackgroundExtension("clip.MOV", "video/quicktime"), "mov");
+assert.equal(productVideoBackgroundExtension("clip.webm", "video/webm"), "webm");
+assert.equal(productVideoBackgroundExtension("clip.avi", "video/avi"), null);
+assert.equal(PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES, 200 * 1024 * 1024);
+assert.equal(PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS, 60);
 
 const ui = read("src/components/author-dashboard/AuthorProductVideoExport.tsx");
 assert.match(ui, /Видео для площадок/);
@@ -104,6 +135,13 @@ assert.match(ui, /motion-reduce:transition-none/);
 assert.match(ui, /video_cover_path_rejected/);
 assert.match(ui, /video_cover_persist_failed/);
 assert.match(ui, /Не удалось создать видео\. Попробуйте ещё раз\./);
+assert.match(ui, /Загрузить видеофон/);
+assert.match(ui, /Заменить видеофон/);
+assert.match(ui, /MP4, MOV или WebM, до 200 МБ и 60 секунд/);
+assert.match(ui, /video-backgrounds/);
+assert.match(ui, /\/playback\?orientation=/);
+assert.match(ui, /uploadStudioFileResumable/);
+assert.match(ui, /Загрузка видеофона/);
 assert.equal(PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS, 2_000);
 assert.equal(PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS, 1_000);
 assert.equal(PRODUCT_VIDEO_X264_PRESET, "veryfast");
@@ -119,8 +157,10 @@ const availableExportHtml = renderToStaticMarkup(
   }),
 );
 assert.match(availableExportHtml, /Видео для площадок/);
-assert.match(availableExportHtml, /Видеообложка 16:9/);
-assert.match(availableExportHtml, /Видеообложка 9:16/);
+assert.match(availableExportHtml, /Обложка 16:9/);
+assert.match(availableExportHtml, /Обложка 9:16/);
+assert.match(availableExportHtml, /Видеофон 16:9/);
+assert.match(availableExportHtml, /Видеофон 9:16/);
 assert.match(form, /getPracticeId=\{getPracticeIdForCoverUpload\}/);
 
 const ffmpeg = read("src/lib/product-video-export/ffmpeg.ts");
@@ -145,6 +185,9 @@ assert.match(ffmpeg, /measureAudioStreamDurationUs/);
 assert.match(ffmpeg, /"-c",\s*"copy"/);
 assert.match(ffmpeg, /"-f",\s*"null"/);
 assert.match(ffmpeg, /PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US = 100_000/);
+assert.match(ffmpeg, /"-stream_loop", "-1"/);
+assert.match(ffmpeg, /visualKind === "video_background"/);
+assert.match(ffmpeg, /"-map",\s*"1:a:0"/);
 assert.match(ffmpeg, /"-t", \(\(measuredDurationUs \+ PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US\) \/ 1_000_000\)\.toFixed\(3\)/);
 assert.match(ffmpeg, /measuredDurationUs = await measureAudioStreamDurationUs\(audioPath, signal\)/);
 assert.match(ffmpeg, /if \(durationUs == null && onProgress\)/);
@@ -261,6 +304,11 @@ assert.match(serverSrc, /product_video_cover_update_error/);
 assert.match(serverSrc, /progress_percent/);
 assert.match(serverSrc, /render_recipe/);
 assert.match(serverSrc, /isProductVideoRenderJobStale\(/);
+assert.match(serverSrc, /startProductVideoBackgroundUpload/);
+assert.match(serverSrc, /finalizeProductVideoBackgroundUpload/);
+assert.match(serverSrc, /PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS/);
+assert.match(serverSrc, /productVideoBackgroundPosterStoragePath/);
+assert.match(serverSrc, /const visualPath = backgroundPath \|\| coverPath/);
 
 const progressMigration = read(
   "supabase/migrations/20261220140000_product_video_render_progress.sql",
@@ -283,6 +331,27 @@ assert.doesNotMatch(
   progressMigration,
   /CREATE OR REPLACE FUNCTION public\.(claim|recover_stale|renew|enqueue)_product_video_render_job/,
 );
+const backgroundsMigration = read(
+  "supabase/migrations/20270410120000_product_video_backgrounds.sql",
+);
+assert.match(backgroundsMigration, /landscape_background_path/);
+assert.match(backgroundsMigration, /portrait_background_path/);
+assert.match(backgroundsMigration, /video\/quicktime/);
+assert.match(backgroundsMigration, /video\/webm/);
+assert.match(backgroundsMigration, /ADD COLUMN IF NOT EXISTS/);
+assert.doesNotMatch(backgroundsMigration, /DROP COLUMN|DELETE FROM|TRUNCATE/);
+
+const backgroundRoute = read(
+  "src/app/api/author/products/[id]/video-backgrounds/[orientation]/route.ts",
+);
+assert.match(backgroundRoute, /startProductVideoBackgroundUpload/);
+assert.match(backgroundRoute, /finalizeProductVideoBackgroundUpload/);
+assert.match(backgroundRoute, /deleteProductVideoBackground/);
+const playbackRoute = read(
+  "src/app/api/author/products/[id]/video/[audioId]/playback/route.ts",
+);
+assert.match(playbackRoute, /createLatestProductVideoPlaybackUrl/);
+assert.match(playbackRoute, /Response\.redirect\(signedUrl, 307\)/);
 
 const workerRuntime = read("src/lib/product-video-export/worker-runtime.ts");
 assert.match(workerRuntime, /report_product_video_render_progress/);
@@ -290,6 +359,9 @@ assert.match(workerRuntime, /progress_percent: 100/);
 assert.match(workerRuntime, /render_recipe: PRODUCT_VIDEO_RENDER_RECIPE/);
 assert.match(workerRuntime, /createProductVideoProgressPersister/);
 assert.match(workerRuntime, /PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS/);
+assert.match(workerRuntime, /downloadStorageObjectToFile/);
+assert.match(workerRuntime, /createSignedUrl\(storagePath, 120\)/);
+assert.doesNotMatch(workerRuntime, /download\(job\.source_cover_path\)/);
 
 assert.equal(parseProductVideoOutTimeUs("00:01:02.500000"), 62_500_000);
 assert.equal(parseProductVideoOutTimeUs("-00:00:00.100000"), null);
@@ -567,6 +639,95 @@ if (ffmpegBin.status !== 0) {
     const vbrDurations = probeStreamDurations(vbrOutput);
     assert.ok(vbrDurations.audio >= decodedDuration - 0.05, `VBR audio truncated: output ${vbrDurations.audio}s, decoded ${decodedDuration}s`);
     assertVideoFollowsAudio(vbrDurations);
+
+    // Accepted moving-background containers probe correctly. Rendering loops
+    // the visual, maps only the author's audio, and keeps both output sizes.
+    const backgroundInputs = [
+      { extension: "mp4", codec: "libx264" },
+      { extension: "mov", codec: "libx264" },
+      { extension: "webm", codec: "libvpx" },
+    ] as const;
+    for (const input of backgroundInputs) {
+      const file = path.join(dir, `background.${input.extension}`);
+      const run = spawnSync(
+        "ffmpeg",
+        [
+          "-y", "-hide_banner", "-loglevel", "error",
+          "-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1",
+          "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=44100:duration=1",
+          "-c:v", input.codec, "-pix_fmt", "yuv420p",
+          "-c:a", input.extension === "webm" ? "libopus" : "aac",
+          file,
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(run.status, 0, run.stderr);
+      const inspection = await inspectProductVideoBackground(file);
+      assert.ok(inspection, `${input.extension} did not probe`);
+      assert.equal(inspection?.width, 320);
+      assert.equal(inspection?.height, 180);
+      assert.ok((inspection?.durationSeconds ?? 0) >= 0.9);
+      if (input.extension === "mp4") {
+        const poster = path.join(dir, "background-first-frame.webp");
+        await extractProductVideoBackgroundPoster(file, poster);
+        const posterProbe = spawnSync(
+          "ffprobe",
+          [
+            "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=width,height", "-of", "csv=p=0", poster,
+          ],
+          { encoding: "utf8" },
+        );
+        assert.equal(posterProbe.status, 0, posterProbe.stderr);
+        assert.equal(posterProbe.stdout.trim(), "320,180");
+      }
+    }
+    const movingAudio = path.join(dir, "moving-author.mp3");
+    assert.equal(
+      spawnSync(
+        "ffmpeg",
+        [
+          "-y", "-hide_banner", "-loglevel", "error",
+          "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=3",
+          "-c:a", "libmp3lame", "-b:a", "128k", movingAudio,
+        ],
+        { encoding: "utf8" },
+      ).status,
+      0,
+    );
+    for (const orientation of ["landscape_16_9", "portrait_9_16"] as const) {
+      const movingOutput = path.join(dir, `moving-${orientation}.mp4`);
+      await renderProductVideo({
+        audioPath: movingAudio,
+        coverPath: path.join(dir, "background.mp4"),
+        outputPath: movingOutput,
+        orientation,
+        visualKind: "video_background",
+      });
+      const expected = PRODUCT_VIDEO_ORIENTATION_META[orientation];
+      const probe = spawnSync(
+        "ffprobe",
+        [
+          "-v", "error",
+          "-show_entries", "stream=codec_type,width,height:format=duration",
+          "-of", "json", movingOutput,
+        ],
+        { encoding: "utf8" },
+      );
+      assert.equal(probe.status, 0, probe.stderr);
+      const result = JSON.parse(probe.stdout) as {
+        streams: Array<{ codec_type: string; width?: number; height?: number }>;
+        format: { duration: string };
+      };
+      const video = result.streams.find((stream) => stream.codec_type === "video");
+      assert.equal(video?.width, expected.width);
+      assert.equal(video?.height, expected.height);
+      assert.equal(
+        result.streams.filter((stream) => stream.codec_type === "audio").length,
+        1,
+      );
+      assert.ok(Math.abs(Number(result.format.duration) - 3) <= 0.15);
+    }
 
     // Indicator pixels: present at t=0, animated, and nothing else touched.
     for (const orientation of ["landscape_16_9", "portrait_9_16"] as const) {

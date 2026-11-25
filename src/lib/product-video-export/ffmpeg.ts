@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
+import { promisify } from "node:util";
 
 import {
   PRODUCT_VIDEO_EXPORT_STALL_MS,
   PRODUCT_VIDEO_X264_PRESET,
   type ProductVideoOrientation,
+  type ProductVideoVisualKind,
 } from "./contract";
 import { productVideoFilterComplex } from "./audio-indicator";
 import {
@@ -14,7 +17,87 @@ import {
 } from "./progress";
 
 const TERM_GRACE_MS = 2_000;
+const execFileAsync = promisify(execFile);
 export const PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US = 100_000;
+
+export type ProductVideoBackgroundInspection = {
+  durationSeconds: number;
+  width: number;
+  height: number;
+  formatNames: string[];
+};
+
+export async function inspectProductVideoBackground(
+  inputPath: string,
+): Promise<ProductVideoBackgroundInspection | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "format=duration,format_name:stream=width,height",
+        "-of",
+        "json",
+        inputPath,
+      ],
+      { timeout: 30_000 },
+    );
+    const parsed = JSON.parse(stdout) as {
+      format?: { duration?: string; format_name?: string };
+      streams?: Array<{ width?: number; height?: number }>;
+    };
+    const durationSeconds = Number(parsed.format?.duration);
+    const stream = parsed.streams?.[0];
+    const width = Number(stream?.width);
+    const height = Number(stream?.height);
+    const formatNames = (parsed.format?.format_name ?? "")
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      !Number.isFinite(durationSeconds) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      durationSeconds <= 0 ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return null;
+    }
+    return { durationSeconds, width, height, formatNames };
+  } catch {
+    return null;
+  }
+}
+
+export async function extractProductVideoBackgroundPoster(
+  inputPath: string,
+  outputPath: string,
+): Promise<void> {
+  await execFileAsync(
+    "ffmpeg",
+    [
+      "-y",
+      "-hide_banner",
+      "-nostdin",
+      "-loglevel",
+      "error",
+      "-i",
+      inputPath,
+      "-map",
+      "0:v:0",
+      "-frames:v",
+      "1",
+      "-an",
+      outputPath,
+    ],
+    { timeout: 30_000 },
+  );
+}
 
 export class ProductVideoRenderAbortedError extends Error {
   readonly code = "worker_lease_lost";
@@ -161,10 +244,19 @@ export async function renderProductVideo(params: {
   coverPath: string;
   outputPath: string;
   orientation: ProductVideoOrientation;
+  visualKind?: ProductVideoVisualKind;
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
 }): Promise<{ sizeBytes: number }> {
-  const { audioPath, coverPath, outputPath, orientation, signal, onProgress } = params;
+  const {
+    audioPath,
+    coverPath,
+    outputPath,
+    orientation,
+    visualKind = "static_cover",
+    signal,
+    onProgress,
+  } = params;
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
   // Cap only from packet-accurate copy-demux duration, never a container
@@ -196,7 +288,7 @@ export async function renderProductVideo(params: {
   }
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
-  // Scaled cover + bottom-right «это аудио» indicator (see audio-indicator.ts).
+  // Scaled visual + bottom-right «это аудио» indicator (see audio-indicator.ts).
   const filter = productVideoFilterComplex(orientation);
   const progressState = createProductVideoFfmpegProgressState();
   const knownDurationUs = durationUs;
@@ -206,10 +298,9 @@ export async function renderProductVideo(params: {
       "ffmpeg",
       [
         "-y",
-        "-loop",
-        "1",
-        "-framerate",
-        "25",
+        ...(visualKind === "video_background"
+          ? ["-stream_loop", "-1"]
+          : ["-loop", "1", "-framerate", "25"]),
         "-i",
         coverPath,
         "-i",
@@ -224,8 +315,7 @@ export async function renderProductVideo(params: {
         "libx264",
         "-preset",
         PRODUCT_VIDEO_X264_PRESET,
-        "-tune",
-        "stillimage",
+        ...(visualKind === "static_cover" ? ["-tune", "stillimage"] : []),
         "-pix_fmt",
         "yuv420p",
         "-r",
@@ -234,6 +324,8 @@ export async function renderProductVideo(params: {
         "aac",
         "-b:a",
         "192k",
+        "-map_metadata",
+        "-1",
         "-shortest",
         ...(measuredDurationUs != null
           ? ["-t", ((measuredDurationUs + PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US) / 1_000_000).toFixed(3)]

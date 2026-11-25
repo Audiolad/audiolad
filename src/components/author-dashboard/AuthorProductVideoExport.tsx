@@ -11,12 +11,20 @@ import {
 
 import type { AudioItemRow } from "@/lib/author-products/types";
 import {
+  PRODUCT_VIDEO_EXPORT_BUCKET,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES,
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATIONS,
   PRODUCT_VIDEO_ORIENTATION_META,
   type ProductVideoOrientation,
 } from "@/lib/product-video-export/contract";
 import { productVideoRenderStatusView } from "@/lib/product-video-export/progress";
+import {
+  STUDIO_RESUMABLE_MIN_BYTES,
+  isStudioResumableUploadError,
+  uploadStudioFileResumable,
+} from "@/lib/studio/resumable-upload";
+import { createClient } from "@/lib/supabase/client";
 
 type VideoAudioItem = Pick<
   AudioItemRow,
@@ -31,6 +39,16 @@ type CoverState = {
   hasCover: boolean;
   previewUrl: string | null;
   busy: boolean;
+  error: string | null;
+};
+
+type BackgroundState = {
+  hasBackground: boolean;
+  previewUrl: string | null;
+  posterUrl: string | null;
+  busy: boolean;
+  phase: "idle" | "uploading" | "processing";
+  uploadPercent: number | null;
   error: string | null;
 };
 
@@ -53,6 +71,16 @@ const EMPTY_COVER: CoverState = {
   hasCover: false,
   previewUrl: null,
   busy: false,
+  error: null,
+};
+
+const EMPTY_BACKGROUND: BackgroundState = {
+  hasBackground: false,
+  previewUrl: null,
+  posterUrl: null,
+  busy: false,
+  phase: "idle",
+  uploadPercent: null,
   error: null,
 };
 
@@ -130,6 +158,12 @@ export function AuthorProductVideoExport({
     landscape_16_9: EMPTY_COVER,
     portrait_9_16: EMPTY_COVER,
   });
+  const [backgrounds, setBackgrounds] = useState<
+    Record<ProductVideoOrientation, BackgroundState>
+  >({
+    landscape_16_9: EMPTY_BACKGROUND,
+    portrait_9_16: EMPTY_BACKGROUND,
+  });
   const [renders, setRenders] = useState<Record<string, RenderState | null>>({});
   const [renderBusy, setRenderBusy] = useState<Record<string, boolean>>({});
   const [renderErrors, setRenderErrors] = useState<Record<string, string | null>>(
@@ -137,6 +171,8 @@ export function AuthorProductVideoExport({
   );
   const landscapeInputRef = useRef<HTMLInputElement>(null);
   const portraitInputRef = useRef<HTMLInputElement>(null);
+  const landscapeBackgroundInputRef = useRef<HTMLInputElement>(null);
+  const portraitBackgroundInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (practiceId) setResolvedPracticeId(practiceId);
@@ -184,6 +220,40 @@ export function AuthorProductVideoExport({
     );
   }, [resolvedPracticeId]);
 
+  const loadBackgrounds = useCallback(async () => {
+    if (!resolvedPracticeId) return;
+    await Promise.all(
+      PRODUCT_VIDEO_ORIENTATIONS.map(async (orientation) => {
+        try {
+          const response = await fetch(
+            `/api/author/products/${resolvedPracticeId}/video-backgrounds/${orientation}`,
+            { cache: "no-store" },
+          );
+          const payload = (await response.json()) as {
+            hasBackground?: boolean;
+            previewUrl?: string | null;
+            posterUrl?: string | null;
+          };
+          if (!response.ok) return;
+          setBackgrounds((current) => ({
+            ...current,
+            [orientation]: {
+              hasBackground: payload.hasBackground === true,
+              previewUrl: payload.previewUrl ?? null,
+              posterUrl: payload.posterUrl ?? null,
+              busy: false,
+              phase: "idle",
+              uploadPercent: null,
+              error: null,
+            },
+          }));
+        } catch {
+          // Keep the form usable; a later refresh retries.
+        }
+      }),
+    );
+  }, [resolvedPracticeId]);
+
   const loadRenderStates = useCallback(async (onlyAudioIds?: readonly string[]) => {
     if (!resolvedPracticeId) return;
     const items = onlyAudioIds
@@ -223,6 +293,10 @@ export function AuthorProductVideoExport({
   useEffect(() => {
     void loadCovers();
   }, [loadCovers]);
+
+  useEffect(() => {
+    void loadBackgrounds();
+  }, [loadBackgrounds]);
 
   useEffect(() => {
     void loadRenderStates();
@@ -365,6 +439,229 @@ export function AuthorProductVideoExport({
     }
   }
 
+  async function uploadBackground(
+    orientation: ProductVideoOrientation,
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size <= 0 || file.size > PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES) {
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: {
+          ...current[orientation],
+          error: "Видеофон должен быть не больше 200 МБ.",
+        },
+      }));
+      return;
+    }
+    setBackgrounds((current) => ({
+      ...current,
+      [orientation]: {
+        ...current[orientation],
+        busy: true,
+        phase: "uploading",
+        uploadPercent: 0,
+        error: null,
+      },
+    }));
+    let uploadPath: string | null = null;
+    let uploadPracticeId: string | null = null;
+    try {
+      const id = await ensurePracticeId();
+      if (!id) throw new Error("Сначала сохраните черновик продукта.");
+      uploadPracticeId = id;
+      const start = await fetch(
+        `/api/author/products/${id}/video-backgrounds/${orientation}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          }),
+        },
+      );
+      const started = (await start.json()) as {
+        uploadPath?: string;
+        contentType?: string;
+        signedUpload?: { path?: string; token?: string };
+        error?: string;
+      };
+      if (
+        !start.ok ||
+        !started.uploadPath ||
+        !started.contentType ||
+        !started.signedUpload?.path ||
+        !started.signedUpload.token
+      ) {
+        throw new Error(
+          started.error === "invalid_video_background"
+            ? "Выберите корректный MP4, MOV или WebM не больше 200 МБ."
+            : "Не удалось начать загрузку видеофона.",
+        );
+      }
+      uploadPath = started.uploadPath;
+      const uploadFile =
+        file.type === started.contentType
+          ? file
+          : new File([file], file.name, {
+              type: started.contentType,
+              lastModified: file.lastModified,
+            });
+      let uploaded = false;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+      if (supabaseUrl && uploadFile.size >= STUDIO_RESUMABLE_MIN_BYTES) {
+        try {
+          await uploadStudioFileResumable({
+            supabaseUrl,
+            bucket: PRODUCT_VIDEO_EXPORT_BUCKET,
+            signedUpload: {
+              path: started.signedUpload.path,
+              token: started.signedUpload.token,
+            },
+            file: uploadFile,
+            contentType: started.contentType,
+            onProgress: ({ percent }) => {
+              setBackgrounds((current) => ({
+                ...current,
+                [orientation]: {
+                  ...current[orientation],
+                  uploadPercent: Math.min(99, percent),
+                },
+              }));
+            },
+          });
+          uploaded = true;
+        } catch (error) {
+          if (
+            !isStudioResumableUploadError(error) ||
+            error.kind !== "unsupported"
+          ) {
+            throw new Error("Не удалось загрузить видеофон.");
+          }
+        }
+      }
+      if (!uploaded) {
+        const { error: uploadError } = await createClient().storage
+          .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+          .uploadToSignedUrl(
+            started.signedUpload.path,
+            started.signedUpload.token,
+            uploadFile,
+            { contentType: started.contentType, upsert: false },
+          );
+        if (uploadError) throw new Error("Не удалось загрузить видеофон.");
+      }
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: {
+          ...current[orientation],
+          phase: "processing",
+          uploadPercent: 99,
+        },
+      }));
+      const finalize = await fetch(
+        `/api/author/products/${id}/video-backgrounds/${orientation}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            upload_path: uploadPath,
+            file_size: file.size,
+          }),
+        },
+      );
+      const finalized = (await finalize.json()) as {
+        previewUrl?: string | null;
+        posterUrl?: string | null;
+        error?: string;
+      };
+      if (!finalize.ok) {
+        const message =
+          finalized.error === "invalid_video_background"
+            ? "Видеофон повреждён, длится больше 60 секунд или имеет слишком большое разрешение."
+            : finalized.error === "video_background_upload_incomplete"
+              ? "Загрузка видеофона не завершилась. Попробуйте ещё раз."
+              : "Не удалось проверить видеофон.";
+        uploadPath = null;
+        throw new Error(message);
+      }
+      uploadPath = null;
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: {
+          hasBackground: true,
+          previewUrl: finalized.previewUrl ?? null,
+          posterUrl: finalized.posterUrl ?? null,
+          busy: false,
+          phase: "idle",
+          uploadPercent: null,
+          error: null,
+        },
+      }));
+      await loadRenderStates();
+    } catch (error) {
+      if (uploadPath && uploadPracticeId) {
+        void fetch(
+          `/api/author/products/${uploadPracticeId}/video-backgrounds/${orientation}?uploadPath=${encodeURIComponent(uploadPath)}`,
+          { method: "DELETE" },
+        );
+      }
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: {
+          ...current[orientation],
+          busy: false,
+          phase: "idle",
+          uploadPercent: null,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Не удалось загрузить видеофон.",
+        },
+      }));
+    }
+  }
+
+  async function deleteBackground(orientation: ProductVideoOrientation) {
+    if (!resolvedPracticeId) return;
+    setBackgrounds((current) => ({
+      ...current,
+      [orientation]: {
+        ...current[orientation],
+        busy: true,
+        error: null,
+      },
+    }));
+    try {
+      const response = await fetch(
+        `/api/author/products/${resolvedPracticeId}/video-backgrounds/${orientation}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw new Error("Не удалось удалить видеофон.");
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: EMPTY_BACKGROUND,
+      }));
+      await loadRenderStates();
+    } catch (error) {
+      setBackgrounds((current) => ({
+        ...current,
+        [orientation]: {
+          ...current[orientation],
+          busy: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Не удалось удалить видеофон.",
+        },
+      }));
+    }
+  }
+
   async function createVideo(
     audioId: string,
     orientation: ProductVideoOrientation,
@@ -389,8 +686,8 @@ export function AuthorProductVideoExport({
       };
       if (!response.ok || !payload.job) {
         const message =
-          payload.error === "video_cover_required"
-            ? "Сначала загрузите соответствующую видеообложку."
+          payload.error === "video_visual_required"
+            ? "Загрузите обложку или видеофон для выбранного формата."
             : payload.error === "audio_not_ready"
               ? "Аудио ещё не готово."
               : "Не удалось поставить видео в очередь.";
@@ -424,7 +721,8 @@ export function AuthorProductVideoExport({
           Видео для площадок
         </h3>
         <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
-          Загрузите отдельные обложки и создайте готовый MP4 из обложки и аудио.
+          Для каждого формата можно использовать обложку, короткий видеофон
+          или оба материала. Видеофон зациклится под ваше аудио.
         </p>
       </div>
 
@@ -432,17 +730,22 @@ export function AuthorProductVideoExport({
         {PRODUCT_VIDEO_ORIENTATIONS.map((orientation) => {
           const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
           const cover = covers[orientation];
+          const background = backgrounds[orientation];
           const inputRef =
             orientation === "landscape_16_9"
               ? landscapeInputRef
               : portraitInputRef;
+          const backgroundInputRef =
+            orientation === "landscape_16_9"
+              ? landscapeBackgroundInputRef
+              : portraitBackgroundInputRef;
           return (
             <div
               key={orientation}
               className="rounded-[18px] border border-[#eadff8] bg-white p-4"
             >
               <p className="text-sm font-medium text-[#3f3560]">
-                {meta.coverLabel}
+                {meta.coverLabel.replace("Видеообложка", "Обложка")}
               </p>
               <button
                 type="button"
@@ -463,7 +766,7 @@ export function AuthorProductVideoExport({
                   />
                 ) : (
                   <span className="m-auto px-4 text-center text-xs text-[#8c79b6]">
-                    Нет видеообложки {meta.ratioLabel}
+                    Нет обложки {meta.ratioLabel}
                   </span>
                 )}
               </button>
@@ -506,6 +809,101 @@ export function AuthorProductVideoExport({
               {cover.error ? (
                 <p className="mt-2 text-sm text-[#9b3d3d]">{cover.error}</p>
               ) : null}
+
+              <div className="mt-5 border-t border-[#eee6f7] pt-4">
+                <p className="text-sm font-medium text-[#3f3560]">
+                  Видеофон {meta.ratioLabel}
+                </p>
+                <div
+                  className={`mt-3 overflow-hidden rounded-[16px] border border-[#d9c9ef] bg-[#181228] ${
+                    orientation === "landscape_16_9"
+                      ? "aspect-video w-full max-w-sm"
+                      : "aspect-[9/16] h-48"
+                  }`}
+                >
+                  {background.previewUrl ? (
+                    <video
+                      src={background.previewUrl}
+                      poster={background.posterUrl ?? undefined}
+                      controls
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#cbbbe2]">
+                      Нет видеофона {meta.ratioLabel}
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={backgroundInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+                  className="sr-only"
+                  disabled={disabled || background.busy}
+                  onChange={(event) =>
+                    void uploadBackground(orientation, event)
+                  }
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={disabled || background.busy}
+                    onClick={() => backgroundInputRef.current?.click()}
+                    className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                  >
+                    {background.busy
+                      ? background.phase === "processing"
+                        ? "Проверяем видео…"
+                        : `Загрузка${
+                            background.uploadPercent == null
+                              ? "…"
+                              : ` ${background.uploadPercent}%`
+                          }`
+                      : background.hasBackground
+                        ? "Заменить видеофон"
+                        : "Загрузить видеофон"}
+                  </button>
+                  {background.hasBackground ? (
+                    <button
+                      type="button"
+                      disabled={disabled || background.busy}
+                      onClick={() => void deleteBackground(orientation)}
+                      className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2] disabled:opacity-60"
+                    >
+                      Удалить
+                    </button>
+                  ) : null}
+                </div>
+                {background.busy &&
+                background.uploadPercent != null ? (
+                  <div
+                    className="mt-3 h-2 overflow-hidden rounded-full bg-[#efe8f8]"
+                    role="progressbar"
+                    aria-label="Загрузка видеофона"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={background.uploadPercent}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[#7042c5] motion-safe:transition-[width] motion-safe:duration-300"
+                      style={{ width: `${background.uploadPercent}%` }}
+                    />
+                  </div>
+                ) : null}
+                <p className="mt-3 text-xs leading-5 text-[#7d70a2]">
+                  MP4, MOV или WebM, до 200 МБ и 60 секунд. Звук видеофона
+                  будет отключён.
+                </p>
+                {background.error ? (
+                  <p className="mt-2 text-sm text-[#9b3d3d]">
+                    {background.error}
+                  </p>
+                ) : null}
+              </div>
             </div>
           );
         })}
@@ -551,7 +949,8 @@ export function AuthorProductVideoExport({
                       state.status === "completed";
                     const canCreate =
                       playable &&
-                      covers[orientation].hasCover &&
+                      (covers[orientation].hasCover ||
+                        backgrounds[orientation].hasBackground) &&
                       !active &&
                       !renderBusy[renderKey] &&
                       !disabled;
@@ -568,6 +967,24 @@ export function AuthorProductVideoExport({
                           {meta.ratioLabel}
                         </p>
                         <ProductVideoJobStatus state={state} />
+                        {currentReady && resolvedPracticeId ? (
+                          <video
+                            src={`/api/author/products/${resolvedPracticeId}/video/${item.id}/playback?orientation=${orientation}`}
+                            poster={
+                              covers[orientation].previewUrl ??
+                              backgrounds[orientation].posterUrl ??
+                              undefined
+                            }
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className={`mt-3 rounded-[14px] bg-[#181228] object-cover ${
+                              orientation === "landscape_16_9"
+                                ? "aspect-video w-full"
+                                : "aspect-[9/16] h-64"
+                            }`}
+                          />
+                        ) : null}
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
                             type="button"
@@ -590,9 +1007,11 @@ export function AuthorProductVideoExport({
                             </a>
                           ) : null}
                         </div>
-                        {!covers[orientation].hasCover ? (
+                        {!covers[orientation].hasCover &&
+                        !backgrounds[orientation].hasBackground ? (
                           <p className="mt-2 text-xs text-[#7d70a2]">
-                            Сначала загрузите видеообложку {meta.ratioLabel}.
+                            Загрузите обложку или видеофон {meta.ratioLabel},
+                            чтобы создать видео.
                           </p>
                         ) : null}
                         {state?.status === "failed" && !state.stale ? (

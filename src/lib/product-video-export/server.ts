@@ -1,6 +1,9 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import sharp from "sharp";
 
@@ -10,21 +13,40 @@ import {
 } from "@/lib/author-products/auth";
 import { isCoursePublication } from "@/lib/author-products/publication-class";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  removeTempFile,
+  writeStreamToTempFile,
+} from "@/lib/studio/server/audio-duration";
 
 import {
   PRODUCT_VIDEO_EXPORT_BUCKET,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS,
+  PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_PIXELS,
   PRODUCT_VIDEO_EXPORT_MAX_IMAGE_BYTES,
   PRODUCT_VIDEO_ORIENTATION_META,
   isProductVideoRenderJobStale,
+  isProductVideoBackgroundStoragePath,
   parseProductVideoOrientation,
+  productVideoBackgroundColumn,
+  productVideoBackgroundExtension,
+  productVideoBackgroundMimeType,
+  productVideoBackgroundPosterStoragePath,
+  productVideoBackgroundStoragePath,
   productVideoCoverColumn,
   productVideoCoverStoragePath,
   type ProductVideoOrientation,
 } from "./contract";
+import {
+  extractProductVideoBackgroundPoster,
+  inspectProductVideoBackground,
+} from "./ffmpeg";
 
 export type ProductVideoAssetState = {
   landscape_cover_path: string | null;
   portrait_cover_path: string | null;
+  landscape_background_path: string | null;
+  portrait_background_path: string | null;
   updated_at: string | null;
 };
 
@@ -69,7 +91,9 @@ export async function getProductVideoAssets(
   const { service } = await requireProductVideoExportAccess(practiceId);
   const { data, error } = await service
     .from("product_video_assets")
-    .select("landscape_cover_path, portrait_cover_path, updated_at")
+    .select(
+      "landscape_cover_path, portrait_cover_path, landscape_background_path, portrait_background_path, updated_at",
+    )
     .eq("practice_id", practiceId)
     .maybeSingle();
 
@@ -81,6 +105,8 @@ export async function getProductVideoAssets(
   return {
     landscape_cover_path: data?.landscape_cover_path ?? null,
     portrait_cover_path: data?.portrait_cover_path ?? null,
+    landscape_background_path: data?.landscape_background_path ?? null,
+    portrait_background_path: data?.portrait_background_path ?? null,
     updated_at: data?.updated_at ?? null,
   };
 }
@@ -98,6 +124,299 @@ export async function createProductVideoCoverSignedUrl(
     return null;
   }
   return data.signedUrl;
+}
+
+export async function createProductVideoAssetSignedUrl(
+  storagePath: string | null,
+): Promise<string | null> {
+  return createProductVideoCoverSignedUrl(storagePath);
+}
+
+function isOwnedBackgroundPath(input: {
+  path: string;
+  practiceId: string;
+  orientation: ProductVideoOrientation;
+}): boolean {
+  return (
+    isProductVideoBackgroundStoragePath(input.path) &&
+    input.path.startsWith(
+      `practices/${input.practiceId}/video-backgrounds/${input.orientation}/`,
+    )
+  );
+}
+
+async function readProductVideoStorageObjectSize(
+  storagePath: string,
+): Promise<number | null> {
+  const service = createServiceRoleClient();
+  const slash = storagePath.lastIndexOf("/");
+  const directory = storagePath.slice(0, slash);
+  const filename = storagePath.slice(slash + 1);
+  const { data, error } = await service.storage
+    .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+    .list(directory, { limit: 20, search: filename });
+  if (error) return null;
+  const object = data?.find((entry) => entry.name === filename);
+  const size = Number(
+    (object?.metadata as { size?: number | string } | undefined)?.size,
+  );
+  return Number.isFinite(size) && size > 0 ? size : null;
+}
+
+async function materializeProductVideoAsset(
+  storagePath: string,
+  extension: string,
+): Promise<string> {
+  const service = createServiceRoleClient();
+  const { data, error } = await service.storage
+    .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+    .createSignedUrl(storagePath, 120);
+  if (error || !data?.signedUrl) {
+    throw new AuthorAccessError("video_background_upload_incomplete", 409);
+  }
+  const response = await fetch(data.signedUrl);
+  if (!response.ok || !response.body) {
+    throw new AuthorAccessError("video_background_upload_incomplete", 409);
+  }
+  const tempPath = join(
+    tmpdir(),
+    `audiolad-product-video-${randomUUID()}.${extension}`,
+  );
+  try {
+    await writeStreamToTempFile(response.body, tempPath);
+    return tempPath;
+  } catch (error) {
+    await removeTempFile(tempPath);
+    throw error;
+  }
+}
+
+export async function startProductVideoBackgroundUpload(input: {
+  practiceId: string;
+  orientation: ProductVideoOrientation;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}) {
+  await requireProductVideoExportAccess(input.practiceId);
+  const extension = productVideoBackgroundExtension(
+    input.fileName,
+    input.mimeType,
+  );
+  if (
+    !extension ||
+    !Number.isFinite(input.fileSize) ||
+    input.fileSize <= 0 ||
+    input.fileSize > PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES
+  ) {
+    throw new AuthorAccessError("invalid_video_background", 400);
+  }
+  const path = productVideoBackgroundStoragePath(
+    input.practiceId,
+    input.orientation,
+    randomUUID(),
+    extension,
+  );
+  const service = createServiceRoleClient();
+  const { data, error } = await service.storage
+    .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+    .createSignedUploadUrl(path, { upsert: false });
+  if (error || !data?.path || !data.token) {
+    console.error("product_video_background_signed_upload_error", error?.message);
+    throw new AuthorAccessError("video_background_upload_failed", 502);
+  }
+  return {
+    uploadPath: data.path,
+    contentType: productVideoBackgroundMimeType(extension),
+    signedUpload: { path: data.path, token: data.token },
+  };
+}
+
+export async function finalizeProductVideoBackgroundUpload(input: {
+  practiceId: string;
+  orientation: ProductVideoOrientation;
+  uploadPath: string;
+  fileSize: number;
+}): Promise<{
+  path: string;
+  previewUrl: string | null;
+  posterUrl: string | null;
+}> {
+  const { service } = await requireProductVideoExportAccess(input.practiceId);
+  if (
+    !isOwnedBackgroundPath({
+      path: input.uploadPath,
+      practiceId: input.practiceId,
+      orientation: input.orientation,
+    }) ||
+    !Number.isFinite(input.fileSize) ||
+    input.fileSize <= 0 ||
+    input.fileSize > PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_BYTES
+  ) {
+    throw new AuthorAccessError("invalid_video_background", 400);
+  }
+  const extension = input.uploadPath.match(/[.]([a-z0-9]+)$/i)?.[1] ?? "bin";
+  const posterPath = productVideoBackgroundPosterStoragePath(input.uploadPath);
+  const column = productVideoBackgroundColumn(input.orientation);
+  let tempPath: string | null = null;
+  let posterTempPath: string | null = null;
+  let persisted = false;
+  try {
+    const objectSize = await readProductVideoStorageObjectSize(input.uploadPath);
+    if (!objectSize || objectSize !== input.fileSize) {
+      throw new AuthorAccessError("video_background_upload_incomplete", 409);
+    }
+    tempPath = await materializeProductVideoAsset(input.uploadPath, extension);
+    if ((await stat(tempPath)).size !== objectSize) {
+      throw new AuthorAccessError("video_background_upload_incomplete", 409);
+    }
+    const media = await inspectProductVideoBackground(tempPath);
+    const expectedContainer =
+      extension.toLowerCase() === "webm"
+        ? media?.formatNames.some(
+            (name) => name === "webm" || name === "matroska",
+          )
+        : media?.formatNames.some((name) => name === "mov" || name === "mp4");
+    if (
+      !media ||
+      !expectedContainer ||
+      media.durationSeconds <= 0 ||
+      media.durationSeconds > PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS ||
+      media.width <= 0 ||
+      media.height <= 0 ||
+      media.width * media.height > PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_PIXELS
+    ) {
+      throw new AuthorAccessError("invalid_video_background", 400);
+    }
+    posterTempPath = join(
+      tmpdir(),
+      `audiolad-product-video-${randomUUID()}.webp`,
+    );
+    await extractProductVideoBackgroundPoster(tempPath, posterTempPath);
+    const poster = await sharp(posterTempPath)
+      .resize(
+        PRODUCT_VIDEO_ORIENTATION_META[input.orientation].width,
+        PRODUCT_VIDEO_ORIENTATION_META[input.orientation].height,
+        { fit: "cover", position: "centre" },
+      )
+      .webp({ quality: 88 })
+      .toBuffer();
+    const { error: posterError } = await service.storage
+      .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+      .upload(posterPath, poster, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        // Finalization can be retried after a lost response. The poster is a
+        // deterministic derivative of this immutable, UUID-named source.
+        upsert: true,
+      });
+    if (posterError) throw new Error("video_background_poster_upload_failed");
+
+    const { data: existing, error: lookupError } = await service
+      .from("product_video_assets")
+      .select("landscape_background_path, portrait_background_path")
+      .eq("practice_id", input.practiceId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    const previous = existing?.[column] ?? null;
+    // Keep cover uploads independent: update only this orientation's
+    // background column instead of writing a stale snapshot of every asset.
+    const row = {
+      practice_id: input.practiceId,
+      [column]: input.uploadPath,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: updateError } = await service
+      .from("product_video_assets")
+      .upsert(row, { onConflict: "practice_id" });
+    if (updateError) throw updateError;
+    persisted = true;
+
+    if (previous && previous !== input.uploadPath) {
+      await service.storage.from(PRODUCT_VIDEO_EXPORT_BUCKET).remove([
+        previous,
+        productVideoBackgroundPosterStoragePath(previous),
+      ]);
+    }
+    return {
+      path: input.uploadPath,
+      previewUrl: await createProductVideoAssetSignedUrl(input.uploadPath),
+      posterUrl: await createProductVideoAssetSignedUrl(posterPath),
+    };
+  } catch (error) {
+    if (!persisted) {
+      const { data: current } = await service
+        .from("product_video_assets")
+        .select("landscape_background_path, portrait_background_path")
+        .eq("practice_id", input.practiceId)
+        .maybeSingle();
+      persisted = current?.[column] === input.uploadPath;
+    }
+    if (!persisted) {
+      await service.storage
+        .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+        .remove([input.uploadPath, posterPath]);
+    }
+    if (error instanceof AuthorAccessError) throw error;
+    console.error(
+      "product_video_background_finalize_error",
+      error instanceof Error ? error.message : "unknown",
+    );
+    throw new AuthorAccessError("video_background_processing_failed", 500);
+  } finally {
+    if (tempPath) await removeTempFile(tempPath);
+    if (posterTempPath) await removeTempFile(posterTempPath);
+  }
+}
+
+export async function deleteProductVideoBackground(input: {
+  practiceId: string;
+  orientation: ProductVideoOrientation;
+}): Promise<void> {
+  const { service } = await requireProductVideoExportAccess(input.practiceId);
+  const column = productVideoBackgroundColumn(input.orientation);
+  const { data: existing, error: lookupError } = await service
+    .from("product_video_assets")
+    .select("landscape_background_path, portrait_background_path")
+    .eq("practice_id", input.practiceId)
+    .maybeSingle();
+  if (lookupError) throw new AuthorAccessError("internal_error", 500);
+  const previous = existing?.[column] ?? null;
+  if (!existing) return;
+  const { error: updateError } = await service
+    .from("product_video_assets")
+    .update({ [column]: null, updated_at: new Date().toISOString() })
+    .eq("practice_id", input.practiceId);
+  if (updateError) throw new AuthorAccessError("internal_error", 500);
+  if (previous) {
+    await service.storage.from(PRODUCT_VIDEO_EXPORT_BUCKET).remove([
+      previous,
+      productVideoBackgroundPosterStoragePath(previous),
+    ]);
+  }
+}
+
+export async function abandonProductVideoBackgroundUpload(input: {
+  practiceId: string;
+  orientation: ProductVideoOrientation;
+  uploadPath: string;
+}): Promise<void> {
+  const { service } = await requireProductVideoExportAccess(input.practiceId);
+  if (
+    !isOwnedBackgroundPath({
+      path: input.uploadPath,
+      practiceId: input.practiceId,
+      orientation: input.orientation,
+    })
+  ) {
+    throw new AuthorAccessError("invalid_request", 400);
+  }
+  await service.storage
+    .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+    .remove([
+      input.uploadPath,
+      productVideoBackgroundPosterStoragePath(input.uploadPath),
+    ]);
 }
 
 export async function uploadProductVideoCover(params: {
@@ -272,7 +591,9 @@ export async function enqueueProductVideoRender(params: {
         .maybeSingle(),
       service
         .from("product_video_assets")
-        .select("landscape_cover_path, portrait_cover_path")
+        .select(
+          "landscape_cover_path, portrait_cover_path, landscape_background_path, portrait_background_path",
+        )
         .eq("practice_id", practiceId)
         .maybeSingle(),
     ]);
@@ -288,12 +609,17 @@ export async function enqueueProductVideoRender(params: {
     throw new AuthorAccessError("audio_not_ready", 409);
   }
 
+  const backgroundPath =
+    orientation === "landscape_16_9"
+      ? assets?.landscape_background_path
+      : assets?.portrait_background_path;
   const coverPath =
     orientation === "landscape_16_9"
       ? assets?.landscape_cover_path
       : assets?.portrait_cover_path;
-  if (!coverPath) {
-    throw new AuthorAccessError("video_cover_required", 409);
+  const visualPath = backgroundPath || coverPath;
+  if (!visualPath) {
+    throw new AuthorAccessError("video_visual_required", 409);
   }
 
   const { data, error } = await service.rpc("enqueue_product_video_render_job", {
@@ -302,7 +628,7 @@ export async function enqueueProductVideoRender(params: {
     p_audio_item_id: audioItemId,
     p_orientation: orientation,
     p_source_audio_path: audioItem.audio_path,
-    p_source_cover_path: coverPath,
+    p_source_cover_path: visualPath,
   });
   if (error || !data) {
     console.error("product_video_render_enqueue_error", error?.message);
@@ -329,7 +655,9 @@ export async function getProductVideoRenderStates(params: {
         .maybeSingle(),
       service
         .from("product_video_assets")
-        .select("landscape_cover_path, portrait_cover_path")
+        .select(
+          "landscape_cover_path, portrait_cover_path, landscape_background_path, portrait_background_path",
+        )
         .eq("practice_id", practiceId)
         .maybeSingle(),
       service
@@ -362,10 +690,15 @@ export async function getProductVideoRenderStates(params: {
   for (const raw of jobs ?? []) {
     const orientation = parseProductVideoOrientation(raw.orientation);
     if (!orientation || result[orientation]) continue;
+    const currentBackground =
+      orientation === "landscape_16_9"
+        ? assets?.landscape_background_path
+        : assets?.portrait_background_path;
     const currentCover =
       orientation === "landscape_16_9"
         ? assets?.landscape_cover_path
         : assets?.portrait_cover_path;
+    const currentVisual = currentBackground || currentCover;
     const job = raw as ProductVideoRenderJobState;
     result[orientation] = {
       ...job,
@@ -376,7 +709,7 @@ export async function getProductVideoRenderStates(params: {
         sourceCoverPath: job.source_cover_path,
         renderRecipe: job.render_recipe,
         currentAudioPath: item?.audio_path,
-        currentCoverPath: currentCover,
+        currentCoverPath: currentVisual,
       }),
     };
   }
@@ -411,4 +744,31 @@ export async function downloadLatestProductVideo(params: {
     throw new AuthorAccessError("not_found", 404);
   }
   return data;
+}
+
+export async function createLatestProductVideoPlaybackUrl(params: {
+  practiceId: string;
+  audioItemId: string;
+  orientation: ProductVideoOrientation;
+}): Promise<string> {
+  const states = await getProductVideoRenderStates({
+    practiceId: params.practiceId,
+    audioItemId: params.audioItemId,
+  });
+  const job = states[params.orientation];
+  if (
+    !job ||
+    job.stale ||
+    job.status !== "completed" ||
+    !job.output_storage_path
+  ) {
+    throw new AuthorAccessError("not_found", 404);
+  }
+  const { data, error } = await createServiceRoleClient().storage
+    .from(PRODUCT_VIDEO_EXPORT_BUCKET)
+    .createSignedUrl(job.output_storage_path, 300);
+  if (error || !data?.signedUrl) {
+    throw new AuthorAccessError("not_found", 404);
+  }
+  return data.signedUrl;
 }
