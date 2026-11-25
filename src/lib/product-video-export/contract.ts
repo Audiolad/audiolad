@@ -1,4 +1,11 @@
 export const PRODUCT_VIDEO_EXPORT_BUCKET = "product-video-assets";
+export const PRODUCT_VIDEO_AUDIO_BUCKETS = [
+  "practice-audio",
+  "music-streams",
+] as const;
+
+export type ProductVideoAudioBucket =
+  (typeof PRODUCT_VIDEO_AUDIO_BUCKETS)[number];
 
 export type ProductVideoOrientation = "landscape_16_9" | "portrait_9_16";
 export type ProductVideoVisualKind = "static_cover" | "video_background";
@@ -81,13 +88,20 @@ export function isProductVideoRenderRecipeCurrent(
  */
 export function isProductVideoRenderJobStale(input: {
   status: string;
+  sourceAudioBucket: string;
   sourceAudioPath: string;
   sourceCoverPath: string;
   renderRecipe: string | null | undefined;
+  currentAudioBucket: string | null | undefined;
   currentAudioPath: string | null | undefined;
   currentCoverPath: string | null | undefined;
 }): boolean {
-  if (!input.currentAudioPath || input.sourceAudioPath !== input.currentAudioPath) {
+  if (
+    !input.currentAudioBucket ||
+    !input.currentAudioPath ||
+    input.sourceAudioBucket !== input.currentAudioBucket ||
+    input.sourceAudioPath !== input.currentAudioPath
+  ) {
     return true;
   }
   if (!input.currentCoverPath || input.sourceCoverPath !== input.currentCoverPath) {
@@ -96,6 +110,21 @@ export function isProductVideoRenderJobStale(input: {
   return (
     input.status === "completed" &&
     !isProductVideoRenderRecipeCurrent(input.renderRecipe)
+  );
+}
+
+export function isProductVideoAudioReady(input: {
+  id: string;
+  audioPath?: string | null;
+  audioPrepareStatus?: string | null;
+  hasActiveMusicDelivery?: boolean | null;
+}): boolean {
+  return (
+    !input.id.startsWith("temp-") &&
+    input.audioPrepareStatus !== "queued" &&
+    input.audioPrepareStatus !== "processing" &&
+    (Boolean(input.audioPath?.trim()) ||
+      input.hasActiveMusicDelivery === true)
   );
 }
 

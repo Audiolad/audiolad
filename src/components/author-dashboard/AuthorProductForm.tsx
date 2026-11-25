@@ -5200,6 +5200,13 @@ export default function AuthorProductForm({
             audioItems={audioItems}
             getPracticeId={getPracticeIdForCoverUpload}
             disabled={!canMutateContent || busy}
+            disabledReason={
+              !canMutateContent
+                ? "Создание видео недоступно: для этого проекта запрещено изменение материалов."
+                : busy
+                  ? "Дождитесь завершения текущего сохранения."
+                  : null
+            }
           />
         ) : null}
 

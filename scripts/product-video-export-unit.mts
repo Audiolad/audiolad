@@ -16,6 +16,7 @@ import {
   PRODUCT_VIDEO_ORIENTATION_META,
   PRODUCT_VIDEO_RENDER_RECIPE,
   PRODUCT_VIDEO_X264_PRESET,
+  isProductVideoAudioReady,
   isProductVideoRenderJobStale,
   isProductVideoRenderRecipeCurrent,
   isProductVideoBackgroundStoragePath,
@@ -142,6 +143,10 @@ assert.match(ui, /video-backgrounds/);
 assert.match(ui, /\/playback\?orientation=/);
 assert.match(ui, /uploadStudioFileResumable/);
 assert.match(ui, /Загрузка видеофона/);
+assert.match(ui, /Нет готового аудио\. Загрузите аудиофайл/);
+assert.match(ui, /Аудио обрабатывается\. Создание видео станет доступно/);
+assert.match(ui, /Не удалось проверить видеообложку/);
+assert.match(ui, /Видео уже создаётся\. Дождитесь завершения\./);
 assert.equal(PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS, 2_000);
 assert.equal(PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS, 1_000);
 assert.equal(PRODUCT_VIDEO_X264_PRESET, "veryfast");
@@ -243,9 +248,11 @@ assert.equal(isProductVideoRenderRecipeCurrent(null), false);
 assert.equal(isProductVideoRenderRecipeCurrent(undefined), false);
 const freshJob = {
   status: "completed",
+  sourceAudioBucket: "practice-audio",
   sourceAudioPath: "a.mp3",
   sourceCoverPath: "c.webp",
   renderRecipe: PRODUCT_VIDEO_RENDER_RECIPE,
+  currentAudioBucket: "practice-audio",
   currentAudioPath: "a.mp3",
   currentCoverPath: "c.webp",
 };
@@ -253,6 +260,13 @@ assert.equal(isProductVideoRenderJobStale(freshJob), false);
 assert.equal(isProductVideoRenderJobStale({ ...freshJob, renderRecipe: null }), true);
 assert.equal(isProductVideoRenderJobStale({ ...freshJob, renderRecipe: "cover-v0" }), true);
 assert.equal(isProductVideoRenderJobStale({ ...freshJob, currentAudioPath: "b.mp3" }), true);
+assert.equal(
+  isProductVideoRenderJobStale({
+    ...freshJob,
+    currentAudioBucket: "music-streams",
+  }),
+  true,
+);
 assert.equal(isProductVideoRenderJobStale({ ...freshJob, currentCoverPath: null }), true);
 for (const status of ["queued", "processing", "failed"]) {
   assert.equal(
@@ -261,6 +275,33 @@ for (const status of ["queued", "processing", "failed"]) {
     `${status} job is rendered by the current worker`,
   );
 }
+assert.equal(
+  isProductVideoAudioReady({
+    id: sampleToken,
+    audioPath: null,
+    audioPrepareStatus: null,
+    hasActiveMusicDelivery: true,
+  }),
+  true,
+);
+assert.equal(
+  isProductVideoAudioReady({
+    id: sampleToken,
+    audioPath: null,
+    audioPrepareStatus: null,
+    hasActiveMusicDelivery: false,
+  }),
+  false,
+);
+assert.equal(
+  isProductVideoAudioReady({
+    id: sampleToken,
+    audioPath: "legacy.mp3",
+    audioPrepareStatus: "processing",
+    hasActiveMusicDelivery: false,
+  }),
+  false,
+);
 const recipeMigration = read(
   "supabase/migrations/20261225120000_product_video_render_recipe.sql",
 );
@@ -309,6 +350,20 @@ assert.match(serverSrc, /finalizeProductVideoBackgroundUpload/);
 assert.match(serverSrc, /PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS/);
 assert.match(serverSrc, /productVideoBackgroundPosterStoragePath/);
 assert.match(serverSrc, /const visualPath = backgroundPath \|\| coverPath/);
+assert.match(serverSrc, /active_music_delivery_asset_id/);
+assert.match(serverSrc, /resolveMusicListenSource/);
+
+const musicStreamSourceMigration = read(
+  "supabase/migrations/20270410120000_product_video_music_stream_source.sql",
+);
+assert.match(musicStreamSourceMigration, /source_audio_bucket/);
+assert.match(
+  musicStreamSourceMigration,
+  /CHECK \(source_audio_bucket IN \('practice-audio', 'music-streams'\)\)/,
+);
+assert.match(musicStreamSourceMigration, /stream\.lifecycle_state = 'verified'/);
+assert.match(musicStreamSourceMigration, /stream\.storage_path = p_source_audio_path/);
+assert.match(musicStreamSourceMigration, /a\.active_music_delivery_asset_id/);
 
 const progressMigration = read(
   "supabase/migrations/20261220140000_product_video_render_progress.sql",
@@ -332,7 +387,7 @@ assert.doesNotMatch(
   /CREATE OR REPLACE FUNCTION public\.(claim|recover_stale|renew|enqueue)_product_video_render_job/,
 );
 const backgroundsMigration = read(
-  "supabase/migrations/20270410120000_product_video_backgrounds.sql",
+  "supabase/migrations/20270410120100_product_video_backgrounds.sql",
 );
 assert.match(backgroundsMigration, /landscape_background_path/);
 assert.match(backgroundsMigration, /portrait_background_path/);
@@ -354,6 +409,10 @@ assert.match(playbackRoute, /createLatestProductVideoPlaybackUrl/);
 assert.match(playbackRoute, /Response\.redirect\(signedUrl, 307\)/);
 
 const workerRuntime = read("src/lib/product-video-export/worker-runtime.ts");
+assert.match(
+  workerRuntime,
+  /downloadStorageObjectToFile\(\s*service,\s*job\.source_audio_bucket,/,
+);
 assert.match(workerRuntime, /report_product_video_render_progress/);
 assert.match(workerRuntime, /progress_percent: 100/);
 assert.match(workerRuntime, /render_recipe: PRODUCT_VIDEO_RENDER_RECIPE/);

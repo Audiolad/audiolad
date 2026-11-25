@@ -6789,6 +6789,11 @@
       "file": "supabase/migrations/20270409120000_support_transfer_music_album.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.transfer_author_music_album_with_support_proof(text, uuid, uuid, uuid) TO authenticated;"
+    },
+    {
+      "file": "supabase/migrations/20270410120000_product_video_music_stream_source.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_product_video_render_job( uuid, uuid, uuid, text, text, text ) TO service_role;"
     }
   ]
 }
