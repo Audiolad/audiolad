@@ -3,10 +3,8 @@ import Link from "next/link";
 
 import { articleBodyClass } from "@/components/articles/typography";
 import JsonLdScript from "@/components/seo/JsonLdScript";
-import {
-  AUDIOLAD_MAX_ARTICLE as article,
-  AUDIOLAD_MAX_BOT_URL,
-} from "@/lib/seo/articles/audiolad-max";
+import { AUDIOLAD_MAX_BOT_URL } from "@/lib/max/startapp";
+import { AUDIOLAD_MAX_ARTICLE as article } from "@/lib/seo/articles/audiolad-max";
 import { buildBreadcrumbListJsonLd } from "@/lib/seo/json-ld";
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 

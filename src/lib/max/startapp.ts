@@ -8,6 +8,7 @@ import { isValidPlaylistPublicSlug } from "@/lib/playlists/public-slug";
 
 export const MAX_MINI_APP_BOT_NAME = "id507305817690_1_bot";
 export const MAX_MINI_APP_DEEP_LINK_ORIGIN = "https://max.ru";
+export const AUDIOLAD_MAX_BOT_URL = `${MAX_MINI_APP_DEEP_LINK_ORIGIN}/${MAX_MINI_APP_BOT_NAME}`;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -88,7 +89,7 @@ export function buildMaxMiniAppDeepLink(payload: string): string | null {
   const normalized = payload.trim();
   if (!/^[A-Za-z0-9_-]{1,512}$/.test(normalized)) return null;
 
-  const url = new URL(`/${MAX_MINI_APP_BOT_NAME}`, MAX_MINI_APP_DEEP_LINK_ORIGIN);
+  const url = new URL(AUDIOLAD_MAX_BOT_URL);
   url.searchParams.set("startapp", normalized);
   return url.toString();
 }

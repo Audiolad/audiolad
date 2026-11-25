@@ -83,7 +83,7 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
         </HomeSectionBoundary>
       ) : null}
 
-      <LegalFooter className="mt-10" />
+      <LegalFooter className="mt-10" showMaxLink />
     </>
   );
 }
