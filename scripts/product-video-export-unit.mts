@@ -10,18 +10,16 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
-  PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS,
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATION_META,
   PRODUCT_VIDEO_RENDER_RECIPE,
   PRODUCT_VIDEO_X264_PRESET,
-  isProductVideoExportAuthorSlug,
   isProductVideoRenderJobStale,
   isProductVideoRenderRecipeCurrent,
   productVideoCoverStoragePath,
   productVideoOutputStoragePath,
 } from "../src/lib/product-video-export/contract";
-import { ProductVideoJobStatus } from "../src/components/author-dashboard/AuthorProductVideoExport";
+import { AuthorProductVideoExport, ProductVideoJobStatus } from "../src/components/author-dashboard/AuthorProductVideoExport";
 import {
   PRODUCT_VIDEO_AUDIO_INDICATOR_LOOP_FRAMES,
   productVideoAudioIndicatorLayout,
@@ -41,17 +39,6 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
-
-assert.deepEqual([...PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS], [
-  "sergey-and-zoya",
-  "sergey-petrov",
-  "zoya-petrova",
-]);
-for (const slug of PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS) {
-  assert.equal(isProductVideoExportAuthorSlug(slug), true);
-}
-assert.equal(isProductVideoExportAuthorSlug("other-author"), false);
-assert.equal(isProductVideoExportAuthorSlug(null), false);
 
 assert.equal(PRODUCT_VIDEO_ORIENTATION_META.landscape_16_9.width, 1920);
 assert.equal(PRODUCT_VIDEO_ORIENTATION_META.landscape_16_9.height, 1080);
@@ -123,7 +110,17 @@ assert.equal(PRODUCT_VIDEO_X264_PRESET, "veryfast");
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /AuthorProductVideoExport/);
-assert.match(form, /authorSlug=\{selectedAuthor\?\.slug \?\? null\}/);
+assert.match(form, /!businessOnly && !isCourse \? \(\s*<AuthorProductVideoExport/);
+const availableExportHtml = renderToStaticMarkup(
+  createElement(AuthorProductVideoExport, {
+    practiceId: null,
+    audioItems: [],
+    getPracticeId: async () => null,
+  }),
+);
+assert.match(availableExportHtml, /Видео для площадок/);
+assert.match(availableExportHtml, /Видеообложка 16:9/);
+assert.match(availableExportHtml, /Видеообложка 9:16/);
 assert.match(form, /getPracticeId=\{getPracticeIdForCoverUpload\}/);
 
 const ffmpeg = read("src/lib/product-video-export/ffmpeg.ts");
@@ -255,6 +252,9 @@ assert.match(
 );
 
 const serverSrc = read("src/lib/product-video-export/server.ts");
+assert.match(serverSrc, /requirePracticeMutationAccess\(practiceId\)/);
+assert.match(serverSrc, /practice\.business_only \|\|\s*isCoursePublication/);
+assert.doesNotMatch(serverSrc, /isProductVideoExportAuthorSlug/);
 assert.match(serverSrc, /video_cover_path_rejected/);
 assert.match(serverSrc, /video_cover_persist_failed/);
 assert.match(serverSrc, /product_video_cover_update_error/);

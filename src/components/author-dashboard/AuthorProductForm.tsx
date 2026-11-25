@@ -13,7 +13,7 @@ import AuthorCourseBuilder from "@/components/author-dashboard/AuthorCourseBuild
 import { AuthorPracticeAccessLinks } from "@/components/author-dashboard/AuthorPracticeAccessLinks";
 import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGallery";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
-import AuthorProductVideoExport from "@/components/author-dashboard/AuthorProductVideoExport";
+import { AuthorProductVideoExport } from "@/components/author-dashboard/AuthorProductVideoExport";
 import { AuthorProductCharCounter as CharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
 import AuthorProductFormActions from "@/components/author-dashboard/product-form-sections/AuthorProductFormActions";
 import AuthorPublicationScheduleSection from "@/components/author-dashboard/product-form-sections/AuthorPublicationScheduleSection";
@@ -5197,7 +5197,6 @@ export default function AuthorProductForm({
         {!businessOnly && !isCourse ? (
           <AuthorProductVideoExport
             practiceId={practiceId || null}
-            authorSlug={selectedAuthor?.slug ?? null}
             audioItems={audioItems}
             getPracticeId={getPracticeIdForCoverUpload}
             disabled={!canMutateContent || busy}

@@ -1,11 +1,5 @@
 export const PRODUCT_VIDEO_EXPORT_BUCKET = "product-video-assets";
 
-export const PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS = [
-  "sergey-and-zoya",
-  "sergey-petrov",
-  "zoya-petrova",
-] as const;
-
 export type ProductVideoOrientation = "landscape_16_9" | "portrait_9_16";
 
 export const PRODUCT_VIDEO_ORIENTATIONS: readonly ProductVideoOrientation[] = [
@@ -93,15 +87,6 @@ export function isProductVideoRenderJobStale(input: {
   return (
     input.status === "completed" &&
     !isProductVideoRenderRecipeCurrent(input.renderRecipe)
-  );
-}
-
-export function isProductVideoExportAuthorSlug(
-  slug: string | null | undefined,
-): boolean {
-  const normalized = typeof slug === "string" ? slug.trim().toLowerCase() : "";
-  return PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS.includes(
-    normalized as (typeof PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS)[number],
   );
 }
 
