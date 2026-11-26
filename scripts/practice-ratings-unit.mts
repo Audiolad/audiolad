@@ -855,9 +855,7 @@ function testRatingsUiVisibilityPolicy() {
 
   assert.equal(
     resolvePracticeRatingsUiEnabled({
-      publicationClass: "practice",
       productKind: "practice",
-      hasStructuredCourseLessons: false,
       env: enabledEnv,
     }),
     true,
@@ -866,27 +864,75 @@ function testRatingsUiVisibilityPolicy() {
 
   assert.equal(
     resolvePracticeRatingsUiEnabled({
-      publicationClass: "course",
-      productKind: "practice",
-      hasStructuredCourseLessons: false,
+      productKind: "music",
       env: enabledEnv,
     }),
     true,
-    "course-tagged audio program without lessons keeps rating UI (Bug 3)",
+    "music products show rating UI when feature is on",
   );
 
   assert.equal(
     resolvePracticeRatingsUiEnabled({
-      publicationClass: "course",
+      productKind: "audio_post",
+      env: enabledEnv,
+    }),
+    true,
+    "audio_post products show rating UI when feature is on",
+  );
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled({
       productKind: "practice",
-      hasStructuredCourseLessons: true,
+      env: { RATINGS_UI_ENABLED: "0" },
+    }),
+    false,
+    "feature flag off hides rating UI",
+  );
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled({
+      productKind: "unknown_kind",
       env: enabledEnv,
     }),
     false,
-    "structured courses with lessons hide rating UI until course rating ships",
+    "non-listen product kinds stay hidden",
+  );
+}
+
+function testRatingsUiVisibilityUnifiedPublicAudioRule() {
+  const enabledEnv = { RATINGS_UI_ENABLED: "1" };
+  const yasnoeLike = {
+    productKind: "practice" as const,
+    env: enabledEnv,
+  };
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled(yasnoeLike),
+    true,
+    "paid audio program (Yasnoe-like): course class / lessons do not affect visibility",
+  );
+
+  const policySource = read("src/lib/ratings/ui-visibility-policy.ts");
+  assert.doesNotMatch(
+    policySource,
+    /hasStructuredCourseLessons|isCoursePublication\(/,
+    "visibility policy must not gate on course structure or publication class",
+  );
+  assert.doesNotMatch(
+    policySource,
+    /\.from\("course_lessons"\)/,
+    "visibility policy must not query course_lessons",
+  );
+
+  const visibilitySource = read("src/lib/ratings/ui-visibility.ts");
+  assert.doesNotMatch(
+    visibilitySource,
+    /course_lessons/,
+    "visibility resolver must not query course_lessons",
   );
 }
 
 testRatingsUiVisibilityPolicy();
+testRatingsUiVisibilityUnifiedPublicAudioRule();
 
 console.log("practice-ratings-unit: ok");
