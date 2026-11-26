@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -95,6 +96,27 @@ function readProgressPercent(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function VideoPlatformChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={`h-5 w-5 shrink-0 text-[#7042c5] transition-transform duration-200 ${
+        expanded ? "rotate-180" : ""
+      }`}
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 7.5 10 12.5 15 7.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ProductVideoJobStatus({ state }: { state: RenderState | null }) {
   if (!state) {
     return <p className="mt-2 text-sm text-[#7d70a2]">Не создано</p>;
@@ -155,6 +177,8 @@ export function AuthorProductVideoExport({
   disabled = false,
   disabledReason = null,
 }: Props) {
+  const panelId = useId();
+  const [expanded, setExpanded] = useState(false);
   const [resolvedPracticeId, setResolvedPracticeId] = useState(practiceId);
   const [covers, setCovers] = useState<
     Record<ProductVideoOrientation, CoverState>
@@ -737,16 +761,38 @@ export function AuthorProductVideoExport({
   }
 
   return (
-    <section className="mt-5 space-y-5 rounded-[20px] border border-[#e4d7f4] bg-[#fbf8ff] p-4">
-      <div>
-        <h3 className="text-[18px] font-semibold text-[#3f3560]">
+    <section
+      className="mt-5 overflow-hidden rounded-[20px] border border-[#e4d7f4] bg-[#fbf8ff]"
+      data-author-product-video-export="true"
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        data-testid="author-product-video-export-toggle"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        <span className="min-w-0 text-[18px] font-semibold text-[#3f3560]">
           Видео для площадок
-        </h3>
-        <p className="mt-1 text-sm leading-5 text-[#7d70a2]">
+        </span>
+        <VideoPlatformChevron expanded={expanded} />
+        <span className="sr-only">
+          {expanded ? "Свернуть блок видео" : "Развернуть блок видео"}
+        </span>
+      </button>
+
+      <div
+        id={panelId}
+        data-testid="author-product-video-export-body"
+        hidden={!expanded}
+        inert={!expanded}
+        className="space-y-5 border-t border-[#eadff8] p-4"
+      >
+        <p className="text-sm leading-5 text-[#7d70a2]">
           Для каждого формата можно использовать обложку, короткий видеофон
           или оба материала. Видеофон зациклится под ваше аудио.
         </p>
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         {PRODUCT_VIDEO_ORIENTATIONS.map((orientation) => {
@@ -1066,6 +1112,7 @@ export function AuthorProductVideoExport({
             );
           })
         )}
+      </div>
       </div>
     </section>
   );
