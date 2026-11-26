@@ -112,6 +112,8 @@ Codex-автор работал без npm/node_modules. Перед коммит
 
 После исправлений REQUEST_CHANGES fixture пересоздан командой выше; на машине проверяющего снова прошли `test:anonymous-rls-audit`, `test:business-guest-auth-hook`, `database-migrations-plan-unit` и `tsc --noEmit`. В CI зелёные Audiolad Business Validation и Database Migrations Real Compile (smoke с реальным владельцем применён на одноразовом Postgres). Не проверялись: повторное применение миграции, SQL consume просроченного билета и реальная конкуренция транзакций (конкурентный unit использует имитацию хранилища), браузерный сценарий. Подключений к реальным БД не было.
 
+**202704 music masters storage (PR #1341):** миграция `20270411120000_music_master_storage_providers.sql` добавляет только service-only таблицы (`REVOKE` для `anon`/`authenticated`) и один новый `GRANT EXECUTE … TO service_role` для `record_music_storage_metric`. Поверхность для anonymous/authenticated не расширяется; snapshot `anonymous-rls-audit` обновляется явно при review.
+
 Не проверены: версия и настройки self-hosted GoTrue/Auth, фактическое включение hook, anonymous sign-ins, точный payload anonymous webhook, его повторные доставки, реальный профиль/ограничения установленной БД, шифрование/refresh Business-сессии, адаптеры внешнего входа VK/MAX. Последние относятся к последующим отдельным работам и не объявлены готовыми этим PR.
 
 ## Human Gate и живая проверка
