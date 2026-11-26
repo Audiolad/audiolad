@@ -109,14 +109,14 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
 
   const masters = await inChunks<{
     id: string; audio_item_id: string; asset_role: string; lifecycle_state: string;
-    storage_bucket: string; storage_path: string | null; size_bytes: number | null;
+    storage_provider: string | null; storage_bucket: string; storage_path: string | null; size_bytes: number | null;
     duration_seconds: number | string | null;
   }>(
     items.filter((item) => item.desired_music_master_asset_id
       && (!item.audio_path?.trim() || positiveFinite(item.duration_seconds) === null))
       .map((item) => item.desired_music_master_asset_id as string),
     (chunk) => db.from("music_audio_assets")
-      .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, size_bytes, duration_seconds").in("id", chunk),
+      .select("id, audio_item_id, asset_role, lifecycle_state, storage_provider, storage_bucket, storage_path, size_bytes, duration_seconds").in("id", chunk),
     "masters",
   );
   const masterById = new Map(masters.map((row) => [row.id, row]));
@@ -163,6 +163,7 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
             audioItemId: master.audio_item_id,
             assetRole: master.asset_role,
             lifecycleState: master.lifecycle_state,
+            storageProvider: master.storage_provider,
             storageBucket: master.storage_bucket,
             storagePath: master.storage_path,
           }

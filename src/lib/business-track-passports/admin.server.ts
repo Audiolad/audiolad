@@ -4,6 +4,7 @@ import { requireAdminPanelAccess } from '@/lib/admin/guard';
 import { listAuthorWorkspacesForUser } from '@/lib/author-products/auth';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { createMusicStorageDownloadUrl } from '@/lib/music-storage/server';
 import { PASSPORT_FIELDS, type Passport } from './model';
 import { loadCatalogAndAlbumDefaults, loadCatalogAndAlbumLicenseRefs } from '@/lib/business-track-passports/license.server';
 import { resolveCatalogPassportDefaults } from '@/lib/business-track-passports/shared';
@@ -186,12 +187,15 @@ export async function verifyBusinessMaster(audioItemId: string) {
   if (audioError || !audio?.desired_music_master_asset_id) throw new Error('Сначала загрузите мастер-файл.');
   const { data: album } = await db.from('practices').select('business_only').eq('id', audio.practice_id).single();
   if (album?.business_only !== true) throw new Error('Нужен закрытый альбом Бизнеса.');
-  const { data: asset, error: assetError } = await db.from('music_audio_assets').select('id,storage_bucket,storage_path,size_bytes')
+  const { data: asset, error: assetError } = await db.from('music_audio_assets').select('id,storage_provider,storage_bucket,storage_path,size_bytes')
     .eq('id', audio.desired_music_master_asset_id).eq('audio_item_id', audioItemId).eq('asset_role', 'master').eq('lifecycle_state', 'verified').single();
   if (assetError || !asset || asset.storage_bucket !== 'music-masters') throw new Error('Мастер-файл ещё не проверен при загрузке.');
-  const { data: signed, error: signedError } = await db.storage.from(asset.storage_bucket).createSignedUrl(asset.storage_path, 300);
-  if (signedError || !signed) throw new Error('Не удалось прочитать мастер-файл.');
-  const response = await fetch(signed.signedUrl, { cache: 'no-store', signal: AbortSignal.timeout(120_000) });
+  const signedUrl = await createMusicStorageDownloadUrl(asset, 300, {
+    service: db,
+    expectedBytes: Number(asset.size_bytes),
+  }).catch(() => null);
+  if (!signedUrl) throw new Error('Не удалось прочитать мастер-файл.');
+  const response = await fetch(signedUrl, { cache: 'no-store', signal: AbortSignal.timeout(120_000) });
   if (!response.ok || !response.body) throw new Error('Не удалось прочитать мастер-файл.');
   const hash = createHash('sha256');
   const reader = response.body.getReader();

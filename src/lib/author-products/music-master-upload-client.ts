@@ -13,9 +13,13 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 type SignedUpload = { path: string; token: string };
+type UploadTarget =
+  | { kind: "supabase_signed_upload"; path: string; token: string }
+  | { kind: "presigned_put"; url: string; headers?: Record<string, string> };
 type StartPayload = {
   asset_id?: string;
   upload_path?: string;
+  upload?: UploadTarget;
   signedUpload?: SignedUpload;
   error?: string;
   message?: string;
@@ -138,8 +142,7 @@ export async function uploadMusicMasterDirect(input: {
     !start.ok ||
     !started?.asset_id ||
     !started.upload_path ||
-    !started.signedUpload?.path ||
-    !started.signedUpload.token
+    (!started.upload && !started.signedUpload)
   ) {
     return { ok: false, error: started?.error, message: started?.message, status: start.status };
   }
@@ -148,32 +151,58 @@ export async function uploadMusicMasterDirect(input: {
     detectProductAudioSourceFormat(input.file.name) === "ogg" ? "ogg" : "wav",
   );
   try {
-    const { error: uploadError } = await createClient().storage
-      .from(MUSIC_MASTERS_BUCKET)
-      .uploadToSignedUrl(
-        started.signedUpload.path,
-        started.signedUpload.token,
+    const uploadTarget = started.upload ?? {
+      kind: "supabase_signed_upload" as const,
+      path: started.signedUpload!.path,
+      token: started.signedUpload!.token,
+    };
+    if (uploadTarget.kind === "presigned_put") {
+      const uploaded = await fetch(uploadTarget.url, {
+        method: "PUT",
+        headers: {
+          ...uploadTarget.headers,
+          "Content-Type": uploadMime,
+        },
+        body: input.file,
+        signal: input.signal,
+      });
+      if (!uploaded.ok) {
+        await abandon({
+          practiceId: input.practiceId,
+          audioId: input.audioId,
+          assetId: started.asset_id,
+          uploadPath: started.upload_path,
+        });
+        return { ok: false, error: "upload_failed", status: 502 };
+      }
+    } else {
+      const { error: uploadError } = await createClient().storage
+        .from(MUSIC_MASTERS_BUCKET)
+        .uploadToSignedUrl(
+          uploadTarget.path,
+          uploadTarget.token,
         fileForSignedAuthorAudioUpload(input.file, input.file.name, uploadMime),
         // storage-js uses the File/Blob type for multipart uploads. Keep the
         // option too, but the wrapped File is what guarantees the canonical source MIME.
         { contentType: uploadMime, upsert: false },
-      );
-    if (uploadError) {
-      const storageError = classifyAuthorSignedUploadError(uploadError);
-      await abandon({
-        practiceId: input.practiceId,
-        audioId: input.audioId,
-        assetId: started.asset_id,
-        uploadPath: started.upload_path,
-        storageError,
-      });
-      return {
-        ok: false,
-        error: storageError.code === "upload_token_expired"
-          ? "upload_token_expired"
-          : "upload_failed",
-        status: 502,
-      };
+        );
+      if (uploadError) {
+        const storageError = classifyAuthorSignedUploadError(uploadError);
+        await abandon({
+          practiceId: input.practiceId,
+          audioId: input.audioId,
+          assetId: started.asset_id,
+          uploadPath: started.upload_path,
+          storageError,
+        });
+        return {
+          ok: false,
+          error: storageError.code === "upload_token_expired"
+            ? "upload_token_expired"
+            : "upload_failed",
+          status: 502,
+        };
+      }
     }
 
     const finalized = await fetch(

@@ -23,6 +23,7 @@ import {
   transcodeWavToMp3,
   validateMusicStreamFile,
 } from "./ffmpeg";
+import { downloadMusicStorageObjectToFile } from "@/lib/music-storage/server";
 import {
   parseClaimedMusicTranscodeJob,
   type ClaimedMusicTranscodeJob,
@@ -35,6 +36,7 @@ type MasterRow = {
   audio_item_id: string;
   asset_role: string;
   lifecycle_state: string;
+  storage_provider: string | null;
   storage_bucket: string;
   storage_path: string;
   original_file_name: string;
@@ -148,7 +150,7 @@ export async function loadVerifiedMusicMaster(
 ): Promise<MasterRow> {
   const { data, error } = await service
     .from("music_audio_assets")
-    .select("id,audio_item_id,asset_role,lifecycle_state,storage_bucket,storage_path,original_file_name,size_bytes,duration_seconds")
+    .select("id,audio_item_id,asset_role,lifecycle_state,storage_provider,storage_bucket,storage_path,original_file_name,size_bytes,duration_seconds")
     .eq("id", sourceAssetId)
     .maybeSingle();
   if (error || !data) throw new MusicTranscodeCodedError("source_unavailable");
@@ -325,11 +327,18 @@ export async function executeClaimedMusicTranscodeJob(
     await mkdir(workspace, { recursive: true });
     const masterPath = join(workspace, master.storage_path.endsWith(".ogg") ? "master.ogg" : "master.wav");
     const outputPath = join(workspace, "mp3-256.mp3");
-    const { data: blob, error: downloadError } = await service.storage
-      .from(MUSIC_MASTERS_BUCKET)
-      .download(master.storage_path);
-    if (downloadError || !blob) throw new MusicTranscodeCodedError("source_unavailable");
-    await writeFile(masterPath, Buffer.from(await blob.arrayBuffer()));
+    try {
+      await downloadMusicStorageObjectToFile({
+        storage_provider: master.storage_provider,
+        storage_bucket: master.storage_bucket,
+        storage_path: master.storage_path,
+      }, masterPath, {
+        service,
+        expectedBytes: asNumber(master.size_bytes),
+      });
+    } catch {
+      throw new MusicTranscodeCodedError("source_unavailable");
+    }
     if (signal.aborted) throw new MusicTranscodeAbortedError();
 
     try {

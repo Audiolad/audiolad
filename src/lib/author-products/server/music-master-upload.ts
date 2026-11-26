@@ -3,7 +3,8 @@ import "server-only";
 import { detectProductAudioSourceFormat } from "@/lib/author-products/product-audio-upload-contract";
 import { assertValidProductSourceFile } from "@/lib/product-audio-normalize/ffmpeg";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -26,12 +27,20 @@ import {
   claimMusicTrackUploadGeneration,
   removeMusicStorageObjectsBestEffort,
 } from "@/lib/author-products/server/music-track-delivery";
+import {
+  createMusicStorageUploadTarget,
+  downloadMusicStorageObjectToFile,
+  headMusicStorageObject,
+  musicStorageLocation,
+  newMusicMasterStorageProvider,
+  removeMusicStorageObject,
+  type MusicStorageLocation,
+} from "@/lib/music-storage/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   inspectAudioMediaFile,
   removeTempFile,
   studioAudioTempPath,
-  writeStreamToTempFile,
 } from "@/lib/studio/server/audio-duration";
 import type { AudioMediaInspection } from "@/lib/studio/server/audio-duration";
 
@@ -55,8 +64,11 @@ type OwnedMusicAudioItem = {
 type MusicAsset = {
   id: string;
   audio_item_id: string;
+  storage_provider: string | null;
+  storage_bucket: string;
   storage_path: string;
   lifecycle_state: string;
+  size_bytes: number | null;
 };
 
 export function isVerifiedMusicMasterMedia(
@@ -69,6 +81,12 @@ export function isVerifiedMusicMasterMedia(
       media.durationSeconds &&
       media.durationSeconds > 0,
   );
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  return hash.digest("hex");
 }
 
 async function loadMusicAudioItem(
@@ -104,39 +122,20 @@ function assertMusicProduct(productKind: string | null | undefined) {
   }
 }
 
-async function readMusicMasterObjectSize(storagePath: string): Promise<number | null> {
-  const service = createServiceRoleClient();
-  const slash = storagePath.lastIndexOf("/");
-  const directory = storagePath.slice(0, Math.max(0, slash));
-  const filename = storagePath.slice(slash + 1);
-  const { data, error } = await service.storage
-    .from(MUSIC_MASTERS_BUCKET)
-    .list(directory, { limit: 20, search: filename });
-  if (error) return null;
-  const object = data?.find((entry) => entry.name === filename);
-  const size = Number((object?.metadata as { size?: number | string } | undefined)?.size);
-  return Number.isFinite(size) && size > 0 ? size : null;
-}
-
-async function materializeMusicMaster(storagePath: string): Promise<string> {
-  const service = createServiceRoleClient();
-  const { data, error } = await service.storage
-    .from(MUSIC_MASTERS_BUCKET)
-    .createSignedUrl(storagePath, 120);
-  if (error || !data?.signedUrl) {
-    throw new MusicMasterUploadError("upload_not_complete", 409);
-  }
-  const response = await fetch(data.signedUrl);
-  if (!response.ok || !response.body) {
-    throw new MusicMasterUploadError("upload_not_complete", 409);
-  }
-  const tempPath = studioAudioTempPath(storagePath.endsWith(".ogg") ? "audio/ogg" : "audio/wav");
+async function materializeMusicMaster(
+  location: MusicStorageLocation,
+  expectedBytes: number,
+): Promise<string> {
+  const tempPath = studioAudioTempPath(
+    location.storage_path.endsWith(".ogg") ? "audio/ogg" : "audio/wav",
+  );
   try {
-    await writeStreamToTempFile(response.body, tempPath);
+    await downloadMusicStorageObjectToFile(location, tempPath, { expectedBytes });
     return tempPath;
   } catch (error) {
     await removeTempFile(tempPath);
-    throw error;
+    if (error instanceof MusicMasterUploadError) throw error;
+    throw new MusicMasterUploadError("upload_not_complete", 409);
   }
 }
 
@@ -168,6 +167,7 @@ export async function startMusicMasterDirectUpload(input: {
 
   const assetId = randomUUID();
   const storagePath = buildMusicMasterStoragePath(input.practiceId, input.audioId, assetId, detectProductAudioSourceFormat(input.fileName) === "ogg" ? "ogg" : "wav");
+  const storageProvider = newMusicMasterStorageProvider();
   let uploadGeneration: number;
   try {
     uploadGeneration = await claimMusicTrackUploadGeneration({
@@ -182,6 +182,7 @@ export async function startMusicMasterDirectUpload(input: {
     id: assetId,
     audio_item_id: input.audioId,
     asset_role: "master",
+    storage_provider: storageProvider,
     storage_bucket: MUSIC_MASTERS_BUCKET,
     storage_path: storagePath,
     original_file_name: input.fileName,
@@ -191,14 +192,35 @@ export async function startMusicMasterDirectUpload(input: {
   });
   if (assetError) throw new MusicMasterUploadError("internal_error", 500);
 
-  const { data, error } = await service.storage
-    .from(MUSIC_MASTERS_BUCKET)
-    .createSignedUploadUrl(storagePath, { upsert: false });
-  if (error || !data?.token || !data.path) {
+  let uploadTarget: Awaited<ReturnType<typeof createMusicStorageUploadTarget>>;
+  try {
+    uploadTarget = await createMusicStorageUploadTarget({
+      storage_provider: storageProvider,
+      storage_bucket: MUSIC_MASTERS_BUCKET,
+      storage_path: storagePath,
+    }, {
+      service,
+      contentType: detectProductAudioSourceFormat(input.fileName) === "ogg"
+        ? "audio/ogg"
+        : input.mimeType || "audio/wav",
+    });
+  } catch {
     await markAssetRejected(assetId);
     throw new MusicMasterUploadError("upload_failed", 502);
   }
-  return { asset_id: assetId, upload_path: data.path, signedUpload: { path: data.path, token: data.token } };
+  if (uploadTarget.kind === "supabase_signed_upload") {
+    return {
+      asset_id: assetId,
+      upload_path: uploadTarget.path,
+      upload: uploadTarget,
+      signedUpload: { path: uploadTarget.path, token: uploadTarget.token },
+    };
+  }
+  return {
+    asset_id: assetId,
+    upload_path: storagePath,
+    upload: uploadTarget,
+  };
 }
 
 export async function finalizeMusicMasterDirectUpload(input: {
@@ -222,7 +244,7 @@ export async function finalizeMusicMasterDirectUpload(input: {
   const service = createServiceRoleClient();
   const { data: asset, error: assetError } = await service
     .from("music_audio_assets")
-    .select("id, audio_item_id, storage_path, lifecycle_state")
+    .select("id, audio_item_id, storage_provider, storage_bucket, storage_path, lifecycle_state, size_bytes")
     .eq("id", input.assetId)
     .maybeSingle<MusicAsset>();
   if (assetError) throw new MusicMasterUploadError("internal_error", 500);
@@ -234,12 +256,18 @@ export async function finalizeMusicMasterDirectUpload(input: {
   }
 
   try {
-    const objectSize = await readMusicMasterObjectSize(input.uploadPath);
+    const location = {
+      storage_provider: asset.storage_provider,
+      storage_bucket: asset.storage_bucket,
+      storage_path: asset.storage_path,
+    };
+    const objectSize = (await headMusicStorageObject(location, service))?.sizeBytes ?? null;
     if (!objectSize || objectSize !== input.fileSize || objectSize > MAX_MUSIC_MASTER_BYTES) {
       throw new MusicMasterUploadError("upload_not_complete", 409);
     }
-    const tempPath = await materializeMusicMaster(input.uploadPath);
+    const tempPath = await materializeMusicMaster(location, objectSize);
     let media: Awaited<ReturnType<typeof inspectAudioMediaFile>>;
+    let contentSha256: string;
     try {
       if ((await stat(tempPath)).size !== objectSize) {
         throw new MusicMasterUploadError("upload_not_complete", 409);
@@ -250,12 +278,22 @@ export async function finalizeMusicMasterDirectUpload(input: {
         });
       }
       media = await inspectAudioMediaFile(tempPath);
+      contentSha256 = await sha256File(tempPath);
     } finally {
       await removeTempFile(tempPath);
     }
     if (!media?.durationSeconds || (!input.uploadPath.endsWith(".ogg") && !isVerifiedMusicMasterMedia(media))) {
       throw new MusicMasterUploadError("invalid_file_type", 400);
     }
+    const { error: checksumError } = await service
+      .from("music_audio_assets")
+      .update({
+        content_sha256: contentSha256,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.assetId)
+      .eq("lifecycle_state", "uploading");
+    if (checksumError) throw new MusicMasterUploadError("internal_error", 500);
 
     const { data: finalizedAsset, error: finalizeError } = await service.rpc(
       "finalize_music_master_asset",
@@ -267,7 +305,11 @@ export async function finalizeMusicMasterDirectUpload(input: {
     );
     if (readMusicAssetLifecycle(finalizedAsset) === "abandoned") {
       await removeMusicStorageObjectsBestEffort(service, [
-        { bucket: MUSIC_MASTERS_BUCKET, path: input.uploadPath },
+        {
+          provider: musicStorageLocation(location).provider,
+          bucket: MUSIC_MASTERS_BUCKET,
+          path: input.uploadPath,
+        },
       ]);
       throw new MusicMasterUploadError("stale_music_upload", 409);
     }
@@ -297,11 +339,11 @@ export async function finalizeMusicMasterDirectUpload(input: {
       !(error instanceof MusicMasterUploadError && error.code === "stale_music_upload")
     ) {
       await markAssetRejected(input.assetId);
-      try {
-        await service.storage.from(MUSIC_MASTERS_BUCKET).remove([input.uploadPath]);
-      } catch {
-        // best-effort Storage cleanup of the rejected candidate
-      }
+      await removeMusicStorageObject({
+        storage_provider: asset.storage_provider,
+        storage_bucket: asset.storage_bucket,
+        storage_path: asset.storage_path,
+      }, service);
     }
     throw error;
   }
@@ -322,7 +364,7 @@ export async function abandonMusicMasterDirectUpload(input: {
   const service = createServiceRoleClient();
   const { data: asset } = await service
     .from("music_audio_assets")
-    .select("id, audio_item_id, lifecycle_state, storage_path")
+    .select("id, audio_item_id, lifecycle_state, storage_provider, storage_bucket, storage_path")
     .eq("id", input.assetId)
     .maybeSingle();
   if (!asset || asset.audio_item_id !== input.audioId || asset.storage_path !== input.uploadPath) {
@@ -334,7 +376,11 @@ export async function abandonMusicMasterDirectUpload(input: {
   ) {
     throw new MusicMasterUploadError("invalid_request", 409);
   }
-  await service.storage.from(MUSIC_MASTERS_BUCKET).remove([input.uploadPath]);
+  await removeMusicStorageObject({
+    storage_provider: asset.storage_provider,
+    storage_bucket: asset.storage_bucket,
+    storage_path: asset.storage_path,
+  }, service);
   const { error } = await service.from("music_audio_assets")
     .update({ lifecycle_state: "abandoned", updated_at: new Date().toISOString() })
     .eq("id", input.assetId)

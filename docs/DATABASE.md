@@ -485,6 +485,32 @@ the authoritative positive duration, then atomically marks the asset verified
 and queues the job. No stream object, FFmpeg worker, public playback change,
 or legacy backfill is part of Slice 1.
 
+#### Per-asset storage provider for music masters
+
+Migration `20270411120000_music_master_storage_providers.sql` adds an additive
+hybrid-storage layer without changing existing file locations:
+
+- `music_audio_assets.storage_provider` is `supabase_file` by default and may
+  be `timeweb_s3` only for master assets. Streams remain on `supabase_file`.
+- `storage_bucket = music-masters` remains a logical namespace; the physical
+  S3 bucket is server configuration and is never stored in browser-readable
+  data.
+- `content_sha256` records the verified bytes. A verified master may change
+  only this hash, `storage_provider` and `updated_at`; provider switching
+  requires a previously recorded unchanged hash.
+- `music_storage_copies` is the service-only idempotency and verification
+  ledger for shadow copy, cutover and rollback. It does not authorize deletion
+  of the local source.
+- `music_storage_cleanup_jobs` durably records both providers before a track
+  teardown. `pending` objects can be retried after a transient delete failure;
+  `blocked` objects are never auto-deleted until teardown is confirmed.
+- `music_storage_daily_metrics` contains daily operation/error/byte counters.
+  Only `service_role` can call `record_music_storage_metric`.
+
+Both tables have RLS enabled and no browser policies. Existing rows are
+backfilled by the column default to `supabase_file`, so deploying the migration
+alone does not activate S3 or change listener playback.
+
 #### Music transcode worker (Slice 2)
 
 Migration `20261007140000_music_transcode_worker.sql` adds worker RPC and an
@@ -2747,8 +2773,10 @@ account-level pending business_subscription через прямой RPC/друг
 Отдельные `stored_master_asset_id`, `stored_master_sha256` и
 `stored_master_sha256_verified_at` фиксирует только service-only RPC
 `record_business_master_hash` после серверного потокового чтения приватного
-мастера администратором. В `music_audio_assets` нет собственного SHA-256;
-переиспользуются ID, `audio_item_id`, роль и проверенное состояние файла.
+мастера администратором. `music_audio_assets.content_sha256` хранит
+транспортную контрольную сумму для provider-copy/cutover, но не заменяет
+паспортную фиксацию: здесь переиспользуются ID, `audio_item_id`, роль и
+проверенное состояние файла.
 Пользовательский `master_sha256` обязан совпасть с вычисленным хешем текущего
 `desired_music_master_asset_id`. Замена пути/мастера/delivery сбрасывает допуск
 и серверную проверку. Отозванный паспорт не редактируется до новой версии аудио.

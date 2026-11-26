@@ -10,6 +10,7 @@ import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
 import { requireAdminPanelAccess } from '@/lib/admin/guard';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { createMusicStorageDownloadUrl } from '@/lib/music-storage/server';
 import { PASSPORT_FIELDS, passportMissing, type Passport } from '@/lib/business-track-passports/model';
 import {
   ALBUM_SHARED_PASSPORT_FIELDS,
@@ -223,7 +224,7 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
   }
 
   const { data: asset, error: assetError } = await db.from('music_audio_assets')
-    .select('id,storage_bucket,storage_path,size_bytes,duration_seconds,source_asset_id,created_at,verified_at')
+    .select('id,storage_provider,storage_bucket,storage_path,size_bytes,duration_seconds,source_asset_id,created_at,verified_at')
     .eq('id', audio.desired_music_master_asset_id)
     .eq('audio_item_id', audioItemId)
     .eq('asset_role', 'master')
@@ -259,9 +260,12 @@ export async function autoFillBusinessPassportTrack(audioItemId: string): Promis
     const tmp = await mkdtemp(join(tmpdir(), 'audiolad-passport-'));
     const destPath = join(tmp, 'master.wav');
     try {
-      const { data: signed, error: signedError } = await db.storage.from(asset.storage_bucket).createSignedUrl(asset.storage_path, 300);
-      if (signedError || !signed?.signedUrl) throw new Error('Не удалось прочитать мастер-файл.');
-      const sha256 = await hashAndStoreMaster(signed.signedUrl, Number(asset.size_bytes), destPath);
+      const signedUrl = await createMusicStorageDownloadUrl(asset, 300, {
+        service: db,
+        expectedBytes: Number(asset.size_bytes),
+      }).catch(() => null);
+      if (!signedUrl) throw new Error('Не удалось прочитать мастер-файл.');
+      const sha256 = await hashAndStoreMaster(signedUrl, Number(asset.size_bytes), destPath);
       const { error: recordError } = await db.rpc('record_business_master_hash', {
         p_audio_item_id: audioItemId,
         p_asset_id: asset.id,
