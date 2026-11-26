@@ -28,6 +28,7 @@ export default function GuestCoffeeGiftCta() {
         href={businessAuthHref(hostname, "sign-up", true)}
         className="business-app-btn business-app-btn-cta business-app-focus-ring business-atmosphere-assemble"
         testId="biz-guest-gift-cta"
+        trackTrialFunnel
         showIncludedServices
       >
         {`Получить ${BUSINESS_GIFT_TITLE}`}

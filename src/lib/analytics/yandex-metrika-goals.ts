@@ -33,6 +33,8 @@ export const YANDEX_METRIKA_BUSINESS_ATLAS_GOALS = [
   "business_atlas_coffee_listen_clicked",
   "business_four_cups_clicked",
   "business_cabinet_signed_in",
+  "business_trial_offer_clicked",
+  "business_trial_start_clicked",
   "business_trial_access_confirmed",
   "business_paid_access_confirmed",
   "business_access_used_confirmed",

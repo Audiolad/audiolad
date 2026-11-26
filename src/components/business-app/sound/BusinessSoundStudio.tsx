@@ -340,7 +340,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, presets = 
               {offerGift && !quiet ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* 253821e0: one action – the green gift CTA of the top banner, no «Подключить». */}
-                  <BusinessGuestStartCta href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-cta business-app-focus-ring" testId="biz-guest-register" enabledLabel={BUSINESS_GIFT_CTA}>
+                  <BusinessGuestStartCta href={businessAuthHref(hostname, "sign-up", true)} className="business-app-btn business-app-btn-cta business-app-focus-ring" testId="biz-guest-register" enabledLabel={BUSINESS_GIFT_CTA} trackTrialFunnel>
                     {GUEST_COFFEE_COPY.exhaustedRegister}
                   </BusinessGuestStartCta>
                 </div>
