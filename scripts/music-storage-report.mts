@@ -1,4 +1,4 @@
-import { loadProductionEnvFromCwd } from "./load-production-env.mts";
+import { loadProductionEnvFromCwd } from "./load-production-env";
 import { createServiceRoleClient } from "../src/lib/supabase/service-role";
 
 loadProductionEnvFromCwd();
