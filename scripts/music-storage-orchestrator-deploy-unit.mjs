@@ -12,6 +12,8 @@ for (const token of [
   "OPS_MUSIC_STORAGE_BULK_START_COPY",
   "OPS_MUSIC_STORAGE_BULK_PAUSE",
   "OPS_MUSIC_STORAGE_BULK_STOP",
+  "OPS_MUSIC_STORAGE_BULK_INSTALL",
+  "audiolad-music-storage-bulk-install-remote.sh",
   "music_storage_bulk_ops:",
   "audiolad-music-storage-bulk-ops-remote.sh",
 ]) {

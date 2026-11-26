@@ -1,8 +1,6 @@
 import {
-  closeSync,
   existsSync,
   mkdirSync,
-  openSync,
   readFileSync,
   renameSync,
   writeFileSync,
@@ -22,6 +20,14 @@ import {
   installBulkMigrationSignalCleanup,
   releaseBulkMigrationLock,
 } from "./bulk-process-lock";
+import {
+  isDeployLockHeld,
+  tryAcquireDeployLockForBulk,
+} from "./deploy-lock-probe";
+import {
+  commitOrchestratorState,
+  withOrchestratorStateLock,
+} from "./orchestrator-state-lock";
 
 export type BulkOrchestratorRunMode =
   | "stopped"
@@ -39,12 +45,14 @@ export type BulkOrchestratorJournal = {
   criticalFailures: number;
   lastTickAt: string | null;
   lastTickSummary: string | null;
+  catalogRescanEachTick: boolean;
 };
 
 export type BulkOrchestratorState = {
   version: 1;
   stage: BulkStage;
   runMode: BulkOrchestratorRunMode;
+  /** Deprecated cursor; catalog is rescanned from the start every tick. */
   afterAssetId: string | null;
   updatedAt: string;
   startedAt: string | null;
@@ -64,23 +72,7 @@ export function orchestratorStatePath(): string {
   return join(shared, DEFAULT_STATE_NAME);
 }
 
-export function deployLockPath(): string {
-  return process.env.DEPLOY_LOCK_FILE?.trim() || "/run/audiolad-deploy.lock";
-}
-
-export function isDeployLockHeld(): boolean {
-  const path = deployLockPath();
-  if (!existsSync(path)) return false;
-  try {
-    const fd = openSync(path, "r");
-    closeSync(fd);
-    return false;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "EBUSY" || code === "EAGAIN") return true;
-    return false;
-  }
-}
+export { deployLockPath, isDeployLockHeld } from "./deploy-lock-probe";
 
 function deployCommitSha(): string | null {
   const path = process.env.AUDIOLAD_DEPLOY_COMMIT_FILE?.trim()
@@ -112,6 +104,7 @@ export function defaultOrchestratorState(stage: BulkStage = "copy"): BulkOrchest
       criticalFailures: 0,
       lastTickAt: null,
       lastTickSummary: null,
+      catalogRescanEachTick: true,
     },
     lastTotals: null,
   };
@@ -123,6 +116,10 @@ export function readOrchestratorState(): BulkOrchestratorState {
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as BulkOrchestratorState;
     if (parsed?.version !== 1) return defaultOrchestratorState(parsed?.stage ?? "copy");
+    if (parsed.journal && parsed.journal.catalogRescanEachTick === undefined) {
+      parsed.journal.catalogRescanEachTick = true;
+    }
+    parsed.afterAssetId = null;
     return parsed;
   } catch {
     return defaultOrchestratorState();
@@ -148,6 +145,7 @@ export function writeOrchestratorState(state: BulkOrchestratorState): void {
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
+  state.afterAssetId = null;
   const tmp = `${path}.tmp-${process.pid}`;
   writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
@@ -190,10 +188,7 @@ function outcomeIsSuccess(outcome: string): boolean {
   ].includes(outcome);
 }
 
-function bulkOptionsFromState(
-  state: BulkOrchestratorState,
-  overrides: Partial<BulkMigrationOptions> = {},
-): BulkMigrationOptions {
+function bulkOptionsFromState(state: BulkOrchestratorState): BulkMigrationOptions {
   return {
     ...parseBulkMigrationOptions([]),
     stage: state.stage,
@@ -201,61 +196,91 @@ function bulkOptionsFromState(
     progressOnly: false,
     batchSize: Number(process.env.AUDIOLAD_MUSIC_STORAGE_ORCHESTRATOR_BATCH_SIZE) || 25,
     concurrency: Number(process.env.AUDIOLAD_MUSIC_STORAGE_ORCHESTRATOR_CONCURRENCY) || 1,
-    afterAssetId: state.afterAssetId,
-    ...overrides,
+    afterAssetId: null,
   };
 }
 
 export async function runOrchestratorTick(
   stage: BulkStage,
 ): Promise<{ outcome: OrchestratorTickOutcome; state: BulkOrchestratorState; detail?: unknown }> {
-  const state = readOrchestratorState();
-  if (state.stage !== stage) {
-    return { outcome: "idle_stopped", state, detail: { reason: "stage_mismatch" } };
+  const initial = readOrchestratorState();
+  if (initial.stage !== stage) {
+    return { outcome: "idle_stopped", state: initial, detail: { reason: "stage_mismatch" } };
   }
-  if (state.runMode === "stopped") return { outcome: "idle_stopped", state };
-  if (state.runMode === "paused") return { outcome: "idle_paused", state };
-  if (state.runMode === "completed") return { outcome: "idle_completed", state };
-  if (state.runMode === "halted") {
-    return { outcome: "halted_critical", state, detail: { haltReason: state.haltReason } };
+  if (initial.runMode === "stopped") return { outcome: "idle_stopped", state: initial };
+  if (initial.runMode === "paused") return { outcome: "idle_paused", state: initial };
+  if (initial.runMode === "completed") return { outcome: "idle_completed", state: initial };
+  if (initial.runMode === "halted") {
+    return { outcome: "halted_critical", state: initial, detail: { haltReason: initial.haltReason } };
   }
 
   if (isDeployLockHeld()) {
-    state.journal.lastTickSummary = "skipped_deploy_lock";
-    state.journal.ticks += 1;
-    state.journal.lastTickAt = new Date().toISOString();
-    writeOrchestratorState(state);
-    return { outcome: "skipped_deploy_lock", state };
+    return withOrchestratorStateLock(() => {
+      const state = readOrchestratorState();
+      state.journal.lastTickSummary = "skipped_deploy_lock";
+      state.journal.ticks += 1;
+      state.journal.lastTickAt = new Date().toISOString();
+      writeOrchestratorState(state);
+      return { outcome: "skipped_deploy_lock" as const, state };
+    });
   }
 
-  state.journal.ticks += 1;
-  state.journal.lastTickAt = new Date().toISOString();
+  const deployHold = tryAcquireDeployLockForBulk();
+  if (!deployHold) {
+    return withOrchestratorStateLock(() => {
+      const state = readOrchestratorState();
+      state.journal.lastTickSummary = "skipped_deploy_lock";
+      state.journal.ticks += 1;
+      state.journal.lastTickAt = new Date().toISOString();
+      writeOrchestratorState(state);
+      return { outcome: "skipped_deploy_lock" as const, state };
+    });
+  }
 
-  const options = bulkOptionsFromState(state);
+  const draft: BulkOrchestratorState = { ...readOrchestratorState() };
+  draft.journal.ticks += 1;
+  draft.journal.lastTickAt = new Date().toISOString();
+
+  const options = bulkOptionsFromState(draft);
   installBulkMigrationSignalCleanup();
   acquireBulkMigrationLock();
   try {
     assertStageExecuteEnv(stage);
     const result = await executeBulkBatch(options);
-    state.lastTotals = result.totals;
+    draft.lastTotals = result.totals;
 
     if (result.paused) {
-      state.journal.lastTickSummary = result.pauseReason ?? "host_guard_pause";
-      writeOrchestratorState(state);
+      draft.journal.lastTickSummary = result.pauseReason ?? "host_guard_pause";
+      const state = commitOrchestratorState(
+        readOrchestratorState,
+        writeOrchestratorState,
+        draft,
+        { preserveControlMode: true },
+      );
       return { outcome: "skipped_host_pause", state, detail: result };
     }
 
     const results = result.results ?? [];
     if (results.length === 0) {
       if (result.totals.stageEligible === 0) {
-        state.runMode = "completed";
-        state.completedAt = new Date().toISOString();
-        state.journal.lastTickSummary = "stage_complete";
-        writeOrchestratorState(state);
+        draft.runMode = "completed";
+        draft.completedAt = new Date().toISOString();
+        draft.journal.lastTickSummary = "stage_complete";
+        const state = commitOrchestratorState(
+          readOrchestratorState,
+          writeOrchestratorState,
+          draft,
+          { preserveControlMode: true },
+        );
         return { outcome: "idle_completed", state, detail: result.totals };
       }
-      state.journal.lastTickSummary = "no_work_in_batch";
-      writeOrchestratorState(state);
+      draft.journal.lastTickSummary = "catalog_rescan_pending_work";
+      const state = commitOrchestratorState(
+        readOrchestratorState,
+        writeOrchestratorState,
+        draft,
+        { preserveControlMode: true },
+      );
       return { outcome: "skipped_empty", state, detail: result };
     }
 
@@ -279,39 +304,46 @@ export async function runOrchestratorTick(
       }
     }
 
-    state.journal.batchesExecuted += 1;
-    state.journal.assetsSucceeded += succeeded;
-    state.journal.bytesSucceeded += bytes;
-    state.journal.transientFailures += transient;
-    state.journal.criticalFailures += critical;
-
-    const lastId = result.batch[result.batch.length - 1]?.id;
-    if (lastId) state.afterAssetId = lastId;
+    draft.journal.batchesExecuted += 1;
+    draft.journal.assetsSucceeded += succeeded;
+    draft.journal.bytesSucceeded += bytes;
+    draft.journal.transientFailures += transient;
+    draft.journal.criticalFailures += critical;
 
     if (critical > 0) {
-      state.runMode = "halted";
+      draft.runMode = "halted";
       const first = results.find((row) => row.outcome === "error" || row.error);
-      state.haltReason = first?.error ?? first?.outcome ?? "critical_batch_failure";
-      state.journal.lastTickSummary = state.haltReason;
-      writeOrchestratorAlert(`stage=${stage} haltReason=${state.haltReason}`);
-      writeOrchestratorState(state);
+      draft.haltReason = first?.error ?? first?.outcome ?? "critical_batch_failure";
+      draft.journal.lastTickSummary = draft.haltReason;
+      writeOrchestratorAlert(`stage=${stage} haltReason=${draft.haltReason}`);
+      const state = commitOrchestratorState(
+        readOrchestratorState,
+        writeOrchestratorState,
+        draft,
+      );
       return { outcome: "halted_critical", state, detail: result };
     }
 
     if (result.totals.stageEligible === 0) {
-      state.runMode = "completed";
-      state.completedAt = new Date().toISOString();
-      state.journal.lastTickSummary = "stage_complete";
+      draft.runMode = "completed";
+      draft.completedAt = new Date().toISOString();
+      draft.journal.lastTickSummary = "stage_complete";
     } else {
-      state.journal.lastTickSummary = `batch_${succeeded}/${results.length}`;
+      draft.journal.lastTickSummary = `batch_${succeeded}/${results.length}`;
     }
-    writeOrchestratorState(state);
+    const state = commitOrchestratorState(
+      readOrchestratorState,
+      writeOrchestratorState,
+      draft,
+      { preserveControlMode: true },
+    );
     return {
       outcome: transient > 0 ? "batch_partial" : "batch_ok",
       state,
       detail: result,
     };
   } finally {
+    deployHold.release();
     releaseBulkMigrationLock();
   }
 }
@@ -328,48 +360,56 @@ export async function orchestratorStatus(stage: BulkStage) {
   };
 }
 
-export function orchestratorStart(stage: BulkStage, resetCursor = false): BulkOrchestratorState {
-  const state = readOrchestratorState();
-  if (state.stage !== stage && state.runMode !== "stopped" && state.runMode !== "completed") {
-    throw new Error("Cannot start another stage while orchestrator is active");
-  }
-  const previousMode = state.runMode;
-  state.stage = stage;
-  state.runMode = "running";
-  state.haltReason = null;
-  state.completedAt = null;
-  if (resetCursor || previousMode === "stopped" || previousMode === "completed") {
+export function orchestratorStart(stage: BulkStage, _resetCursor = false): BulkOrchestratorState {
+  return withOrchestratorStateLock(() => {
+    const state = readOrchestratorState();
+    if (state.stage !== stage && state.runMode !== "stopped" && state.runMode !== "completed") {
+      throw new Error("Cannot start another stage while orchestrator is active");
+    }
+    const previousMode = state.runMode;
+    state.stage = stage;
+    state.runMode = "running";
+    state.haltReason = null;
+    state.completedAt = null;
     state.afterAssetId = null;
-  }
-  state.startedAt = new Date().toISOString();
-  state.deployShaAtStart = deployCommitSha();
-  writeOrchestratorState(state);
-  return state;
+    if (previousMode === "stopped" || previousMode === "completed") {
+      state.startedAt = new Date().toISOString();
+      state.deployShaAtStart = deployCommitSha();
+    }
+    writeOrchestratorState(state);
+    return state;
+  });
 }
 
 export function orchestratorStop(): BulkOrchestratorState {
-  const state = readOrchestratorState();
-  state.runMode = "stopped";
-  state.haltReason = null;
-  writeOrchestratorState(state);
-  return state;
+  return withOrchestratorStateLock(() => {
+    const state = readOrchestratorState();
+    state.runMode = "stopped";
+    state.haltReason = null;
+    writeOrchestratorState(state);
+    return state;
+  });
 }
 
 export function orchestratorPause(): BulkOrchestratorState {
-  const state = readOrchestratorState();
-  if (state.runMode !== "running") throw new Error("orchestrator_not_running");
-  state.runMode = "paused";
-  writeOrchestratorState(state);
-  return state;
+  return withOrchestratorStateLock(() => {
+    const state = readOrchestratorState();
+    if (state.runMode !== "running") throw new Error("orchestrator_not_running");
+    state.runMode = "paused";
+    writeOrchestratorState(state);
+    return state;
+  });
 }
 
 export function orchestratorResume(): BulkOrchestratorState {
-  const state = readOrchestratorState();
-  if (state.runMode !== "paused" && state.runMode !== "halted") {
-    throw new Error("orchestrator_not_pausable");
-  }
-  state.runMode = "running";
-  state.haltReason = null;
-  writeOrchestratorState(state);
-  return state;
+  return withOrchestratorStateLock(() => {
+    const state = readOrchestratorState();
+    if (state.runMode !== "paused" && state.runMode !== "halted") {
+      throw new Error("orchestrator_not_pausable");
+    }
+    state.runMode = "running";
+    state.haltReason = null;
+    writeOrchestratorState(state);
+    return state;
+  });
 }

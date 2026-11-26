@@ -38,10 +38,10 @@ try {
   orchestratorStart("copy", true);
   const state = readOrchestratorState();
   assert.equal(state.afterAssetId, null);
+  assert.equal(state.journal.catalogRescanEachTick, true);
   state.afterAssetId = "00000000-0000-4000-8000-000000000001";
   writeOrchestratorState(state);
-  orchestratorStart("copy", false);
-  assert.equal(readOrchestratorState().afterAssetId, "00000000-0000-4000-8000-000000000001");
+  assert.equal(readOrchestratorState().afterAssetId, null);
 
   writeFileSync(join(dir, "deploy-commit"), "a".repeat(40), "utf8");
   process.env.AUDIOLAD_DEPLOY_COMMIT_FILE = join(dir, "deploy-commit");

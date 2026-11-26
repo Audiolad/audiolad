@@ -62,6 +62,7 @@ on:
           - OPS_STUDIO_DUPLICATE_ASSET_DIAG
           - OPS_COURSE_UPGRADE_DIAG
           - OPS_MUSIC_STORAGE_BULK_STATUS
+          - OPS_MUSIC_STORAGE_BULK_INSTALL
           - OPS_MUSIC_STORAGE_BULK_START_COPY
           - OPS_MUSIC_STORAGE_BULK_PAUSE
           - OPS_MUSIC_STORAGE_BULK_STOP
@@ -4542,6 +4543,7 @@ jobs:
     needs: resolve
     if: |
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STATUS' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_INSTALL' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_START_COPY' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_PAUSE' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STOP'
@@ -4599,15 +4601,43 @@ jobs:
           PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
           PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
           CONFIRM: ${{ inputs.confirm }}
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           case "${CONFIRM}" in
             OPS_MUSIC_STORAGE_BULK_STATUS) ACTION=status ;;
+            OPS_MUSIC_STORAGE_BULK_INSTALL) ACTION=install ;;
             OPS_MUSIC_STORAGE_BULK_START_COPY) ACTION=start_copy ;;
             OPS_MUSIC_STORAGE_BULK_PAUSE) ACTION=pause ;;
             OPS_MUSIC_STORAGE_BULK_STOP) ACTION=stop ;;
             *) echo "unexpected confirm=${CONFIRM}" >&2; exit 1 ;;
           esac
+          if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_INSTALL" ]]; then
+            umask 077
+            INSTALL_HELPER="$(mktemp)"
+            chmod 0600 "${INSTALL_HELPER}"
+            curl -fsS \
+              -H "Accept: application/vnd.github.raw+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -o "${INSTALL_HELPER}" \
+              -- \
+              "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-music-storage-bulk-install-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+            test -s "${INSTALL_HELPER}"
+            bash -n "${INSTALL_HELPER}"
+            ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              "bash -s" < "${INSTALL_HELPER}"
+            rm -f "${INSTALL_HELPER}"
+            exit 0
+          fi
           ssh \
             -i "${SSH_KEY_FILE}" \
             -o BatchMode=yes \

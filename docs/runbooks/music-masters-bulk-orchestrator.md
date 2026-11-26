@@ -5,9 +5,12 @@
 не меняется.
 
 Оркестратор выполняет **одну партию** (по умолчанию 25 masters, concurrency 1)
-каждые **5 минут** через systemd timer. Состояние хранится в
+каждые **5 минут** через systemd timer. **Каждый tick** заново сканирует каталог
+masters с начала (`catalogRescanEachTick`): transient/retry и **новые** masters не
+теряются из-за курсора. Состояние хранится в
 `/var/www/audiolad-deploy/shared/music-storage-bulk-orchestrator.json` и
-переживает перезагрузку.
+переживает перезагрузку. Пауза/stop во время batch не перезаписывается итогом tick
+(state file lock + `preserveControlMode`).
 
 Этапы **независимы** (отдельное разрешение и отдельный timer):
 
@@ -28,28 +31,22 @@
 - Повтор transient с backoff (в `music_storage_copies`)
 - Пропуск `verified` / ожидание backoff для `failed`
 - SHA-256 и размер — в `copyPilotAsset` / `cutoverPilotAsset`
-- **Deploy safety:** tick пропускается, если занят `/run/audiolad-deploy.lock`
+- **Deploy safety:** взаимное исключение с deploy через **`flock`** на
+  `/run/audiolad-deploy.lock` (shell tick + удержание на время batch в Node)
 
-## Однократная установка (VPS)
+## Однократная установка
 
-```bash
-# 1. Скрипты (после деплоя с оркестратором)
-sudo install -m 0755 /var/www/audiolad-deploy/current/deploy/scripts/audiolad-music-storage-bulk-orchestrator.sh /usr/local/lib/audiolad/
-sudo install -m 0755 /var/www/audiolad-deploy/current/deploy/scripts/audiolad-music-storage-bulk-ctl.sh /usr/local/lib/audiolad/
+**GitHub Actions (рекомендуется):** Production Deploy → `main` →
+`confirm=OPS_MUSIC_STORAGE_BULK_INSTALL` (скрипты в `/usr/local/lib/audiolad/`,
+units в `/etc/systemd/system/`, примеры env в `/etc/audiolad/`; **без**
+`AUDIOLAD_MUSIC_STORAGE_BULK=1`, **без** enable timer).
 
-# 2. systemd units
-sudo cp /var/www/audiolad-deploy/current/deploy/systemd/audiolad-music-storage-bulk-*.timer /etc/systemd/system/
-sudo cp /var/www/audiolad-deploy/current/deploy/systemd/audiolad-music-storage-bulk-*.service /etc/systemd/system/
-sudo systemctl daemon-reload
+**Вручную (VPS):** `bash deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`
 
-# 3. Env (пример copy — НЕ включать execute-флаги до согласования)
-sudo install -d -m 0750 /etc/audiolad
-sudo cp /var/www/audiolad-deploy/current/deploy/etc/audiolad/music-storage-bulk-copy.env.example /etc/audiolad/music-storage-bulk-copy.env
-sudo chmod 0600 /etc/audiolad/music-storage-bulk-copy.env
-# Вручную добавить AUDIOLAD_MUSIC_STORAGE_BULK=1 только после approval.
-```
+Добавить `AUDIOLAD_MUSIC_STORAGE_BULK=1` в `/etc/audiolad/music-storage-bulk-copy.env`
+**только после approval** на автоматический copy.
 
-Timers **не включать** до команды `start` (см. ниже).
+Timers **не включать** до `start copy` (см. ниже).
 
 ## Управление (одна команда)
 
@@ -94,6 +91,7 @@ Workflow **Production Deploy** → `workflow_dispatch`:
 | confirm | Действие |
 |---------|----------|
 | `OPS_MUSIC_STORAGE_BULK_STATUS` | JSON status + totals |
+| `OPS_MUSIC_STORAGE_BULK_INSTALL` | one-shot install scripts + systemd units |
 | `OPS_MUSIC_STORAGE_BULK_START_COPY` | `start copy` + enable copy timer |
 | `OPS_MUSIC_STORAGE_BULK_PAUSE` | pause |
 | `OPS_MUSIC_STORAGE_BULK_STOP` | stop + disable timers |

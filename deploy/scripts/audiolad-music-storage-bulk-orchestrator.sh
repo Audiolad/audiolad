@@ -29,14 +29,6 @@ CURRENT_LINK="${DEPLOY_ROOT}/current"
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/audiolad-deploy.lock}"
 ENV_FILE="${AUDIOLAD_MUSIC_STORAGE_ORCHESTRATOR_ENV:-/etc/audiolad/music-storage-bulk-${STAGE}.env}"
 
-if [[ "$CMD" == "tick" ]]; then
-  exec {AUDIOLAD_DEPLOY_LOCK_PROBE_FD}>>"$DEPLOY_LOCK_FILE"
-  if ! flock -n "$AUDIOLAD_DEPLOY_LOCK_PROBE_FD"; then
-    printf '%s\n' '{"outcome":"skipped_deploy_lock","reason":"deploy_in_progress"}'
-    exit 0
-  fi
-fi
-
 if [[ ! -L "$CURRENT_LINK" ]]; then
   printf '%s\n' '{"error":"current_release_missing"}' >&2
   exit 1
@@ -63,4 +55,17 @@ if [[ "${3:-}" == "--reset-cursor" ]]; then
   ARGS+=("--reset-cursor")
 fi
 
-exec npx tsx scripts/music-storage-bulk-orchestrator.mts "${ARGS[@]}"
+run_tsx() {
+  npx tsx scripts/music-storage-bulk-orchestrator.mts "$@"
+}
+
+if [[ "$CMD" == "tick" ]]; then
+  if ! command -v flock >/dev/null 2>&1; then
+    printf '%s\n' '{"error":"flock_required_for_deploy_lock"}' >&2
+    exit 1
+  fi
+  flock -n "$DEPLOY_LOCK_FILE" run_tsx "${ARGS[@]}"
+  exit $?
+fi
+
+run_tsx "${ARGS[@]}"
