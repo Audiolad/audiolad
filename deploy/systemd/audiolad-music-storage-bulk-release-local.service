@@ -1,0 +1,14 @@
+[Unit]
+Description=Audiolad music masters bulk migration (release-local stage, one batch)
+Documentation=file:/var/www/audiolad/deploy/docs/runbooks/music-masters-bulk-orchestrator.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/audiolad/music-storage-bulk-release-local.env
+ExecStart=/usr/local/lib/audiolad/audiolad-music-storage-bulk-orchestrator.sh release-local tick
+Nice=10
+SyslogIdentifier=audiolad-music-storage-bulk-release-local
+StandardOutput=journal
+StandardError=journal

@@ -61,6 +61,10 @@ on:
           - OPS_DISK_STORAGE_CLEANUP
           - OPS_STUDIO_DUPLICATE_ASSET_DIAG
           - OPS_COURSE_UPGRADE_DIAG
+          - OPS_MUSIC_STORAGE_BULK_STATUS
+          - OPS_MUSIC_STORAGE_BULK_START_COPY
+          - OPS_MUSIC_STORAGE_BULK_PAUSE
+          - OPS_MUSIC_STORAGE_BULK_STOP
           - DEPLOY
 
 permissions:
@@ -4528,6 +4532,100 @@ jobs:
           set -euo pipefail
           if [[ -n "${COURSE_UPGRADE_HELPER:-}" ]]; then
             rm -f "${COURSE_UPGRADE_HELPER}"
+          fi
+          if [[ -n "${SSH_DIR:-}" ]]; then
+            rm -rf "${SSH_DIR}"
+          fi
+
+  music_storage_bulk_ops:
+    name: Ops music storage bulk orchestrator
+    needs: resolve
+    if: |
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STATUS' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_START_COPY' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_PAUSE' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STOP'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH identity
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          echo "SSH_DIR=${SSH_DIR}" >> "${GITHUB_ENV}"
+          echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Fetch trusted origin/main ops helper
+        env:
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ ! "${ORIGIN_MAIN_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ORIGIN_MAIN_SHA must be a 40-character lowercase hex SHA" >&2
+            exit 1
+          fi
+          : "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+          umask 077
+          HELPER="$(mktemp)"
+          chmod 0600 "${HELPER}"
+          echo "MUSIC_STORAGE_OPS_HELPER=${HELPER}" >> "${GITHUB_ENV}"
+          curl -fsS \
+            -H "Accept: application/vnd.github.raw+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o "${HELPER}" \
+            -- \
+            "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-music-storage-bulk-ops-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+          test -s "${HELPER}"
+          bash -n "${HELPER}"
+
+      - name: Music storage bulk orchestrator via SSH
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          case "${CONFIRM}" in
+            OPS_MUSIC_STORAGE_BULK_STATUS) ACTION=status ;;
+            OPS_MUSIC_STORAGE_BULK_START_COPY) ACTION=start_copy ;;
+            OPS_MUSIC_STORAGE_BULK_PAUSE) ACTION=pause ;;
+            OPS_MUSIC_STORAGE_BULK_STOP) ACTION=stop ;;
+            *) echo "unexpected confirm=${CONFIRM}" >&2; exit 1 ;;
+          esac
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            "bash -s --" "${ACTION}" \
+            < "${MUSIC_STORAGE_OPS_HELPER}"
+
+      - name: Remove SSH identity
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${MUSIC_STORAGE_OPS_HELPER:-}" ]]; then
+            rm -f "${MUSIC_STORAGE_OPS_HELPER}"
           fi
           if [[ -n "${SSH_DIR:-}" ]]; then
             rm -rf "${SSH_DIR}"
