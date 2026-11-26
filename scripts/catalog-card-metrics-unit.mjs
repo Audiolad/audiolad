@@ -37,12 +37,19 @@ metricsOnFormatRow(shell);
 
 assert.match(
   maxCard,
-  /PRODUCT_FORMAT_LINE_CLASS[\s\S]{0,180}formatLabel[\s\S]{0,180}CatalogCardPublicMetrics/,
+  /CATALOG_CARD_RUBRIC_LINE_CLASS[\s\S]{0,180}formatLabel[\s\S]{0,180}CatalogCardPublicMetrics/,
   "MAX: metrics on format row with web class",
 );
 
 assert.match(shell, /flex items-center gap-2[\s\S]*data-catalog-card-format/);
-assert.match(shell, /PRODUCT_FORMAT_LINE_CLASS/);
+assert.match(shell, /CATALOG_CARD_RUBRIC_LINE_CLASS/);
+assert.match(maxCard, /CATALOG_CARD_RUBRIC_LINE_CLASS/);
+const format = read("src/lib/author-products/format.ts");
+assert.match(
+  format,
+  /CATALOG_CARD_RUBRIC_LINE_CLASS[\s\S]*text-\[8px\][\s\S]*sm:text-\[11px\]/,
+  "mobile rubric ~30% smaller than 11px desktop",
+);
 assert.match(metrics, /data-catalog-card-public-metrics/);
 assert.match(metrics, /text-\[#9485b4\]/, "secondary metadata color");
 

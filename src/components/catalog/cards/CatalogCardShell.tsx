@@ -2,7 +2,7 @@ import CatalogCardPublicMetrics from "@/components/catalog/CatalogCardPublicMetr
 import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import CatalogProductPlayButton from "@/components/products/CatalogProductPlayButton";
 import CatalogCardGallery from "@/components/catalog/cards/CatalogCardGallery";
-import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
+import { CATALOG_CARD_RUBRIC_LINE_CLASS } from "@/lib/author-products/format";
 import {
   catalogCardToActionTarget,
   type CatalogCard,
@@ -83,7 +83,7 @@ export default function CatalogCardShell({
         <div className="flex items-center gap-2">
           <p
             data-catalog-card-format
-            className={`${PRODUCT_FORMAT_LINE_CLASS} min-w-0 flex-1 truncate`}
+            className={`${CATALOG_CARD_RUBRIC_LINE_CLASS} min-w-0 flex-1 truncate`}
           >
             {card.display_label}
           </p>

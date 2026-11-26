@@ -6,7 +6,7 @@ import {
   shouldRenderCatalogCardGallery,
 } from "@/lib/gallery/catalog-card-gallery";
 import CatalogCardPublicMetrics from "@/components/catalog/CatalogCardPublicMetrics";
-import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
+import { CATALOG_CARD_RUBRIC_LINE_CLASS } from "@/lib/author-products/format";
 import {
   buildCatalogPublicMetrics,
   type CatalogPublicMetrics,
@@ -32,7 +32,7 @@ function CatalogCardCopy({ product }: { product: MaxCatalogProduct }) {
   return (
     <div className="px-2.5 pb-2.5 pt-2">
       <div className="flex items-center gap-2">
-        <p className={`${PRODUCT_FORMAT_LINE_CLASS} min-w-0 flex-1 truncate`}>
+        <p className={`${CATALOG_CARD_RUBRIC_LINE_CLASS} min-w-0 flex-1 truncate`}>
           {product.formatLabel}
         </p>
         <CatalogCardPublicMetrics metrics={maxProductPublicMetrics(product)} />
