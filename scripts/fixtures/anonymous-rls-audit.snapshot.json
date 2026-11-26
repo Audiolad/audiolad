@@ -6794,6 +6794,11 @@
       "file": "supabase/migrations/20270410120000_product_video_music_stream_source.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.enqueue_product_video_render_job( uuid, uuid, uuid, text, text, text ) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20270411120000_music_master_storage_providers.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.record_music_storage_metric(text, text, text, bigint) TO service_role;"
     }
   ]
 }

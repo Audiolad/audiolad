@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 
 import { evidenceRoot } from "@/lib/evidence/storage.server";
+import { createMusicStorageDownloadUrl } from "@/lib/music-storage/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type Db = ReturnType<typeof createServiceRoleClient>;
@@ -208,7 +209,7 @@ async function catalogEntries(db: Db): Promise<ManifestEntry[]> {
     const chunk = passports.slice(i, i + 200);
     const assetIds = chunk.map((p) => p.stored_master_asset_id as string).filter(Boolean);
     const [{ data: assets, error }, { data: items }] = await Promise.all([
-      db.from("music_audio_assets").select("id, storage_bucket, storage_path, audio_item_id, asset_role").in("id", assetIds),
+      db.from("music_audio_assets").select("id, storage_provider, storage_bucket, storage_path, size_bytes, audio_item_id, asset_role").in("id", assetIds),
       db.from("audio_items").select("id, title").in("id", chunk.map((p) => p.audio_item_id as string)),
     ]);
     if (error) throw new Error("evidence_assets_failed");
@@ -217,10 +218,17 @@ async function catalogEntries(db: Db): Promise<ManifestEntry[]> {
     for (const p of chunk) {
       const a = byId.get(p.stored_master_asset_id as string);
       if (!a || a.audio_item_id !== p.audio_item_id || a.storage_bucket !== "music-masters" || !p.al_code) continue;
-      const { data: signed, error: sErr } = await db.storage.from(String(a.storage_bucket)).createSignedUrl(String(a.storage_path), SIGNED_URL_TTL_S);
-      if (sErr || !signed?.signedUrl) throw new Error("evidence_signed_url_failed");
+      const signedUrl = await createMusicStorageDownloadUrl({
+        storage_provider: typeof a.storage_provider === "string" ? a.storage_provider : null,
+        storage_bucket: String(a.storage_bucket),
+        storage_path: String(a.storage_path),
+      }, SIGNED_URL_TTL_S, {
+        service: db,
+        expectedBytes: Number(a.size_bytes) || null,
+      }).catch(() => null);
+      if (!signedUrl) throw new Error("evidence_signed_url_failed");
       entries.push({
-        code: String(p.al_code), kind: "catalog", url: signed.signedUrl,
+        code: String(p.al_code), kind: "catalog", url: signedUrl,
         sha256: (p.stored_master_sha256 as string) ?? null, title: titles.get(p.audio_item_id as string) ?? null,
       });
     }

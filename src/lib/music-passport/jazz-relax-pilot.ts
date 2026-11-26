@@ -11,6 +11,10 @@ import {
 import { buildRunStoragePath, safeAudioFilename, sha256Hex } from "@/lib/music-analyzer-runs/policy";
 import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  downloadMusicStorageObjectBytes,
+  headMusicStorageObject,
+} from "@/lib/music-storage/server";
 
 import {
   ALBUM_PASSPORT_AGGREGATION_VERSION,
@@ -85,6 +89,7 @@ export type JazzRelaxMasterCandidate = {
   audioItemId: string;
   assetRole: string;
   lifecycleState: string;
+  storageProvider?: string | null;
   storageBucket: string;
   storagePath: string | null;
   originalFileName?: string | null;
@@ -96,6 +101,7 @@ export type JazzRelaxAnalysisAudio =
       kind: "music_master";
       bucket: typeof MUSIC_MASTERS_BUCKET;
       path: string;
+      provider?: string | null;
       originalFileName: string | null;
     }
   | { kind: "missing_audio" };
@@ -105,6 +111,7 @@ type MasterAssetRow = {
   audio_item_id: string;
   asset_role: string;
   lifecycle_state: string;
+  storage_provider: string | null;
   storage_bucket: string;
   storage_path: string | null;
   original_file_name: string | null;
@@ -548,6 +555,7 @@ export function resolveJazzRelaxAnalysisAudio(input: {
       kind: "music_master",
       bucket: MUSIC_MASTERS_BUCKET,
       path: storagePath,
+      ...(master.storageProvider ? { provider: master.storageProvider } : {}),
       originalFileName: master.originalFileName?.trim() || null,
     };
   }
@@ -556,11 +564,15 @@ export function resolveJazzRelaxAnalysisAudio(input: {
 
 export function jazzRelaxAnalysisStorageTarget(
   source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>,
-): { bucket: string; path: string } {
+): { provider?: string | null; bucket: string; path: string } {
   if (source.kind === "practice_audio") {
     return { bucket: PRACTICE_AUDIO_BUCKET, path: source.path };
   }
-  return { bucket: source.bucket, path: source.path };
+  return {
+    ...(source.provider ? { provider: source.provider } : {}),
+    bucket: source.bucket,
+    path: source.path,
+  };
 }
 
 async function loadDesiredMasterAssets(tracks: AudioRow[]): Promise<Map<string, MasterAssetRow>> {
@@ -573,7 +585,7 @@ async function loadDesiredMasterAssets(tracks: AudioRow[]): Promise<Map<string, 
   if (ids.length === 0) return map;
   const { data, error } = await service()
     .from("music_audio_assets")
-    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, original_file_name")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_provider, storage_bucket, storage_path, original_file_name")
     .in("id", ids);
   if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
   for (const row of data ?? []) map.set(row.id as string, row as MasterAssetRow);
@@ -596,6 +608,7 @@ function analysisForTrack(
           audioItemId: row.audio_item_id,
           assetRole: row.asset_role,
           lifecycleState: row.lifecycle_state,
+          storageProvider: row.storage_provider,
           storageBucket: row.storage_bucket,
           storagePath: row.storage_path,
           originalFileName: row.original_file_name,
@@ -608,6 +621,19 @@ async function downloadAnalysisAudio(
   source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>,
 ): Promise<Uint8Array> {
   const target = jazzRelaxAnalysisStorageTarget(source);
+  if (source.kind === "music_master") {
+    try {
+      return await downloadMusicStorageObjectBytes({
+        storage_provider: target.provider,
+        storage_bucket: target.bucket,
+        storage_path: target.path,
+      }, {
+        maxBytes: MUSIC_ANALYZER_MAX_UPLOAD_BYTES,
+      });
+    } catch {
+      throw new JazzRelaxPassportError("track_audio_missing", 400);
+    }
+  }
   const { data, error } = await service().storage.from(target.bucket).download(target.path);
   if (error || !data) throw new JazzRelaxPassportError("track_audio_missing", 400);
   const bytes = new Uint8Array(await data.arrayBuffer());
@@ -723,7 +749,7 @@ export function discardJazzRelaxAnalyzerRunCopy(
 
 /** Current analysis audio object of the track linked to a passport run. */
 async function resolveRunSourceTarget(runId: string, expectedSha256: string): Promise<
-  | { outcome: "ok"; target: { bucket: string; path: string } }
+  | { outcome: "ok"; target: { provider?: string | null; bucket: string; path: string } }
   | { outcome: "not_product_run" | "source_missing" | "source_changed" | "lookup_failed" }
 > {
   const { data: link, error: linkError } = await service()
@@ -756,9 +782,22 @@ export async function jazzRelaxRunSourceBytes(runId: string, expectedSha256: str
   const resolved = await resolveRunSourceTarget(runId, expectedSha256);
   if (resolved.outcome !== "ok") return resolved;
   const { target } = resolved;
-  const { data, error } = await service().storage.from(target.bucket).download(target.path);
-  if (error || !data) return { outcome: "source_missing" };
-  const bytes = new Uint8Array(await data.arrayBuffer());
+  let bytes: Uint8Array;
+  try {
+    bytes = target.bucket === MUSIC_MASTERS_BUCKET
+      ? await downloadMusicStorageObjectBytes({
+        storage_provider: target.provider,
+        storage_bucket: target.bucket,
+        storage_path: target.path,
+      }, { maxBytes: MUSIC_ANALYZER_MAX_UPLOAD_BYTES })
+      : await (async () => {
+        const { data, error } = await service().storage.from(target.bucket).download(target.path);
+        if (error || !data) throw new Error("source_missing");
+        return new Uint8Array(await data.arrayBuffer());
+      })();
+  } catch {
+    return { outcome: "source_missing" };
+  }
   if (bytes.byteLength === 0 || sha256Hex(bytes) !== expectedSha256) return { outcome: "source_changed" };
   return {
     outcome: "ok",
@@ -767,8 +806,19 @@ export async function jazzRelaxRunSourceBytes(runId: string, expectedSha256: str
       const again = await resolveRunSourceTarget(runId, expectedSha256);
       if (again.outcome === "lookup_failed") return null;
       if (again.outcome !== "ok") return false;
-      if (again.target.bucket !== target.bucket || again.target.path !== target.path) return false;
+      if (
+        again.target.provider !== target.provider
+        || again.target.bucket !== target.bucket
+        || again.target.path !== target.path
+      ) return false;
       try {
+        if (target.bucket === MUSIC_MASTERS_BUCKET) {
+          return Boolean(await headMusicStorageObject({
+            storage_provider: target.provider,
+            storage_bucket: target.bucket,
+            storage_path: target.path,
+          }));
+        }
         const { data: present } = await service().storage.from(target.bucket).exists(target.path);
         return present === true;
       } catch {

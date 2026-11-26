@@ -38,6 +38,7 @@ assert.equal(isOwnedMusicMasterStoragePath(`${pathValue}/../spoof.wav`, practice
 
 const migration = read("supabase/migrations/20261007120000_music_wav_master_foundation.sql");
 const server = read("src/lib/author-products/server/music-master-upload.ts");
+const storageServer = read("src/lib/music-storage/server.ts");
 const client = read("src/lib/author-products/music-master-upload-client.ts");
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const legacyServer = read("src/lib/author-products/server/direct-audio-upload.ts");
@@ -61,7 +62,9 @@ assert.match(server, /productKind !== "music"/);
 assert.doesNotMatch(server, /getPracticeSaleLock|shouldBlockMusicAudioReplacement/);
 assert.match(server, /active_music_delivery_asset_id, desired_music_master_asset_id/);
 assert.match(server, /isProductContentLockedDbError/);
-assert.match(server, /createSignedUploadUrl\(storagePath, \{ upsert: false \}\)/);
+assert.match(server, /createMusicStorageUploadTarget/);
+assert.match(storageServer, /createSignedUploadUrl\(normalized\.path, \{ upsert: false \}\)/);
+assert.match(storageServer, /kind: "presigned_put"/);
 assert.match(server, /inspectAudioMediaFile/);
 assert.match(server, /isVerifiedMusicMasterMedia/);
 assert.match(server, /objectSize !== input\.fileSize/);

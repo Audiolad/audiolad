@@ -113,6 +113,16 @@ assert.deepEqual(
   ),
   [{ bucket: "music-masters", path: "masters/old.wav" }],
 );
+assert.deepEqual(
+  storageObjectsToRemove([
+    { provider: "supabase_file", bucket: "music-masters", path: "masters/copied.wav" },
+    { provider: "timeweb_s3", bucket: "music-masters", path: "masters/copied.wav" },
+  ]),
+  [
+    { bucket: "music-masters", path: "masters/copied.wav" },
+    { provider: "timeweb_s3", bucket: "music-masters", path: "masters/copied.wav" },
+  ],
+);
 
 assert.deepEqual(
   readMusicTrackTeardownResult({

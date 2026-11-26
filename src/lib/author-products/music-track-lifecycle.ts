@@ -10,6 +10,7 @@ export const MUSIC_TRACK_CLEANUP_BUCKETS = [
 const CLEANUP_BUCKETS = new Set<string>(MUSIC_TRACK_CLEANUP_BUCKETS);
 
 export type MusicStorageObjectRef = {
+  provider?: "supabase_file" | "timeweb_s3";
   bucket: string;
   path: string;
 };
@@ -63,7 +64,11 @@ export function latestMusicUploadGeneration(generations: readonly number[]): num
 }
 
 export function storageObjectsToRemove(
-  objects: ReadonlyArray<{ bucket?: string | null; path?: string | null }>,
+  objects: ReadonlyArray<{
+    provider?: string | null;
+    bucket?: string | null;
+    path?: string | null;
+  }>,
   protectedKeys: ReadonlySet<string> = new Set(),
 ): MusicStorageObjectRef[] {
   const seen = new Set<string>();
@@ -75,11 +80,19 @@ export function storageObjectsToRemove(
       continue;
     }
     const key = musicStorageObjectKey(bucket, path);
-    if (protectedKeys.has(key) || seen.has(key)) {
+    const provider = object.provider === "timeweb_s3"
+      ? "timeweb_s3"
+      : "supabase_file";
+    const seenKey = `${provider}\n${key}`;
+    if (protectedKeys.has(key) || seen.has(seenKey)) {
       continue;
     }
-    seen.add(key);
-    removable.push({ bucket, path });
+    seen.add(seenKey);
+    removable.push({
+      ...(provider === "timeweb_s3" ? { provider } : {}),
+      bucket,
+      path,
+    });
   }
   return removable;
 }

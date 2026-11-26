@@ -2,15 +2,13 @@
 // ffprobe/ffmpeg cuts at nice 10 and the pinned shazamio venv. Runs only inside the PM2 worker,
 // never inside a Next.js request.
 import { execFile } from 'node:child_process';
-import { createWriteStream } from 'node:fs';
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { downloadMusicStorageObjectToFile } from '@/lib/music-storage/server';
 import { parseShazamHelperOutput, type ShazamHelperOutput } from './shazam';
 import type { ShazamClaimedJob, ShazamWorkerPort } from './shazam-worker';
 
@@ -42,31 +40,6 @@ export function parseClaimedShazamJob(claimed: unknown): ShazamClaimedJob | null
     master_asset_id: job.master_asset_id,
     attempts: typeof job.attempts === 'number' ? job.attempts : 0,
   };
-}
-
-async function downloadToFile(url: string, dest: string, expectedBytes: number | null) {
-  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(300_000) });
-  if (!response.ok || !response.body) throw new Error(`master_download_failed_${response.status}`);
-  let bytes = 0;
-  const source = Readable.from(async function* () {
-    const reader = response.body!.getReader();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > MAX_MASTER_BYTES) throw new Error('master_too_large');
-        yield value;
-      }
-    } finally {
-      await reader.cancel().catch(() => undefined);
-      reader.releaseLock();
-    }
-  }());
-  await pipeline(source, createWriteStream(dest, { mode: 0o600 }));
-  if (bytes === 0 || (expectedBytes !== null && expectedBytes > 0 && bytes !== expectedBytes)) {
-    throw new Error('master_size_mismatch');
-  }
 }
 
 async function probeDuration(path: string): Promise<number> {
@@ -123,7 +96,7 @@ export function createBusinessShazamPort(service: SupabaseClient, options?: {
     },
     async loadMaster(job) {
       const { data: asset, error } = await service.from('music_audio_assets')
-        .select('id,storage_bucket,storage_path,duration_seconds,size_bytes,asset_role,lifecycle_state,audio_item_id')
+        .select('id,storage_provider,storage_bucket,storage_path,duration_seconds,size_bytes,asset_role,lifecycle_state,audio_item_id')
         .eq('id', job.master_asset_id).maybeSingle();
       if (error) throw new Error('asset_lookup_failed');
       if (!asset || asset.asset_role !== 'master' || asset.lifecycle_state !== 'verified'
@@ -133,6 +106,7 @@ export function createBusinessShazamPort(service: SupabaseClient, options?: {
       sizes.set(job.id, typeof asset.size_bytes === 'number' ? asset.size_bytes : Number(asset.size_bytes) || null);
       const duration = Number(asset.duration_seconds);
       return {
+        storageProvider: typeof asset.storage_provider === 'string' ? asset.storage_provider : 'supabase_file',
         storageBucket: String(asset.storage_bucket),
         storagePath: String(asset.storage_path),
         durationSeconds: Number.isFinite(duration) && duration > 0 ? duration : null,
@@ -142,10 +116,18 @@ export function createBusinessShazamPort(service: SupabaseClient, options?: {
     async prepare(job, master, plan) {
       const workDir = await mkdtemp(join(tmpdir(), 'audiolad-shazam-'));
       try {
-        const { data: signed, error } = await service.storage.from(master.storageBucket).createSignedUrl(master.storagePath, 600);
-        if (error || !signed?.signedUrl) throw new Error('signed_url_failed');
         const masterPath = join(workDir, 'master');
-        await downloadToFile(signed.signedUrl, masterPath, sizes.get(job.id) ?? null);
+        const expectedBytes = sizes.get(job.id) ?? null;
+        if (expectedBytes && expectedBytes > MAX_MASTER_BYTES) throw new Error('master_too_large');
+        await downloadMusicStorageObjectToFile({
+          storage_provider: master.storageProvider,
+          storage_bucket: master.storageBucket,
+          storage_path: master.storagePath,
+        }, masterPath, {
+          service,
+          expectedBytes,
+          timeoutMs: 300_000,
+        });
         const duration = master.durationSeconds ?? await probeDuration(masterPath);
         const segments = [];
         for (const segment of plan(duration)) {

@@ -23,6 +23,7 @@ export type ShazamClaimedJob = {
 };
 
 export type ShazamMasterInfo = {
+  storageProvider?: string | null;
   storageBucket: string;
   storagePath: string;
   durationSeconds: number | null;

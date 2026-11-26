@@ -194,7 +194,8 @@ const complete = (calls: Call[]) => calls.filter((c) => c.kind === 'complete');
 {
   // Worst single step between two heartbeats stays far below the 30-minute reclaim window.
   const runtime = read('src/lib/business-track-passports/shazam-runtime.ts');
-  assert.match(runtime, /AbortSignal\.timeout\(300_000\)/, 'download timeout 5 min');
+  assert.match(runtime, /downloadMusicStorageObjectToFile/);
+  assert.match(runtime, /timeoutMs: 300_000/, 'download timeout 5 min');
   assert.match(runtime, /timeout: 180_000/, 'helper timeout 3 min');
   const prepareWorstMs = 300_000 + 60_000 + 3 * 120_000;
   const requestWorstMs = 180_000 + 80_000 + 5_000;
