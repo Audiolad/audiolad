@@ -516,6 +516,11 @@ sudoers: `deploy/sudoers/audiolad-music-storage-bulk` →
 Не включает timers, не выставляет `AUDIOLAD_MUSIC_STORAGE_BULK=1`, не запускает
 cutover / release-local / глобальный upload provider.
 
+**Проверка sbin:** trusted helper проверяет наличие wrapper **без**
+`sudo test` (в sudoers разрешены только фиксированные sbin). Ошибки:
+`privileged_ops_sbin_missing` (файл) vs `privileged_ops_sudo_denied`
+(отказ sudo).
+
 ### Privileged web PM2 logdiag wrapper (Draft only — do not install)
 
 In-repo discovery found **no** existing narrow read-only privilege
