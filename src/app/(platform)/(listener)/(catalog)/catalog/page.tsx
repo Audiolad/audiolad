@@ -4,6 +4,7 @@ import Link from "next/link";
 import { toCatalogPromos } from "@/lib/catalog/catalog-promo";
 import { loadManagedCatalogPromoSafe } from "@/lib/catalog/managed-promo";
 
+import CatalogProductSort from "@/components/catalog/CatalogProductSort";
 import CatalogSectionCards from "@/components/catalog/CatalogSectionCards";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
 import {
@@ -150,6 +151,15 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           class: resolvedListingQuery.class,
           sort: resolvedListingQuery.sort,
         }}
+      />
+
+      <CatalogProductSort
+        query={searchQuery}
+        topic={activeTopicParam}
+        section={activeSection}
+        access={resolvedListingQuery.access}
+        class={resolvedListingQuery.class}
+        sort={resolvedListingQuery.sort}
       />
 
       {isSearchActive ? (

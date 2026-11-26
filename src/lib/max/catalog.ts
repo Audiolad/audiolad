@@ -12,7 +12,12 @@ import {
   CATALOG_LISTING_SEARCH_LIMIT,
   filterCatalogListingItems,
   mapCatalogProductToListingItem,
+  rankCatalogListingCandidates,
 } from "@/lib/catalog/listing";
+import {
+  parseCatalogSort,
+  type CatalogSort,
+} from "@/lib/catalog/listing-contract";
 import {
   normalizeCatalogSearchQuery,
   searchPublishedCatalogProducts,
@@ -46,6 +51,7 @@ export type ListMaxPublishedCatalogInput = {
   topicKey?: string | null;
   access?: CatalogAccessFilter | null;
   class?: CatalogClassFilter | null;
+  sort?: CatalogSort | null;
   getCatalogProducts?: typeof getPublishedCatalogProducts;
   searchCatalogProducts?: typeof searchPublishedCatalogProducts;
   getServiceClient?: typeof createServiceRoleClient;
@@ -106,6 +112,20 @@ export function parseMaxCatalogAccessParam(
   }
 
   return { ok: true, access: normalized as CatalogAccessFilter };
+}
+
+export function parseMaxCatalogSortParam(
+  value: unknown,
+): { ok: true; sort: CatalogSort } | { ok: false } {
+  if (value == null) {
+    return { ok: true, sort: "new" };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  return { ok: true, sort: parseCatalogSort(value) };
 }
 
 export function parseMaxCatalogClassParam(
@@ -191,6 +211,7 @@ async function listMaxPublishedCatalogImpl(
     const topicKey = input.topicKey?.trim() ? input.topicKey.trim() : null;
     const access = input.access ?? "all";
     const publicationClass = input.class ?? "all";
+    const sort = input.sort ?? "new";
     const products = normalizedQuery
       ? await (input.searchCatalogProducts ?? searchPublishedCatalogProducts)(
           service,
@@ -212,26 +233,31 @@ async function listMaxPublishedCatalogImpl(
           },
         );
 
-    const filteredProducts =
-      access === "all" && publicationClass === "all"
-        ? products
-        : (() => {
-            const candidates = products.flatMap((product) => {
-              try {
-                return [mapCatalogProductToListingItem(product)];
-              } catch {
-                return [];
-              }
-            });
-            const allowedIds = new Set(
-              filterCatalogListingItems(candidates, {
-                access,
-                class: publicationClass,
-              }).map((item) => item.publication_id),
-            );
-
-            return products.filter((product) => allowedIds.has(product.id));
-          })();
+    const candidates = products.flatMap((product) => {
+      try {
+        return [mapCatalogProductToListingItem(product)];
+      } catch {
+        return [];
+      }
+    });
+    const filteredCandidates = filterCatalogListingItems(candidates, {
+      access,
+      class: publicationClass,
+    });
+    const ranked = await rankCatalogListingCandidates(
+      service,
+      filteredCandidates,
+      sort,
+    );
+    const allowedOrder = new Map(
+      ranked.map((item, index) => [item.publication_id, index]),
+    );
+    const filteredProducts = products
+      .filter((product) => allowedOrder.has(product.id))
+      .sort(
+        (left, right) =>
+          (allowedOrder.get(left.id) ?? 0) - (allowedOrder.get(right.id) ?? 0),
+      );
 
     return {
       ok: true,

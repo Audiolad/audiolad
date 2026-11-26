@@ -25,7 +25,19 @@ export const CATALOG_CLASS_FILTERS = [
 /** @deprecated Use CATALOG_CLASS_FILTERS. Kept for URL/query aliases. */
 export const CATALOG_KIND_FILTERS = CATALOG_CLASS_FILTERS;
 
-export const CATALOG_SORTS = ["new", "price_asc", "price_desc"] as const;
+export const CATALOG_SORTS = [
+  "new",
+  "popular",
+  "rating",
+  "price_asc",
+  "price_desc",
+] as const;
+
+export const CATALOG_PUBLIC_SORT_OPTIONS = [
+  "new",
+  "popular",
+  "rating",
+] as const;
 
 export type CatalogAccessFilter = (typeof CATALOG_ACCESS_FILTERS)[number];
 export type CatalogClassFilter = (typeof CATALOG_CLASS_FILTERS)[number];
@@ -171,6 +183,52 @@ export function encodeCatalogCursor(
   return `${sortTimestamp}:${id}`;
 }
 
+export type CatalogListingNewCursor = {
+  sort: "new" | "price_asc" | "price_desc";
+  sortTimestamp: number;
+  id: string;
+};
+
+export type CatalogListingPopularCursor = {
+  sort: "popular";
+  popularListenCount: number;
+  sortTimestamp: number;
+  id: string;
+};
+
+export type CatalogListingRatingCursor = {
+  sort: "rating";
+  totalStars: number;
+  sortTimestamp: number;
+  id: string;
+};
+
+export type CatalogListingResolvedCursor =
+  | CatalogListingNewCursor
+  | CatalogListingPopularCursor
+  | CatalogListingRatingCursor;
+
+function parseCatalogListingId(id: string): string | null {
+  const trimmed = id.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export function encodeCatalogPopularCursor(
+  popularListenCount: number,
+  sortTimestamp: number,
+  id: string,
+): string {
+  return `${popularListenCount}:${sortTimestamp}:${id}`;
+}
+
+export function encodeCatalogRatingCursor(
+  totalStars: number,
+  sortTimestamp: number,
+  id: string,
+): string {
+  return `${totalStars}:${sortTimestamp}:${id}`;
+}
+
 export function decodeCatalogCursor(
   cursor: string | null | undefined,
 ): { sortTimestamp: number; id: string } | null {
@@ -194,6 +252,90 @@ export function decodeCatalogCursor(
   }
 
   return { sortTimestamp, id };
+}
+
+export function decodeCatalogPopularCursor(
+  cursor: string | null | undefined,
+): { popularListenCount: number; sortTimestamp: number; id: string } | null {
+  const raw = cursor?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(":");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const popularListenCount = Number(parts[0]);
+  const sortTimestamp = Number(parts[1]);
+  const id = parseCatalogListingId(parts[2] ?? "");
+
+  if (
+    !Number.isInteger(popularListenCount) ||
+    popularListenCount < 0 ||
+    !Number.isFinite(sortTimestamp) ||
+    !id
+  ) {
+    return null;
+  }
+
+  return { popularListenCount, sortTimestamp, id };
+}
+
+export function decodeCatalogRatingCursor(
+  cursor: string | null | undefined,
+): { totalStars: number; sortTimestamp: number; id: string } | null {
+  const raw = cursor?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(":");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const totalStars = Number(parts[0]);
+  const sortTimestamp = Number(parts[1]);
+  const id = parseCatalogListingId(parts[2] ?? "");
+
+  if (
+    !Number.isInteger(totalStars) ||
+    totalStars < 0 ||
+    !Number.isFinite(sortTimestamp) ||
+    !id
+  ) {
+    return null;
+  }
+
+  return { totalStars, sortTimestamp, id };
+}
+
+export function resolveCatalogListingCursor(
+  cursor: string | null | undefined,
+  sort: CatalogSort,
+): CatalogListingResolvedCursor | null {
+  if (sort === "popular") {
+    const popular = decodeCatalogPopularCursor(cursor);
+    return popular ? { sort: "popular", ...popular } : null;
+  }
+
+  if (sort === "rating") {
+    const rating = decodeCatalogRatingCursor(cursor);
+    return rating ? { sort: "rating", ...rating } : null;
+  }
+
+  if (decodeCatalogPopularCursor(cursor) || decodeCatalogRatingCursor(cursor)) {
+    return null;
+  }
+
+  const newest = decodeCatalogCursor(cursor);
+  return newest ? { sort, sortTimestamp: newest.sortTimestamp, id: newest.id } : null;
 }
 
 export function buildCatalogListingApiUrl(

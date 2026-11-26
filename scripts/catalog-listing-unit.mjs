@@ -75,7 +75,9 @@ assert(parseCatalogKindFilter("audio_post") === "post", "legacy kind audio_post 
 assert(parseCatalogKindFilter("program") === "practice", "legacy program -> practice");
 assert(parseCatalogKindFilter("trending") === "all", "unknown kind -> all");
 assert(parseCatalogSort("price_asc") === "price_asc", "sort price_asc");
-assert(parseCatalogSort("popular") === "new", "unknown sort -> new");
+assert(parseCatalogSort("popular") === "popular", "popular sort");
+assert(parseCatalogSort("rating") === "rating", "rating sort");
+assert(parseCatalogSort("trending") === "new", "unknown sort -> new");
 assert(parseCatalogListingLimit("20") === 20, "default page size");
 assert(parseCatalogListingLimit("99") === 50, "limit clamped");
 assert(parseCatalogListingLimit("0") === 1, "limit min 1");

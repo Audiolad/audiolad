@@ -8,6 +8,7 @@ import {
   listMaxPublishedCatalog,
   parseMaxCatalogAccessParam,
   parseMaxCatalogClassParam,
+  parseMaxCatalogSortParam,
   parseMaxCatalogTopicParam,
   type ListMaxPublishedCatalogInput,
 } from "@/lib/max/catalog";
@@ -31,12 +32,16 @@ export function parseVkCatalogBody(
   const publicationClass = parseMaxCatalogClassParam(body.class);
   if (!publicationClass.ok) return { ok: false };
 
+  const sort = parseMaxCatalogSortParam(body.sort);
+  if (!sort.ok) return { ok: false };
+
   const input: ListMaxPublishedCatalogInput = {};
   if (typeof body.query === "string") input.query = body.query;
   if (section.section) input.section = section.section;
   if (topic.topicKey) input.topicKey = topic.topicKey;
   if (access.access !== "all") input.access = access.access;
   if (publicationClass.class !== "all") input.class = publicationClass.class;
+  if (sort.sort !== "new") input.sort = sort.sort;
   return { ok: true, input };
 }
 

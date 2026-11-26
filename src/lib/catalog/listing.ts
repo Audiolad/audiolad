@@ -26,6 +26,9 @@ import {
 import {
   decodeCatalogCursor,
   encodeCatalogCursor,
+  encodeCatalogPopularCursor,
+  encodeCatalogRatingCursor,
+  resolveCatalogListingCursor,
   CATALOG_CLASS_FILTERS,
   type CatalogAccessFilter,
   type CatalogClassFilter,
@@ -65,6 +68,8 @@ export const CATALOG_LISTING_SEARCH_LIMIT = 200;
 
 export type CatalogListingCandidate = CatalogCard & {
   sortTimestamp: number;
+  popularListenCount: number;
+  totalStars: number;
   listingTypes?: CatalogClassFilter[];
 };
 
@@ -109,6 +114,8 @@ export function mapCatalogProductToListingItem(
   return {
     ...card,
     sortTimestamp: product.sortTimestamp,
+    popularListenCount: 0,
+    totalStars: 0,
     listingTypes: CATALOG_CLASS_FILTERS.filter((filter) =>
       matchesCatalogProductType({
         product_kind: product.productKind,
@@ -151,6 +158,39 @@ export function matchesCatalogKindFilter(
   return matchesCatalogClassFilter(item, publicationClass);
 }
 
+export async function rankCatalogListingCandidates(
+  _supabase: SupabaseClient,
+  candidates: CatalogListingCandidate[],
+  sort: CatalogSort,
+): Promise<CatalogListingCandidate[]> {
+  let prepared = candidates;
+
+  if (sort === "popular" || sort === "rating") {
+    try {
+      const { attachCatalogListingSortMetrics, loadCatalogListingSortMetrics } =
+        await import("@/lib/catalog/sort-metrics");
+      const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+      const metricsClient = createServiceRoleClient();
+      const metricsById = await loadCatalogListingSortMetrics(
+        candidates.map((item) => item.publication_id),
+        {
+          popular: sort === "popular",
+          rating: sort === "rating",
+        },
+        metricsClient,
+      );
+      prepared = attachCatalogListingSortMetrics(candidates, metricsById);
+    } catch (error) {
+      console.error(
+        "catalog_listing_sort_metrics_error",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  return sortCatalogListingItems(prepared, sort);
+}
+
 export function filterCatalogListingItems(
   items: CatalogListingCandidate[],
   query: Pick<CatalogListingQuery, "access" | "class">,
@@ -179,6 +219,18 @@ export function sortCatalogListingItems(
   sort: CatalogSort,
 ): CatalogListingCandidate[] {
   return [...items].sort((left, right) => {
+    if (sort === "popular") {
+      if (left.popularListenCount !== right.popularListenCount) {
+        return right.popularListenCount - left.popularListenCount;
+      }
+    }
+
+    if (sort === "rating") {
+      if (left.totalStars !== right.totalStars) {
+        return right.totalStars - left.totalStars;
+      }
+    }
+
     if (sort === "price_asc" || sort === "price_desc") {
       const priceDelta = listingPriceValue(left) - listingPriceValue(right);
 
@@ -210,18 +262,56 @@ function isAfterNewCursor(
   return item.publication_id < cursor.id;
 }
 
+function isAfterPopularCursor(
+  item: CatalogListingCandidate,
+  cursor: { popularListenCount: number; sortTimestamp: number; id: string },
+): boolean {
+  if (item.popularListenCount < cursor.popularListenCount) {
+    return true;
+  }
+
+  if (item.popularListenCount > cursor.popularListenCount) {
+    return false;
+  }
+
+  return isAfterNewCursor(item, cursor);
+}
+
+function isAfterRatingCursor(
+  item: CatalogListingCandidate,
+  cursor: { totalStars: number; sortTimestamp: number; id: string },
+): boolean {
+  if (item.totalStars < cursor.totalStars) {
+    return true;
+  }
+
+  if (item.totalStars > cursor.totalStars) {
+    return false;
+  }
+
+  return isAfterNewCursor(item, cursor);
+}
+
 export function applyCatalogListingCursor(
   items: CatalogListingCandidate[],
   cursor: string | null,
   sort: CatalogSort,
 ): CatalogListingCandidate[] {
-  const decoded = decodeCatalogCursor(cursor);
+  const decoded = resolveCatalogListingCursor(cursor, sort);
 
   if (!decoded) {
     return items;
   }
 
-  if (sort === "new") {
+  if (decoded.sort === "popular") {
+    return items.filter((item) => isAfterPopularCursor(item, decoded));
+  }
+
+  if (decoded.sort === "rating") {
+    return items.filter((item) => isAfterRatingCursor(item, decoded));
+  }
+
+  if (decoded.sort === "new") {
     return items.filter((item) => isAfterNewCursor(item, decoded));
   }
 
@@ -245,12 +335,32 @@ export function paginateCatalogListingItems(
   const lastItem = page[page.length - 1];
   const hasMore = remaining.length > query.limit && Boolean(lastItem);
 
+  let nextCursor: string | null = null;
+
+  if (hasMore && lastItem) {
+    if (query.sort === "popular") {
+      nextCursor = encodeCatalogPopularCursor(
+        lastItem.popularListenCount,
+        lastItem.sortTimestamp,
+        lastItem.publication_id,
+      );
+    } else if (query.sort === "rating") {
+      nextCursor = encodeCatalogRatingCursor(
+        lastItem.totalStars,
+        lastItem.sortTimestamp,
+        lastItem.publication_id,
+      );
+    } else {
+      nextCursor = encodeCatalogCursor(
+        lastItem.sortTimestamp,
+        lastItem.publication_id,
+      );
+    }
+  }
+
   return {
     items: page.map(toPublicListingCard),
-    nextCursor:
-      hasMore && lastItem
-        ? encodeCatalogCursor(lastItem.sortTimestamp, lastItem.publication_id)
-        : null,
+    nextCursor,
   };
 }
 
@@ -366,7 +476,7 @@ export async function listPublishedCatalog(
     }),
     query,
   );
-  const sorted = sortCatalogListingItems(candidates, query.sort);
+  const sorted = await rankCatalogListingCandidates(supabase, candidates, query.sort);
   const page = paginateCatalogListingItems(sorted, query);
   const grantedIds = new Set(viewer.entitledPracticeIds);
 
