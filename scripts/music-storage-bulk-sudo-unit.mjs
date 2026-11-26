@@ -58,7 +58,8 @@ const installRemote = readFileSync(
   join(root, "deploy/scripts/audiolad-music-storage-bulk-install-remote.sh"),
   "utf8",
 );
-assert.match(installRemote, /sudo -n \/usr\/local\/sbin\/audiolad-music-storage-bulk-install/);
+assert.match(installRemote, /exec sudo -n "\$INSTALL"/);
+assert.doesNotMatch(installRemote, /sudo\s+-n\s+test/);
 assert.doesNotMatch(sudoersText, /\/current\/deploy\/scripts/);
 assert.match(
   readFileSync(join(root, "deploy/sbin/audiolad-music-storage-bulk-install"), "utf8"),
@@ -69,8 +70,21 @@ const opsRemote = readFileSync(
   join(root, "deploy/scripts/audiolad-music-storage-bulk-ops-remote.sh"),
   "utf8",
 );
-assert.match(opsRemote, /exec sudo -n "\$SBIN"/);
+assert.doesNotMatch(opsRemote, /sudo\s+-n\s+test/);
+assert.match(opsRemote, /audiolad_music_bulk_deploy_user_can_execute/);
+assert.match(opsRemote, /privileged_ops_sudo_denied/);
 assert.match(opsRemote, /resume/);
+
+const opsRemoteDeployTest = spawnSync(
+  "bash",
+  [join(root, "deploy/scripts/audiolad-music-storage-bulk-ops-remote-deploy-test.sh")],
+  { encoding: "utf8" },
+);
+assert.equal(
+  opsRemoteDeployTest.status,
+  0,
+  `ops-remote deploy-user: ${opsRemoteDeployTest.stderr || opsRemoteDeployTest.stdout}`,
+);
 
 const bootstrapTest = spawnSync(
   "bash",
