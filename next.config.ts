@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
   experimental: {
     // App audio limit 50 MB; multipart overhead needs headroom (matches nginx 55m).
     proxyClientMaxBodySize: "55mb",
+    agentUpgrade: "security",
   },
   async headers() {
     return [
