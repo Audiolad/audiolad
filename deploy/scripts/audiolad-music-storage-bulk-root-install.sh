@@ -54,6 +54,7 @@ install -m 0755 "${SRC}/scripts/audiolad-music-storage-bulk-orchestrator.sh" "${
 install -m 0755 "${SRC}/scripts/audiolad-music-storage-bulk-ctl.sh" "${LIB_DIR}/"
 install -m 0755 "${SRC}/scripts/audiolad-music-storage-bulk-ops-privileged.sh" "${LIB_DIR}/"
 install -m 0755 "${SRC}/scripts/audiolad-music-storage-bulk-enable-copy-env.sh" "${LIB_DIR}/"
+install -m 0755 "${SRC}/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh" "${LIB_DIR}/"
 
 for unit in audiolad-music-storage-bulk-copy \
   audiolad-music-storage-bulk-cutover \

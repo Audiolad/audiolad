@@ -13,6 +13,7 @@ audiolad_music_storage_bulk_validate_release_tree() {
   real="$(readlink -f "$tree")"
   case "$real" in
     "${root}/releases"/*) ;;
+    "${root}/shared/.gha-trusted-deploy/deploy") ;;
     *)
       printf '%s\n' '{"error":"deploy_tree_outside_releases"}' >&2
       return 1

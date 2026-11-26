@@ -8,3 +8,6 @@ deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-star
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-pause ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-stop ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-resume ""
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-diag ""
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance.sh --dry-run ""
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance.sh --apply ""

@@ -549,6 +549,13 @@ main() {
   stop_pm2_app_safe "$OLD_ACTIVE_PM2_APP" "$OLD_ACTIVE_PORT"
   pm2 save
 
+  # Free old release trees before long post-cutover worker ensures (deploy may exit 1 later).
+  rm -f "$RELEASE_DIR/.deploy-inflight"
+  unset CANDIDATE_RELEASE_DIR
+  if ! prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"; then
+    log_warn "post_cutover_release_prune_failed_non_fatal"
+  fi
+
   MUSIC_WORKER_ECOSYSTEM="$RELEASE_DIR/deploy/music-transcode-worker.ecosystem.config.cjs"
   MUSIC_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-music-transcode-worker.sh"
   if [[ ! -f "$MUSIC_WORKER_ECOSYSTEM" ]]; then
@@ -659,9 +666,8 @@ main() {
   # Best effort: a failure is logged and never fails or rolls back the deploy.
   enqueue_article_recrawl "$RELEASE_DIR" "$old_current"
 
-  rm -f "$RELEASE_DIR/.deploy-inflight"
-  unset CANDIDATE_RELEASE_DIR
-  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
+  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}" || \
+    log_warn "final_release_prune_failed_non_fatal"
   SALE_EMAIL_OUTBOX_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-author-sale-email-outbox.sh"
   if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SALE_EMAIL_OUTBOX_ENSURE"; then
     log_error "author_sale_email_outbox_ensure_failed"

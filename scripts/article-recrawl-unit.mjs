@@ -327,8 +327,15 @@ assert.match(fnBody, /NODE_ENV=production timeout -k "\$\{ARTICLE_RECRAWL_KILL_A
 assert.match(fnBody, /log_warn "article_recrawl_enqueue_failed/);
 const call = deploy.indexOf('enqueue_article_recrawl "$RELEASE_DIR" "$old_current"');
 const workerEnsure = deploy.indexOf("search_recrawl_worker_ensure_failed");
-const inflight = deploy.indexOf('rm -f "$RELEASE_DIR/.deploy-inflight"');
-assert.ok(workerEnsure > 0 && call > workerEnsure && inflight > call, "hook order");
+const earlyInflight = deploy.indexOf('rm -f "$RELEASE_DIR/.deploy-inflight"');
+const postCutoverPrune = deploy.indexOf("post_cutover_release_prune_failed_non_fatal");
+assert.ok(
+  earlyInflight > 0
+    && postCutoverPrune > earlyInflight
+    && workerEnsure > postCutoverPrune
+    && call > workerEnsure,
+  "hook order",
+);
 
 // --- deploy.sh function behaviour with a stub tsx: success / failure / timeout / missing
 const fnSource = `${fnBody}\n}\n`;
