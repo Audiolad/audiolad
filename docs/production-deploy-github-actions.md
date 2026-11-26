@@ -486,6 +486,35 @@ DEPLOY_ROOT=/var/www/audiolad-deploy \
 **Ограничение GitHub Environment:** как у `DO_NOT_DEPLOY` — dispatch только с
 branch **`main`**. Ослаблять protection нельзя.
 
+### Music storage bulk orchestrator (OPS_MUSIC_STORAGE_BULK_*)
+
+Trusted helpers с `origin/main` (Contents API): INSTALL →
+`deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`;
+остальные действия → `audiolad-music-storage-bulk-ops-remote.sh`.
+На VPS deploy-пользователь вызывает **только** узкий `sudo -n` на
+`/usr/local/sbin/audiolad-music-storage-bulk-*` (без `audiolad-deploy`, без
+произвольного shell). INSTALL идемпотентен: не меняет mode существующих
+`/etc/audiolad` и `/usr/local/lib/audiolad`.
+
+| confirm | sudo wrapper (argv фиксирован) |
+|---------|--------------------------------|
+| `OPS_MUSIC_STORAGE_BULK_INSTALL` | bootstrap при необходимости, затем `…-install` |
+| `OPS_MUSIC_STORAGE_BULK_STATUS` | `…-ops-status` |
+| `OPS_MUSIC_STORAGE_BULK_START_COPY` | `…-ops-start-copy` |
+| `OPS_MUSIC_STORAGE_BULK_PAUSE` | `…-ops-pause` |
+| `OPS_MUSIC_STORAGE_BULK_RESUME` | `…-ops-resume` |
+| `OPS_MUSIC_STORAGE_BULK_STOP` | `…-ops-stop` |
+
+sudoers: `deploy/sudoers/audiolad-music-storage-bulk` →
+`/etc/sudoers.d/audiolad-music-storage-bulk` (`visudo -cf`). Bootstrap ставится
+из `deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh` (также при
+успешном `deploy.sh`). До первого bootstrap допустим seed через ту же строку
+sudoers на путь
+`/var/www/audiolad-deploy/current/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh`.
+
+Не включает timers, не выставляет `AUDIOLAD_MUSIC_STORAGE_BULK=1`, не запускает
+cutover / release-local / глобальный upload provider.
+
 ### Privileged web PM2 logdiag wrapper (Draft only — do not install)
 
 In-repo discovery found **no** existing narrow read-only privilege

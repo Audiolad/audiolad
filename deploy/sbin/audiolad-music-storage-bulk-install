@@ -1,0 +1,11 @@
+#!/bin/bash
+# Intended install: /usr/local/sbin/audiolad-music-storage-bulk-install
+set -Eeuo pipefail
+if [[ $# -ne 0 ]]; then
+  printf 'ERROR: accepts no arguments.\n' >&2
+  exit 1
+fi
+PATH=/usr/sbin:/usr/bin:/bin
+export PATH
+CURRENT="$(readlink -f /var/www/audiolad-deploy/current)"
+exec "$CURRENT/deploy/scripts/audiolad-music-storage-bulk-root-install.sh"
