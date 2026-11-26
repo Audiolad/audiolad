@@ -17,7 +17,8 @@
 ## Предпосылки
 
 - Пилот copy/cutover/rollback успешен.
-- Миграция `20271126130000_music_storage_source_released.sql` применена (restamp; SQL неизменён).
+- Миграция `20271126130000_music_storage_source_released.sql` применена (restamp
+  после catalog `20271126120000`; SQL неизменён; см. `docs/database-migration-safety.md`).
 - `TIMEWEB_S3_*` в `shared/.env.production`.
 - Резервная копия БД.
 - Диск: при **≥ 88%** copy-пакеты **паузятся** (настраивается), при **≥ 90%** — стоп-фактор.
