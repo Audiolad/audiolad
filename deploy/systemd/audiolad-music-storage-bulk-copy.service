@@ -1,0 +1,16 @@
+[Unit]
+Description=Audiolad music masters bulk migration (copy stage, one batch)
+Documentation=file:/var/www/audiolad/deploy/docs/runbooks/music-masters-bulk-orchestrator.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/audiolad/music-storage-bulk-copy.env
+ExecStart=/usr/local/lib/audiolad/audiolad-music-storage-bulk-orchestrator.sh copy tick
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+SyslogIdentifier=audiolad-music-storage-bulk-copy
+StandardOutput=journal
+StandardError=journal

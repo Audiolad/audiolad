@@ -17,7 +17,7 @@ loadProductionEnvFromCwd();
 async function main() {
   const options = parseBulkMigrationOptions(process.argv.slice(2));
 
-  if (process.argv.includes("--progress-only")) {
+  if (options.progressOnly) {
     const totals = await summarizeBulkProgress(options.stage);
     console.log(JSON.stringify({ progressOnly: true, stage: options.stage, totals }, null, 2));
     return;

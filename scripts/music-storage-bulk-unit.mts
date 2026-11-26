@@ -50,4 +50,8 @@ const defaults = parseBulkMigrationOptions([]);
 assert.equal(defaults.batchSize, 25);
 assert.equal(defaults.concurrency, 1);
 
+const progressOnly = parseBulkMigrationOptions(["--stage", "copy", "--progress-only"]);
+assert.equal(progressOnly.progressOnly, true);
+assert.equal(progressOnly.execute, false);
+
 console.log("music-storage-bulk-unit: ok");

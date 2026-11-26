@@ -22,6 +22,7 @@ export type BulkStage = "copy" | "cutover" | "release-local";
 export type BulkMigrationOptions = {
   stage: BulkStage;
   execute: boolean;
+  progressOnly: boolean;
   batchSize: number;
   concurrency: number;
   maxAttempts: number;
@@ -359,6 +360,7 @@ export async function executeBulkBatch(
 export function parseBulkMigrationOptions(argv: string[]): BulkMigrationOptions {
   let stage: BulkStage = "copy";
   let execute = false;
+  let progressOnly = false;
   let batchSize = 25;
   let concurrency = 1;
   let maxAttempts = 5;
@@ -368,6 +370,7 @@ export function parseBulkMigrationOptions(argv: string[]): BulkMigrationOptions 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--execute") execute = true;
+    else if (argument === "--progress-only") progressOnly = true;
     else if (argument === "--stage") {
       const value = argv[index + 1];
       if (value !== "copy" && value !== "cutover" && value !== "release-local") {
@@ -411,6 +414,7 @@ export function parseBulkMigrationOptions(argv: string[]): BulkMigrationOptions 
   return {
     stage,
     execute,
+    progressOnly,
     batchSize,
     concurrency,
     maxAttempts,
