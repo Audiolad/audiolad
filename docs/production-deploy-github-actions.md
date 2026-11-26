@@ -500,6 +500,7 @@ Trusted helpers с `origin/main` (Contents API): INSTALL →
 |---------|--------------------------------|
 | `OPS_MUSIC_STORAGE_BULK_INSTALL` | bootstrap при необходимости, затем `…-install` |
 | `OPS_MUSIC_STORAGE_BULK_STATUS` | `…-ops-status` |
+| `OPS_MUSIC_STORAGE_BULK_DIAG` | trusted `audiolad-music-storage-bulk-diag-remote.sh` (disk, report, dry-run 25, timer/env; read-only) |
 | `OPS_MUSIC_STORAGE_BULK_START_COPY` | `…-ops-start-copy` |
 | `OPS_MUSIC_STORAGE_BULK_PAUSE` | `…-ops-pause` |
 | `OPS_MUSIC_STORAGE_BULK_RESUME` | `…-ops-resume` |

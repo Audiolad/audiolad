@@ -86,6 +86,7 @@
     "music-storage:pilot": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-masters-storage-pilot.mts",
     "music-storage:bulk": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-masters-storage-bulk.mts",
     "music-storage:report": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-report.mts",
+    "music-storage:preflight": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-bulk-preflight.mts",
     "music-storage:orchestrator": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-bulk-orchestrator.mts",
     "music-storage:cleanup": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-cleanup-retry.mts",
     "test:music-storage": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-provider-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-bulk-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/music-storage-bulk-orchestrator-unit.mts && node scripts/music-storage-deploy-lock-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/load-production-env-unit.mts && node scripts/music-storage-migration-sql-unit.mjs && node scripts/music-storage-orchestrator-deploy-unit.mjs && node scripts/music-storage-bulk-sudo-unit.mjs",

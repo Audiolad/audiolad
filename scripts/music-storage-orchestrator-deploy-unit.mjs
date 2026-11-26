@@ -9,6 +9,8 @@ const runbook = readFileSync(join(root, "docs/runbooks/music-masters-bulk-orches
 
 for (const token of [
   "OPS_MUSIC_STORAGE_BULK_STATUS",
+  "OPS_MUSIC_STORAGE_BULK_DIAG",
+  "audiolad-music-storage-bulk-diag-remote.sh",
   "OPS_MUSIC_STORAGE_BULK_START_COPY",
   "OPS_MUSIC_STORAGE_BULK_PAUSE",
   "OPS_MUSIC_STORAGE_BULK_RESUME",

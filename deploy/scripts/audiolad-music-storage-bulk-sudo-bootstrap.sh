@@ -66,8 +66,10 @@ else
     "${LIB_DIR}/audiolad-music-storage-bulk-root-install.sh"
   install -o root -g root -m 0755 "$BOOTSTRAP_SRC" \
     "${LIB_DIR}/audiolad-music-storage-bulk-sudo-bootstrap-pinned.sh"
-  install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-privileged-common.sh" \
-    "${LIB_DIR}/audiolad-music-storage-bulk-privileged-common.sh"
+install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-privileged-common.sh" \
+  "${LIB_DIR}/audiolad-music-storage-bulk-privileged-common.sh"
+install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-enable-copy-env.sh" \
+  "${LIB_DIR}/audiolad-music-storage-bulk-enable-copy-env.sh"
 fi
 
 for name in \
