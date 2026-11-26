@@ -17,8 +17,10 @@ import {
 } from "@/lib/max/catalog-product";
 import { MAX_CATALOG_PATH } from "@/lib/max/host";
 import MaxCatalogProductCard from "@/components/max/MaxCatalogProductCard";
+import MaxCatalogProductSort from "@/components/max/MaxCatalogProductSort";
 import MaxCatalogSections from "@/components/max/MaxCatalogSections";
 import MaxCatalogTopicsSheet from "@/components/max/MaxCatalogTopicsSheet";
+import type { CatalogPublicSort } from "@/lib/catalog/listing-filters";
 
 /** Matches ordinary catalog URL debounce without importing catalog routing. */
 const MAX_CATALOG_SEARCH_DEBOUNCE_MS = 300;
@@ -126,6 +128,7 @@ function buildMaxCatalogRequestBody(input: {
   topicParam?: string | null;
   access?: CatalogAccessFilter;
   publicationClass?: CatalogClassFilter;
+  sort?: CatalogPublicSort;
 }): string {
   const body: {
     initData: string;
@@ -134,6 +137,7 @@ function buildMaxCatalogRequestBody(input: {
     topic?: string;
     access?: CatalogAccessFilter;
     class?: CatalogClassFilter;
+    sort?: CatalogPublicSort;
   } = { initData: input.initData };
 
   if (input.query) body.query = input.query;
@@ -142,6 +146,9 @@ function buildMaxCatalogRequestBody(input: {
   if (input.access && input.access !== "all") body.access = input.access;
   if (input.publicationClass && input.publicationClass !== "all") {
     body.class = input.publicationClass;
+  }
+  if (input.sort && input.sort !== "new") {
+    body.sort = input.sort;
   }
 
   return JSON.stringify(body);
@@ -161,6 +168,7 @@ export default function MaxCatalogSearch({
     status: "idle",
   });
   const [searchInput, setSearchInput] = useState("");
+  const [catalogSort, setCatalogSort] = useState<CatalogPublicSort>("new");
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const [searchItems, setSearchItems] = useState<MaxCatalogProduct[] | null>(null);
   const [resultQuery, setResultQuery] = useState("");
@@ -182,6 +190,11 @@ export default function MaxCatalogSearch({
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
+  const catalogSortRef = useRef<CatalogPublicSort>("new");
+
+  useEffect(() => {
+    catalogSortRef.current = catalogSort;
+  }, [catalogSort]);
 
   function cancelPendingSearch() {
     if (debounceRef.current !== null) {
@@ -249,6 +262,7 @@ export default function MaxCatalogSearch({
               topic: topicParam,
               access,
               publicationClass,
+              sort: catalogSortRef.current,
             },
             controller.signal,
           );
@@ -284,6 +298,7 @@ export default function MaxCatalogSearch({
             topicParam,
             access,
             publicationClass,
+            sort: catalogSortRef.current,
           }),
           cache: "no-store",
           signal: controller.signal,
@@ -504,7 +519,10 @@ export default function MaxCatalogSearch({
     void (async () => {
       try {
         if (guestTransport) {
-          const guest = await guestTransport.postCatalog({}, controller.signal);
+          const guest = await guestTransport.postCatalog(
+            { sort: catalogSortRef.current },
+            controller.signal,
+          );
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
             return;
           }
@@ -566,7 +584,10 @@ export default function MaxCatalogSearch({
     void (async () => {
       try {
         if (guestTransport) {
-          const guest = await guestTransport.postCatalog({ section }, controller.signal);
+          const guest = await guestTransport.postCatalog(
+            { section, sort: catalogSortRef.current },
+            controller.signal,
+          );
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
             return;
           }
@@ -649,7 +670,13 @@ export default function MaxCatalogSearch({
       try {
         if (guestTransport) {
           const guest = await guestTransport.postCatalog(
-            { section, topic: topicParam, access, publicationClass },
+            {
+              section,
+              topic: topicParam,
+              access,
+              publicationClass,
+              sort: catalogSortRef.current,
+            },
             controller.signal,
           );
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -702,6 +729,7 @@ export default function MaxCatalogSearch({
             topicParam,
             access,
             publicationClass,
+            sort: catalogSortRef.current,
           }),
           cache: "no-store",
           signal: controller.signal,
@@ -795,6 +823,39 @@ export default function MaxCatalogSearch({
     applyFilters([], "all", "all");
   }
 
+  function applyCatalogSort(nextSort: CatalogPublicSort) {
+    if (nextSort === catalogSortRef.current) {
+      return;
+    }
+
+    setCatalogSort(nextSort);
+    catalogSortRef.current = nextSort;
+    sectionCacheRef.current.clear();
+
+    const section = activeSectionRef.current;
+    const normalized = normalizeCatalogSearchQuery(searchInputRef.current);
+    const topicParam = activeTopicParamRef.current;
+    const access = activeAccessRef.current;
+    const publicationClass = activeClassRef.current;
+
+    if (normalized) {
+      beginSearch(normalized, section, topicParam, access, publicationClass);
+      return;
+    }
+
+    if (hasActiveCatalogFilters(topicParam, access, publicationClass)) {
+      loadFilteredCatalog(section, topicParam, access, publicationClass);
+      return;
+    }
+
+    if (section) {
+      loadSectionCatalog(section);
+      return;
+    }
+
+    loadRootCatalog();
+  }
+
   useEffect(() => {
     if (!topicNavigationRequest) return;
     const request = topicNavigationRequest;
@@ -858,7 +919,10 @@ export default function MaxCatalogSearch({
     void (async () => {
       try {
         if (guestTransport) {
-          const guest = await guestTransport.postCatalog({}, controller.signal);
+          const guest = await guestTransport.postCatalog(
+            { sort: catalogSortRef.current },
+            controller.signal,
+          );
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
             return;
           }
@@ -1075,6 +1139,8 @@ export default function MaxCatalogSearch({
         activeSection={activeSection}
         onSelectSection={selectSection}
       />
+
+      <MaxCatalogProductSort sort={catalogSort} onChange={applyCatalogSort} />
 
       {searchStatus === "searching" ? (
         <p className="mt-3 text-sm text-[#6c5d94]">Ищем…</p>

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminAnalyticsBreakdownPanel from "@/components/admin/AdminAnalyticsBreakdownPanel";
 import AdminAnalyticsDefinitions from "@/components/admin/AdminAnalyticsDefinitions";
+import AdminCatalogSortMethodology from "@/components/admin/AdminCatalogSortMethodology";
 import AdminAnalyticsDrilldownDrawer from "@/components/admin/AdminAnalyticsDrilldownDrawer";
 import AdminAnalyticsFilters from "@/components/admin/AdminAnalyticsFilters";
 import AdminAnalyticsFunnelPanel from "@/components/admin/AdminAnalyticsFunnelPanel";
@@ -459,6 +460,7 @@ export default function AdminAnalyticsWorkbench({
       </section>
 
       <AdminAnalyticsDefinitions />
+      <AdminCatalogSortMethodology />
 
       <AdminAnalyticsTimeseriesChart
         points={summary.timeseries.points}

@@ -23,6 +23,7 @@ function catalogBody(query: {
   topic?: string | null;
   access?: string;
   publicationClass?: string;
+  sort?: string;
 }) {
   const body: Record<string, string> = {};
   if (query.query) body.query = query.query;
@@ -31,6 +32,9 @@ function catalogBody(query: {
   if (query.access && query.access !== "all") body.access = query.access;
   if (query.publicationClass && query.publicationClass !== "all") {
     body.class = query.publicationClass;
+  }
+  if (query.sort && query.sort !== "new") {
+    body.sort = query.sort;
   }
   return body;
 }

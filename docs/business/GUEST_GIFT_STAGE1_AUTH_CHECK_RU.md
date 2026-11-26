@@ -114,6 +114,8 @@ Codex-автор работал без npm/node_modules. Перед коммит
 
 **202704 music masters storage (PR #1341):** миграция `20270411120000_music_master_storage_providers.sql` добавляет только service-only таблицы (`REVOKE` для `anon`/`authenticated`) и один новый `GRANT EXECUTE … TO service_role` для `record_music_storage_metric`. Поверхность для anonymous/authenticated не расширяется; snapshot `anonymous-rls-audit` обновляется явно при review.
 
+**202711 catalog qualified listens (PR #1344):** миграция `20271126120000_catalog_listing_qualified_listen_counts.sql` — только `GRANT EXECUTE … TO service_role` для `catalog_practice_qualified_listen_counts`; `anon`/`authenticated` без доступа. Snapshot обновлён при review.
+
 Не проверены: версия и настройки self-hosted GoTrue/Auth, фактическое включение hook, anonymous sign-ins, точный payload anonymous webhook, его повторные доставки, реальный профиль/ограничения установленной БД, шифрование/refresh Business-сессии, адаптеры внешнего входа VK/MAX. Последние относятся к последующим отдельным работам и не объявлены готовыми этим PR.
 
 ## Human Gate и живая проверка

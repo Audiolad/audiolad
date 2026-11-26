@@ -36,6 +36,7 @@ assert.match(
   /CatalogSectionCards/,
   "catalog page mounts public section cards",
 );
+assert.match(page, /CatalogProductSort/, "catalog page mounts product sort chips");
 const sectionCards = read("src/components/catalog/CatalogSectionCards.tsx");
 assert.match(
   sectionCards,

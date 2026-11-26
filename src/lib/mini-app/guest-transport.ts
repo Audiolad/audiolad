@@ -7,6 +7,7 @@ export type MiniAppCatalogListQuery = {
   topic?: string | null;
   access?: string;
   publicationClass?: string;
+  sort?: string;
 };
 
 export type MiniAppPlaybackAudioResult =

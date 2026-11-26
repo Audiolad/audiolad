@@ -8,6 +8,7 @@ import {
   listMaxPublishedCatalog,
   parseMaxCatalogAccessParam,
   parseMaxCatalogClassParam,
+  parseMaxCatalogSortParam,
   parseMaxCatalogTopicParam,
 } from "@/lib/max/catalog";
 import { isMaxHostname } from "@/lib/max/host";
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
     topic?: unknown;
     access?: unknown;
     class?: unknown;
+    sort?: unknown;
   };
   const initData = body.initData;
   if (typeof initData !== "string") {
@@ -181,12 +183,18 @@ export async function POST(request: Request) {
     return errorResponse("invalid_request", 400);
   }
 
+  const sort = parseMaxCatalogSortParam(body.sort);
+  if (!sort.ok) {
+    return errorResponse("invalid_request", 400);
+  }
+
   const catalogInput: {
     query?: string;
     section?: PublicCatalogSection;
     topicKey?: string;
     access?: typeof access.access;
     class?: typeof publicationClass.class;
+    sort?: typeof sort.sort;
   } = {};
   if (typeof body.query === "string") {
     catalogInput.query = body.query;
@@ -202,6 +210,9 @@ export async function POST(request: Request) {
   }
   if (publicationClass.class !== "all") {
     catalogInput.class = publicationClass.class;
+  }
+  if (sort.sort !== "new") {
+    catalogInput.sort = sort.sort;
   }
 
   const catalog = await listMaxPublishedCatalog(catalogInput);
