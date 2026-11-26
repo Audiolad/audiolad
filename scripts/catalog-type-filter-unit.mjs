@@ -115,7 +115,11 @@ const products = read("../src/lib/products/catalog.ts");
 assert.equal((listing.match(/catalogType: query.class/g) ?? []).length, 2, "listing and search receive the type");
 assert.equal((search.match(/query = query.or\(typeFilter\)/g) ?? []).length, 2, "field and author search filter before limit");
 assert.match(products, /query = query.or\(typeFilter\)/, "ordinary catalog filters in query");
-assert.match(listing, /const candidates = filterCatalogListingItems\([\s\S]*const sorted = sortCatalogListingItems\([\s\S]*const page = paginateCatalogListingItems\(/, "filter before pagination");
+assert.match(
+  listing,
+  /const candidates = filterCatalogListingItems\([\s\S]*const sorted = await rankCatalogListingCandidates\([\s\S]*const page = paginateCatalogListingItems\(/,
+  "filter before pagination",
+);
 assert.match(read("../src/lib/catalog/catalog-filter-ui.ts"), /value: "stories", label: "Истории"/);
 assert.match(read("../src/lib/catalog/catalog-filter-ui.ts"), /value: "course", label: "Курсы" },\s*\{ value: "education", label: "Обучение"/);
 console.log("catalog-type-filter-unit: ok");

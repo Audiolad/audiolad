@@ -1,6 +1,16 @@
-export const CATALOG_SORT_METHODOLOGY_VERSION = "2026-11-26.1" as const;
+import {
+  PLAYBACK_USAGE_METERING_MIGRATION_ID,
+  PLAYBACK_USAGE_PRODUCTION_FIRST_FACTS_REFERENCE_ISO,
+} from "@/lib/catalog/sort-constants";
+
+export const CATALOG_SORT_METHODOLOGY_VERSION = "2026-11-26.2" as const;
 
 export const CATALOG_SORT_METHODOLOGY_CHANGELOG = [
+  {
+    version: "2026-11-26.2",
+    summary:
+      "Популярность: бакет session_id для альбома; даты учёта и деплой-док.",
+  },
   {
     version: "2026-11-26.1",
     summary:
@@ -17,7 +27,7 @@ export const CATALOG_SORT_METHODOLOGY_SECTIONS = [
   {
     title: "Популярные",
     body:
-      "Сортировка по числу реальных прослушиваний за всё измеряемое время. Одно прослушивание — одна сессия listening_key по продукту (practice_id), в которой сумма server-accepted listened_ms из playback_usage_facts строго больше 60 секунд. Ровно 60 секунд не считается. Пауза и продолжение в той же сессии — одно прослушивание. Новая сессия >60 с считается отдельно. Seek/scrub не добавляет «лишних» прослушиваний: засчитывается только принятый MEDIA-TIME. Альбом: непрерывная сессия альбома — одно прослушивание продукта, без умножения на число треков. Радио и автоплей: прослушивание засчитывается продукту трека, если в его сессии >60 с; соседние треки того же альбома в одной сессии не дублируют продукт. Учитываются гости и авторизованные. При равной популярности — сначала более новые продукты.",
+      "Сортировка по числу реальных прослушиваний за всё измеряемое время. Одно прослушивание — одна группа (practice_id + coalesce(session_id, listening_key)), в которой сумма server-accepted listened_ms из playback_usage_facts строго больше 60 секунд. Ровно 60 секунд не считается. listening_key сменяется при смене трека; в альбоме analytics session_id держит один продуктовый зачёт. Радио и автоплей: у каждого practice_id свой счётчик; при общей session_id оба продукта могут получить по одному зачёту, если каждый набрал >60 с. Учитываются гости и авторизованные. При равной популярности — сначала более новые продукты.",
   },
   {
     title: "По рейтингу",
@@ -27,7 +37,7 @@ export const CATALOG_SORT_METHODOLOGY_SECTIONS = [
   {
     title: "Исторические данные",
     body:
-      "Популярность опирается на playback_usage_facts не раньше listening_time_valid_from (миграция 20261127120000). До этой отметки прослушивания в метрику популярности не входят: это не ноль, а отсутствие данных. Backfill не выполнялся. Рейтинг использует все активные оценки в базе на момент расчёта.",
+      `Популярность опирается на playback_usage_facts не раньше listening_time_valid_from из playback_usage_settings (выставляется миграцией ${PLAYBACK_USAGE_METERING_MIGRATION_ID} при применении в окружении). Эталон первых фактов на проде по аудиту — не ранее ${PLAYBACK_USAGE_PRODUCTION_FIRST_FACTS_REFERENCE_ISO}; это не заменяет listening_time_valid_from. Backfill нет. Рейтинг — все активные practice_ratings на момент запроса.`,
   },
   {
     title: "Поддержка и авторам",

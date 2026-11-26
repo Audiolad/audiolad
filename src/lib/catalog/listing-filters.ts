@@ -1,6 +1,11 @@
-import { parseCatalogListingQuery } from "@/lib/catalog/listing-contract";
+import {
+  CATALOG_PUBLIC_SORT_OPTIONS,
+  parseCatalogListingQuery,
+} from "@/lib/catalog/listing-contract";
 
 export type CatalogPublicSort = (typeof CATALOG_PUBLIC_SORT_OPTIONS)[number];
+
+export { CATALOG_PUBLIC_SORT_OPTIONS };
 
 export const CATALOG_PRODUCT_SORT_OPTIONS = [
   { value: "new", label: "Новые" },
