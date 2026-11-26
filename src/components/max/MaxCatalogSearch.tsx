@@ -544,7 +544,10 @@ export default function MaxCatalogSearch({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData }),
+          body: buildMaxCatalogRequestBody({
+            initData,
+            sort: catalogSortRef.current,
+          }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -613,7 +616,11 @@ export default function MaxCatalogSearch({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData, section }),
+          body: buildMaxCatalogRequestBody({
+            initData,
+            section,
+            sort: catalogSortRef.current,
+          }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -939,7 +946,10 @@ export default function MaxCatalogSearch({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData }),
+          body: buildMaxCatalogRequestBody({
+            initData,
+            sort: catalogSortRef.current,
+          }),
           cache: "no-store",
           signal: controller.signal,
         });
