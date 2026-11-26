@@ -392,6 +392,45 @@ function toPublicListingCard(item: CatalogListingCandidate): CatalogCard {
   };
 }
 
+export async function loadCatalogListingPublicMetricsById(
+  publicationIds: readonly string[],
+  client: SupabaseClient,
+): Promise<Map<string, ReturnType<typeof buildCatalogPublicMetrics>>> {
+  if (publicationIds.length === 0) {
+    return new Map();
+  }
+
+  try {
+    const { loadCatalogListingSortMetrics } = await import("@/lib/catalog/sort-metrics");
+    const metricsById = await loadCatalogListingSortMetrics(
+      [...publicationIds],
+      { popular: true, rating: true },
+      client,
+    );
+
+    return new Map(
+      publicationIds.map((publicationId) => {
+        const metrics = metricsById.get(publicationId);
+        return [
+          publicationId,
+          metrics
+            ? buildCatalogPublicMetrics(
+                metrics.popularListenCount,
+                metrics.totalStars,
+              )
+            : EMPTY_CATALOG_PUBLIC_METRICS,
+        ];
+      }),
+    );
+  } catch (error) {
+    console.error(
+      "catalog_listing_public_metrics_error",
+      error instanceof Error ? error.message : error,
+    );
+    return new Map();
+  }
+}
+
 function mergeListingPublicMetricsFromCandidates(
   page: CatalogListingResult,
   sortedCandidates: readonly CatalogListingCandidate[],
@@ -427,37 +466,23 @@ export async function attachPublicMetricsToListingResult(
     return page;
   }
 
-  try {
-    const { loadCatalogListingSortMetrics } = await import("@/lib/catalog/sort-metrics");
-    const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
-    const metricsById = await loadCatalogListingSortMetrics(
-      publicationIds,
-      { popular: true, rating: true },
-      createServiceRoleClient(),
-    );
-
-    return {
-      ...page,
-      items: page.items.map((item) => {
-        const metrics = metricsById.get(item.publication_id);
-        return {
-          ...item,
-          public_metrics: metrics
-            ? buildCatalogPublicMetrics(
-                metrics.popularListenCount,
-                metrics.totalStars,
-              )
-            : EMPTY_CATALOG_PUBLIC_METRICS,
-        };
-      }),
-    };
-  } catch (error) {
-    console.error(
-      "catalog_listing_public_metrics_error",
-      error instanceof Error ? error.message : error,
-    );
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const metricsById = await loadCatalogListingPublicMetricsById(
+    publicationIds,
+    createServiceRoleClient(),
+  );
+  if (metricsById.size === 0) {
     return page;
   }
+
+  return {
+    ...page,
+    items: page.items.map((item) => ({
+      ...item,
+      public_metrics:
+        metricsById.get(item.publication_id) ?? item.public_metrics,
+    })),
+  };
 }
 
 export function applyCatalogListingSavedState(

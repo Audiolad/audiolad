@@ -9,11 +9,14 @@ import {
   type CatalogClassFilter,
 } from "@/lib/catalog/listing-contract";
 import { buildCatalogPublicMetrics } from "@/lib/catalog/public-metrics";
+import type { CatalogPublicMetrics } from "@/lib/catalog/public-metrics";
 import {
   CATALOG_LISTING_SEARCH_LIMIT,
   filterCatalogListingItems,
+  loadCatalogListingPublicMetricsById,
   mapCatalogProductToListingItem,
   rankCatalogListingCandidates,
+  type CatalogListingCandidate,
 } from "@/lib/catalog/listing";
 import {
   parseCatalogSort,
@@ -38,6 +41,8 @@ import type {
   MaxCatalogGallerySlide,
   MaxCatalogProduct,
 } from "@/lib/max/catalog-product";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type { MaxCatalogProduct };
@@ -56,6 +61,15 @@ export type ListMaxPublishedCatalogInput = {
   getCatalogProducts?: typeof getPublishedCatalogProducts;
   searchCatalogProducts?: typeof searchPublishedCatalogProducts;
   getServiceClient?: typeof createServiceRoleClient;
+  loadListingPublicMetricsById?: (
+    publicationIds: readonly string[],
+    client: SupabaseClient,
+  ) => Promise<Map<string, CatalogPublicMetrics>>;
+  rankCatalogListingCandidates?: (
+    client: SupabaseClient,
+    candidates: CatalogListingCandidate[],
+    sort: CatalogSort,
+  ) => Promise<CatalogListingCandidate[]>;
 };
 
 export function parseMaxCatalogTopicParam(
@@ -265,11 +279,9 @@ async function listMaxPublishedCatalogImpl(
       access,
       class: publicationClass,
     });
-    const ranked = await rankCatalogListingCandidates(
-      service,
-      filteredCandidates,
-      sort,
-    );
+    const rankCandidates =
+      input.rankCatalogListingCandidates ?? rankCatalogListingCandidates;
+    const ranked = await rankCandidates(service, filteredCandidates, sort);
     const allowedOrder = new Map(
       ranked.map((item, index) => [item.publication_id, index]),
     );
@@ -280,14 +292,30 @@ async function listMaxPublishedCatalogImpl(
           (allowedOrder.get(left.id) ?? 0) - (allowedOrder.get(right.id) ?? 0),
       );
 
-    const rankedMetrics = new Map(
+    let metricsById = new Map(
       ranked.map((item) => [
         item.publication_id,
         buildCatalogPublicMetrics(item.popularListenCount, item.totalStars),
       ]),
     );
 
-    const metricsById = rankedMetrics;
+    if (sort === "new") {
+      const publicationIds = ranked.map((item) => item.publication_id);
+      const loadMetrics =
+        input.loadListingPublicMetricsById ??
+        loadCatalogListingPublicMetricsById;
+      const loaded = await loadMetrics(publicationIds, service);
+      if (loaded.size > 0) {
+        metricsById = new Map(
+          publicationIds.map((publicationId) => [
+            publicationId,
+            loaded.get(publicationId) ??
+              metricsById.get(publicationId) ??
+              buildCatalogPublicMetrics(0, 0),
+          ]),
+        );
+      }
+    }
 
     return {
       ok: true,
