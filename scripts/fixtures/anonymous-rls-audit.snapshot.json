@@ -6799,6 +6799,11 @@
       "file": "supabase/migrations/20270411120000_music_master_storage_providers.sql",
       "kind": "execute",
       "statement": "GRANT EXECUTE ON FUNCTION public.record_music_storage_metric(text, text, text, bigint) TO service_role;"
+    },
+    {
+      "file": "supabase/migrations/20271126120000_catalog_listing_qualified_listen_counts.sql",
+      "kind": "execute",
+      "statement": "GRANT EXECUTE ON FUNCTION public.catalog_practice_qualified_listen_counts(uuid[]) TO service_role;"
     }
   ]
 }
