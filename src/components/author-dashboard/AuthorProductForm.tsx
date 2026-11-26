@@ -26,6 +26,7 @@ import JazzRelaxMusicPassportPanel, {
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
+import MusicAlbumBulkTrackTitlesPanel from "@/components/author-dashboard/product-form-sections/MusicAlbumBulkTrackTitlesPanel";
 import { applyNextStepProductSelection } from "@/lib/products/next-step-product-options";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
@@ -234,6 +235,13 @@ import {
   musicDraftMayDeleteLastTrack,
   resolveAlbumTrackTitle,
 } from "@/lib/author-products/music-album-batch";
+import {
+  applyBulkTrackTitlesToItems,
+  formatBulkTrackTitlesSuccessMessage,
+  isMusicAlbumBulkTrackTitlesEnabled,
+  restoreBulkTrackTitlesFromSnapshot,
+  snapshotBulkTrackTitles,
+} from "@/lib/author-products/music-album-bulk-track-titles";
 import {
   appendCreatedAudioItem,
   applyMusicAudioItemDeletion,
@@ -1076,6 +1084,11 @@ export default function AuthorProductForm({
   const [musicQueue, setMusicQueue] = useState<MusicQueueSnapshot>(emptyMusicQueue);
   const [albumDropActive, setAlbumDropActive] = useState(false);
   const [albumBatchNotice, setAlbumBatchNotice] = useState<string | null>(null);
+  const [bulkTrackTitlesUndoSnapshot, setBulkTrackTitlesUndoSnapshot] = useState<
+    Record<string, string> | null
+  >(null);
+  const [bulkTrackTitlesSuccessMessage, setBulkTrackTitlesSuccessMessage] =
+    useState<string | null>(null);
   const [albumBatchProgress, setAlbumBatchProgress] = useState<{
     created: number;
     total: number;
@@ -1498,6 +1511,11 @@ export default function AuthorProductForm({
   );
   const closedCatalogOnly = isClosedCatalogOnlyAuthor(selectedAuthor?.closedCatalogOnly);
   const hideOpenCatalogFields = shouldHideOpenCatalogAlbumFields(closedCatalogOnly);
+  const showBulkTrackTitlesPanel = isMusicAlbumBulkTrackTitlesEnabled({
+    productKind: form.productKind,
+    scope: "closed",
+    closedCatalogOnly,
+  });
   const visibleWizardSteps = visibleProductWizardSteps(closedCatalogOnly);
   const lastWizardStep = lastVisibleProductWizardStep(closedCatalogOnly);
   const wizardStep = clampProductWizardStep(wizardStepRaw, closedCatalogOnly);
@@ -3325,6 +3343,52 @@ export default function AuthorProductForm({
         ),
       );
     }
+  }
+
+  function applyBulkTrackTitles(names: string[]) {
+    if (names.length === 0 || audioItems.length === 0) {
+      return;
+    }
+    const appliedIds = audioItems
+      .slice(0, Math.min(audioItems.length, names.length))
+      .map((item) => item.id);
+    setBulkTrackTitlesUndoSnapshot(snapshotBulkTrackTitles(audioItems));
+    const { items, appliedCount } = applyBulkTrackTitlesToItems(
+      audioItems,
+      names,
+    );
+    setAudioItems(items);
+    setAudioFieldErrors((current) => {
+      const next = { ...current };
+      for (const audioId of appliedIds) {
+        if (!next[audioId]) {
+          continue;
+        }
+        next[audioId] = { ...next[audioId], title: undefined };
+      }
+      return next;
+    });
+    setAudioTitleNotices((current) => {
+      const next = { ...current };
+      for (const audioId of appliedIds) {
+        delete next[audioId];
+      }
+      return next;
+    });
+    setBulkTrackTitlesSuccessMessage(
+      formatBulkTrackTitlesSuccessMessage(appliedCount),
+    );
+  }
+
+  function undoBulkTrackTitles() {
+    if (!bulkTrackTitlesUndoSnapshot) {
+      return;
+    }
+    setAudioItems((current) =>
+      restoreBulkTrackTitlesFromSnapshot(current, bulkTrackTitlesUndoSnapshot),
+    );
+    setBulkTrackTitlesUndoSnapshot(null);
+    setBulkTrackTitlesSuccessMessage(null);
   }
 
   function commitMusicQueue(next: MusicQueueSnapshot) {
@@ -5827,6 +5891,22 @@ export default function AuthorProductForm({
               <p className="mt-3 text-sm text-[#9b3d3d]">{albumBatchNotice}</p>
             ) : null}
           </div>
+        ) : null}
+
+        {showBulkTrackTitlesPanel ? (
+          <MusicAlbumBulkTrackTitlesPanel
+            trackCount={audioItems.length}
+            disabled={
+              busy ||
+              reorderBusy ||
+              !canEditPublicFields ||
+              Boolean(albumBatchProgress)
+            }
+            canUndo={bulkTrackTitlesUndoSnapshot !== null}
+            successMessage={bulkTrackTitlesSuccessMessage}
+            onApply={applyBulkTrackTitles}
+            onUndo={undoBulkTrackTitles}
+          />
         ) : null}
 
         <div className="space-y-4">

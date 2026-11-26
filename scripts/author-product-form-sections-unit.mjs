@@ -16,6 +16,7 @@ const sectionFiles = {
   listeningNotice: `${sectionsDir}/AuthorProductListeningNoticeSection.tsx`,
   postListenPromo: `${sectionsDir}/AuthorProductPostListenPromoSection.tsx`,
   actions: `${sectionsDir}/AuthorProductFormActions.tsx`,
+  bulkTrackTitles: `${sectionsDir}/MusicAlbumBulkTrackTitlesPanel.tsx`,
 };
 
 for (const rel of Object.values(sectionFiles)) {
@@ -42,11 +43,16 @@ assert.match(
   form,
   /from "@\/components\/author-dashboard\/product-form-sections\/AuthorProductFormActions"/,
 );
+assert.match(
+  form,
+  /from "@\/components\/author-dashboard\/product-form-sections\/MusicAlbumBulkTrackTitlesPanel"/,
+);
 
 assert.match(form, /<AuthorProductFormStatusNotices/);
 assert.match(form, /<AuthorProductListeningNoticeSection/);
 assert.match(form, /<AuthorProductPostListenPromoSection/);
 assert.match(form, /<AuthorProductFormActions/);
+assert.match(form, /<MusicAlbumBulkTrackTitlesPanel/);
 assert.match(form, /AuthorProductCharCounter as CharCounter/);
 
 const listening = read(sectionFiles.listeningNotice);
