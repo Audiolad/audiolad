@@ -500,7 +500,8 @@ hybrid-storage layer without changing existing file locations:
   requires a previously recorded unchanged hash.
 - `music_storage_copies` is the service-only idempotency and verification
   ledger for shadow copy, cutover and rollback. It does not authorize deletion
-  of the local source.
+  of the local source. `source_released_at` records when the Supabase master
+  duplicate was removed after cutover (migration `20270412120000`).
 - `music_storage_cleanup_jobs` durably records both providers before a track
   teardown. `pending` objects can be retried after a transient delete failure;
   `blocked` objects are never auto-deleted until teardown is confirmed.
