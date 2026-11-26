@@ -7,9 +7,10 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { CATALOG_QUALIFIED_LISTEN_THRESHOLD_MS } from "../src/lib/catalog/sort-constants.ts";
 import {
   countQualifiedListenSessions,
-  CATALOG_QUALIFIED_LISTEN_MIN_MS,
+  isCatalogQualifiedListenSessionMs,
 } from "../src/lib/catalog/sort-metrics-pure.ts";
 import {
   decodeCatalogPopularCursor,
@@ -61,22 +62,25 @@ function candidate(overrides = {}) {
   };
 }
 
-assert.equal(CATALOG_QUALIFIED_LISTEN_MIN_MS, 60_001);
+assert.equal(CATALOG_QUALIFIED_LISTEN_THRESHOLD_MS, 40_000);
+assert.equal(isCatalogQualifiedListenSessionMs(39_999), false);
+assert.equal(isCatalogQualifiedListenSessionMs(40_000), true);
+assert.equal(isCatalogQualifiedListenSessionMs(41_000), true);
 
 assert.equal(
-  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 59_000 }]),
+  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 39_000 }]),
   0,
-  "59s is not qualified",
+  "39s is not qualified",
 );
 assert.equal(
-  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 60_000 }]),
-  0,
-  "exactly 60s is not qualified",
-);
-assert.equal(
-  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 60_001 }]),
+  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 40_000 }]),
   1,
-  "61ms over threshold qualifies",
+  "exactly 40s qualifies",
+);
+assert.equal(
+  countQualifiedListenSessions([{ listeningKey: "a", listenedMs: 41_000 }]),
+  1,
+  "41s qualifies",
 );
 
 assert.equal(
@@ -140,10 +144,11 @@ assert.deepEqual(decodeCatalogRatingCursor(ratingCursor)?.totalStars, 12);
 assert.deepEqual(decodeCatalogPopularCursor(popularCursor)?.popularListenCount, 5);
 
 const migration = readFileSync(
-  join(root, "supabase/migrations/20271126120000_catalog_listing_qualified_listen_counts.sql"),
+  join(root, "supabase/migrations/20271126140000_catalog_qualified_listen_40s_threshold.sql"),
   "utf8",
 );
-assert.match(migration, /session_ms > 60000/, "SQL uses strictly > 60000");
+assert.match(migration, /session_ms >= 40000/, "SQL uses >= 40000 inclusive");
+assert.match(migration, /usage_kind = 'consumer'/, "SQL excludes coffee venue facts");
 
 const page = readFileSync(
   join(root, "src/app/(platform)/(listener)/(catalog)/catalog/page.tsx"),

@@ -19,9 +19,10 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = readFileSync(
-  join(root, "supabase/migrations/20271126120000_catalog_listing_qualified_listen_counts.sql"),
+  join(root, "supabase/migrations/20271126140000_catalog_qualified_listen_40s_threshold.sql"),
   "utf8",
 );
+assert.match(migration, /session_ms >= 40000/, "SQL threshold 40s inclusive");
 
 const startedAt = 1_700_000_000_000;
 const practiceAlbum = "practice-album";
@@ -91,13 +92,13 @@ assert.equal(
       practiceId: practiceAlbum,
       sessionId: null,
       listeningKey: track1Key,
-      listenedMs: 30_000,
+      listenedMs: 19_000,
     },
     {
       practiceId: practiceAlbum,
       sessionId: null,
       listeningKey: track2Key,
-      listenedMs: 30_000,
+      listenedMs: 19_000,
     },
   ]).get(practiceAlbum) ?? 0,
   0,
@@ -120,7 +121,7 @@ assert.equal(
     },
   ]).get(practiceAlbum),
   2,
-  "without session_id each track >60s counts separately",
+  "without session_id each track >=40s counts separately",
 );
 
 const radioAutoplay = countQualifiedListenSessionsByPractice([

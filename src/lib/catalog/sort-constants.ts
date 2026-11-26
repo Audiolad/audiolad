@@ -13,4 +13,11 @@ export const PLAYBACK_USAGE_METERING_MIGRATION_ID =
 export const PLAYBACK_USAGE_PRODUCTION_FIRST_FACTS_REFERENCE_ISO =
   "2026-09-26T00:00:00.000Z" as const;
 
-export const CATALOG_QUALIFIED_LISTEN_THRESHOLD_MS = 60_000 as const;
+/** Inclusive minimum MEDIA-TIME per bucket for public catalog popularity. */
+export const CATALOG_QUALIFIED_LISTEN_THRESHOLD_MS = 40_000 as const;
+
+/**
+ * Public audiolad.ru listener stack writes `playback_usage_facts.usage_kind = consumer`.
+ * coffee.audiolad.ru venue player writes `usage_kind = business` (no hostname on facts).
+ */
+export const PUBLIC_CATALOG_PLAYBACK_USAGE_KIND = "consumer" as const;

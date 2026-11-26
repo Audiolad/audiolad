@@ -2,7 +2,7 @@
 
 ## 1. Миграция БД
 
-1. Применить `supabase/migrations/20271126120000_catalog_listing_qualified_listen_counts.sql` на production **до** или **вместе с** выкладкой кода, который вызывает RPC `catalog_practice_qualified_listen_counts`.
+1. Применить `supabase/migrations/20271126140000_catalog_qualified_listen_40s_threshold.sql` на production **до** или **вместе с** выкладкой кода с порогом 40 с. (Предшественник: `20271126120000_catalog_listing_qualified_listen_counts.sql` — >60 с.)
 2. Убедиться, что `playback_usage_settings.listening_time_valid_from` уже задан миграцией `20261127120000_playback_usage_facts.sql` (в каждом окружении — своё значение `now()` на момент применения).
 3. Без RPC сортировка «Популярные» деградирует: метрики останутся нулевыми, ошибка логируется как `catalog_listing_sort_metrics_error`.
 
@@ -22,7 +22,7 @@
 
 ## 4. Методика и граница учёта
 
-См. [CATALOG_SORT_METHODOLOGY.md](./CATALOG_SORT_METHODOLOGY.md) — порог 60 с, `session_id` для альбома.
+См. [CATALOG_SORT_METHODOLOGY.md](./CATALOG_SORT_METHODOLOGY.md) — порог 40 с (включительно), `session_id` для альбома.
 
 **Авторитетная граница популярности:** `playback_usage_settings.listening_time_valid_from` — `now()` при применении `20261127120000_playback_usage_facts.sql` в **данном** окружении (на проде это дата деплоя metering, не константа в коде).
 
@@ -45,4 +45,4 @@
 | 2 | Популярные | Продукт с известными длинными прослушиваниями выше нулевых; нет пустой сетки. |
 | 3 | По рейтингу | Продукт с большей суммой звёзд выше; при равенстве — новее публикация. |
 | 4 | Пагинация | «Вперёд» на popular/rating сохраняет `sort` в URL. |
-| 5 | Админ | Методика совпадает с `CATALOG_SORT_METHODOLOGY.md` (60 с, session_id, даты). |
+| 5 | Админ | Методика совпадает с `CATALOG_SORT_METHODOLOGY.md` (40 с, session_id, даты). |
