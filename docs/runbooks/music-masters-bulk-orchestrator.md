@@ -37,11 +37,22 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 ## Однократная установка
 
 **GitHub Actions (рекомендуется):** Production Deploy → `main` →
-`confirm=OPS_MUSIC_STORAGE_BULK_INSTALL` (скрипты в `/usr/local/lib/audiolad/`,
-units в `/etc/systemd/system/`, примеры env в `/etc/audiolad/`; **без**
-`AUDIOLAD_MUSIC_STORAGE_BULK=1`, **без** enable timer).
+`confirm=OPS_MUSIC_STORAGE_BULK_INSTALL`. Trusted helper с `main` через SSH
+вызывает узкий `sudo -n` (`/usr/local/sbin/audiolad-music-storage-bulk-*`):
+скрипты в `/usr/local/lib/audiolad/`, units в `/etc/systemd/system/`,
+примеры env в `/etc/audiolad/`; **без** `AUDIOLAD_MUSIC_STORAGE_BULK=1`,
+**без** enable timer. Существующие каталоги `/etc/audiolad` и
+`/usr/local/lib/audiolad` не перечмариваются.
 
-**Вручную (VPS):** `bash deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`
+Сначала **Production DEPLOY** с merge SHA (bootstrap sudoers + sbin как root в
+`deploy.sh`), затем `OPS_MUSIC_STORAGE_BULK_INSTALL`. Без DEPLOY INSTALL вернёт
+`run_production_DEPLOY_once_then_retry_OPS_INSTALL`.
+
+**Вручную (deploy-пользователь на VPS):**  
+`bash deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`
+
+**Узкий sudo (справочно):** `deploy/sudoers/audiolad-music-storage-bulk` →
+`/etc/sudoers.d/audiolad-music-storage-bulk`, `visudo -cf` обязателен.
 
 Добавить `AUDIOLAD_MUSIC_STORAGE_BULK=1` в `/etc/audiolad/music-storage-bulk-copy.env`
 **только после approval** на автоматический copy.

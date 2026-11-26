@@ -65,6 +65,7 @@ on:
           - OPS_MUSIC_STORAGE_BULK_INSTALL
           - OPS_MUSIC_STORAGE_BULK_START_COPY
           - OPS_MUSIC_STORAGE_BULK_PAUSE
+          - OPS_MUSIC_STORAGE_BULK_RESUME
           - OPS_MUSIC_STORAGE_BULK_STOP
           - DEPLOY
 
@@ -4546,6 +4547,7 @@ jobs:
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_INSTALL' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_START_COPY' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_PAUSE' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_RESUME' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STOP'
     runs-on: ubuntu-latest
     environment: production
@@ -4610,6 +4612,7 @@ jobs:
             OPS_MUSIC_STORAGE_BULK_INSTALL) ACTION=install ;;
             OPS_MUSIC_STORAGE_BULK_START_COPY) ACTION=start_copy ;;
             OPS_MUSIC_STORAGE_BULK_PAUSE) ACTION=pause ;;
+            OPS_MUSIC_STORAGE_BULK_RESUME) ACTION=resume ;;
             OPS_MUSIC_STORAGE_BULK_STOP) ACTION=stop ;;
             *) echo "unexpected confirm=${CONFIRM}" >&2; exit 1 ;;
           esac

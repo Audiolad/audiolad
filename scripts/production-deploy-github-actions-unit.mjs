@@ -273,6 +273,7 @@ function main() {
     "OPS_MUSIC_STORAGE_BULK_INSTALL",
     "OPS_MUSIC_STORAGE_BULK_START_COPY",
     "OPS_MUSIC_STORAGE_BULK_PAUSE",
+    "OPS_MUSIC_STORAGE_BULK_RESUME",
     "OPS_MUSIC_STORAGE_BULK_STOP",
   ]) {
     assert.ok(
@@ -282,6 +283,11 @@ function main() {
   }
   assert.match(workflowText, /music_storage_bulk_ops:/);
   assert.match(workflowText, /audiolad-music-storage-bulk-ops-remote\.sh/);
+  assert.match(workflowText, /audiolad-music-storage-bulk-install-remote\.sh/);
+  assert.match(
+    workflowText,
+    /audiolad-music-storage-bulk-(install|ops)/,
+  );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `wrapper bash -n failed: ${syntax.stderr}`);
