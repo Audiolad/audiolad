@@ -106,6 +106,22 @@ assert.equal(
 );
 assert.equal(
   isMusicAlbumBulkTrackTitlesEnabled({
+    productKind: PRODUCT_KIND.MUSIC,
+    scope: "all",
+    closedCatalogOnly: false,
+  }),
+  true,
+);
+assert.equal(
+  isMusicAlbumBulkTrackTitlesEnabled({
+    productKind: PRODUCT_KIND.MUSIC,
+    scope: "all",
+    closedCatalogOnly: true,
+  }),
+  true,
+);
+assert.equal(
+  isMusicAlbumBulkTrackTitlesEnabled({
     productKind: PRODUCT_KIND.PRACTICE,
     scope: "closed",
     closedCatalogOnly: true,
@@ -127,6 +143,6 @@ assert.match(panel, /Заполнить названия треков/);
 assert.match(panel, /Отменить последнее заполнение/);
 assert.match(form, /MusicAlbumBulkTrackTitlesPanel/);
 assert.match(form, /showBulkTrackTitlesPanel/);
-assert.match(form, /scope: "closed"/);
+assert.match(form, /scope: "all"/);
 
 console.log("music-album-bulk-track-titles-unit: PASS");

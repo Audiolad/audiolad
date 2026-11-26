@@ -1513,7 +1513,7 @@ export default function AuthorProductForm({
   const hideOpenCatalogFields = shouldHideOpenCatalogAlbumFields(closedCatalogOnly);
   const showBulkTrackTitlesPanel = isMusicAlbumBulkTrackTitlesEnabled({
     productKind: form.productKind,
-    scope: "closed",
+    scope: "all",
     closedCatalogOnly,
   });
   const visibleWizardSteps = visibleProductWizardSteps(closedCatalogOnly);
