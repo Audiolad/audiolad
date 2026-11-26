@@ -15,6 +15,7 @@ import MaxProductLegalFooter from "@/components/max/MaxProductLegalFooter";
 import MiniAppGuestRating from "@/components/mini-app/MiniAppGuestRating";
 import MiniAppNextStep from "@/components/mini-app/MiniAppNextStep";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
+import PracticeHeroListenMetric from "@/components/products/practice-page/PracticeHeroListenMetric";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogSlide } from "@/lib/catalog/dto";
@@ -123,7 +124,14 @@ export default function MaxProductDetailView({
               {product.priceLabel}
             </p>
           ) : null}
-          <div className="practice-product-hero__cta shrink-0">{listenSlot}</div>
+          <div className="practice-product-hero__cta shrink-0">
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="min-w-0 flex-1">{listenSlot}</div>
+              <PracticeHeroListenMetric
+                qualifiedListenCount={product.qualifiedListenCount}
+              />
+            </div>
+          </div>
         </FeaturedProductCard>
       </section>
 

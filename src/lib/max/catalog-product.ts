@@ -9,6 +9,11 @@ export type MaxCatalogGallerySlide = {
   position: number;
 };
 
+export type MaxCatalogPublicMetrics = {
+  qualifiedListenCount: number;
+  totalStars: number;
+};
+
 export type MaxCatalogProduct = {
   authorSlug: string;
   slug: string;
@@ -19,6 +24,7 @@ export type MaxCatalogProduct = {
   formatLabel: string;
   priceLabel: string;
   isFree: boolean;
+  publicMetrics: MaxCatalogPublicMetrics;
   /** Absent on recommendation rows; catalog payloads always send an array. */
   gallery?: MaxCatalogGallerySlide[];
 };
@@ -68,6 +74,20 @@ export function readMaxCatalogProduct(value: unknown): MaxCatalogProduct | null 
     return null;
   }
 
+  const metrics = (value as { publicMetrics?: unknown }).publicMetrics;
+  const qualifiedListenCount =
+    metrics &&
+    typeof metrics === "object" &&
+    typeof (metrics as MaxCatalogPublicMetrics).qualifiedListenCount === "number"
+      ? Math.max(0, Math.floor((metrics as MaxCatalogPublicMetrics).qualifiedListenCount))
+      : 0;
+  const totalStars =
+    metrics &&
+    typeof metrics === "object" &&
+    typeof (metrics as MaxCatalogPublicMetrics).totalStars === "number"
+      ? Math.max(0, Math.floor((metrics as MaxCatalogPublicMetrics).totalStars))
+      : 0;
+
   return {
     authorSlug: product.authorSlug,
     slug: product.slug,
@@ -78,6 +98,7 @@ export function readMaxCatalogProduct(value: unknown): MaxCatalogProduct | null 
     formatLabel: product.formatLabel,
     priceLabel: product.priceLabel,
     isFree: product.isFree,
+    publicMetrics: { qualifiedListenCount, totalStars },
     gallery,
   };
 }

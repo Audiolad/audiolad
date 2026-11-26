@@ -89,6 +89,10 @@ export type CatalogCardSummary = Record<string, never>;
 
 export type CatalogCardProgress = null;
 
+import type { CatalogPublicMetrics } from "@/lib/catalog/public-metrics";
+
+export type { CatalogPublicMetrics };
+
 export type CatalogCard = {
   publication_id: string;
   class: PublicationClass;
@@ -108,6 +112,7 @@ export type CatalogCard = {
   badges: string[];
   progress: CatalogCardProgress;
   summary: CatalogCardSummary;
+  public_metrics: CatalogPublicMetrics;
 };
 
 export type CatalogCardActionTarget = {

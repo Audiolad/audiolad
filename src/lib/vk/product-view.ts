@@ -19,6 +19,7 @@ export type VkProductView = {
   metaLine: string | null;
   priceLabel: string;
   isFree: boolean;
+  qualifiedListenCount: number;
   appreciation: VkProductAppreciation | null;
   /** Canonical public aggregate. VK has no verified identity: read-only here. */
   rating: MaxProductRatingView;
@@ -175,8 +176,15 @@ export function toVkProductView(product: {
     image_url?: string | null;
     alt?: string | null;
   }[] | null;
+  qualifiedListenCount?: number | null;
 }): VkProductView {
   const commerce = publicCommerce(product);
+  const qualifiedListenCount =
+    typeof product.qualifiedListenCount === "number" &&
+    Number.isFinite(product.qualifiedListenCount)
+      ? Math.max(0, Math.floor(product.qualifiedListenCount))
+      : 0;
+
   return {
     authorSlug: product.authorSlug,
     productSlug: product.productSlug,
@@ -187,6 +195,7 @@ export function toVkProductView(product: {
     metaLine: product.metaLine,
     priceLabel: commerce.priceLabel,
     isFree: commerce.isFree,
+    qualifiedListenCount,
     appreciation: publicAppreciation(product.appreciation),
     rating: publicRating(product.rating),
     nextStep: readMiniAppNextStep(product.nextStep),
@@ -262,6 +271,12 @@ export function readVkProductView(value: unknown): VkProductView | null {
   });
   if (contents.length !== value.contents.length) return null;
 
+  const qualifiedListenCount =
+    typeof value.qualifiedListenCount === "number" &&
+    Number.isFinite(value.qualifiedListenCount)
+      ? Math.max(0, Math.floor(value.qualifiedListenCount))
+      : 0;
+
   return {
     authorSlug,
     productSlug,
@@ -272,6 +287,7 @@ export function readVkProductView(value: unknown): VkProductView | null {
     metaLine,
     priceLabel,
     isFree: value.isFree,
+    qualifiedListenCount,
     appreciation,
     rating,
     nextStep: readMiniAppNextStep(value.nextStep),

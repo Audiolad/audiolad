@@ -22,6 +22,7 @@ import type { PracticeAccessPresentation } from "@/lib/products/practice-access-
 import { shouldShowPaidBuyPreviewCta } from "@/lib/course-content/storefront-preview";
 import { PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 
+import PracticeHeroListenMetric from "./PracticeHeroListenMetric";
 import PracticeListenCtaLink from "./PracticeListenCtaLink";
 import PublishPreviewBanner from "./PublishPreviewBanner";
 import type { PracticePageCoverData, PracticePageViewModel } from "./types";
@@ -417,6 +418,11 @@ export function PracticePrimaryActionSection({
   const listenClassName = buyAction
     ? FEATURED_CARD_SECONDARY_CTA_CLASS
     : FEATURED_CARD_PRIMARY_CTA_CLASS;
+  const listenMetric = (
+    <PracticeHeroListenMetric
+      qualifiedListenCount={viewModel.publicMetrics.qualified_listen_count}
+    />
+  );
 
   return (
     <section className={className}>
@@ -463,22 +469,25 @@ export function PracticePrimaryActionSection({
                     />
                   )}
                   {showPrimaryPlay ? (
-                    <PracticeListenCtaLink
-                      authorSlug={resolvedAuthorSlug}
-                      productSlug={practice.slug}
-                      practiceId={practice.id}
-                      playAriaLabel={playLabel}
-                      className={listenClassName}
-                      playingChildren={
-                        <>
-                          <PauseIcon />
-                          Пауза
-                        </>
-                      }
-                    >
-                      <PlayIcon />
-                      {playLabel}
-                    </PracticeListenCtaLink>
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                      <PracticeListenCtaLink
+                        authorSlug={resolvedAuthorSlug}
+                        productSlug={practice.slug}
+                        practiceId={practice.id}
+                        playAriaLabel={playLabel}
+                        className={listenClassName}
+                        playingChildren={
+                          <>
+                            <PauseIcon />
+                            Пауза
+                          </>
+                        }
+                      >
+                        <PlayIcon />
+                        {playLabel}
+                      </PracticeListenCtaLink>
+                      {listenMetric}
+                    </div>
                   ) : null}
                 </div>
               </ProductPriceOffer>
@@ -515,22 +524,25 @@ export function PracticePrimaryActionSection({
                     />
                   )}
                   {showPrimaryPlay ? (
-                    <PracticeListenCtaLink
-                      authorSlug={resolvedAuthorSlug}
-                      productSlug={practice.slug}
-                      practiceId={practice.id}
-                      playAriaLabel={playLabel}
-                      className={listenClassName}
-                      playingChildren={
-                        <>
-                          <PauseIcon />
-                          Пауза
-                        </>
-                      }
-                    >
-                      <PlayIcon />
-                      {playLabel}
-                    </PracticeListenCtaLink>
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                      <PracticeListenCtaLink
+                        authorSlug={resolvedAuthorSlug}
+                        productSlug={practice.slug}
+                        practiceId={practice.id}
+                        playAriaLabel={playLabel}
+                        className={listenClassName}
+                        playingChildren={
+                          <>
+                            <PauseIcon />
+                            Пауза
+                          </>
+                        }
+                      >
+                        <PlayIcon />
+                        {playLabel}
+                      </PracticeListenCtaLink>
+                      {listenMetric}
+                    </div>
                   ) : null}
                 </div>
               </>
@@ -554,22 +566,25 @@ export function PracticePrimaryActionSection({
           data-practice-hero-actions
           className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
         >
-          <PracticeListenCtaLink
-            authorSlug={resolvedAuthorSlug}
-            productSlug={practice.slug}
-            practiceId={practice.id}
-            playAriaLabel={playLabel}
-            className={listenClassName}
-            playingChildren={
-              <>
-                <PauseIcon />
-                Пауза
-              </>
-            }
-          >
-            <PlayIcon />
-            {playLabel}
-          </PracticeListenCtaLink>
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+            <PracticeListenCtaLink
+              authorSlug={resolvedAuthorSlug}
+              productSlug={practice.slug}
+              practiceId={practice.id}
+              playAriaLabel={playLabel}
+              className={listenClassName}
+              playingChildren={
+                <>
+                  <PauseIcon />
+                  Пауза
+                </>
+              }
+            >
+              <PlayIcon />
+              {playLabel}
+            </PracticeListenCtaLink>
+            {listenMetric}
+          </div>
         </div>
       ) : (
         <button

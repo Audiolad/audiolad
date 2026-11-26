@@ -19,6 +19,7 @@ const page = read(
 const filterUi = read("src/lib/catalog/catalog-filter-ui.ts");
 const grid = read("src/components/products/CatalogProductGrid.tsx");
 const card = read("src/components/catalog/cards/CatalogCardShell.tsx");
+const publicMetrics = read("src/components/catalog/CatalogCardPublicMetrics.tsx");
 const gridCard = read("src/components/products/CatalogProductGridCard.tsx");
 const css = read("src/app/globals.css");
 const api = read("src/app/api/catalog/route.ts");
@@ -163,6 +164,18 @@ assert.match(card, /rounded-\[20px\]/, "card has a shared radius");
 assert.match(card, /border border-\[#eadff8\]/, "card has a light border");
 assert.match(card, /data-catalog-card-format/, "format label is marked");
 assert.match(card, /display_label/, "format uses CatalogCard.display_label");
+assert.match(card, /CatalogCardPublicMetrics/, "card shows public listen/star metrics");
+assert.match(
+  card,
+  /data-catalog-card-format[\s\S]{0,240}CatalogCardPublicMetrics/,
+  "metrics align right on the format/type row",
+);
+assert.match(publicMetrics, /data-catalog-card-public-metrics/);
+assert.match(
+  read("src/lib/catalog/listing.ts"),
+  /attachPublicMetricsToListingResult/,
+  "listing enriches non-sort pages with display metrics",
+);
 assert.doesNotMatch(
   card,
   /getCatalogClassLabel|CATALOG_CLASS_LABELS/,
