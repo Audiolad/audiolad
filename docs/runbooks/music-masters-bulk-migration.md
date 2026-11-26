@@ -29,9 +29,12 @@
 
 ```bash
 cd /var/www/audiolad-deploy/current
-npm run music-storage:bulk -- --stage copy --progress-only
-npm run music-storage:report
+NODE_ENV=production npm run music-storage:bulk -- --stage copy --progress-only
+NODE_ENV=production npm run music-storage:report
 ```
+
+Автоматический режим (systemd timer, 5 мин, партии по 25):
+`docs/runbooks/music-masters-bulk-orchestrator.md`.
 
 ### Dry-run пакета (copy)
 

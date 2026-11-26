@@ -1,0 +1,11 @@
+[Unit]
+Description=Audiolad music masters bulk copy every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=audiolad-music-storage-bulk-copy.service
+
+[Install]
+WantedBy=timers.target

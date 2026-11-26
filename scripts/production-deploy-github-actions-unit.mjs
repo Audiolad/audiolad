@@ -268,6 +268,20 @@ function main() {
     confirm.options.includes("OPS_COURSE_UPGRADE_DIAG"),
     "confirm options must include OPS_COURSE_UPGRADE_DIAG",
   );
+  for (const musicBulkConfirm of [
+    "OPS_MUSIC_STORAGE_BULK_STATUS",
+    "OPS_MUSIC_STORAGE_BULK_INSTALL",
+    "OPS_MUSIC_STORAGE_BULK_START_COPY",
+    "OPS_MUSIC_STORAGE_BULK_PAUSE",
+    "OPS_MUSIC_STORAGE_BULK_STOP",
+  ]) {
+    assert.ok(
+      confirm.options.includes(musicBulkConfirm),
+      `confirm options must include ${musicBulkConfirm}`,
+    );
+  }
+  assert.match(workflowText, /music_storage_bulk_ops:/);
+  assert.match(workflowText, /audiolad-music-storage-bulk-ops-remote\.sh/);
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, `wrapper bash -n failed: ${syntax.stderr}`);
