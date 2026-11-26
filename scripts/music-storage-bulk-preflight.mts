@@ -5,7 +5,6 @@ import { evaluateS3QuotaBeforeCopy } from "../src/lib/music-storage/s3-quota-gua
 import {
   headMusicStorageObject,
   MusicStorageConfigurationError,
-  musicStorageLocation,
 } from "../src/lib/music-storage/server";
 
 loadProductionEnvFromCwd();
@@ -36,11 +35,11 @@ async function probeTimewebS3Head(): Promise<{
     };
   }
   const bucket = (data.storage_bucket as string | null) ?? "music-masters";
-  const location = musicStorageLocation({
-    provider: "timeweb_s3",
-    bucket,
-    path: data.storage_path as string,
-  });
+  const location = {
+    storage_provider: "timeweb_s3",
+    storage_bucket: bucket,
+    storage_path: data.storage_path as string,
+  };
   try {
     const head = await headMusicStorageObject(location, service);
     if (!head) {
