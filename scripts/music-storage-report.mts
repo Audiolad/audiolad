@@ -1,4 +1,7 @@
+import { loadProductionEnvFromCwd } from "./load-production-env";
 import { createServiceRoleClient } from "../src/lib/supabase/service-role";
+
+loadProductionEnvFromCwd();
 
 type Asset = {
   storage_provider: string | null;
@@ -40,11 +43,11 @@ function summarizeAssets(assets: Asset[]) {
 async function main() {
   const service = createServiceRoleClient();
   const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
-  const [assets, copies, cleanup, metrics] = await Promise.all([
+  const [assets, copies, cleanup, metrics, mastersOnS3] = await Promise.all([
     allAssets(),
     service
       .from("music_storage_copies")
-      .select("status,size_bytes,attempt_count,last_error_code,updated_at")
+      .select("status,size_bytes,attempt_count,last_error_code,updated_at,source_released_at")
       .order("updated_at", { ascending: false })
       .limit(1000),
     service
@@ -58,14 +61,42 @@ async function main() {
       .select("metric_date,provider,operation,outcome,request_count,byte_count")
       .gte("metric_date", since)
       .order("metric_date", { ascending: false }),
+    service
+      .from("music_audio_assets")
+      .select("id", { count: "exact", head: true })
+      .eq("asset_role", "master")
+      .eq("lifecycle_state", "verified")
+      .eq("storage_provider", "timeweb_s3"),
   ]);
   if (copies.error) throw new Error(`copy_report_failed:${copies.error.message}`);
   if (cleanup.error) throw new Error(`cleanup_report_failed:${cleanup.error.message}`);
   if (metrics.error) throw new Error(`metrics_report_failed:${metrics.error.message}`);
+  const copyRows = copies.data ?? [];
+  const copyStats = {
+    verified: copyRows.filter((row) => row.status === "verified").length,
+    cutover: copyRows.filter((row) => row.status === "cutover").length,
+    failed: copyRows.filter((row) => row.status === "failed").length,
+    rolledBack: copyRows.filter((row) => row.status === "rolled_back").length,
+    copying: copyRows.filter((row) => row.status === "copying").length,
+    localReleased: copyRows.filter((row) => (row as { source_released_at?: string }).source_released_at).length,
+  };
+  const masterCount = assets.filter((row) => row.asset_role === "master" && row.lifecycle_state === "verified").length;
+  const mastersOnS3Count = mastersOnS3.count ?? 0;
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(),
     storage: summarizeAssets(assets),
-    copies: copies.data ?? [],
+    bulkMigration: {
+      mastersVerified: masterCount,
+      mastersOnTimewebProvider: mastersOnS3Count,
+      copyStats,
+      copyPercentComplete: masterCount > 0
+        ? Math.round((copyStats.verified / masterCount) * 10_000) / 100
+        : 100,
+      cutoverPercentComplete: masterCount > 0
+        ? Math.round((mastersOnS3Count / masterCount) * 10_000) / 100
+        : 0,
+    },
+    copies: copyRows,
     unresolvedCleanup: cleanup.data ?? [],
     last30Days: metrics.data ?? [],
     hostDisk: {

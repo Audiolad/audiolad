@@ -216,6 +216,12 @@ npm run music-storage:cleanup -- --execute
 Команда принципиально не обрабатывает `blocked`: такой job сначала требует
 ручной проверки результата teardown.
 
+## Массовая миграция (этап 2)
+
+После успешного пилота используйте отдельный runbook
+`docs/runbooks/music-masters-bulk-migration.md` и команду `npm run music-storage:bulk`.
+Production-запуск bulk — только после письменного согласования.
+
 ## Стоп-факторы
 
 - отсутствует точный allowlist;
