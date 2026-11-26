@@ -16,20 +16,21 @@ function testLoadProductionEnvFromCwdInTempDir() {
   const marker = "audiolad-load-prod-env-marker";
   writeFileSync(join(dir, ".env.production"), `${marker}=from-env-file\n`, "utf8");
   const previousCwd = process.cwd();
-  const previousNodeEnv = process.env.NODE_ENV;
-  const previousMarker = process.env[marker];
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const previousNodeEnv = mutableEnv.NODE_ENV;
+  const previousMarker = mutableEnv[marker];
   try {
     process.chdir(dir);
-    process.env.NODE_ENV = "production";
-    delete process.env[marker];
+    mutableEnv.NODE_ENV = "production";
+    delete mutableEnv[marker];
     loadProductionEnvFromCwd();
-    assert.equal(process.env[marker], "from-env-file");
+    assert.equal(mutableEnv[marker], "from-env-file");
   } finally {
     process.chdir(previousCwd);
-    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = previousNodeEnv;
-    if (previousMarker === undefined) delete process.env[marker];
-    else process.env[marker] = previousMarker;
+    if (previousNodeEnv === undefined) delete mutableEnv.NODE_ENV;
+    else mutableEnv.NODE_ENV = previousNodeEnv;
+    if (previousMarker === undefined) delete mutableEnv[marker];
+    else mutableEnv[marker] = previousMarker;
   }
 }
 
