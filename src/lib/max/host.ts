@@ -55,6 +55,9 @@ export const MAX_PROMO_ANALYTICS_PATH = "/api/max/promo/analytics";
 /** HMAC-verify linked MAX identity, then read or write the canonical practice rating. */
 export const MAX_RATING_PATH = "/api/max/rating";
 
+/** HMAC-verify linked MAX identity, then accrue practice listen-stats for rating eligibility. */
+export const MAX_LISTEN_STATS_PATH = "/api/max/listen-stats";
+
 /**
  * HMAC-verify linked MAX identity, then start the canonical author-appreciation
  * checkout. Returns a payment link only; it never marks a payment successful.
@@ -127,6 +130,10 @@ export function isMaxPromoAnalyticsPath(pathname: string): boolean {
 
 export function isMaxRatingPath(pathname: string): boolean {
   return pathname === MAX_RATING_PATH;
+}
+
+export function isMaxListenStatsPath(pathname: string): boolean {
+  return pathname === MAX_LISTEN_STATS_PATH;
 }
 
 export function isMaxAppreciationPath(pathname: string): boolean {

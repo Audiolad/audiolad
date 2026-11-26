@@ -287,29 +287,7 @@ async function listMaxPublishedCatalogImpl(
       ]),
     );
 
-    let metricsById = rankedMetrics;
-    if (sort !== "popular" && sort !== "rating" && filteredProducts.length > 0) {
-      const { loadCatalogListingSortMetrics } = await import(
-        "@/lib/catalog/sort-metrics"
-      );
-      const loaded = await loadCatalogListingSortMetrics(
-        filteredProducts.map((product) => product.id),
-        { popular: true, rating: true },
-        service,
-      );
-      metricsById = new Map(
-        filteredProducts.map((product) => {
-          const row = loaded.get(product.id);
-          return [
-            product.id,
-            buildCatalogPublicMetrics(
-              row?.popularListenCount ?? 0,
-              row?.totalStars ?? 0,
-            ),
-          ] as const;
-        }),
-      );
-    }
+    const metricsById = rankedMetrics;
 
     return {
       ok: true,

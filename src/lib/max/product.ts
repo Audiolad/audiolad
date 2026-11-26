@@ -8,7 +8,6 @@ import {
 } from "@/lib/catalog/product-hero-gallery";
 import { loadCatalogListingSortMetrics } from "@/lib/catalog/sort-metrics";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
-import { isCoursePublication } from "@/lib/course-content/validators";
 import { resolveMaxExactPractice, type MaxExactPracticeDeps } from "@/lib/max/exact-product";
 import { mapCuratedMaxRecommendations } from "@/lib/max/product-recommendations";
 import { toMaxProductContentTracks, type MaxProductDetailView } from "@/lib/max/product-view";
@@ -27,9 +26,9 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
-import { isRatingsUiEnabled } from "@/lib/ratings/feature";
 import { isGuestRatingsCollectEnabled } from "@/lib/ratings/guest/feature";
 import { getPracticeRatingAggregate } from "@/lib/ratings/read";
+import { resolvePracticeRatingsUiEnabledForPractice } from "@/lib/ratings/ui-visibility";
 import { MAX_AUTHOR_RECOMMENDATIONS } from "@/lib/seo/related-product-search";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -185,9 +184,19 @@ export async function getMaxPublishedProduct(
       catalogById,
     });
 
-    const ratingsEnabled =
-      isRatingsUiEnabled() &&
-      !isCoursePublication(product.publicationClass, product.productKind);
+    let ratingsEnabled = false;
+    try {
+      ratingsEnabled = await resolvePracticeRatingsUiEnabledForPractice(
+        service,
+        {
+          id: practice.id,
+          publication_class: practice.publication_class,
+          product_kind: practice.product_kind,
+        },
+      );
+    } catch {
+      ratingsEnabled = false;
+    }
     let ratingAggregate = EMPTY_RATING_AGGREGATE;
     if (ratingsEnabled) {
       try {
