@@ -10,11 +10,11 @@ usage() {
 Usage: release-prune.sh [--dry-run] [keep-extra]
 
 Safely prune old Audiolad production releases under deploy lock.
-Always keeps current, previous, and the newest extra releases (default: 3).
+Always keeps current, previous, and the newest extra releases (default: 1).
 EOF
 }
 
-KEEP_EXTRA="${RELEASE_RETENTION_KEEP_EXTRA:-3}"
+KEEP_EXTRA="${RELEASE_RETENTION_KEEP_EXTRA:-1}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do

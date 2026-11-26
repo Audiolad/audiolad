@@ -48,6 +48,12 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 `deploy.sh`), затем `OPS_MUSIC_STORAGE_BULK_INSTALL`. Без DEPLOY INSTALL вернёт
 `run_production_DEPLOY_once_then_retry_OPS_INSTALL`.
 
+При диске ≥85% сначала `OPS_DISK_STORAGE_AUDIT`, затем
+`OPS_DEPLOY_MAINTENANCE_DRY_RUN` → после проверки лога
+`OPS_DEPLOY_MAINTENANCE_APPLY`. `OPS_MUSIC_STORAGE_BULK_INSTALL` подтягивает
+sbin/sudoers с `origin/main` **без** полного DEPLOY (trusted bundle в
+`shared/.gha-trusted-deploy`).
+
 **Перед автокопированием:** `OPS_MUSIC_STORAGE_BULK_DIAG` (read-only: диск,
 `music-storage:report`, **`music-storage:preflight`** — S3 HEAD + квота на весь
 `pendingBytes`, dry-run batch 25, timer/env). Реальный старт —

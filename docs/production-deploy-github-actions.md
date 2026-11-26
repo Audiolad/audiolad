@@ -500,7 +500,9 @@ Trusted helpers с `origin/main` (Contents API): INSTALL →
 |---------|--------------------------------|
 | `OPS_MUSIC_STORAGE_BULK_INSTALL` | bootstrap при необходимости, затем `…-install` |
 | `OPS_MUSIC_STORAGE_BULK_STATUS` | `…-ops-status` |
-| `OPS_MUSIC_STORAGE_BULK_DIAG` | trusted `audiolad-music-storage-bulk-diag-remote.sh` (disk, report, dry-run 25, timer/env; read-only) |
+| `OPS_MUSIC_STORAGE_BULK_DIAG` | trusted `audiolad-music-storage-bulk-diag-remote.sh` (disk, **sudo privileged** env/systemd/releases, report, S3 preflight, dry-run 25; job fails without `OPS_MUSIC_STORAGE_BULK_DIAG_END=ok`) |
+| `OPS_DEPLOY_MAINTENANCE_DRY_RUN` | `audiolad-maintenance.sh --dry-run` via sudo (releases/tmp; no new release) |
+| `OPS_DEPLOY_MAINTENANCE_APPLY` | safe cleanup: keep current/previous/+1 release, cursor cache, tmp (emergency at ≥85% disk) |
 | `OPS_MUSIC_STORAGE_BULK_START_COPY` | `…-ops-start-copy` |
 | `OPS_MUSIC_STORAGE_BULK_PAUSE` | `…-ops-pause` |
 | `OPS_MUSIC_STORAGE_BULK_RESUME` | `…-ops-resume` |

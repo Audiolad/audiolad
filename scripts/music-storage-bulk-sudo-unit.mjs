@@ -30,6 +30,10 @@ const bashScripts = [
   "deploy/scripts/audiolad-music-storage-bulk-root-install.sh",
   "deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh",
   "deploy/scripts/audiolad-music-storage-bulk-ops-privileged.sh",
+  "deploy/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh",
+  "deploy/scripts/audiolad-music-storage-bulk-diag-remote.sh",
+  "deploy/scripts/audiolad-deploy-maintenance-remote.sh",
+  "deploy/scripts/audiolad-gha-trusted-deploy-bundle-apply-remote.sh",
   ...[
     "audiolad-music-storage-bulk-install",
     "audiolad-music-storage-bulk-sudo-bootstrap",
@@ -38,6 +42,7 @@ const bashScripts = [
     "audiolad-music-storage-bulk-ops-pause",
     "audiolad-music-storage-bulk-ops-stop",
     "audiolad-music-storage-bulk-ops-resume",
+    "audiolad-music-storage-bulk-ops-diag",
   ].map((name) => `deploy/sbin/${name}`),
 ];
 

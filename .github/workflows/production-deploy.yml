@@ -68,6 +68,8 @@ on:
           - OPS_MUSIC_STORAGE_BULK_PAUSE
           - OPS_MUSIC_STORAGE_BULK_RESUME
           - OPS_MUSIC_STORAGE_BULK_STOP
+          - OPS_DEPLOY_MAINTENANCE_DRY_RUN
+          - OPS_DEPLOY_MAINTENANCE_APPLY
           - DEPLOY
 
 permissions:
@@ -4631,6 +4633,8 @@ jobs:
               "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-music-storage-bulk-diag-remote.sh?ref=${ORIGIN_MAIN_SHA}"
             test -s "${DIAG_HELPER}"
             bash -n "${DIAG_HELPER}"
+            REMOTE_LOG="$(mktemp)"
+            chmod 0600 "${REMOTE_LOG}"
             ssh \
               -i "${SSH_KEY_FILE}" \
               -o BatchMode=yes \
@@ -4640,12 +4644,84 @@ jobs:
               -p "${PRODUCTION_SSH_PORT}" \
               -- \
               "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
-              "bash -s" < "${DIAG_HELPER}"
-            rm -f "${DIAG_HELPER}"
+              "bash -s" < "${DIAG_HELPER}" | tee "${REMOTE_LOG}"
+            test -s "${REMOTE_LOG}"
+            if grep -Fq "DIAG_SECTION_FAILED=" "${REMOTE_LOG}"; then
+              echo "music_storage_bulk_diag: one or more sections failed" >&2
+              exit 1
+            fi
+            if ! grep -Fxq "OPS_MUSIC_STORAGE_BULK_DIAG_END=ok" "${REMOTE_LOG}"; then
+              echo "music_storage_bulk_diag: missing OPS_MUSIC_STORAGE_BULK_DIAG_END=ok" >&2
+              exit 1
+            fi
+            rm -f "${DIAG_HELPER}" "${REMOTE_LOG}"
             exit 0
           fi
           if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_INSTALL" ]]; then
             umask 077
+            TRUSTED_STAGING="$(mktemp -d)"
+            BUNDLE_APPLY="$(mktemp)"
+            chmod 0600 "${BUNDLE_APPLY}"
+            curl -fsS \
+              -H "Accept: application/vnd.github.raw+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -o "${BUNDLE_APPLY}" \
+              -- \
+              "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-gha-trusted-deploy-bundle-apply-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+            test -s "${BUNDLE_APPLY}"
+            bash -n "${BUNDLE_APPLY}"
+            TRUSTED_PATHS=(
+              deploy/sudoers/audiolad-music-storage-bulk
+              deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh
+              deploy/scripts/audiolad-music-storage-bulk-root-install.sh
+              deploy/scripts/audiolad-music-storage-bulk-privileged-common.sh
+              deploy/scripts/audiolad-music-storage-bulk-enable-copy-env.sh
+              deploy/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh
+              deploy/scripts/audiolad-music-storage-bulk-ops-privileged.sh
+              deploy/sbin/audiolad-music-storage-bulk-sudo-bootstrap
+              deploy/sbin/audiolad-music-storage-bulk-install
+              deploy/sbin/audiolad-music-storage-bulk-ops-status
+              deploy/sbin/audiolad-music-storage-bulk-ops-start-copy
+              deploy/sbin/audiolad-music-storage-bulk-ops-pause
+              deploy/sbin/audiolad-music-storage-bulk-ops-stop
+              deploy/sbin/audiolad-music-storage-bulk-ops-resume
+              deploy/sbin/audiolad-music-storage-bulk-ops-diag
+            )
+            for rel in "${TRUSTED_PATHS[@]}"; do
+              dest="${TRUSTED_STAGING}/${rel}"
+              mkdir -p "$(dirname "${dest}")"
+              curl -fsS \
+                -H "Accept: application/vnd.github.raw+json" \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -o "${dest}" \
+                -- \
+                "https://api.github.com/repos/Audiolad/audiolad/contents/${rel}?ref=${ORIGIN_MAIN_SHA}"
+              test -s "${dest}"
+            done
+            chmod +x "${TRUSTED_STAGING}/deploy/sbin/"*
+            chmod +x "${TRUSTED_STAGING}/deploy/scripts/"*.sh
+            tar -C "${TRUSTED_STAGING}" -czf - deploy | ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              "bash -s" < "${BUNDLE_APPLY}"
+            DEPLOY_TREE="/var/www/audiolad-deploy/shared/.gha-trusted-deploy/deploy"
+            ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              "sudo -n env DEPLOY_TREE=${DEPLOY_TREE} /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap"
+            rm -rf "${TRUSTED_STAGING}" "${BUNDLE_APPLY}"
             INSTALL_HELPER="$(mktemp)"
             chmod 0600 "${INSTALL_HELPER}"
             curl -fsS \
@@ -4688,6 +4764,88 @@ jobs:
           if [[ -n "${MUSIC_STORAGE_OPS_HELPER:-}" ]]; then
             rm -f "${MUSIC_STORAGE_OPS_HELPER}"
           fi
+          if [[ -n "${SSH_DIR:-}" ]]; then
+            rm -rf "${SSH_DIR}"
+          fi
+
+  deploy_maintenance_ops:
+    name: Ops deploy disk maintenance
+    needs: resolve
+    if: |
+      inputs.confirm == 'OPS_DEPLOY_MAINTENANCE_DRY_RUN' ||
+      inputs.confirm == 'OPS_DEPLOY_MAINTENANCE_APPLY'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH identity
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          echo "SSH_DIR=${SSH_DIR}" >> "${GITHUB_ENV}"
+          echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Deploy maintenance (releases/tmp, no app deploy)
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          CONFIRM: ${{ inputs.confirm }}
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          case "${CONFIRM}" in
+            OPS_DEPLOY_MAINTENANCE_DRY_RUN) MODE="dry-run" ;;
+            OPS_DEPLOY_MAINTENANCE_APPLY) MODE="apply" ;;
+            *) echo "unexpected confirm=${CONFIRM}" >&2; exit 1 ;;
+          esac
+          umask 077
+          HELPER="$(mktemp)"
+          chmod 0600 "${HELPER}"
+          curl -fsS \
+            -H "Accept: application/vnd.github.raw+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o "${HELPER}" \
+            -- \
+            "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-deploy-maintenance-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+          test -s "${HELPER}"
+          bash -n "${HELPER}"
+          REMOTE_LOG="$(mktemp)"
+          chmod 0600 "${REMOTE_LOG}"
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            "bash -s --" "${MODE}" < "${HELPER}" | tee "${REMOTE_LOG}"
+          test -s "${REMOTE_LOG}"
+          if ! grep -Fxq "OPS_DEPLOY_MAINTENANCE_END=ok" "${REMOTE_LOG}"; then
+            echo "deploy_maintenance: missing OPS_DEPLOY_MAINTENANCE_END=ok" >&2
+            exit 1
+          fi
+          rm -f "${HELPER}" "${REMOTE_LOG}"
+
+      - name: Remove SSH identity
+        if: always()
+        run: |
+          set -euo pipefail
           if [[ -n "${SSH_DIR:-}" ]]; then
             rm -rf "${SSH_DIR}"
           fi

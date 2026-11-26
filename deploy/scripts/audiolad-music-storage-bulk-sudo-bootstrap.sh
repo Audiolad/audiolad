@@ -70,6 +70,8 @@ install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-b
   "${LIB_DIR}/audiolad-music-storage-bulk-privileged-common.sh"
 install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-enable-copy-env.sh" \
   "${LIB_DIR}/audiolad-music-storage-bulk-enable-copy-env.sh"
+install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh" \
+  "${LIB_DIR}/audiolad-music-storage-bulk-ops-privileged-diag.sh"
 fi
 
 for name in \
@@ -79,7 +81,8 @@ for name in \
   audiolad-music-storage-bulk-ops-start-copy \
   audiolad-music-storage-bulk-ops-pause \
   audiolad-music-storage-bulk-ops-stop \
-  audiolad-music-storage-bulk-ops-resume; do
+  audiolad-music-storage-bulk-ops-resume \
+  audiolad-music-storage-bulk-ops-diag; do
   src="${SBIN_SRC}/${name}"
   if ! audiolad_music_storage_bulk_validate_regular_file "$src"; then
     exit 1

@@ -5,7 +5,8 @@ set -Eeuo pipefail
 DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
 CURRENT_LINK="${DEPLOY_ROOT}/current"
 CTL="/usr/local/lib/audiolad/audiolad-music-storage-bulk-ctl.sh"
-ENV_COPY="/etc/audiolad/music-storage-bulk-copy.env"
+DIAG_SBIN="/usr/local/sbin/audiolad-music-storage-bulk-ops-diag"
+DIAG_FAILED=0
 
 section() {
   printf '\n===%s===\n' "$1"
@@ -19,50 +20,89 @@ redact_stream() {
     -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[redacted-jwt]/g'
 }
 
+mark_section_fail() {
+  local name="$1"
+  printf '%s\n' "DIAG_SECTION_FAILED=${name}"
+  DIAG_FAILED=1
+}
+
+mark_section_ok() {
+  local name="$1"
+  printf '%s\n' "DIAG_SECTION_OK=${name}"
+}
+
+sudo_stderr_is_denial() {
+  local err_file="$1"
+  grep -qiE 'a password is required|not allowed to execute|sorry, user .+ is not allowed' "$err_file"
+}
+
+invoke_privileged_diag() {
+  local err
+  err="$(mktemp)"
+  trap "rm -f '$err'" RETURN
+  if [[ -x "$DIAG_SBIN" ]] && sudo -n "$DIAG_SBIN" 2>"$err" | redact_stream; then
+    return 0
+  fi
+  if sudo_stderr_is_denial "$err"; then
+    printf '%s\n' '{"error":"privileged_diag_sudo_denied"}' >&2
+  else
+    cat "$err" >&2
+  fi
+  return 1
+}
+
+finish_diag() {
+  if (( DIAG_FAILED )); then
+    printf '%s\n' "OPS_MUSIC_STORAGE_BULK_DIAG_END=incomplete"
+    exit 1
+  fi
+  printf '%s\n' "OPS_MUSIC_STORAGE_BULK_DIAG_END=ok"
+}
+
+trap 'finish_diag' EXIT
+
 printf '%s\n' "confirm=OPS_MUSIC_STORAGE_BULK_DIAG"
 printf '%s\n' "mode=read_only"
 
 section "DISK"
-df -P -h / /var/www 2>/dev/null | redact_stream || df -P -h / | redact_stream
+if ! df -P -h / /var/www 2>/dev/null | redact_stream; then
+  df -P -h / | redact_stream || mark_section_fail "disk"
+fi
+mark_section_ok "disk"
 
 section "COPY_ENV"
-if [[ -f "$ENV_COPY" ]]; then
+if [[ -e "/etc/audiolad/music-storage-bulk-copy.env" ]]; then
   printf '%s\n' "copy_env_present=true"
-  if grep -q '^AUDIOLAD_MUSIC_STORAGE_BULK=1' "$ENV_COPY" 2>/dev/null; then
-    printf '%s\n' "audiolad_music_storage_bulk=enabled"
-  elif grep -q '^AUDIOLAD_MUSIC_STORAGE_BULK=' "$ENV_COPY" 2>/dev/null; then
-    printf '%s\n' "audiolad_music_storage_bulk=set_not_1"
+  if [[ -r "/etc/audiolad/music-storage-bulk-copy.env" ]]; then
+    printf '%s\n' "copy_env_deploy_readable=true"
   else
-    printf '%s\n' "audiolad_music_storage_bulk=absent"
+    printf '%s\n' "copy_env_deploy_readable=false"
+    printf '%s\n' "hint=privileged_diag_required"
   fi
-  grep -E '^AUDIOLAD_MUSIC_STORAGE_ORCHESTRATOR_(STATE|BATCH_SIZE|CONCURRENCY)=' "$ENV_COPY" \
-    | sed -E 's/=.*$/=<set>/' || true
 else
   printf '%s\n' "copy_env_present=false"
-  printf '%s\n' "audiolad_music_storage_bulk=absent"
 fi
 
-section "SYSTEMD_COPY_TIMER"
-for u in audiolad-music-storage-bulk-copy.timer audiolad-music-storage-bulk-copy.service; do
-  if [[ -f "/etc/systemd/system/${u}" ]]; then
-    printf '%s\n' "unit_present_${u}=true"
-  else
-    printf '%s\n' "unit_present_${u}=false"
-  fi
-done
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl is-enabled audiolad-music-storage-bulk-copy.timer 2>&1 | sed 's/^/timer_enabled=/' || true
-  systemctl is-active audiolad-music-storage-bulk-copy.timer 2>&1 | sed 's/^/timer_active=/' || true
-  systemctl show audiolad-music-storage-bulk-copy.timer -p NextElapseUSecRealtime --value 2>/dev/null \
-    | sed 's/^/timer_next=/' || true
+section "PRIVILEGED_DIAG"
+if invoke_privileged_diag; then
+  mark_section_ok "privileged_diag"
+else
+  mark_section_fail "privileged_diag"
 fi
 
 section "ORCHESTRATOR_CTL_STATUS"
+set +e
 if [[ -x "$CTL" ]]; then
-  "$CTL" status copy 2>&1 | redact_stream || true
+  if "$CTL" status copy 2>&1 | redact_stream; then
+    mark_section_ok "orchestrator_ctl"
+  else
+    mark_section_fail "orchestrator_ctl"
+  fi
 else
   printf '%s\n' '{"error":"ctl_not_installed"}'
+  mark_section_fail "orchestrator_ctl"
 fi
+set -e
 
 section "START_COPY_READINESS"
 ENABLE_LIB="/usr/local/lib/audiolad/audiolad-music-storage-bulk-enable-copy-env.sh"
@@ -72,7 +112,8 @@ else
   printf '%s\n' "enable_copy_env_helper=missing"
   printf '%s\n' "hint=OPS_MUSIC_STORAGE_BULK_INSTALL_after_merge_or_redeploy"
 fi
-if [[ -x "$CTL" ]] \
+if [[ -x "$DIAG_SBIN" ]] \
+  && [[ -x "$CTL" ]] \
   && [[ -f /etc/systemd/system/audiolad-music-storage-bulk-copy.timer ]]; then
   printf '%s\n' "start_copy_ops_ready=units_and_ctl"
 else
@@ -80,7 +121,7 @@ else
 fi
 
 if [[ ! -L "$CURRENT_LINK" ]]; then
-  printf '%s\n' '{"error":"current_release_missing"}' >&2
+  mark_section_fail "current_release"
   exit 1
 fi
 
@@ -90,20 +131,27 @@ export NODE_ENV=production
 export NODE_OPTIONS="${NODE_OPTIONS:---require ./scripts/cjs-stub-server-only.cjs}"
 
 section "MUSIC_STORAGE_REPORT"
-if ! npm run music-storage:report 2>&1 | redact_stream; then
+set +e
+if npm run music-storage:report 2>&1 | redact_stream; then
+  mark_section_ok "music_storage_report"
+else
   printf '%s\n' "music_storage_report_failed=true"
+  mark_section_fail "music_storage_report"
 fi
 
 section "BULK_COPY_PREFLIGHT_S3_QUOTA_FULL_REMAINING"
-# Full pendingBytes quota + S3 HEAD probe (not limited to batch 25).
-if ! npm run music-storage:preflight 2>&1 | redact_stream; then
+if npm run music-storage:preflight 2>&1 | redact_stream; then
+  mark_section_ok "bulk_copy_preflight"
+else
   printf '%s\n' "bulk_copy_preflight_failed=true"
+  mark_section_fail "bulk_copy_preflight"
 fi
 
 section "BULK_COPY_DRY_RUN_BATCH_25"
-if ! npm run music-storage:bulk -- --stage copy --batch-size 25 --concurrency 1 2>&1 | redact_stream; then
+if npm run music-storage:bulk -- --stage copy --batch-size 25 --concurrency 1 2>&1 | redact_stream; then
+  mark_section_ok "bulk_copy_dry_run"
+else
   printf '%s\n' "bulk_copy_dry_run_failed=true"
+  mark_section_fail "bulk_copy_dry_run"
 fi
-
-section "DIAG_END"
-printf '%s\n' "OPS_MUSIC_STORAGE_BULK_DIAG_END=ok"
+set -e
