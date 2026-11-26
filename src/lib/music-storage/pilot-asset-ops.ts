@@ -334,6 +334,31 @@ export async function releaseLocalSupabaseCopy(asset: PilotAssetRow): Promise<st
   ) throw new Error("s3_target_not_verified");
   const localHead = await headMusicStorageObject(pilotLocation(asset, "supabase_file"), service);
   if (!localHead || localHead.sizeBytes !== size) throw new Error("local_copy_missing");
+
+  const workspace = await mkdtemp(join(tmpdir(), "audiolad-master-release-"));
+  try {
+    const localPath = join(workspace, "local-final");
+    await downloadMusicStorageObjectToFile(
+      pilotLocation(asset, "supabase_file"),
+      localPath,
+      { service, expectedBytes: size },
+    );
+    const localHash = await sha256File(localPath);
+    if (localHash !== asset.content_sha256) throw new Error("local_predelete_checksum_mismatch");
+    const s3Path = join(workspace, "s3-final");
+    await downloadMusicStorageObjectToFile(
+      pilotLocation(asset, "timeweb_s3"),
+      s3Path,
+      { service, expectedBytes: size },
+    );
+    const s3Hash = await sha256File(s3Path);
+    if (s3Hash !== asset.content_sha256 || s3Hash !== localHash) {
+      throw new Error("s3_predelete_checksum_mismatch");
+    }
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+
   const removed = await removeMusicStorageObject(
     pilotLocation(asset, "supabase_file"),
     service,
@@ -346,4 +371,65 @@ export async function releaseLocalSupabaseCopy(asset: PilotAssetRow): Promise<st
     .eq("id", copy.id);
   if (error) throw new Error("release_ledger_write_failed");
   return "local_released";
+}
+
+/**
+ * Restore a Supabase duplicate from S3 after release-local (provider stays timeweb_s3).
+ * Enables rollback paths that need a local copy without deleting S3.
+ */
+export async function rehydrateLocalSupabaseCopy(asset: PilotAssetRow): Promise<string> {
+  const service = createServiceRoleClient();
+  if ((asset.storage_provider ?? "supabase_file") !== "timeweb_s3") {
+    throw new Error("rehydrate_requires_timeweb_provider");
+  }
+  if (!asset.content_sha256) throw new Error("asset_checksum_missing");
+  const size = pilotByteSize(asset);
+  const localHead = await headMusicStorageObject(pilotLocation(asset, "supabase_file"), service);
+  if (localHead && localHead.sizeBytes === size) return "local_already_present";
+
+  const workspace = await mkdtemp(join(tmpdir(), "audiolad-master-rehydrate-"));
+  try {
+    const sourcePath = join(workspace, "s3-source");
+    await downloadMusicStorageObjectToFile(
+      pilotLocation(asset, "timeweb_s3"),
+      sourcePath,
+      { service, expectedBytes: size },
+    );
+    const hash = await sha256File(sourcePath);
+    if (hash !== asset.content_sha256) throw new Error("s3_rehydrate_checksum_mismatch");
+    await uploadMusicStorageObjectFromFile(
+      pilotLocation(asset, "supabase_file"),
+      sourcePath,
+      {
+        service,
+        contentType: asset.accepted_mime_type || "application/octet-stream",
+        upsert: true,
+      },
+    );
+    const verifyPath = join(workspace, "local-verify");
+    await downloadMusicStorageObjectToFile(
+      pilotLocation(asset, "supabase_file"),
+      verifyPath,
+      { service, expectedBytes: size },
+    );
+    if (await sha256File(verifyPath) !== asset.content_sha256) {
+      throw new Error("local_rehydrate_verify_failed");
+    }
+    const { data: copy } = await service
+      .from("music_storage_copies")
+      .select("id,source_released_at")
+      .eq("asset_id", asset.id)
+      .eq("target_provider", "timeweb_s3")
+      .maybeSingle();
+    if (copy?.source_released_at) {
+      const now = new Date().toISOString();
+      await service
+        .from("music_storage_copies")
+        .update({ source_released_at: null, updated_at: now })
+        .eq("id", copy.id);
+    }
+    return "local_rehydrated";
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 }

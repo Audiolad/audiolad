@@ -1,4 +1,7 @@
+import { loadProductionEnvFromCwd } from "./load-production-env.mts";
 import { createServiceRoleClient } from "../src/lib/supabase/service-role";
+
+loadProductionEnvFromCwd();
 
 type Asset = {
   storage_provider: string | null;

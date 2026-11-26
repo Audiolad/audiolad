@@ -6,6 +6,7 @@ import {
   retryBackoffMs,
 } from "../src/lib/music-storage/host-guards";
 import { parseBulkMigrationOptions } from "../src/lib/music-storage/bulk-migration";
+import { readS3QuotaBytes } from "../src/lib/music-storage/s3-quota-guard";
 
 const options = parseBulkMigrationOptions([
   "--stage",
@@ -42,5 +43,11 @@ const host = readHostGuardSnapshot({
   loadAvg1Max: 999,
 });
 assert.ok(["ok", "warning", "pause", "critical"].includes(host.level));
+
+assert.equal(readS3QuotaBytes(), 100 * 1024 * 1024 * 1024);
+
+const defaults = parseBulkMigrationOptions([]);
+assert.equal(defaults.batchSize, 25);
+assert.equal(defaults.concurrency, 1);
 
 console.log("music-storage-bulk-unit: ok");

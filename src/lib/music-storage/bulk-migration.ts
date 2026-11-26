@@ -15,6 +15,7 @@ import {
   retryBackoffMs,
   type HostGuardThresholds,
 } from "./host-guards";
+import { evaluateS3QuotaBeforeCopy, type S3QuotaSnapshot } from "./s3-quota-guard";
 
 export type BulkStage = "copy" | "cutover" | "release-local";
 
@@ -58,6 +59,8 @@ export type BulkSessionResult = {
   paused: boolean;
   pauseReason?: string;
   next?: string;
+  s3Quota?: S3QuotaSnapshot;
+  lock?: { pid: number; path: string };
 };
 
 const ASSET_FIELDS = "id,storage_provider,storage_bucket,storage_path,accepted_mime_type,size_bytes,content_sha256,asset_role,lifecycle_state,created_at";
@@ -114,7 +117,8 @@ function copyNeedsWork(
   if (copy.status === "cutover" || copy.status === "rolled_back") return false;
   if (copy.status === "copying") {
     const ageMs = Date.now() - Date.parse(copy.updated_at);
-    if (ageMs < 3_600_000) return false;
+    const staleMs = Number(process.env.AUDIOLAD_MUSIC_STORAGE_COPYING_STALE_MS) || 900_000;
+    if (ageMs < staleMs) return false;
   }
   if (copy.status === "failed") {
     if (copy.attempt_count >= maxAttempts) return false;
@@ -295,9 +299,23 @@ export async function executeBulkBatch(
     .map((entry) => byId.get(entry.id))
     .filter((asset): asset is PilotAssetRow => Boolean(asset));
 
+  let s3Quota: S3QuotaSnapshot | undefined;
   if (options.stage === "copy" && work.length > 0) {
     const largest = Math.max(...work.map((asset) => pilotByteSize(asset)));
     await assertTempSpaceForBytes(largest);
+    const batchBytes = work.reduce((sum, asset) => sum + pilotByteSize(asset), 0);
+    s3Quota = await evaluateS3QuotaBeforeCopy(batchBytes);
+    if (!s3Quota.ok) {
+      return {
+        ...planned,
+        dryRun: false,
+        paused: true,
+        pauseReason: "s3_quota_exceeded",
+        s3Quota,
+        results: [],
+        next: "Reduce batch or raise TIMEWEB_S3_MUSIC_MASTERS_QUOTA_BYTES after review",
+      };
+    }
   }
 
   const results = await runWithConcurrency(work, options.concurrency, async (asset) => {
@@ -333,6 +351,7 @@ export async function executeBulkBatch(
     dryRun: false,
     totals,
     results,
+    s3Quota,
     paused: results.some((row) => row.outcome === "paused"),
   };
 }

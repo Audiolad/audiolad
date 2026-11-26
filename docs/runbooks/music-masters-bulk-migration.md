@@ -38,7 +38,48 @@ npm run music-storage:report
 npm run music-storage:bulk -- --stage copy --batch-size 25 --concurrency 1
 ```
 
-По умолчанию: `concurrency` 1 (временный каталог ≈ 2× размер файла), `batch-size` 25.
+Утверждённые стартовые параметры: **`--batch-size 25`**, **`--concurrency 1`**
+(значения по умолчанию в CLI).
+
+## Окружение на production
+
+Запуск **только** из `cd /var/www/audiolad-deploy/current` (симлинк
+`.env.local` → `shared/.env.production`). CLI вызывает `loadEnvConfig` из
+`@next/env` до обращения к Supabase/S3 (`scripts/load-production-env.mts`).
+
+## Параллельные процессы
+
+На execute действует **файловый exclusive lock** (по умолчанию
+`/tmp/audiolad-music-storage-bulk.lock`, override:
+`AUDIOLAD_MUSIC_STORAGE_BULK_LOCK`). Второй процесс получит
+`bulk_migration_already_running`. При аварийном завершении lock снимается;
+если PID в lock-файле уже не жив, lock переинициализируется.
+
+`SIGINT`/`SIGTERM` — освобождают lock; незавершённая копия остаётся в статусе
+`copying` и станет повторно eligible через **15 минут** (или
+`AUDIOLAD_MUSIC_STORAGE_COPYING_STALE_MS`).
+
+## Ёмкость бакета S3
+
+Перед copy (dry-run и execute) оценивается `ledgerBytes + batchBytes` против
+`TIMEWEB_S3_MUSIC_MASTERS_QUOTA_BYTES` (default **100 GiB**). При превышении —
+`paused`, `s3_quota_exceeded`.
+
+## release-local и восстановление
+
+`release-local` выполняет **полную** повторную загрузку локального и S3
+объекта и сверку SHA-256 **непосредственно перед** удалением Supabase-копии.
+
+После `release-local` canonical provider остаётся `timeweb_s3`. Восстановить
+локальную копию (для rollback и аварийного доступа) без cutover:
+
+```bash
+npm run music-storage:pilot -- --mode rehydrate-local --asset-id <uuid> --execute
+# + AUDIOLAD_MUSIC_STORAGE_PILOT=1
+```
+
+Эта операция скачивает из S3, загружает в Supabase Storage по тому же пути,
+проверяет SHA-256 и сбрасывает `source_released_at` в ledger.
 
 ### Выполнить пакет copy
 

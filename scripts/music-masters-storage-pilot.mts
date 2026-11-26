@@ -1,12 +1,16 @@
+import { loadProductionEnvFromCwd } from "./load-production-env.mts";
 import {
   copyPilotAsset,
   cutoverPilotAsset,
+  rehydrateLocalSupabaseCopy,
   rollbackPilotAsset,
   type PilotAssetRow,
 } from "../src/lib/music-storage/pilot-asset-ops";
+
+loadProductionEnvFromCwd();
 import { createServiceRoleClient } from "../src/lib/supabase/service-role";
 
-type Mode = "copy" | "cutover" | "rollback";
+type Mode = "copy" | "cutover" | "rollback" | "rehydrate-local";
 
 function argumentsFrom(argv: string[]): {
   mode: Mode;
@@ -23,8 +27,8 @@ function argumentsFrom(argv: string[]): {
     if (argument === "--execute") execute = true;
     else if (argument === "--mode") {
       const value = argv[index + 1];
-      if (value !== "copy" && value !== "cutover" && value !== "rollback") {
-        throw new Error("--mode must be copy, cutover or rollback");
+      if (value !== "copy" && value !== "cutover" && value !== "rollback" && value !== "rehydrate-local") {
+        throw new Error("--mode must be copy, cutover, rollback or rehydrate-local");
       }
       mode = value;
       index += 1;
@@ -101,7 +105,9 @@ async function main() {
       ? await copyPilotAsset(asset)
       : input.mode === "cutover"
         ? await cutoverPilotAsset(asset)
-        : await rollbackPilotAsset(asset);
+        : input.mode === "rehydrate-local"
+          ? await rehydrateLocalSupabaseCopy(asset)
+          : await rollbackPilotAsset(asset);
     results.push({ id: asset.id, outcome });
   }
   console.log(JSON.stringify({ dryRun: false, mode: input.mode, results }, null, 2));
