@@ -46,7 +46,7 @@ npm run music-storage:bulk -- --stage copy --batch-size 25 --concurrency 1
 
 Запуск **только** из `cd /var/www/audiolad-deploy/current` (симлинк
 `.env.local` → `shared/.env.production`). CLI вызывает `loadEnvConfig` из
-`@next/env` до обращения к Supabase/S3 (`scripts/load-production-env.mts`).
+`@next/env` до обращения к Supabase/S3 (`scripts/load-production-env.ts`, CJS `require`).
 
 ## Параллельные процессы
 
