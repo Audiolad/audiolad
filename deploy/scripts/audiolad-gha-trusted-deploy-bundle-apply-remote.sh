@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# Apply trusted deploy/ bundle tarball to shared staging (deploy user). GHA pipes tar on stdin.
+# Deploy-user fallback: extract trusted bundle to $HOME/.cache (never root-owned shared/).
 set -Eeuo pipefail
 
-DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
-DEST="${DEPLOY_ROOT}/shared/.gha-trusted-deploy"
-
+DEST="${HOME:?HOME must be set}/.cache/audiolad/gha-trusted-deploy"
 mkdir -p "$DEST"
 umask 077
-tar -xzf - -C "$DEST"
+if ! tar -xzf - -C "$DEST"; then
+  printf '%s\n' '{"error":"trusted_bundle_tar_failed"}' >&2
+  exit 1
+fi
+if [[ ! -d "$DEST/deploy/sbin" ]]; then
+  printf '%s\n' '{"error":"trusted_bundle_layout_invalid"}' >&2
+  exit 1
+fi
+chmod -R u=rwX,go-rwx "$DEST/deploy" 2>/dev/null || true
+printf '%s\n' "trusted_bundle_deploy_tree=${DEST}/deploy"
 printf '%s\n' "gha_trusted_deploy_bundle_applied=1"
-printf '%s\n' "deploy_tree=${DEST}/deploy"
+printf '%s\n' "OPS_TRUSTED_BUNDLE_END=ok"

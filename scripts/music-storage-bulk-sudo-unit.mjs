@@ -31,6 +31,8 @@ const bashScripts = [
   "deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh",
   "deploy/scripts/audiolad-music-storage-bulk-ops-privileged.sh",
   "deploy/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh",
+  "deploy/scripts/audiolad-music-storage-bulk-ops-privileged-trusted-bundle.sh",
+  "deploy/scripts/audiolad-music-storage-bulk-ops-preflight-remote.sh",
   "deploy/scripts/audiolad-music-storage-bulk-diag-remote.sh",
   "deploy/scripts/audiolad-deploy-maintenance-remote.sh",
   "deploy/scripts/audiolad-gha-trusted-deploy-bundle-apply-remote.sh",
@@ -43,6 +45,7 @@ const bashScripts = [
     "audiolad-music-storage-bulk-ops-stop",
     "audiolad-music-storage-bulk-ops-resume",
     "audiolad-music-storage-bulk-ops-diag",
+    "audiolad-music-storage-bulk-ops-trusted-bundle",
   ].map((name) => `deploy/sbin/${name}`),
 ];
 
@@ -66,6 +69,18 @@ const installRemote = readFileSync(
 assert.match(installRemote, /exec sudo -n "\$INSTALL"/);
 assert.doesNotMatch(installRemote, /sudo\s+-n\s+test/);
 assert.doesNotMatch(sudoersText, /\/current\/deploy\/scripts/);
+assert.match(sudoersText, /audiolad-music-storage-bulk-ops-trusted-bundle/);
+
+const ghaTrustedTest = spawnSync(
+  "bash",
+  [join(root, "deploy/scripts/audiolad-music-storage-bulk-gha-trusted-install-test.sh")],
+  { encoding: "utf8" },
+);
+assert.equal(
+  ghaTrustedTest.status,
+  0,
+  `gha-trusted-install-test: ${ghaTrustedTest.stderr || ghaTrustedTest.stdout}`,
+);
 assert.match(
   readFileSync(join(root, "deploy/sbin/audiolad-music-storage-bulk-install"), "utf8"),
   /\/usr\/local\/lib\/audiolad\/audiolad-music-storage-bulk-root-install\.sh/,
