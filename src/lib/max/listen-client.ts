@@ -1,11 +1,10 @@
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_LISTEN_STATS_PATH } from "@/lib/max/host";
-import { readListenStatsClientAuthenticated } from "@/lib/listen/listen-stats-client";
 
 /**
  * Linked MAX listeners accrue practice_listen_stats through the MAX host.
- * Apex Supabase cookies are absent in the mini-app; guest samples cannot set
- * rating_eligible_at for a registered user id.
+ * initData identifies the linked AudioLad user; apex Supabase cookies are not
+ * used (and on desktop MAX may be present without matching the linked user).
  */
 export function reportMaxLinkedListenSample(input: {
   authorSlug: string;
@@ -14,10 +13,6 @@ export function reportMaxLinkedListenSample(input: {
   positionMs: number;
   priorPositionMs: number | null;
 }): void {
-  if (readListenStatsClientAuthenticated()) {
-    return;
-  }
-
   const initData = readMaxInitData();
   if (!initData) {
     return;
