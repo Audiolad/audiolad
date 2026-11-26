@@ -29,8 +29,8 @@ export async function resolvePracticeRatingsUiEnabledForPractice(
   client: SupabaseClient,
   practice: {
     id: string;
-    publication_class: string | null | undefined;
-    product_kind: string | null | undefined;
+    publication_class?: string | null;
+    product_kind?: string | null;
   },
 ): Promise<boolean> {
   const hasStructuredCourseLessons = isCoursePublication(
