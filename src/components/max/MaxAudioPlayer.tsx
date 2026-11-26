@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
+import { reportMaxLinkedListenSample } from "@/lib/max/listen-client";
 import { reportGuestListenSample } from "@/lib/ratings/guest/listen-client";
 import {
   isMaxPreviewPlaybackMode,
@@ -36,6 +37,7 @@ export default function MaxAudioPlayer({
   externalQueue,
   hideTrackList = false,
   guestListen = false,
+  linkedListen = false,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -59,6 +61,8 @@ export default function MaxAudioPlayer({
   hideTrackList?: boolean;
   /** Unauthenticated MAX/VK listen samples for guest ratings. No-op when a site session exists. */
   guestListen?: boolean;
+  /** Linked MAX listener: accrue practice_listen_stats for rating eligibility. */
+  linkedListen?: boolean;
 }) {
   const {
     audioRef,
@@ -84,7 +88,7 @@ export default function MaxAudioPlayer({
   const lastGuestListenRef = useRef({ trackId: "", positionMs: 0, at: 0 });
 
   useEffect(() => {
-    if (!guestListen || !isPlaying || !currentTrack?.trackId) {
+    if ((!guestListen && !linkedListen) || !isPlaying || !currentTrack?.trackId) {
       return;
     }
     const trackId = currentTrack.trackId;
@@ -96,17 +100,28 @@ export default function MaxAudioPlayer({
     }
     const prior = sameTrack ? last.positionMs : null;
     lastGuestListenRef.current = { trackId, positionMs, at: Date.now() };
-    reportGuestListenSample({
-      authorSlug: session.authorSlug,
-      productSlug: session.productSlug,
-      audioItemId: trackId,
-      positionMs,
-      priorPositionMs: prior,
-    });
+    if (linkedListen) {
+      reportMaxLinkedListenSample({
+        authorSlug: session.authorSlug,
+        productSlug: session.productSlug,
+        audioItemId: trackId,
+        positionMs,
+        priorPositionMs: prior,
+      });
+    } else {
+      reportGuestListenSample({
+        authorSlug: session.authorSlug,
+        productSlug: session.productSlug,
+        audioItemId: trackId,
+        positionMs,
+        priorPositionMs: prior,
+      });
+    }
   }, [
     currentTime,
     currentTrack?.trackId,
     guestListen,
+    linkedListen,
     isPlaying,
     session.authorSlug,
     session.productSlug,

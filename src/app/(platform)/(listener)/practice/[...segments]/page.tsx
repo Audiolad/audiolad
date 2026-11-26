@@ -115,9 +115,9 @@ import { loadCourseStorefrontPreviewAvailable } from "@/lib/course-content/store
 import { resolvePracticeFileViewerRoute } from "@/lib/course-content/learner-file-http";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
-import { isRatingsUiEnabled } from "@/lib/ratings/feature";
 import { isGuestRatingsCollectEnabled } from "@/lib/ratings/guest/feature";
 import { getPracticeRatingAggregate } from "@/lib/ratings/read";
+import { resolvePracticeRatingsUiEnabledForPractice } from "@/lib/ratings/ui-visibility";
 import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -830,9 +830,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const promoStartPending =
     validPromoStart && !isHeroPromoOfferActive(priceOffer);
 
-  const ratingsUiEnabled =
-    isRatingsUiEnabled() &&
-    !isCoursePublication(practice.publication_class, practice.product_kind);
+  let ratingsUiEnabled = false;
+  try {
+    ratingsUiEnabled = await resolvePracticeRatingsUiEnabledForPractice(
+      productDataClient,
+      practice,
+    );
+  } catch {
+    ratingsUiEnabled = false;
+  }
 
   let ratingAggregate = EMPTY_RATING_AGGREGATE;
   if (ratingsUiEnabled) {

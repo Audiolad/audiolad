@@ -66,6 +66,11 @@ assert.deepEqual(popularPage.items[0]?.public_metrics, {
   qualified_listen_count: 42,
   total_stars: 9,
 });
+assert.deepEqual(
+  popularPage.items[0]?.public_metrics.total_stars,
+  listingCandidate.totalStars,
+  "popular sort cards must show star totals when sort metrics load both dimensions",
+);
 
 const freshCandidate = {
   ...listingCandidate,
@@ -92,6 +97,27 @@ assert.deepEqual(enrichedPopular.items[0]?.public_metrics, {
   total_stars: 9,
 });
 
+const ratingPageWithStaleZeros = {
+  ...popularPage,
+  items: popularPage.items.map((item) => ({
+    ...item,
+    public_metrics: { qualified_listen_count: 0, total_stars: 37 },
+  })),
+};
+const enrichedRating = await attachPublicMetricsToListingResult(
+  ratingPageWithStaleZeros,
+  "rating",
+  [listingCandidate],
+);
+assert.deepEqual(
+  enrichedRating.items[0]?.public_metrics,
+  {
+    qualified_listen_count: 42,
+    total_stars: 9,
+  },
+  "rating sort must restore listen count from ranked candidates",
+);
+
 const shell = read("src/components/catalog/cards/CatalogCardShell.tsx");
 assert.match(shell, /CatalogCardPublicMetrics/);
 assert.match(
@@ -111,5 +137,17 @@ assert.match(dto, /public_metrics: CatalogPublicMetrics/);
 
 const methodology = read("src/lib/admin/catalog-sort-methodology.ts");
 assert.match(methodology, /Публичное отображение/);
+
+const listing = read("src/lib/catalog/listing.ts");
+assert.match(
+  listing,
+  /loadCatalogListingSortMetrics\([\s\S]*popular: true,\s*rating: true/,
+  "sort ranking must always load listen and star metrics for card display",
+);
+assert.match(
+  listing,
+  /mergeListingPublicMetricsFromCandidates/,
+  "popular/rating attach merges both metrics from ranked candidates",
+);
 
 console.log("catalog-public-metrics-unit: ok");

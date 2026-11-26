@@ -20,6 +20,7 @@ import {
   isActiveRatingEligibleAt,
 } from "../src/lib/ratings/eligibility";
 import { isRatingsUiEnabled } from "../src/lib/ratings/feature";
+import { resolvePracticeRatingsUiEnabled } from "../src/lib/ratings/ui-visibility-policy";
 import { hmacRatingSignal } from "../src/lib/ratings/signal-hmac";
 import { parsePracticeRatingStars } from "../src/lib/ratings/stars";
 import {
@@ -636,7 +637,7 @@ function testSourceContracts() {
   assert.match(previewAccess, /isCatalogPreviewApiPurpose/);
 
   assert.match(feature, /RATINGS_UI_ENABLED/);
-  assert.match(page, /isRatingsUiEnabled/);
+  assert.match(page, /resolvePracticeRatingsUiEnabledForPractice/);
   assert.match(pdp, /PracticeRatingStars/);
   assert.match(pdp, /ratingsUiEnabled/);
   assert.match(audioPost, /PracticeRatingStars/);
@@ -848,5 +849,44 @@ testAggregateNoDoubleCount();
 testClientContracts();
 testSourceContracts();
 testPaidPreviewRatingMatrix();
+
+function testRatingsUiVisibilityPolicy() {
+  const enabledEnv = { RATINGS_UI_ENABLED: "1" };
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled({
+      publicationClass: "practice",
+      productKind: "practice",
+      hasStructuredCourseLessons: false,
+      env: enabledEnv,
+    }),
+    true,
+    "practice products show rating UI when feature is on",
+  );
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled({
+      publicationClass: "course",
+      productKind: "practice",
+      hasStructuredCourseLessons: false,
+      env: enabledEnv,
+    }),
+    true,
+    "course-tagged audio program without lessons keeps rating UI (Bug 3)",
+  );
+
+  assert.equal(
+    resolvePracticeRatingsUiEnabled({
+      publicationClass: "course",
+      productKind: "practice",
+      hasStructuredCourseLessons: true,
+      env: enabledEnv,
+    }),
+    false,
+    "structured courses with lessons hide rating UI until course rating ships",
+  );
+}
+
+testRatingsUiVisibilityPolicy();
 
 console.log("practice-ratings-unit: ok");

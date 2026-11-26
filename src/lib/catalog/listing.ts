@@ -177,10 +177,7 @@ export async function rankCatalogListingCandidates(
       const metricsClient = createServiceRoleClient();
       const metricsById = await loadCatalogListingSortMetrics(
         candidates.map((item) => item.publication_id),
-        {
-          popular: sort === "popular",
-          rating: sort === "rating",
-        },
+        { popular: true, rating: true },
         metricsClient,
       );
       prepared = attachCatalogListingSortMetrics(candidates, metricsById);
@@ -395,13 +392,34 @@ function toPublicListingCard(item: CatalogListingCandidate): CatalogCard {
   };
 }
 
+function mergeListingPublicMetricsFromCandidates(
+  page: CatalogListingResult,
+  sortedCandidates: readonly CatalogListingCandidate[],
+): CatalogListingResult {
+  const metricsById = new Map(
+    sortedCandidates.map((item) => [
+      item.publication_id,
+      buildCatalogPublicMetrics(item.popularListenCount, item.totalStars),
+    ]),
+  );
+
+  return {
+    ...page,
+    items: page.items.map((item) => ({
+      ...item,
+      public_metrics:
+        metricsById.get(item.publication_id) ?? item.public_metrics,
+    })),
+  };
+}
+
 export async function attachPublicMetricsToListingResult(
   page: CatalogListingResult,
   sort: CatalogSort,
   sortedCandidates: readonly CatalogListingCandidate[],
 ): Promise<CatalogListingResult> {
   if (sort === "popular" || sort === "rating") {
-    return page;
+    return mergeListingPublicMetricsFromCandidates(page, sortedCandidates);
   }
 
   const publicationIds = page.items.map((item) => item.publication_id);

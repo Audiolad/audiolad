@@ -21,6 +21,7 @@ import {
   isMaxPromoPath,
   isMaxPromoAnalyticsPath,
   isMaxRatingPath,
+  isMaxListenStatsPath,
   isMaxAppreciationPath,
   isMaxLibraryPath,
   isMaxProfilePath,
@@ -42,6 +43,7 @@ import {
   MAX_PROMO_PATH,
   MAX_PROMO_ANALYTICS_PATH,
   MAX_RATING_PATH,
+  MAX_LISTEN_STATS_PATH,
   MAX_APPRECIATION_PATH,
   MAX_LIBRARY_PATH,
   MAX_PROFILE_PATH,
@@ -148,6 +150,8 @@ assert.equal(isMaxPromoAnalyticsPath(MAX_PROMO_ANALYTICS_PATH), true);
 assert.equal(isMaxPromoAnalyticsPath(`${MAX_PROMO_ANALYTICS_PATH}/`), false);
 assert.equal(isMaxRatingPath(MAX_RATING_PATH), true);
 assert.equal(isMaxRatingPath(`${MAX_RATING_PATH}/`), false);
+assert.equal(isMaxListenStatsPath(MAX_LISTEN_STATS_PATH), true);
+assert.equal(isMaxListenStatsPath(`${MAX_LISTEN_STATS_PATH}/`), false);
 assert.equal(isMaxAppreciationPath(MAX_APPRECIATION_PATH), true);
 assert.equal(isMaxAppreciationPath(`${MAX_APPRECIATION_PATH}/`), false);
 assert.equal(isMaxPlaybackSessionPath(MAX_PLAYBACK_SESSION_PATH), true);
@@ -178,6 +182,7 @@ assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PROMO_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PROMO_ANALYTICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_RATING_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_LISTEN_STATS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_APPRECIATION_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_SESSION_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_AUDIO_PATH, "pass_through");
@@ -204,6 +209,7 @@ assertMaxAction(MAX_HOSTNAME, `${MAX_PROMO_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/promo/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PROMO_ANALYTICS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_RATING_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_LISTEN_STATS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_APPRECIATION_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/rating/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/appreciation/extra", "not_found");

@@ -762,7 +762,9 @@ function testSurfacesAndRegisteredRegression() {
   const maxPlayer = read("src/components/max/MaxAudioPlayer.tsx");
   const listenClient = read("src/lib/ratings/guest/listen-client.ts");
   assert.match(maxPlayer, /reportGuestListenSample/);
+  assert.match(maxPlayer, /reportMaxLinkedListenSample/);
   assert.match(maxPlayer, /guestListen/);
+  assert.match(maxPlayer, /linkedListen/);
   assert.doesNotMatch(maxPlayer, /\/listen\/|\/practice\//);
   assert.match(listenClient, /readListenStatsClientAuthenticated\(\)/);
   assert.match(listenClient, /listen-stats/);
