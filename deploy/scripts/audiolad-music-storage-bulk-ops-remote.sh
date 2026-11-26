@@ -1,36 +1,40 @@
 #!/usr/bin/env bash
 # Remote ops entry for GHA production-deploy music-storage bulk controls.
-# Never invokes audiolad-deploy. Hardcoded actions only.
+# Never invokes audiolad-deploy. Hardcoded actions only; uses narrow sudo wrappers.
 set -Eeuo pipefail
 
 ACTION="${1:-status}"
-CTL="/usr/local/lib/audiolad/audiolad-music-storage-bulk-ctl.sh"
 
-if [[ ! -x "$CTL" ]]; then
-  printf '%s\n' '{"error":"ctl_not_installed"}' >&2
-  exit 1
-fi
+sbin_for_action() {
+  case "$1" in
+    status) printf '%s\n' /usr/local/sbin/audiolad-music-storage-bulk-ops-status ;;
+    start_copy) printf '%s\n' /usr/local/sbin/audiolad-music-storage-bulk-ops-start-copy ;;
+    pause) printf '%s\n' /usr/local/sbin/audiolad-music-storage-bulk-ops-pause ;;
+    resume) printf '%s\n' /usr/local/sbin/audiolad-music-storage-bulk-ops-resume ;;
+    stop) printf '%s\n' /usr/local/sbin/audiolad-music-storage-bulk-ops-stop ;;
+    *) return 1 ;;
+  esac
+}
 
 case "$ACTION" in
-  status)
-    "$CTL" status copy
-    ;;
-  start_copy)
-    "$CTL" start copy
-    systemctl enable --now audiolad-music-storage-bulk-copy.timer
-    systemctl status audiolad-music-storage-bulk-copy.timer --no-pager || true
-    ;;
-  pause)
-    "$CTL" pause copy
-    ;;
-  stop)
-    "$CTL" stop copy
-    systemctl disable --now audiolad-music-storage-bulk-copy.timer 2>/dev/null || true
-    systemctl disable --now audiolad-music-storage-bulk-cutover.timer 2>/dev/null || true
-    systemctl disable --now audiolad-music-storage-bulk-release-local.timer 2>/dev/null || true
-    ;;
+  status|start_copy|pause|resume|stop) ;;
   *)
     printf '%s\n' '{"error":"unknown_action"}' >&2
     exit 2
     ;;
 esac
+
+SBIN="$(sbin_for_action "$ACTION")"
+if ! sudo -n test -x "$SBIN" 2>/dev/null; then
+  if ! sudo -n /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap 2>/dev/null; then
+    printf '%s\n' '{"error":"music_storage_bulk_privileged_assets_missing","hint":"run_production_DEPLOY_once"}' >&2
+    exit 1
+  fi
+fi
+
+if ! sudo -n test -x "$SBIN" 2>/dev/null; then
+  printf '%s\n' '{"error":"privileged_ops_sbin_missing"}' >&2
+  exit 1
+fi
+
+exec sudo -n "$SBIN"

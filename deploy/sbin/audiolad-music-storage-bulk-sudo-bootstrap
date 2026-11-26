@@ -1,0 +1,15 @@
+#!/bin/bash
+# Intended install: /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap
+set -Eeuo pipefail
+if [[ $# -ne 0 ]]; then
+  printf 'ERROR: accepts no arguments.\n' >&2
+  exit 1
+fi
+PATH=/usr/sbin:/usr/bin:/bin
+export PATH
+PINNED=/usr/local/lib/audiolad/audiolad-music-storage-bulk-sudo-bootstrap-pinned.sh
+if [[ ! -x "$PINNED" ]]; then
+  printf 'ERROR: pinned bootstrap missing; run production DEPLOY first.\n' >&2
+  exit 1
+fi
+exec "$PINNED"

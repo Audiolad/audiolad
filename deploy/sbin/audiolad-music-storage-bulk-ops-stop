@@ -1,0 +1,6 @@
+#!/bin/bash
+set -Eeuo pipefail
+[[ $# -eq 0 ]] || { printf 'ERROR: accepts no arguments.\n' >&2; exit 1; }
+PATH=/usr/sbin:/usr/bin:/bin
+export PATH
+exec /usr/local/lib/audiolad/audiolad-music-storage-bulk-ops-privileged.sh stop

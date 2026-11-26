@@ -14,6 +14,7 @@ import {
 import {
   paginateCatalogListingItems,
   attachPublicMetricsToListingResult,
+  loadCatalogListingPublicMetricsById,
 } from "../src/lib/catalog/listing.ts";
 import { adaptLegacyCatalogSourceToCard } from "../src/lib/catalog/legacy-adapter.ts";
 
@@ -141,8 +142,18 @@ assert.match(methodology, /Публичное отображение/);
 const listing = read("src/lib/catalog/listing.ts");
 assert.match(
   listing,
+  /export async function loadCatalogListingPublicMetricsById/,
+  "shared loader for publication-date sort card metrics",
+);
+assert.match(
+  listing,
   /loadCatalogListingSortMetrics\([\s\S]*popular: true,\s*rating: true/,
   "sort ranking must always load listen and star metrics for card display",
+);
+assert.equal(
+  typeof loadCatalogListingPublicMetricsById,
+  "function",
+  "loadCatalogListingPublicMetricsById is importable",
 );
 assert.match(
   listing,
