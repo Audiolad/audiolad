@@ -270,6 +270,7 @@ function main() {
   );
   for (const musicBulkConfirm of [
     "OPS_MUSIC_STORAGE_BULK_STATUS",
+    "OPS_MUSIC_STORAGE_BULK_DIAG",
     "OPS_MUSIC_STORAGE_BULK_INSTALL",
     "OPS_MUSIC_STORAGE_BULK_START_COPY",
     "OPS_MUSIC_STORAGE_BULK_PAUSE",

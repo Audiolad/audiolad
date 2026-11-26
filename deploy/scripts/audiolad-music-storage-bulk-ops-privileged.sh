@@ -15,6 +15,12 @@ case "$ACTION" in
     "$CTL" status copy
     ;;
   start_copy)
+    ENABLE_ENV="/usr/local/lib/audiolad/audiolad-music-storage-bulk-enable-copy-env.sh"
+    if [[ ! -x "$ENABLE_ENV" ]]; then
+      printf '%s\n' '{"error":"enable_copy_env_helper_missing"}' >&2
+      exit 1
+    fi
+    "$ENABLE_ENV"
     "$CTL" start copy
     systemctl enable --now audiolad-music-storage-bulk-copy.timer
     systemctl status audiolad-music-storage-bulk-copy.timer --no-pager || true

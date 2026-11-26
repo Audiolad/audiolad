@@ -62,6 +62,7 @@ on:
           - OPS_STUDIO_DUPLICATE_ASSET_DIAG
           - OPS_COURSE_UPGRADE_DIAG
           - OPS_MUSIC_STORAGE_BULK_STATUS
+          - OPS_MUSIC_STORAGE_BULK_DIAG
           - OPS_MUSIC_STORAGE_BULK_INSTALL
           - OPS_MUSIC_STORAGE_BULK_START_COPY
           - OPS_MUSIC_STORAGE_BULK_PAUSE
@@ -4544,6 +4545,7 @@ jobs:
     needs: resolve
     if: |
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STATUS' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_DIAG' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_INSTALL' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_START_COPY' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_PAUSE' ||
@@ -4609,6 +4611,7 @@ jobs:
           set -euo pipefail
           case "${CONFIRM}" in
             OPS_MUSIC_STORAGE_BULK_STATUS) ACTION=status ;;
+            OPS_MUSIC_STORAGE_BULK_DIAG) ;;
             OPS_MUSIC_STORAGE_BULK_INSTALL) ACTION=install ;;
             OPS_MUSIC_STORAGE_BULK_START_COPY) ACTION=start_copy ;;
             OPS_MUSIC_STORAGE_BULK_PAUSE) ACTION=pause ;;
@@ -4616,6 +4619,31 @@ jobs:
             OPS_MUSIC_STORAGE_BULK_STOP) ACTION=stop ;;
             *) echo "unexpected confirm=${CONFIRM}" >&2; exit 1 ;;
           esac
+          if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_DIAG" ]]; then
+            umask 077
+            DIAG_HELPER="$(mktemp)"
+            chmod 0600 "${DIAG_HELPER}"
+            curl -fsS \
+              -H "Accept: application/vnd.github.raw+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -o "${DIAG_HELPER}" \
+              -- \
+              "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-music-storage-bulk-diag-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+            test -s "${DIAG_HELPER}"
+            bash -n "${DIAG_HELPER}"
+            ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              "bash -s" < "${DIAG_HELPER}"
+            rm -f "${DIAG_HELPER}"
+            exit 0
+          fi
           if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_INSTALL" ]]; then
             umask 077
             INSTALL_HELPER="$(mktemp)"

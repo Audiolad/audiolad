@@ -48,6 +48,11 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 `deploy.sh`), затем `OPS_MUSIC_STORAGE_BULK_INSTALL`. Без DEPLOY INSTALL вернёт
 `run_production_DEPLOY_once_then_retry_OPS_INSTALL`.
 
+**Перед автокопированием:** `OPS_MUSIC_STORAGE_BULK_DIAG` (read-only: диск,
+`music-storage:report`, dry-run batch 25, timer/env). Реальный старт —
+`OPS_MUSIC_STORAGE_BULK_START_COPY` (ставит `AUDIOLAD_MUSIC_STORAGE_BULK=1` в
+env как root, **без** ручного правки на VPS).
+
 **Вручную (deploy-пользователь на VPS):**  
 `bash deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`
 
