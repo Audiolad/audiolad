@@ -126,6 +126,11 @@ assert.equal(PRODUCT_VIDEO_EXPORT_MAX_BACKGROUND_DURATION_SECONDS, 60);
 
 const ui = read("src/components/author-dashboard/AuthorProductVideoExport.tsx");
 assert.match(ui, /Видео для площадок/);
+assert.match(ui, /data-testid="author-product-video-export-toggle"/);
+assert.match(ui, /data-testid="author-product-video-export-body"/);
+assert.match(ui, /useState\(false\)/, "collapsed by default on fresh open");
+assert.match(ui, /hidden=\{!expanded\}/);
+assert.match(ui, /inert=\{!expanded\}/);
 assert.match(ui, /Создать MP4 из аудио/);
 assert.match(ui, /Скачать MP4/);
 assert.match(ui, /Создать заново/);
@@ -162,6 +167,13 @@ const availableExportHtml = renderToStaticMarkup(
   }),
 );
 assert.match(availableExportHtml, /Видео для площадок/);
+assert.match(availableExportHtml, /aria-expanded="false"/, "toggle collapsed by default");
+assert.match(availableExportHtml, /hidden=""/, "body hidden while collapsed");
+assert.doesNotMatch(
+  availableExportHtml,
+  /aria-expanded="true"/,
+  "fresh editor open does not expand video block",
+);
 assert.match(availableExportHtml, /Обложка 16:9/);
 assert.match(availableExportHtml, /Обложка 9:16/);
 assert.match(availableExportHtml, /Видеофон 16:9/);
