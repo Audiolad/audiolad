@@ -403,6 +403,7 @@ export function maxLibraryCatalogToProduct(
     formatLabel: item.displayLabel ?? "",
     priceLabel: item.priceLabel ?? "",
     isFree: isProductFree(item.isFree, item.price),
+    publicMetrics: { qualifiedListenCount: 0, totalStars: 0 },
     gallery: [],
   };
 }

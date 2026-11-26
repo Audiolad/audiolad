@@ -1,3 +1,5 @@
+import type { MaxProductRecommendationView } from "@/lib/max/product-view";
+
 /**
  * Safe MAX catalog card DTO shared by the catalog grid and Home shelves.
  * Internal ids, storage paths, and auth fields are not part of this shape.
@@ -146,5 +148,29 @@ function readMaxCatalogGallerySlide(
     image_url: imageUrl,
     alt: typeof slide.alt === "string" ? slide.alt : "",
     position,
+  };
+}
+
+const EMPTY_MAX_PUBLIC_METRICS: MaxCatalogPublicMetrics = {
+  qualifiedListenCount: 0,
+  totalStars: 0,
+};
+
+/** Opens a PDP recommendation in the catalog product flow (metrics load on detail fetch). */
+export function maxRecommendationToCatalogProduct(
+  item: MaxProductRecommendationView,
+): MaxCatalogProduct {
+  return {
+    authorSlug: item.authorSlug,
+    slug: item.slug,
+    title: item.title,
+    subtitle: item.subtitle,
+    coverUrl: item.coverUrl,
+    authorName: item.authorName,
+    formatLabel: item.formatLabel,
+    priceLabel: item.priceLabel,
+    isFree: item.isFree,
+    publicMetrics: EMPTY_MAX_PUBLIC_METRICS,
+    gallery: [],
   };
 }
