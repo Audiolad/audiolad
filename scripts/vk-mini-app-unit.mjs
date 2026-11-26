@@ -803,6 +803,25 @@ try {
   assert.equal(catalogCalls[0].topicKey, "sleep");
   assert.equal("limit" in catalogCalls[0], false);
 
+  setListMaxPublishedCatalogForTests(async (input = {}) => {
+    const items =
+      input.sort === "rating"
+        ? [{ ...guestCard, slug: "rating-first", title: "По рейтингу" }]
+        : [{ ...guestCard, slug: "new-first", title: "По новизне" }];
+    return { ok: true, items };
+  });
+  catalogCalls.length = 0;
+  const rated = await postCatalog(request("https://audiolad.ru/api/vk/catalog", {
+    sort: "rating",
+  }));
+  const ratedBody = await rated.json();
+  assert.equal(rated.status, 200);
+  assert.equal(ratedBody.items[0].slug, "rating-first");
+  assert.equal(catalogCalls[0].sort, "rating");
+  const newest = await postCatalog(request("https://audiolad.ru/api/vk/catalog", {}));
+  const newestBody = await newest.json();
+  assert.equal(newestBody.items[0].slug, "new-first");
+
   const badSection = await postCatalog(request("https://audiolad.ru/api/vk/catalog", {
     section: "secret",
   }));

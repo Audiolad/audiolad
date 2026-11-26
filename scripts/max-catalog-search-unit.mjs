@@ -84,7 +84,7 @@ assert.match(clear, /restoreDefaultCatalog\(\)/);
 assert.match(search, /new AbortController\(\)/);
 assert.match(search, /abortRef\.current\?\.abort\(\)/);
 assert.match(search, /requestId !== requestGenerationRef\.current \|\| controller\.signal\.aborted/);
-assert.match(search, /JSON\.stringify\(\{ initData \}\)/);
+assert.doesNotMatch(search, /JSON\.stringify\(\{ initData \}\)/);
 assert.match(
   search,
   /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*query: normalized/,
@@ -241,5 +241,65 @@ assert.match(search, /<CatalogGrid items=\{gridItems\}/);
 const catalogGrid = search.slice(search.indexOf("function CatalogGrid"));
 assert.match(catalogGrid, /\{items\.map\(\(product\) =>/);
 assert.doesNotMatch(catalogGrid, /\.slice\(/);
+
+const productSort = read("src/components/max/MaxCatalogProductSort.tsx");
+assert.match(productSort, /CATALOG_PRODUCT_SORT_OPTIONS/);
+assert.match(search, /<MaxCatalogProductSort sort=\{catalogSort\} onChange=\{applyCatalogSort\} \/>/);
+
+const applySort = search.slice(
+  search.indexOf("function applyCatalogSort"),
+  search.indexOf("useEffect(() => {", search.indexOf("function applyCatalogSort")),
+);
+assert.match(applySort, /sectionCacheRef\.current\.clear\(\)/);
+assert.match(applySort, /catalogSortRef\.current = nextSort/);
+assert.match(applySort, /loadRootCatalog\(\)/);
+assert.match(applySort, /loadSectionCatalog\(section\)/);
+assert.match(applySort, /beginSearch\(/);
+assert.match(applySort, /loadFilteredCatalog\(/);
+
+const loadRoot = search.slice(
+  search.indexOf("function loadRootCatalog"),
+  search.indexOf("function loadSectionCatalog"),
+);
+assert.match(
+  loadRoot,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*sort: catalogSortRef\.current/,
+);
+assert.doesNotMatch(loadRoot, /JSON\.stringify\(\{ initData \}\)/);
+
+const loadSection = search.slice(
+  search.indexOf("function loadSectionCatalog"),
+  search.indexOf("function loadFilteredCatalog"),
+);
+assert.match(
+  loadSection,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*section,[\s\S]*sort: catalogSortRef\.current/,
+);
+assert.doesNotMatch(loadSection, /JSON\.stringify\(\{ initData, section \}\)/);
+
+const guestMountEffect = search.slice(
+  search.lastIndexOf("useEffect(() => {", search.indexOf("}, [guestTransport]);")),
+  search.indexOf("}, [guestTransport]);"),
+);
+assert.match(
+  guestMountEffect,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*sort: catalogSortRef\.current/,
+  "initial catalog load sends active sort with initData",
+);
+
+const beginSearchBlock = search.slice(
+  search.indexOf("function beginSearch"),
+  search.indexOf("function scheduleSearch"),
+);
+assert.match(beginSearchBlock, /sort: catalogSortRef\.current/);
+assert.match(beginSearchBlock, /guestTransport\.postCatalog\(/);
+assert.match(
+  beginSearchBlock,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*sort: catalogSortRef\.current/,
+);
+
+const vkTransport = read("src/lib/vk/guest-transport.ts");
+assert.match(vkTransport, /query\.sort !== "new"/);
+assert.match(vkTransport, /body\.sort = query\.sort/);
 
 console.log("max-catalog-search-unit: ok");

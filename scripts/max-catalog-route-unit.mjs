@@ -303,6 +303,78 @@ try {
   );
   assert.equal(blockedOrigin.status, 403);
   assert.equal(blockedOrigin.body.reason, "forbidden_origin");
+
+  setListMaxPublishedCatalogForTests(async (input) => {
+    const items =
+      input?.sort === "popular"
+        ? [
+            {
+              authorSlug: "author",
+              slug: "popular-first",
+              title: "Популярный",
+              subtitle: null,
+              coverUrl: null,
+              authorName: "Автор",
+              formatLabel: "Аудиопрактика",
+              priceLabel: "Бесплатно",
+              isFree: true,
+            },
+            {
+              authorSlug: "author",
+              slug: "popular-second",
+              title: "Второй",
+              subtitle: null,
+              coverUrl: null,
+              authorName: "Автор",
+              formatLabel: "Аудиопрактика",
+              priceLabel: "Бесплатно",
+              isFree: true,
+            },
+          ]
+        : [
+            {
+              authorSlug: "author",
+              slug: "new-first",
+              title: "Новый",
+              subtitle: null,
+              coverUrl: null,
+              authorName: "Автор",
+              formatLabel: "Аудиопрактика",
+              priceLabel: "Бесплатно",
+              isFree: true,
+            },
+            {
+              authorSlug: "author",
+              slug: "new-second",
+              title: "Второй",
+              subtitle: null,
+              coverUrl: null,
+              authorName: "Автор",
+              formatLabel: "Аудиопрактика",
+              priceLabel: "Бесплатно",
+              isFree: true,
+            },
+          ];
+    return { ok: true, items };
+  });
+  const popularSort = await readJson(
+    await POST(maxRequest({ initData: currentInitData(), sort: "popular" })),
+  );
+  assert.equal(popularSort.status, 200);
+  assert.deepEqual(
+    popularSort.body.items.map((item) => item.slug),
+    ["popular-first", "popular-second"],
+    "popular sort changes card order in API response",
+  );
+  const newSort = await readJson(
+    await POST(maxRequest({ initData: currentInitData(), sort: "new" })),
+  );
+  assert.equal(newSort.status, 200);
+  assert.deepEqual(
+    newSort.body.items.map((item) => item.slug),
+    ["new-first", "new-second"],
+    "default new sort keeps default card order",
+  );
 } finally {
   setListMaxPublishedCatalogForTests(null);
   if (previousToken === undefined) {
