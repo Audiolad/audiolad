@@ -44,5 +44,7 @@ History-hole reissue (SQL unchanged; only versions moved after production max
 
 History-hole reissue (SQL unchanged): `20260901130000_author_support_mode.sql` → `20260902120200_author_support_mode.sql`. Production max is now `20260902120000`; local max was `20260902120100` (later `20260903120000_search_practice_visibility_users.sql` is already on main). New stamp sits after analytics `20260902120100` so search can still replace the 3-column list wrapper. SQL unchanged.
 
+History-hole reissue (SQL unchanged): `20270412120000_music_storage_source_released.sql` → `20271126130000_music_storage_source_released.sql`. Production already had `20271126120000_catalog_listing_qualified_listen_counts` from deploy `c5b8ab2f` while `20270412120000` was absent from the tree; first deploy with the file aborted `database_migration_history_drift`. New stamp sits after catalog listens RPC so ordinary deploy can apply the additive column.
+
 Do not invent a parallel history table. After a one-time baseline, ordinary
 deploy applies pending files by these unique versions.
