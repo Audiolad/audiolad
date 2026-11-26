@@ -7,5 +7,9 @@ if [[ $# -ne 0 ]]; then
 fi
 PATH=/usr/sbin:/usr/bin:/bin
 export PATH
-CURRENT="$(readlink -f /var/www/audiolad-deploy/current)"
-exec "$CURRENT/deploy/scripts/audiolad-music-storage-bulk-root-install.sh"
+LIB_ROOT_INSTALL=/usr/local/lib/audiolad/audiolad-music-storage-bulk-root-install.sh
+if [[ ! -x "$LIB_ROOT_INSTALL" ]]; then
+  printf 'ERROR: pinned root install missing; run production DEPLOY or bootstrap.\n' >&2
+  exit 1
+fi
+exec "$LIB_ROOT_INSTALL"

@@ -1,7 +1,6 @@
 # Narrow sudoers for music-storage bulk orchestrator GHA ops (production deploy user).
 # No NOPASSWD: ALL. No wildcards. No SETENV.
-# Seed path via /current works before sbin wrappers exist on the host.
-deploy ALL=(root) NOPASSWD: /var/www/audiolad-deploy/current/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh ""
+# Initial install of this file is performed by deploy.sh as root (Production DEPLOY).
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-install ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-status ""

@@ -506,11 +506,12 @@ Trusted helpers с `origin/main` (Contents API): INSTALL →
 | `OPS_MUSIC_STORAGE_BULK_STOP` | `…-ops-stop` |
 
 sudoers: `deploy/sudoers/audiolad-music-storage-bulk` →
-`/etc/sudoers.d/audiolad-music-storage-bulk` (`visudo -cf`). Bootstrap ставится
-из `deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh` (также при
-успешном `deploy.sh`). До первого bootstrap допустим seed через ту же строку
-sudoers на путь
-`/var/www/audiolad-deploy/current/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh`.
+`/etc/sudoers.d/audiolad-music-storage-bulk` (`visudo -cf`). **Первичная**
+установка sudoers + `/usr/local/sbin` + pinned `/usr/local/lib/audiolad`
+выполняется **только как root** в конце успешного Production `deploy.sh`
+(циклической зависимости от ещё не установленного sudoers нет). `/usr/local/sbin/*`
+исполняет **только** pinned root-owned копии в `/usr/local/lib/audiolad`,
+не `exec` через symlink `current` от имени root.
 
 Не включает timers, не выставляет `AUDIOLAD_MUSIC_STORAGE_BULK=1`, не запускает
 cutover / release-local / глобальный upload provider.

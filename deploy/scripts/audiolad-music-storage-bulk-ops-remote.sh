@@ -26,14 +26,9 @@ esac
 
 SBIN="$(sbin_for_action "$ACTION")"
 if ! sudo -n test -x "$SBIN" 2>/dev/null; then
-  if sudo -n /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap 2>/dev/null; then
-    :
-  else
-    CURRENT="$(readlink -f /var/www/audiolad-deploy/current)"
-    BOOT="${CURRENT}/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh"
-    if [[ -f "$BOOT" ]]; then
-      sudo -n "$BOOT" || true
-    fi
+  if ! sudo -n /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap 2>/dev/null; then
+    printf '%s\n' '{"error":"music_storage_bulk_privileged_assets_missing","hint":"run_production_DEPLOY_once"}' >&2
+    exit 1
   fi
 fi
 

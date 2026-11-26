@@ -7,5 +7,9 @@ if [[ $# -ne 0 ]]; then
 fi
 PATH=/usr/sbin:/usr/bin:/bin
 export PATH
-CURRENT="$(readlink -f /var/www/audiolad-deploy/current)"
-exec "$CURRENT/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh"
+PINNED=/usr/local/lib/audiolad/audiolad-music-storage-bulk-sudo-bootstrap-pinned.sh
+if [[ ! -x "$PINNED" ]]; then
+  printf 'ERROR: pinned bootstrap missing; run production DEPLOY first.\n' >&2
+  exit 1
+fi
+exec "$PINNED"

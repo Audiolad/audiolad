@@ -707,13 +707,17 @@ main() {
     exit 1
   fi
   MUSIC_BULK_PRIV="${RELEASE_DIR}/deploy/scripts/audiolad-music-storage-bulk-sudo-bootstrap.sh"
-  if [[ -x "$MUSIC_BULK_PRIV" ]]; then
-    if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_BULK_PRIV"; then
-      log_warn "music_storage_bulk_privileged_assets_ensure_failed_non_fatal"
-    fi
-  else
-    log_warn "music_storage_bulk_privileged_assets_ensure_missing_non_fatal"
+  if [[ ! -x "$MUSIC_BULK_PRIV" ]]; then
+    log_error "music_storage_bulk_privileged_assets_ensure_missing"
+    send_deploy_alert "deploy_failed" "Music storage bulk privileged assets ensure missing for $RELEASE_NAME"
+    exit 1
   fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_BULK_PRIV"; then
+    log_error "music_storage_bulk_privileged_assets_ensure_failed"
+    send_deploy_alert "deploy_failed" "Music storage bulk sudo/bootstrap ensure failed for $RELEASE_NAME"
+    exit 1
+  fi
+  log_info "music_storage_bulk_privileged_assets_ensure_ok release=${RELEASE_NAME}"
   RECONCILE_LOG="/var/log/audiolad/author-appreciation-getcourse-reconcile.log"
   if [[ -r "$RECONCILE_LOG" ]]; then
     log_info "author_appreciation_getcourse_reconcile_log_tail"

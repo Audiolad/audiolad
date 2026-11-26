@@ -59,6 +59,11 @@ const installRemote = readFileSync(
   "utf8",
 );
 assert.match(installRemote, /sudo -n \/usr\/local\/sbin\/audiolad-music-storage-bulk-install/);
+assert.doesNotMatch(sudoersText, /\/current\/deploy\/scripts/);
+assert.match(
+  readFileSync(join(root, "deploy/sbin/audiolad-music-storage-bulk-install"), "utf8"),
+  /\/usr\/local\/lib\/audiolad\/audiolad-music-storage-bulk-root-install\.sh/,
+);
 
 const opsRemote = readFileSync(
   join(root, "deploy/scripts/audiolad-music-storage-bulk-ops-remote.sh"),
@@ -66,5 +71,20 @@ const opsRemote = readFileSync(
 );
 assert.match(opsRemote, /exec sudo -n "\$SBIN"/);
 assert.match(opsRemote, /resume/);
+
+const bootstrapTest = spawnSync(
+  "bash",
+  [join(root, "deploy/scripts/audiolad-music-storage-bulk-bootstrap-test.sh")],
+  { encoding: "utf8" },
+);
+assert.equal(
+  bootstrapTest.status,
+  0,
+  `bootstrap integration: ${bootstrapTest.stderr || bootstrapTest.stdout}`,
+);
+
+const deploySh = readFileSync(join(root, "deploy/scripts/deploy.sh"), "utf8");
+assert.match(deploySh, /music_storage_bulk_privileged_assets_ensure_failed/);
+assert.doesNotMatch(deploySh, /music_storage_bulk_privileged_assets_ensure_failed_non_fatal/);
 
 console.log("music-storage-bulk-sudo-unit: ok");

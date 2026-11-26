@@ -44,10 +44,9 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 **без** enable timer. Существующие каталоги `/etc/audiolad` и
 `/usr/local/lib/audiolad` не перечмариваются.
 
-Первый INSTALL после merge также ставит wrapper + `deploy/sudoers/audiolad-music-storage-bulk`
-(через bootstrap), если их ещё нет; production `deploy.sh` делает то же при
-каждом успешном DEPLOY. Без bootstrap sudo на сервере INSTALL подскажет установить
-файл sudoers или один раз прогнать DEPLOY.
+Сначала **Production DEPLOY** с merge SHA (bootstrap sudoers + sbin как root в
+`deploy.sh`), затем `OPS_MUSIC_STORAGE_BULK_INSTALL`. Без DEPLOY INSTALL вернёт
+`run_production_DEPLOY_once_then_retry_OPS_INSTALL`.
 
 **Вручную (deploy-пользователь на VPS):**  
 `bash deploy/scripts/audiolad-music-storage-bulk-install-remote.sh`
