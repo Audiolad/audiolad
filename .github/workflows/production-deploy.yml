@@ -63,6 +63,7 @@ on:
           - OPS_COURSE_UPGRADE_DIAG
           - OPS_MUSIC_STORAGE_BULK_STATUS
           - OPS_MUSIC_STORAGE_BULK_DIAG
+          - OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT
           - OPS_MUSIC_STORAGE_BULK_INSTALL
           - OPS_MUSIC_STORAGE_BULK_START_COPY
           - OPS_MUSIC_STORAGE_BULK_PAUSE
@@ -4548,6 +4549,7 @@ jobs:
     if: |
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_STATUS' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_DIAG' ||
+      inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_INSTALL' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_START_COPY' ||
       inputs.confirm == 'OPS_MUSIC_STORAGE_BULK_PAUSE' ||
@@ -4614,6 +4616,7 @@ jobs:
           case "${CONFIRM}" in
             OPS_MUSIC_STORAGE_BULK_STATUS) ACTION=status ;;
             OPS_MUSIC_STORAGE_BULK_DIAG) ;;
+            OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT) ;;
             OPS_MUSIC_STORAGE_BULK_INSTALL) ACTION=install ;;
             OPS_MUSIC_STORAGE_BULK_START_COPY) ACTION=start_copy ;;
             OPS_MUSIC_STORAGE_BULK_PAUSE) ACTION=pause ;;
@@ -4657,6 +4660,38 @@ jobs:
             rm -f "${DIAG_HELPER}" "${REMOTE_LOG}"
             exit 0
           fi
+          if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT" ]]; then
+            umask 077
+            PREFLIGHT="$(mktemp)"
+            chmod 0600 "${PREFLIGHT}"
+            curl -fsS \
+              -H "Accept: application/vnd.github.raw+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -o "${PREFLIGHT}" \
+              -- \
+              "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-music-storage-bulk-ops-preflight-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+            test -s "${PREFLIGHT}"
+            bash -n "${PREFLIGHT}"
+            REMOTE_LOG="$(mktemp)"
+            chmod 0600 "${REMOTE_LOG}"
+            ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              "bash -s" < "${PREFLIGHT}" | tee "${REMOTE_LOG}"
+            test -s "${REMOTE_LOG}"
+            if ! grep -Fxq "OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT_END=ok" "${REMOTE_LOG}"; then
+              echo "ops_preflight: incomplete (run OPS_MUSIC_STORAGE_BULK_INSTALL after merge)" >&2
+              exit 1
+            fi
+            rm -f "${PREFLIGHT}" "${REMOTE_LOG}"
+            exit 0
+          fi
           if [[ "${CONFIRM}" == "OPS_MUSIC_STORAGE_BULK_INSTALL" ]]; then
             umask 077
             TRUSTED_STAGING="$(mktemp -d)"
@@ -4677,6 +4712,7 @@ jobs:
               deploy/scripts/audiolad-music-storage-bulk-privileged-common.sh
               deploy/scripts/audiolad-music-storage-bulk-enable-copy-env.sh
               deploy/scripts/audiolad-music-storage-bulk-ops-privileged-diag.sh
+              deploy/scripts/audiolad-music-storage-bulk-ops-privileged-trusted-bundle.sh
               deploy/scripts/audiolad-music-storage-bulk-ops-privileged.sh
               deploy/sbin/audiolad-music-storage-bulk-sudo-bootstrap
               deploy/sbin/audiolad-music-storage-bulk-install
@@ -4686,6 +4722,7 @@ jobs:
               deploy/sbin/audiolad-music-storage-bulk-ops-stop
               deploy/sbin/audiolad-music-storage-bulk-ops-resume
               deploy/sbin/audiolad-music-storage-bulk-ops-diag
+              deploy/sbin/audiolad-music-storage-bulk-ops-trusted-bundle
             )
             for rel in "${TRUSTED_PATHS[@]}"; do
               dest="${TRUSTED_STAGING}/${rel}"
@@ -4700,7 +4737,10 @@ jobs:
             done
             chmod +x "${TRUSTED_STAGING}/deploy/sbin/"*
             chmod +x "${TRUSTED_STAGING}/deploy/scripts/"*.sh
-            tar -C "${TRUSTED_STAGING}" -czf - deploy | ssh \
+            BUNDLE_SB="/usr/local/sbin/audiolad-music-storage-bulk-ops-trusted-bundle"
+            INSTALL_LOG="$(mktemp)"
+            chmod 0600 "${INSTALL_LOG}"
+            if ssh \
               -i "${SSH_KEY_FILE}" \
               -o BatchMode=yes \
               -o IdentitiesOnly=yes \
@@ -4709,8 +4749,36 @@ jobs:
               -p "${PRODUCTION_SSH_PORT}" \
               -- \
               "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
-              "bash -s" < "${BUNDLE_APPLY}"
-            DEPLOY_TREE="/var/www/audiolad-deploy/shared/.gha-trusted-deploy/deploy"
+              "test -x ${BUNDLE_SB}"; then
+              tar -C "${TRUSTED_STAGING}" -czf - deploy | ssh \
+                -i "${SSH_KEY_FILE}" \
+                -o BatchMode=yes \
+                -o IdentitiesOnly=yes \
+                -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+                -o StrictHostKeyChecking=yes \
+                -p "${PRODUCTION_SSH_PORT}" \
+                -- \
+                "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+                "sudo -n ${BUNDLE_SB}" | tee -a "${INSTALL_LOG}"
+              DEPLOY_TREE="/var/lib/audiolad/gha-trusted-deploy/deploy"
+            else
+              tar -C "${TRUSTED_STAGING}" -czf - deploy | ssh \
+                -i "${SSH_KEY_FILE}" \
+                -o BatchMode=yes \
+                -o IdentitiesOnly=yes \
+                -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+                -o StrictHostKeyChecking=yes \
+                -p "${PRODUCTION_SSH_PORT}" \
+                -- \
+                "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+                "bash -s" < "${BUNDLE_APPLY}" | tee -a "${INSTALL_LOG}"
+              DEPLOY_TREE="$(grep -E '^trusted_bundle_deploy_tree=' "${INSTALL_LOG}" | tail -1 | cut -d= -f2-)"
+            fi
+            if ! grep -Fq 'OPS_TRUSTED_BUNDLE_END=ok' "${INSTALL_LOG}"; then
+              echo "trusted bundle delivery failed (see log; shared/ is not writable by deploy)" >&2
+              exit 1
+            fi
+            test -n "${DEPLOY_TREE}"
             ssh \
               -i "${SSH_KEY_FILE}" \
               -o BatchMode=yes \
@@ -4720,7 +4788,7 @@ jobs:
               -p "${PRODUCTION_SSH_PORT}" \
               -- \
               "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
-              "sudo -n env DEPLOY_TREE=${DEPLOY_TREE} /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap"
+              "sudo -n env DEPLOY_TREE=${DEPLOY_TREE} /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap" | tee -a "${INSTALL_LOG}"
             rm -rf "${TRUSTED_STAGING}" "${BUNDLE_APPLY}"
             INSTALL_HELPER="$(mktemp)"
             chmod 0600 "${INSTALL_HELPER}"
@@ -4741,8 +4809,12 @@ jobs:
               -p "${PRODUCTION_SSH_PORT}" \
               -- \
               "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
-              "bash -s" < "${INSTALL_HELPER}"
-            rm -f "${INSTALL_HELPER}"
+              "bash -s" < "${INSTALL_HELPER}" | tee -a "${INSTALL_LOG}"
+            if ! grep -Fq 'OPS_MUSIC_STORAGE_BULK_INSTALL_END=ok' "${INSTALL_LOG}"; then
+              echo "music_storage_bulk_install: missing OPS_MUSIC_STORAGE_BULK_INSTALL_END=ok" >&2
+              exit 1
+            fi
+            rm -f "${INSTALL_HELPER}" "${INSTALL_LOG}"
             exit 0
           fi
           ssh \

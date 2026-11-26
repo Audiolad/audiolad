@@ -50,9 +50,11 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 
 При диске ≥85% сначала `OPS_DISK_STORAGE_AUDIT`, затем
 `OPS_DEPLOY_MAINTENANCE_DRY_RUN` → после проверки лога
-`OPS_DEPLOY_MAINTENANCE_APPLY`. `OPS_MUSIC_STORAGE_BULK_INSTALL` подтягивает
-sbin/sudoers с `origin/main` **без** полного DEPLOY (trusted bundle в
-`shared/.gha-trusted-deploy`).
+`OPS_DEPLOY_MAINTENANCE_APPLY`. Перед INSTALL полезен `OPS_MUSIC_STORAGE_BULK_OPS_PREFLIGHT` (sudo/sbin без
+мутаций). `OPS_MUSIC_STORAGE_BULK_INSTALL` доставляет trusted bundle с
+`origin/main` в `~/.cache/audiolad/` (deploy) или через
+`sudo …-ops-trusted-bundle` в `/var/lib/audiolad/` — **не** в root-owned
+`shared/`. Полный DEPLOY не нужен.
 
 **Перед автокопированием:** `OPS_MUSIC_STORAGE_BULK_DIAG` (read-only: диск,
 `music-storage:report`, **`music-storage:preflight`** — S3 HEAD + квота на весь
