@@ -100,7 +100,7 @@ function VideoPlatformChevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
       viewBox="0 0 20 20"
-      className={`h-5 w-5 shrink-0 text-[#7042c5] transition-transform duration-200 ${
+      className={`h-6 w-6 shrink-0 text-[#7042c5] transition-transform duration-200 ${
         expanded ? "rotate-180" : ""
       }`}
       fill="none"
@@ -762,7 +762,7 @@ export function AuthorProductVideoExport({
 
   return (
     <section
-      className="mt-5 overflow-hidden rounded-[20px] border border-[#e4d7f4] bg-[#fbf8ff]"
+      className="mt-5 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]"
       data-author-product-video-export="true"
     >
       <button
@@ -771,9 +771,9 @@ export function AuthorProductVideoExport({
         aria-controls={panelId}
         data-testid="author-product-video-export-toggle"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-3.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        <span className="min-w-0 text-[18px] font-semibold text-[#3f3560]">
+        <span className="min-w-0 text-[15px] font-semibold text-[#7042c5]">
           Видео для площадок
         </span>
         <VideoPlatformChevron expanded={expanded} />

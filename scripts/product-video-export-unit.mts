@@ -131,6 +131,8 @@ assert.match(ui, /data-testid="author-product-video-export-body"/);
 assert.match(ui, /useState\(false\)/, "collapsed by default on fresh open");
 assert.match(ui, /hidden=\{!expanded\}/);
 assert.match(ui, /inert=\{!expanded\}/);
+assert.match(ui, /text-\[#7042c5\]/, "purple title on collapsed bar");
+assert.match(ui, /border border-\[#eadff8\] bg-\[#fcfbfe\]/);
 assert.match(ui, /Создать MP4 из аудио/);
 assert.match(ui, /Скачать MP4/);
 assert.match(ui, /Создать заново/);
