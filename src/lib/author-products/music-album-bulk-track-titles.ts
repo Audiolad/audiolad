@@ -74,16 +74,18 @@ export function restoreBulkTrackTitlesFromSnapshot<T extends BulkTrackTitleItem>
 
 export type MusicAlbumBulkTrackTitlesScope = "closed" | "all";
 
+/** Music album editor gate: `scope: "all"` is the default product surface. */
 export function isMusicAlbumBulkTrackTitlesEnabled(params: {
   productKind: string | null | undefined;
-  scope: MusicAlbumBulkTrackTitlesScope;
-  closedCatalogOnly: boolean;
+  scope?: MusicAlbumBulkTrackTitlesScope;
+  closedCatalogOnly?: boolean;
 }): boolean {
   if (params.productKind !== PRODUCT_KIND.MUSIC) {
     return false;
   }
-  if (params.scope === "closed") {
-    return params.closedCatalogOnly;
+  const scope = params.scope ?? "all";
+  if (scope === "closed") {
+    return params.closedCatalogOnly === true;
   }
   return true;
 }
