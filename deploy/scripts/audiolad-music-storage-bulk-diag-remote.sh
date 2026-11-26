@@ -94,6 +94,12 @@ if ! npm run music-storage:report 2>&1 | redact_stream; then
   printf '%s\n' "music_storage_report_failed=true"
 fi
 
+section "BULK_COPY_PREFLIGHT_S3_QUOTA_FULL_REMAINING"
+# Full pendingBytes quota + S3 HEAD probe (not limited to batch 25).
+if ! npm run music-storage:preflight 2>&1 | redact_stream; then
+  printf '%s\n' "bulk_copy_preflight_failed=true"
+fi
+
 section "BULK_COPY_DRY_RUN_BATCH_25"
 if ! npm run music-storage:bulk -- --stage copy --batch-size 25 --concurrency 1 2>&1 | redact_stream; then
   printf '%s\n' "bulk_copy_dry_run_failed=true"

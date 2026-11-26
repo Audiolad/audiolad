@@ -49,7 +49,8 @@ masters с начала (`catalogRescanEachTick`): transient/retry и **новы
 `run_production_DEPLOY_once_then_retry_OPS_INSTALL`.
 
 **Перед автокопированием:** `OPS_MUSIC_STORAGE_BULK_DIAG` (read-only: диск,
-`music-storage:report`, dry-run batch 25, timer/env). Реальный старт —
+`music-storage:report`, **`music-storage:preflight`** — S3 HEAD + квота на весь
+`pendingBytes`, dry-run batch 25, timer/env). Реальный старт —
 `OPS_MUSIC_STORAGE_BULK_START_COPY` (ставит `AUDIOLAD_MUSIC_STORAGE_BULK=1` в
 env как root, **без** ручного правки на VPS).
 
