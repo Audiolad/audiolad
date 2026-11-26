@@ -1387,6 +1387,39 @@ function testCurrentProductionAfterWavNormalize() {
   assert.equal(plan.code, "apply");
 }
 
+function testDeploy946HoleIfSourceReleasedBelowCatalogMax() {
+  const plan = planDatabaseMigrations({
+    localVersions: [
+      "20270411120000",
+      "20270412120000",
+      "20271126120000",
+    ],
+    remoteVersions: ["20270411120000", "20271126120000"],
+  });
+  assert.equal(plan.action, "abort");
+  assert.equal(plan.code, "database_migration_history_drift");
+  assert.deepEqual(plan.pending, ["20270412120000"]);
+  assert.equal(plan.database_migrations_pending, 1);
+}
+
+function testProductionAfterCatalogSortSourceReleasedApplies() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const productionMax = "20271126120000";
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions: listed.versions.filter((version) => version <= productionMax),
+  });
+  assert.equal(productionMax, plan.remoteVersions[plan.remoteVersions.length - 1]);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.notEqual(plan.code, "database_migration_history_drift");
+  assert.equal(plan.pending.some((version) => version < productionMax), false);
+  assert.ok(plan.pending.includes("20271126130000"));
+  assert.equal(listed.versions.includes("20270412120000"), false);
+}
+
 function testCurrentProductionAfterStudioDisableNewFree() {
   const listed = listLocalMigrationFiles(
     join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
@@ -1460,6 +1493,8 @@ function main() {
 testCurrentProductionAfterMusicPublishPlayable();
   testCurrentProductionAfterCatalogSections();
   testCurrentProductionAfterStudioDisableNewFree();
+  testDeploy946HoleIfSourceReleasedBelowCatalogMax();
+  testProductionAfterCatalogSortSourceReleasedApplies();
   testCurrentProductionAfterWavNormalize();
   testReissuedVisibilityAfterProductionMaxHasNoHole();
   testMusicStorageSourceReleasedAfterCatalogListenDeploy();

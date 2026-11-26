@@ -1,3 +1,6 @@
+-- Re-stamped from 20270412120000: production already has 20271126120000
+-- (catalog qualified listens, deploy #945) before bulk deploy #946.
+
 BEGIN;
 
 ALTER TABLE public.music_storage_copies
