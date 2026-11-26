@@ -6,6 +6,7 @@ import {
   buildPracticeHeroLightMeta,
   resolvePracticeHeroSubtitle,
 } from "@/lib/catalog/product-hero-gallery";
+import { loadCatalogListingSortMetrics } from "@/lib/catalog/sort-metrics";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import { resolveMaxExactPractice, type MaxExactPracticeDeps } from "@/lib/max/exact-product";
@@ -246,6 +247,18 @@ export async function getMaxPublishedProduct(
         "lg",
       ) ?? product.coverUrl;
 
+    let qualifiedListenCount = 0;
+    try {
+      const metrics = await loadCatalogListingSortMetrics(
+        [product.id],
+        { popular: true, rating: false },
+        service,
+      );
+      qualifiedListenCount = metrics.get(product.id)?.popularListenCount ?? 0;
+    } catch {
+      qualifiedListenCount = 0;
+    }
+
     return {
       ok: true,
       product: {
@@ -263,6 +276,7 @@ export async function getMaxPublishedProduct(
         }),
         priceLabel: product.priceLabel,
         isFree: product.isFree,
+        qualifiedListenCount,
         gallery: (product.gallery ?? []).map((slide) => ({
           id: slide.id,
           image_url: slide.image_url,

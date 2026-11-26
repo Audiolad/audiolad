@@ -1,3 +1,5 @@
+import { buildCatalogPublicMetrics } from "@/lib/catalog/public-metrics";
+import { loadCatalogListingSortMetrics } from "@/lib/catalog/sort-metrics";
 import { productFirstPublicationAt } from "@/lib/products/publication-dates";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -841,6 +843,23 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     }
   }
 
+  let publicMetrics = buildCatalogPublicMetrics(0, 0);
+  try {
+    const listingMetrics = await loadCatalogListingSortMetrics([practice.id], {
+      popular: true,
+      rating: true,
+    });
+    const row = listingMetrics.get(practice.id);
+    if (row) {
+      publicMetrics = buildCatalogPublicMetrics(
+        row.popularListenCount,
+        row.totalStars,
+      );
+    }
+  } catch {
+    publicMetrics = buildCatalogPublicMetrics(0, 0);
+  }
+
   const viewModel: PracticePageViewModel = {
     firstPublishedAt: isPracticePublished(practice.status)
       ? productFirstPublicationAt(practice)
@@ -904,6 +923,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     ratingsUiEnabled,
     ratingAggregate,
     guestRatingsCollect: ratingsUiEnabled && isGuestRatingsCollectEnabled(),
+    publicMetrics,
     listenerCommentsEnabled: practiceAcceptsListenerComments({
       productKind: practice.product_kind,
       catalogSection: practice.catalog_section,

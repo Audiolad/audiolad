@@ -22,6 +22,7 @@ import MiniAppGuestRating from "@/components/mini-app/MiniAppGuestRating";
 import { MiniAppGuestTransportProvider } from "@/components/mini-app/MiniAppGuestTransport";
 import MiniAppNextStep from "@/components/mini-app/MiniAppNextStep";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
+import PracticeHeroListenMetric from "@/components/products/practice-page/PracticeHeroListenMetric";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import VkAuthorAppreciation from "@/components/vk/VkAuthorAppreciation";
 import VkHomePanel from "@/components/vk/VkHomePanel";
@@ -476,14 +477,19 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
           ) : null}
 
           {!listenArmed && playback.status === "ready" ? (
-            <button
-              type="button"
-              onClick={startListening}
-              className={`${commerce?.buyLabel ? FEATURED_CARD_SECONDARY_CTA_CLASS : FEATURED_CARD_PRIMARY_CTA_CLASS} mt-4`}
-            >
-              <PlayIcon />
-              {playLabel}
-            </button>
+            <div className="mt-4 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={startListening}
+                className={`${commerce?.buyLabel ? FEATURED_CARD_SECONDARY_CTA_CLASS : FEATURED_CARD_PRIMARY_CTA_CLASS} w-full justify-center sm:w-auto`}
+              >
+                <PlayIcon />
+                {playLabel}
+              </button>
+              <PracticeHeroListenMetric
+                qualifiedListenCount={product.qualifiedListenCount}
+              />
+            </div>
           ) : null}
 
           {product.contents.length ? (

@@ -4,6 +4,7 @@
  */
 
 import type { CatalogCard } from "@/lib/catalog/dto";
+import { EMPTY_CATALOG_PUBLIC_METRICS } from "@/lib/catalog/public-metrics";
 import type { UnifiedCatalogLibraryEntry } from "@/lib/library/unified-entry";
 
 function resolveDurationSeconds(
@@ -62,5 +63,6 @@ export function unifiedCatalogEntryToCatalogCard(
     badges: [],
     progress: null,
     summary: {},
+    public_metrics: EMPTY_CATALOG_PUBLIC_METRICS,
   };
 }

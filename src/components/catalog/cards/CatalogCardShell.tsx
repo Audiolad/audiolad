@@ -1,7 +1,8 @@
+import CatalogCardPublicMetrics from "@/components/catalog/CatalogCardPublicMetrics";
 import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import CatalogProductPlayButton from "@/components/products/CatalogProductPlayButton";
 import CatalogCardGallery from "@/components/catalog/cards/CatalogCardGallery";
-import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
+import { CATALOG_CARD_RUBRIC_LINE_CLASS } from "@/lib/author-products/format";
 import {
   catalogCardToActionTarget,
   type CatalogCard,
@@ -79,9 +80,15 @@ export default function CatalogCardShell({
         data-catalog-info-block
         className="block px-2.5 pb-2.5 pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        <p data-catalog-card-format className={PRODUCT_FORMAT_LINE_CLASS}>
-          {card.display_label}
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            data-catalog-card-format
+            className={`${CATALOG_CARD_RUBRIC_LINE_CLASS} min-w-0 flex-1 truncate`}
+          >
+            {card.display_label}
+          </p>
+          <CatalogCardPublicMetrics metrics={card.public_metrics} />
+        </div>
 
         <h3 className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c] sm:text-[15px] sm:leading-5">
           {card.title}

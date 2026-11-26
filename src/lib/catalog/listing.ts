@@ -24,6 +24,10 @@ import {
 } from "@/lib/catalog/visibility-query";
 
 import {
+  buildCatalogPublicMetrics,
+  EMPTY_CATALOG_PUBLIC_METRICS,
+} from "@/lib/catalog/public-metrics";
+import {
   decodeCatalogCursor,
   encodeCatalogCursor,
   encodeCatalogPopularCursor,
@@ -384,7 +388,58 @@ function toPublicListingCard(item: CatalogListingCandidate): CatalogCard {
     badges: item.badges,
     progress: item.progress,
     summary: item.summary,
+    public_metrics: buildCatalogPublicMetrics(
+      item.popularListenCount,
+      item.totalStars,
+    ),
   };
+}
+
+export async function attachPublicMetricsToListingResult(
+  page: CatalogListingResult,
+  sort: CatalogSort,
+  sortedCandidates: readonly CatalogListingCandidate[],
+): Promise<CatalogListingResult> {
+  if (sort === "popular" || sort === "rating") {
+    return page;
+  }
+
+  const publicationIds = page.items.map((item) => item.publication_id);
+  if (publicationIds.length === 0) {
+    return page;
+  }
+
+  try {
+    const { loadCatalogListingSortMetrics } = await import("@/lib/catalog/sort-metrics");
+    const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+    const metricsById = await loadCatalogListingSortMetrics(
+      publicationIds,
+      { popular: true, rating: true },
+      createServiceRoleClient(),
+    );
+
+    return {
+      ...page,
+      items: page.items.map((item) => {
+        const metrics = metricsById.get(item.publication_id);
+        return {
+          ...item,
+          public_metrics: metrics
+            ? buildCatalogPublicMetrics(
+                metrics.popularListenCount,
+                metrics.totalStars,
+              )
+            : EMPTY_CATALOG_PUBLIC_METRICS,
+        };
+      }),
+    };
+  } catch (error) {
+    console.error(
+      "catalog_listing_public_metrics_error",
+      error instanceof Error ? error.message : error,
+    );
+    return page;
+  }
 }
 
 export function applyCatalogListingSavedState(
@@ -477,7 +532,8 @@ export async function listPublishedCatalog(
     query,
   );
   const sorted = await rankCatalogListingCandidates(supabase, candidates, query.sort);
-  const page = paginateCatalogListingItems(sorted, query);
+  let page = paginateCatalogListingItems(sorted, query);
+  page = await attachPublicMetricsToListingResult(page, query.sort, sorted);
   const grantedIds = new Set(viewer.entitledPracticeIds);
 
   if (!userId) {

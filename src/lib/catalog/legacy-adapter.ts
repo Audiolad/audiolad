@@ -8,6 +8,7 @@ import { normalizeDurationSeconds } from "@/lib/products/duration";
 
 export { mapLegacyProductKindToClass, resolvePublicationClass };
 
+import { EMPTY_CATALOG_PUBLIC_METRICS } from "@/lib/catalog/public-metrics";
 import type {
   CatalogCard,
   CatalogCardAuthor,
@@ -199,5 +200,6 @@ export function adaptLegacyCatalogSourceToCard(
     badges: [],
     progress: null,
     summary: {},
+    public_metrics: EMPTY_CATALOG_PUBLIC_METRICS,
   };
 }

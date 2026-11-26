@@ -72,6 +72,7 @@ function card(
     badges: [],
     progress: null,
     summary: {},
+    public_metrics: { qualified_listen_count: 0, total_stars: 0 },
   };
 
   return {

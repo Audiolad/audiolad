@@ -5,6 +5,12 @@ import {
   buildCatalogCardGalleryPages,
   shouldRenderCatalogCardGallery,
 } from "@/lib/gallery/catalog-card-gallery";
+import CatalogCardPublicMetrics from "@/components/catalog/CatalogCardPublicMetrics";
+import { CATALOG_CARD_RUBRIC_LINE_CLASS } from "@/lib/author-products/format";
+import {
+  buildCatalogPublicMetrics,
+  type CatalogPublicMetrics,
+} from "@/lib/catalog/public-metrics";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 
 type MaxCatalogProductCardProps = {
@@ -15,12 +21,22 @@ type MaxCatalogProductCardProps = {
 const CARD_CLASS =
   "flex w-full min-w-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-white text-left shadow-[0_6px_16px_rgba(91,62,145,0.06)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
+function maxProductPublicMetrics(product: MaxCatalogProduct): CatalogPublicMetrics {
+  return buildCatalogPublicMetrics(
+    product.publicMetrics.qualifiedListenCount,
+    product.publicMetrics.totalStars,
+  );
+}
+
 function CatalogCardCopy({ product }: { product: MaxCatalogProduct }) {
   return (
     <div className="px-2.5 pb-2.5 pt-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-        {product.formatLabel}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className={`${CATALOG_CARD_RUBRIC_LINE_CLASS} min-w-0 flex-1 truncate`}>
+          {product.formatLabel}
+        </p>
+        <CatalogCardPublicMetrics metrics={maxProductPublicMetrics(product)} />
+      </div>
       <p className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c]">
         {product.title}
       </p>

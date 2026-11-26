@@ -1,5 +1,5 @@
 import type { ProductTopicLinkItem } from "@/components/products/ProductTopicLinks";
-import type { CatalogSlide } from "@/lib/catalog/dto";
+import type { CatalogPublicMetrics, CatalogSlide } from "@/lib/catalog/dto";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 import type { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
@@ -90,4 +90,5 @@ export type PracticePageViewModel = {
   ratingAggregate: PracticeRatingAggregate;
   guestRatingsCollect: boolean;
   listenerCommentsEnabled: boolean;
+  publicMetrics: CatalogPublicMetrics;
 };

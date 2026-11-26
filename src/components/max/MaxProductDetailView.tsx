@@ -15,6 +15,7 @@ import MaxProductLegalFooter from "@/components/max/MaxProductLegalFooter";
 import MiniAppGuestRating from "@/components/mini-app/MiniAppGuestRating";
 import MiniAppNextStep from "@/components/mini-app/MiniAppNextStep";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
+import PracticeHeroListenMetric from "@/components/products/practice-page/PracticeHeroListenMetric";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogSlide } from "@/lib/catalog/dto";
@@ -26,7 +27,8 @@ import { openMaxExternalLink } from "@/lib/max/bridge";
 import { formatMaxDuration } from "@/lib/max/format-duration";
 import { MAX_SHELL_LOGIN_CTA } from "@/lib/max/session-shell";
 import type { MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
-import type { MaxCatalogProduct } from "@/components/max/MaxCatalogSearch";
+import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
+import { maxRecommendationToCatalogProduct } from "@/lib/max/catalog-product";
 
 type MaxProductTrackPlayback = {
   playableTrackIds: readonly string[];
@@ -123,7 +125,14 @@ export default function MaxProductDetailView({
               {product.priceLabel}
             </p>
           ) : null}
-          <div className="practice-product-hero__cta shrink-0">{listenSlot}</div>
+          <div className="practice-product-hero__cta shrink-0">
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="min-w-0 flex-1">{listenSlot}</div>
+              <PracticeHeroListenMetric
+                qualifiedListenCount={product.qualifiedListenCount}
+              />
+            </div>
+          </div>
         </FeaturedProductCard>
       </section>
 
@@ -253,7 +262,7 @@ export default function MaxProductDetailView({
                 <li key={`${item.authorSlug}/${item.slug}`} className="min-w-0">
                   <button
                     type="button"
-                    onClick={() => onOpenRecommendation(item)}
+                    onClick={() => onOpenRecommendation(maxRecommendationToCatalogProduct(item))}
                     className="flex w-full max-w-full min-w-0 items-center gap-3 rounded-[16px] border border-[#eadff8] bg-white px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                   >
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[12px]" aria-hidden="true">

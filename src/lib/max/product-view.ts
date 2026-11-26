@@ -43,6 +43,7 @@ export type MaxProductDetailView = {
   metaLine: string | null;
   priceLabel: string;
   isFree: boolean;
+  qualifiedListenCount: number;
   gallery: MaxProductGallerySlide[];
   topics: Array<{ key: string; title: string }>;
   contents: MaxProductContentTrack[];
@@ -196,6 +197,12 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
     appreciation = { authorName };
   }
 
+  const qualifiedListenCount =
+    typeof value.qualifiedListenCount === "number" &&
+    Number.isFinite(value.qualifiedListenCount)
+      ? Math.max(0, Math.floor(value.qualifiedListenCount))
+      : 0;
+
   return {
     title,
     subtitle,
@@ -204,6 +211,7 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
     metaLine,
     priceLabel,
     isFree: value.isFree,
+    qualifiedListenCount,
     gallery,
     topics,
     contents,

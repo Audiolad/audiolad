@@ -8,6 +8,7 @@ import {
   type CatalogAccessFilter,
   type CatalogClassFilter,
 } from "@/lib/catalog/listing-contract";
+import { buildCatalogPublicMetrics } from "@/lib/catalog/public-metrics";
 import {
   CATALOG_LISTING_SEARCH_LIMIT,
   filterCatalogListingItems,
@@ -168,18 +169,29 @@ function toPublicCatalogGallery(
   });
 }
 
-function toMaxCatalogProduct(product: {
-  authorSlug: string | null;
-  slug: string;
-  title: string;
-  subtitle: string | null;
-  coverUrl: string | null;
-  authorName: string | null;
-  productTypeLabel: string;
-  priceLabel: string;
-  isFree: boolean;
-  gallery?: Parameters<typeof normalizeCatalogGallery>[0];
-}): MaxCatalogProduct {
+function toMaxCatalogProduct(
+  product: {
+    id: string;
+    authorSlug: string | null;
+    slug: string;
+    title: string;
+    subtitle: string | null;
+    coverUrl: string | null;
+    authorName: string | null;
+    productTypeLabel: string;
+    priceLabel: string;
+    isFree: boolean;
+    gallery?: Parameters<typeof normalizeCatalogGallery>[0];
+  },
+  metrics?: ReturnType<typeof buildCatalogPublicMetrics>,
+): MaxCatalogProduct {
+  const publicMetrics = metrics
+    ? {
+        qualifiedListenCount: metrics.qualified_listen_count,
+        totalStars: metrics.total_stars,
+      }
+    : { qualifiedListenCount: 0, totalStars: 0 };
+
   return {
     authorSlug: product.authorSlug ?? "",
     slug: product.slug,
@@ -190,14 +202,23 @@ function toMaxCatalogProduct(product: {
     formatLabel: product.productTypeLabel,
     priceLabel: product.priceLabel,
     isFree: product.isFree,
+    publicMetrics,
     gallery: toPublicCatalogGallery(product.gallery),
   };
 }
 
-function toMaxCatalogProducts(products: CatalogProduct[]): MaxCatalogProduct[] {
+function toMaxCatalogProducts(
+  products: CatalogProduct[],
+  metricsById: ReadonlyMap<string, ReturnType<typeof buildCatalogPublicMetrics>>,
+): MaxCatalogProduct[] {
   return products
     .filter((product) => Boolean(product.authorSlug))
-    .map(toMaxCatalogProduct);
+    .map((product) =>
+      toMaxCatalogProduct(
+        product,
+        metricsById.get(product.id),
+      ),
+    );
 }
 
 async function listMaxPublishedCatalogImpl(
@@ -259,9 +280,40 @@ async function listMaxPublishedCatalogImpl(
           (allowedOrder.get(left.id) ?? 0) - (allowedOrder.get(right.id) ?? 0),
       );
 
+    const rankedMetrics = new Map(
+      ranked.map((item) => [
+        item.publication_id,
+        buildCatalogPublicMetrics(item.popularListenCount, item.totalStars),
+      ]),
+    );
+
+    let metricsById = rankedMetrics;
+    if (sort !== "popular" && sort !== "rating" && filteredProducts.length > 0) {
+      const { loadCatalogListingSortMetrics } = await import(
+        "@/lib/catalog/sort-metrics"
+      );
+      const loaded = await loadCatalogListingSortMetrics(
+        filteredProducts.map((product) => product.id),
+        { popular: true, rating: true },
+        service,
+      );
+      metricsById = new Map(
+        filteredProducts.map((product) => {
+          const row = loaded.get(product.id);
+          return [
+            product.id,
+            buildCatalogPublicMetrics(
+              row?.popularListenCount ?? 0,
+              row?.totalStars ?? 0,
+            ),
+          ] as const;
+        }),
+      );
+    }
+
     return {
       ok: true,
-      items: toMaxCatalogProducts(filteredProducts),
+      items: toMaxCatalogProducts(filteredProducts, metricsById),
     };
   } catch {
     return { ok: false, reason: "storage_unavailable" };

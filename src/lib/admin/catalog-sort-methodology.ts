@@ -3,9 +3,14 @@ import {
   PLAYBACK_USAGE_PRODUCTION_FIRST_FACTS_REFERENCE_ISO,
 } from "@/lib/catalog/sort-constants";
 
-export const CATALOG_SORT_METHODOLOGY_VERSION = "2026-11-26.2" as const;
+export const CATALOG_SORT_METHODOLOGY_VERSION = "2026-11-26.3" as const;
 
 export const CATALOG_SORT_METHODOLOGY_CHANGELOG = [
+  {
+    version: "2026-11-26.3",
+    summary:
+      "Публичный показ метрик на карточках каталога и PDP: те же прослушивания (>60 с) и сумма звёзд, без изменения формул сортировки.",
+  },
   {
     version: "2026-11-26.2",
     summary:
@@ -43,5 +48,10 @@ export const CATALOG_SORT_METHODOLOGY_SECTIONS = [
     title: "Поддержка и авторам",
     body:
       "Если у продукта «мало прослушиваний» при видимой активности, проверьте дату включения учёта MEDIA-TIME и что сессия превысила 60 с без разрыва listening_key. Правила начисления авторской статистики и существующий учёт слушателей авторам этим релизом не меняются.",
+  },
+  {
+    title: "Публичное отображение",
+    body:
+      "В каталоге (все режимы сортировки, включая «Новые»), на карточках MAX/VK и на странице продукта показываются те же два числа, что и в сортировках: ▶ — квалифицированные сессии прослушивания (>60 с на группу practice_id + coalesce(session_id, listening_key)); ★ — сумма активных звёзд (practice_ratings и, при включённом флаге, гостевые оценки). Формулы, RPC и порядок сортировки не меняются; метрики подмешиваются в существующие ответы listing/catalog API пакетно по id продукта.",
   },
 ] as const;

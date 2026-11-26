@@ -117,7 +117,7 @@ assert.equal((search.match(/query = query.or\(typeFilter\)/g) ?? []).length, 2, 
 assert.match(products, /query = query.or\(typeFilter\)/, "ordinary catalog filters in query");
 assert.match(
   listing,
-  /const candidates = filterCatalogListingItems\([\s\S]*const sorted = await rankCatalogListingCandidates\([\s\S]*const page = paginateCatalogListingItems\(/,
+  /const candidates = filterCatalogListingItems\([\s\S]*const sorted = await rankCatalogListingCandidates\([\s\S]*(const|let) page = paginateCatalogListingItems\(/,
   "filter before pagination",
 );
 assert.match(read("../src/lib/catalog/catalog-filter-ui.ts"), /value: "stories", label: "Истории"/);

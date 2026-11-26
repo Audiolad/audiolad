@@ -253,6 +253,13 @@ export function getAudioPostDisplayLabel(
 export const PRODUCT_FORMAT_LINE_CLASS =
   "text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]";
 
+/**
+ * Catalog / MAX catalog cards: smaller rubric on narrow viewports so rubric + ▶/★
+ * fit one row (~30% below desktop 11px). Desktop matches PRODUCT_FORMAT_LINE_CLASS.
+ */
+export const CATALOG_CARD_RUBRIC_LINE_CLASS =
+  "text-[8px] font-semibold uppercase leading-none tracking-[0.06em] text-[#9485b4] sm:text-[11px] sm:leading-normal sm:tracking-[0.08em]";
+
 /** Public label for cards, pages, and author dashboard lists. */
 export function getDisplayFormat(format: string | null | undefined): string | null {
   const trimmed = typeof format === "string" ? format.trim() : "";
