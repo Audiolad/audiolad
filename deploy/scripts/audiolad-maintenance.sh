@@ -653,6 +653,15 @@ main() {
   log "current=$(readlink -f "$DEPLOY_ROOT/current" 2>/dev/null || echo missing)"
   log "previous=$(readlink -f "$DEPLOY_ROOT/previous" 2>/dev/null || echo missing)"
 
+  local host_disk_lib="${SCRIPT_DIR}/lib/audiolad-host-disk-readonly.sh"
+  if [[ "$(id -u)" -eq 0 && -f "$host_disk_lib" ]]; then
+    # shellcheck source=lib/audiolad-host-disk-readonly.sh
+    source "$host_disk_lib"
+    audiolad_host_disk_readonly_report || log_warn "host_disk_readonly_report_failed"
+  elif [[ "$(id -u)" -eq 0 ]]; then
+    log_warn "host_disk_readonly_lib_missing path=${host_disk_lib}"
+  fi
+
   prune_cursor_sandbox_cache
   prune_node_compile_cache
   prune_releases

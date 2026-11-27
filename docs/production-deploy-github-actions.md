@@ -164,11 +164,7 @@ pipe скрипта на stdin (как `OPS_COURSE_UPGRADE_DIAG`). Job пада�
 cutover, без `audiolad-deploy`).
 Печатает размеры/пути: `df` (DISK BEFORE), `du` по `/var` `/usr` `/home`
 `/opt` `/tmp` `/var/www`, largest dirs deploy-каталогов, privileged-блок
-через `sudo -n /usr/local/sbin/audiolad-disk-storage-audit-privileged`
-(Docker `system df`, все релизы, aggregate Supabase Storage buckets,
-`lsof` deleted) если установлен sudoers
-`deploy/sudoers/audiolad-music-storage-bulk` (строка
-`audiolad-disk-storage-audit-privileged`); old
+плюс chained maintenance dry-run (root snapshot, DRY-RUN REMOVE кандидаты); old
 `/var/www/audiolad-deploy/releases/*` (CURRENT / PREVIOUS / CANDIDATE),
 PM2 / nginx / docker log sizes if readable, search for acceptance
 fixtures (`6aa9fd82`, `synth_3h`, `synth_3h_le10800`, ~10802s / 343MiB /
@@ -196,11 +192,21 @@ MODE = read_only_audit
 OPS_DISK_STORAGE_AUDIT_END=ok
 ```
 
-**Установка privileged-фрагмента (без консоли Timeweb):** с branch **`main`** запустить
-`confirm=OPS_MUSIC_STORAGE_BULK_INSTALL` — trusted bundle доставляет
-`audiolad-disk-storage-audit-privileged` + sudoers (строка в
-`audiolad-music-storage-bulk`), затем `sudo-bootstrap`. Это **не** включает
-копирование masters в S3 и не выставляет `AUDIOLAD_MUSIC_STORAGE_BULK=1`.
+**Privileged host snapshot (Docker, `/var`, releases, Storage buckets):** job
+`OPS_DISK_STORAGE_AUDIT` после deploy-отчёта автоматически вызывает
+`sudo -n /usr/local/sbin/audiolad-maintenance.sh --dry-run` (тот же путь, что
+`OPS_DEPLOY_MAINTENANCE_DRY_RUN`). Root-only секции печатаются, если на хосте
+установлен актуальный `audiolad-maintenance.sh` с
+`lib/audiolad-host-disk-readonly.sh` (обычно после обычного **Production
+DEPLOY**; миграцию S3 не запускает).
+
+**Не использовать** `OPS_MUSIC_STORAGE_BULK_INSTALL` для диска: после
+`OPS_TRUSTED_BUNDLE_END=ok` падает
+`sudo -n …/audiolad-music-storage-bulk-sudo-bootstrap` (на хосте нет NOPASSWD
+для bootstrap, пока deploy.sh не выполнил bootstrap при cutover).
+
+**Очистка:** `OPS_DEPLOY_MAINTENANCE_DRY_RUN` → согласование →
+`OPS_DEPLOY_MAINTENANCE_APPLY`.
 
 Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
 делает checkout):

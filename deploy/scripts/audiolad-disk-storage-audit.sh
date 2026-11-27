@@ -185,8 +185,11 @@ invoke_privileged_disk_audit() {
   err_file="$(mktemp)"
   trap "rm -f '${err_file}'" RETURN
   if [[ ! -x "${PRIV_AUDIT_SBIN}" ]]; then
+    section "PRIVILEGED DISK AUDIT"
     echo "privileged_audit=skipped reason=sbin_missing path=${PRIV_AUDIT_SBIN}"
-    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main after merge (trusted bundle; does not start migration)"
+    echo "blocked_install_sudo=sudo -n env DEPLOY_TREE=... /usr/local/sbin/audiolad-music-storage-bulk-sudo-bootstrap (password required until Production DEPLOY runs deploy.sh bootstrap)"
+    echo "working_complement=OPS_DEPLOY_MAINTENANCE_DRY_RUN (sudo -n /usr/local/sbin/audiolad-maintenance.sh --dry-run)"
+    echo "note=disk_audit_job_chains_maintenance_dry_run_when_privileged_sbin_missing"
     return 0
   fi
   section "PRIVILEGED DISK AUDIT"
@@ -201,7 +204,7 @@ invoke_privileged_disk_audit() {
   set -e
   if grep -qiE 'a password is required|not allowed to execute|sorry, user .+ is not allowed' "${err_file}"; then
     echo "privileged_audit=denied"
-    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main to refresh sudoers/bootstrap"
+    echo "hint=use_OPS_DEPLOY_MAINTENANCE_DRY_RUN (audiolad-maintenance.sh --dry-run via existing sudoers)"
   else
     sed -E 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' "${err_file}" | redact_studio_stream || true
     mark_section_fail "privileged_audit"

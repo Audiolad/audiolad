@@ -378,7 +378,7 @@ function main() {
   const workflowAncestorOffset = workflowText.indexOf("merge-base --is-ancestor");
   const sshStepOffset = workflowText.indexOf("name: Deploy via SSH wrapper");
   const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
-  const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk/Storage audit via SSH");
+  const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk audit + maintenance dry-run via SSH");
   const diskCleanupStepOffset = workflowText.indexOf("name: One-shot allowlist disk/Storage cleanup via SSH");
   const dupAssetDiagStepOffset = workflowText.indexOf(
     "name: Read-only Studio duplicate asset diagnostic via SSH",
@@ -1121,6 +1121,8 @@ function assertDiskStorageAudit(workflowText, docsText) {
     "OPS_DISK_STORAGE_AUDIT_END=ok",
     "Fetch trusted origin/main helper",
     "DISK_AUDIT_HELPER",
+    "DISK_MAINT_HELPER",
+    "OPS_DEPLOY_MAINTENANCE_DRY_RUN_REMOTE_BEGIN",
     "audiolad-disk-storage-audit.sh",
     "grep -F -q \"OPS_DISK_STORAGE_AUDIT_END=ok\"",
   ];
