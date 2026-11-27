@@ -96,6 +96,12 @@ function readProgressPercent(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/** Fixed-height preview well so 16:9 and 9:16 columns share row baselines on lg grid. */
+const ORIENTATION_PREVIEW_SLOT =
+  "mt-3 flex h-48 w-full items-center justify-center overflow-hidden rounded-[16px] border border-[#d9c9ef]";
+const LANDSCAPE_PREVIEW_FRAME = "aspect-video h-full max-h-full w-auto max-w-full";
+const PORTRAIT_PREVIEW_FRAME = "aspect-[9/16] h-full max-h-full w-auto";
+
 function VideoPlatformChevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -794,7 +800,7 @@ export function AuthorProductVideoExport({
           или оба материала. Видеофон зациклится под ваше аудио.
         </p>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
         {PRODUCT_VIDEO_ORIENTATIONS.map((orientation) => {
           const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
           const cover = covers[orientation];
@@ -810,7 +816,7 @@ export function AuthorProductVideoExport({
           return (
             <div
               key={orientation}
-              className="rounded-[18px] border border-[#eadff8] bg-white p-4"
+              className="flex h-full flex-col rounded-[18px] border border-[#eadff8] bg-white p-4"
             >
               <p className="text-sm font-medium text-[#3f3560]">
                 {meta.coverLabel.replace("Видеообложка", "Обложка")}
@@ -819,21 +825,27 @@ export function AuthorProductVideoExport({
                 type="button"
                 disabled={disabled || cover.busy}
                 onClick={() => inputRef.current?.click()}
-                className={`group mt-3 flex overflow-hidden rounded-[16px] border border-[#d9c9ef] bg-[#f8f4fc] disabled:opacity-60 ${
-                  orientation === "landscape_16_9"
-                    ? "aspect-video w-full max-w-sm"
-                    : "aspect-[9/16] h-48"
-                }`}
+                className={`group ${ORIENTATION_PREVIEW_SLOT} bg-[#f8f4fc] disabled:opacity-60`}
               >
                 {cover.previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={cover.previewUrl}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className={`${
+                      orientation === "landscape_16_9"
+                        ? LANDSCAPE_PREVIEW_FRAME
+                        : PORTRAIT_PREVIEW_FRAME
+                    } object-cover`}
                   />
                 ) : (
-                  <span className="m-auto px-4 text-center text-xs text-[#8c79b6]">
+                  <span
+                    className={`flex items-center justify-center px-4 text-center text-xs text-[#8c79b6] ${
+                      orientation === "landscape_16_9"
+                        ? LANDSCAPE_PREVIEW_FRAME
+                        : PORTRAIT_PREVIEW_FRAME
+                    }`}
+                  >
                     Нет обложки {meta.ratioLabel}
                   </span>
                 )}
@@ -846,7 +858,7 @@ export function AuthorProductVideoExport({
                 disabled={disabled || cover.busy}
                 onChange={(event) => void uploadCover(orientation, event)}
               />
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex min-h-10 flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={disabled || cover.busy}
@@ -883,11 +895,7 @@ export function AuthorProductVideoExport({
                   Видеофон {meta.ratioLabel}
                 </p>
                 <div
-                  className={`mt-3 overflow-hidden rounded-[16px] border border-[#d9c9ef] bg-[#181228] ${
-                    orientation === "landscape_16_9"
-                      ? "aspect-video w-full max-w-sm"
-                      : "aspect-[9/16] h-48"
-                  }`}
+                  className={`${ORIENTATION_PREVIEW_SLOT} bg-[#181228]`}
                 >
                   {background.previewUrl ? (
                     <video
@@ -898,10 +906,20 @@ export function AuthorProductVideoExport({
                       loop
                       playsInline
                       preload="metadata"
-                      className="h-full w-full object-cover"
+                      className={`${
+                        orientation === "landscape_16_9"
+                          ? LANDSCAPE_PREVIEW_FRAME
+                          : PORTRAIT_PREVIEW_FRAME
+                      } object-cover`}
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#cbbbe2]">
+                    <div
+                      className={`flex items-center justify-center px-4 text-center text-xs text-[#cbbbe2] ${
+                        orientation === "landscape_16_9"
+                          ? LANDSCAPE_PREVIEW_FRAME
+                          : PORTRAIT_PREVIEW_FRAME
+                      }`}
+                    >
                       Нет видеофона {meta.ratioLabel}
                     </div>
                   )}
@@ -916,7 +934,7 @@ export function AuthorProductVideoExport({
                     void uploadBackground(orientation, event)
                   }
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex min-h-10 flex-wrap items-center gap-2">
                   <button
                     type="button"
                     disabled={disabled || background.busy}
