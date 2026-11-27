@@ -423,7 +423,7 @@ function main() {
   assertRemoteRecoverScriptSyntax(workflowText);
   assertStudioRecoverHelper();
   assertDiskStorageAudit(workflowText, docsText);
-  assertRemoteDiskAuditScriptSyntax(workflowText);
+  assertRemoteDiskAuditScriptSyntax();
   assertDiskAuditHelper();
   assertDiskStorageCleanup(workflowText, docsText);
   assertRemoteDiskCleanupScriptSyntax(workflowText);
@@ -1118,24 +1118,22 @@ function extractRemoteDiskAuditScript(workflowText) {
 function assertDiskStorageAudit(workflowText, docsText) {
   const required = [
     "OPS_DISK_STORAGE_AUDIT",
+    "OPS_DISK_STORAGE_AUDIT_END=ok",
+    "Fetch trusted origin/main helper",
+    "DISK_AUDIT_HELPER",
+    "audiolad-disk-storage-audit.sh",
+    "grep -F -q \"OPS_DISK_STORAGE_AUDIT_END=ok\"",
+  ];
+  const helperNeedles = [
     "DISK BEFORE =",
     "LARGEST DIRECTORIES =",
-    "TEST/ORPHAN FILES FOUND =",
-    "OLD RELEASES FOUND =",
+    "FILESYSTEM ROOTS",
     "SAFE TO DELETE =",
-    "ESTIMATED SPACE RECOVERY =",
-    "CUTOVER = NO",
-    "audiolad_deploy = NOT_INVOKED",
-    "MODE = read_only_audit",
-    "du -xh --max-depth=2",
-    "6aa9fd82",
-    "synth_3h",
-    "synth_3h_le10800",
-    "studio-draft-assets",
-    "studio-renders",
+    "OPS_DISK_STORAGE_AUDIT_END=ok",
+    "du_largest_subdirs",
+    "invoke_privileged_disk_audit",
     "loadEnvConfig(dir, false, silent, true)",
     "CUTOVER=NO",
-    "audiolad_deploy=NOT_INVOKED",
   ];
   for (const needle of required) {
     assert.match(
@@ -1143,6 +1141,10 @@ function assertDiskStorageAudit(workflowText, docsText) {
       new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
       `disk audit workflow must contain ${needle}`,
     );
+  }
+  const helperText = readFileSync(diskAuditPath, "utf8");
+  for (const needle of helperNeedles) {
+    assert.match(helperText, new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `disk audit helper must contain ${needle}`);
   }
 
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
@@ -1173,8 +1175,7 @@ function assertDiskStorageAudit(workflowText, docsText) {
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
   assert.doesNotMatch(auditCode, /\bdeploy\.sh\b/, "audit job must not call deploy.sh");
-  const remoteAudit = extractRemoteDiskAuditScript(workflowText);
-  const remoteAuditCode = remoteAudit
+  const remoteAuditCode = readFileSync(diskAuditPath, "utf8")
     .split("\n")
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
@@ -1199,17 +1200,17 @@ function assertDiskStorageAudit(workflowText, docsText) {
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(auditJob, /<<'REMOTE_DISK_AUDIT'/, "audit must fetch helper, not inline heredoc");
   assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
   assert.match(docsText, /audiolad-disk-storage-audit\.sh/);
 }
 
-function assertRemoteDiskAuditScriptSyntax(workflowText) {
-  const remote = extractRemoteDiskAuditScript(workflowText);
-  const scriptPath = join(tmpdir(), `audiolad-disk-audit-remote-${process.pid}.sh`);
-  writeFileSync(scriptPath, remote);
-  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
-  rmSync(scriptPath, { force: true });
-  assert.equal(syntax.status, 0, `remote disk audit bash -n failed: ${syntax.stderr}`);
+function assertRemoteDiskAuditScriptSyntax() {
+  const syntax = spawnSync("bash", ["-n", diskAuditPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `disk audit helper bash -n failed: ${syntax.stderr}`);
+  const privPath = join(repoRoot, "deploy/scripts/audiolad-disk-storage-audit-privileged.sh");
+  const privSyntax = spawnSync("bash", ["-n", privPath], { encoding: "utf8" });
+  assert.equal(privSyntax.status, 0, `privileged disk audit bash -n failed: ${privSyntax.stderr}`);
 }
 
 function writeDiskAuditFixture(root, { secretUrl, secretKey }) {

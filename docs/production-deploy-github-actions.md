@@ -156,9 +156,18 @@ branch **`main`**. Ослаблять protection нельзя.
 ### Read-only disk/Storage audit (`confirm=OPS_DISK_STORAGE_AUDIT`)
 
 Тот же workflow, но `confirm=OPS_DISK_STORAGE_AUDIT` запускает job
-**Ops disk/Storage audit**: SSH как `deploy`, фиксированная read-only
-последовательность (без deletes, без cutover, без `audiolad-deploy`).
-Печатает размеры/пути: `df` (DISK BEFORE), `du` largest dirs, old
+**Ops disk/Storage audit**: после `resolve` job загружает с GitHub API
+ровно `deploy/scripts/audiolad-disk-storage-audit.sh` с `origin_main_sha`
+(`bash -n`, маркер `OPS_DISK_STORAGE_AUDIT`), затем SSH как `deploy` и
+pipe скрипта на stdin (как `OPS_COURSE_UPGRADE_DIAG`). Job падает, если в
+логе нет `OPS_DISK_STORAGE_AUDIT_END=ok`. Read-only (без deletes, без
+cutover, без `audiolad-deploy`).
+Печатает размеры/пути: `df` (DISK BEFORE), `du` по `/var` `/usr` `/home`
+`/opt` `/tmp` `/var/www`, largest dirs deploy-каталогов, privileged-блок
+через `sudo -n /usr/local/sbin/audiolad-disk-storage-audit-privileged`
+(Docker `system df`, все релизы, aggregate Supabase Storage buckets,
+`lsof` deleted) если установлен sudoers
+`deploy/sudoers/audiolad-disk-storage-audit`; old
 `/var/www/audiolad-deploy/releases/*` (CURRENT / PREVIOUS / CANDIDATE),
 PM2 / nginx / docker log sizes if readable, search for acceptance
 fixtures (`6aa9fd82`, `synth_3h`, `synth_3h_le10800`, ~10802s / 343MiB /
@@ -183,6 +192,16 @@ ESTIMATED SPACE RECOVERY =
 CUTOVER = NO
 audiolad_deploy = NOT_INVOKED
 MODE = read_only_audit
+OPS_DISK_STORAGE_AUDIT_END=ok
+```
+
+**Установка privileged-фрагмента на хост (однократно, root):**
+
+```bash
+install -m 755 deploy/scripts/audiolad-disk-storage-audit-privileged.sh /usr/local/lib/audiolad/
+install -m 755 deploy/sbin/audiolad-disk-storage-audit-privileged /usr/local/sbin/
+install -m 440 deploy/sudoers/audiolad-disk-storage-audit /etc/sudoers.d/audiolad-disk-storage-audit
+visudo -cf /etc/sudoers.d/audiolad-disk-storage-audit
 ```
 
 Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
