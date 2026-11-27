@@ -3994,6 +3994,8 @@ jobs:
               deploy/sbin/audiolad-music-storage-bulk-ops-resume
               deploy/sbin/audiolad-music-storage-bulk-ops-diag
               deploy/sbin/audiolad-music-storage-bulk-ops-trusted-bundle
+              deploy/scripts/audiolad-disk-storage-audit-privileged.sh
+              deploy/sbin/audiolad-disk-storage-audit-privileged
             )
             for rel in "${TRUSTED_PATHS[@]}"; do
               dest="${TRUSTED_STAGING}/${rel}"

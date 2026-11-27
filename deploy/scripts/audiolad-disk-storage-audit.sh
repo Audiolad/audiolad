@@ -181,29 +181,29 @@ docker_bin() {
 }
 
 invoke_privileged_disk_audit() {
-  local err
-  err="$(mktemp)"
-  trap 'rm -f "${err}"' RETURN
+  local err_file
+  err_file="$(mktemp)"
+  trap "rm -f '${err_file}'" RETURN
   if [[ ! -x "${PRIV_AUDIT_SBIN}" ]]; then
     echo "privileged_audit=skipped reason=sbin_missing path=${PRIV_AUDIT_SBIN}"
-    echo "hint=install deploy/scripts/audiolad-disk-storage-audit-privileged.sh to /usr/local/lib/audiolad/ and sudoers deploy/sudoers/audiolad-disk-storage-audit"
+    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main after merge (trusted bundle; does not start migration)"
     return 0
   fi
   section "PRIVILEGED DISK AUDIT"
   set +e
   set +o pipefail
-  if sudo -n "${PRIV_AUDIT_SBIN}" 2>"${err}" | redact_studio_stream; then
+  if sudo -n "${PRIV_AUDIT_SBIN}" 2>"${err_file}" | redact_studio_stream; then
     set -o pipefail
     set -e
     return 0
   fi
   set -o pipefail
   set -e
-  if grep -qiE 'a password is required|not allowed to execute|sorry, user .+ is not allowed' "${err}"; then
+  if grep -qiE 'a password is required|not allowed to execute|sorry, user .+ is not allowed' "${err_file}"; then
     echo "privileged_audit=denied"
-    echo "hint=copy deploy/sudoers/audiolad-disk-storage-audit to /etc/sudoers.d/ on the host"
+    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main to refresh sudoers/bootstrap"
   else
-    sed -E 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' "${err}" | redact_studio_stream || true
+    sed -E 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' "${err_file}" | redact_studio_stream || true
     mark_section_fail "privileged_audit"
   fi
   return 0

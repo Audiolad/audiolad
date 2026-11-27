@@ -87,8 +87,8 @@ is a list-only production disk/Storage audit. It does **not** apply this
 cleanup, does not delete, and does not call `audiolad-deploy`. Operator
 equivalent: `bash deploy/scripts/audiolad-disk-storage-audit.sh`. Optional
 privileged Docker/Supabase/`/root` sizes:
-`deploy/scripts/audiolad-disk-storage-audit-privileged.sh` (see install
-steps in `docs/production-deploy-github-actions.md`).
+`audiolad-disk-storage-audit-privileged` via
+`OPS_MUSIC_STORAGE_BULK_INSTALL` (see `docs/production-deploy-github-actions.md`).
 
 GitHub Actions `confirm=OPS_DISK_STORAGE_CLEANUP` is a separate one-shot
 hardcoded allowlist of the 13 `SAFE TO DELETE` items from audit run

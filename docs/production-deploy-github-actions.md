@@ -167,7 +167,8 @@ cutover, без `audiolad-deploy`).
 через `sudo -n /usr/local/sbin/audiolad-disk-storage-audit-privileged`
 (Docker `system df`, все релизы, aggregate Supabase Storage buckets,
 `lsof` deleted) если установлен sudoers
-`deploy/sudoers/audiolad-disk-storage-audit`; old
+`deploy/sudoers/audiolad-music-storage-bulk` (строка
+`audiolad-disk-storage-audit-privileged`); old
 `/var/www/audiolad-deploy/releases/*` (CURRENT / PREVIOUS / CANDIDATE),
 PM2 / nginx / docker log sizes if readable, search for acceptance
 fixtures (`6aa9fd82`, `synth_3h`, `synth_3h_le10800`, ~10802s / 343MiB /
@@ -195,14 +196,11 @@ MODE = read_only_audit
 OPS_DISK_STORAGE_AUDIT_END=ok
 ```
 
-**Установка privileged-фрагмента на хост (однократно, root):**
-
-```bash
-install -m 755 deploy/scripts/audiolad-disk-storage-audit-privileged.sh /usr/local/lib/audiolad/
-install -m 755 deploy/sbin/audiolad-disk-storage-audit-privileged /usr/local/sbin/
-install -m 440 deploy/sudoers/audiolad-disk-storage-audit /etc/sudoers.d/audiolad-disk-storage-audit
-visudo -cf /etc/sudoers.d/audiolad-disk-storage-audit
-```
+**Установка privileged-фрагмента (без консоли Timeweb):** с branch **`main`** запустить
+`confirm=OPS_MUSIC_STORAGE_BULK_INSTALL` — trusted bundle доставляет
+`audiolad-disk-storage-audit-privileged` + sudoers (строка в
+`audiolad-music-storage-bulk`), затем `sudo-bootstrap`. Это **не** включает
+копирование masters в S3 и не выставляет `AUDIOLAD_MUSIC_STORAGE_BULK=1`.
 
 Локальный/operator эквивалент (workflow его не exec-ит с `/current` — job не
 делает checkout):
