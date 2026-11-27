@@ -272,7 +272,8 @@ audit_disk_before() {
 audit_filesystem_roots() {
   section "FILESYSTEM ROOTS (deploy-readable)"
   local p=""
-  for p in /var /usr /home /opt /tmp /var/www; do
+  GIT_WORKDIR="${GIT_WORKDIR:-/var/www/audiolad}"
+  for p in "${DEPLOY_ROOT}" "${GIT_WORKDIR}" /var/www "${AUDIT_TMP_DIR}" "${AUDIT_LOG_DIR}"; do
     if [[ ! -e "${p}" ]]; then
       echo "missing path=${p}"
       continue
@@ -284,7 +285,7 @@ audit_filesystem_roots() {
     echo "top_path=${p} total=$(du -sh "${p}" 2>/dev/null | awk '{print $1}' || echo blocked)"
     du_largest_subdirs "${p}" 1 25
   done
-  echo "note=/root_sizes_require_privileged_audit"
+  echo "note=host_wide_/var_/root_/opt_/usr_ require_privileged_audit"
 }
 
 audit_largest_directories() {
