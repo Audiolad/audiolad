@@ -1375,7 +1375,26 @@ jobs:
           grep -F -q "OPS_DISK_STORAGE_AUDIT" "${HELPER}"
           grep -F -q "OPS_DISK_STORAGE_AUDIT_END=ok" "${HELPER}"
 
-      - name: Read-only disk/Storage audit via SSH
+      - name: Fetch maintenance helper (disk cleanup candidates)
+        env:
+          ORIGIN_MAIN_SHA: ${{ needs.resolve.outputs.origin_main_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          MAINT_HELPER="$(mktemp)"
+          chmod 0600 "${MAINT_HELPER}"
+          echo "DISK_MAINT_HELPER=${MAINT_HELPER}" >> "${GITHUB_ENV}"
+          curl -fsS \
+            -H "Accept: application/vnd.github.raw+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o "${MAINT_HELPER}" \
+            -- \
+            "https://api.github.com/repos/Audiolad/audiolad/contents/deploy/scripts/audiolad-deploy-maintenance-remote.sh?ref=${ORIGIN_MAIN_SHA}"
+          test -s "${MAINT_HELPER}"
+          bash -n "${MAINT_HELPER}"
+
+      - name: Read-only disk audit + maintenance dry-run via SSH
         env:
           PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
           PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
@@ -1388,11 +1407,15 @@ jobs:
           : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
           : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
           : "${DISK_AUDIT_HELPER:?DISK_AUDIT_HELPER is required}"
+          : "${DISK_MAINT_HELPER:?DISK_MAINT_HELPER is required}"
           test -f "${DISK_AUDIT_HELPER}"
           test -s "${DISK_AUDIT_HELPER}"
+          test -f "${DISK_MAINT_HELPER}"
+          test -s "${DISK_MAINT_HELPER}"
 
           LOG_FILE="$(mktemp)"
           trap 'rm -f "${LOG_FILE}"' EXIT
+          echo "===== OPS_DISK_STORAGE_AUDIT_REMOTE_BEGIN ====="
           ssh \
             -i "${SSH_KEY_FILE}" \
             -o BatchMode=yes \
@@ -1405,6 +1428,25 @@ jobs:
             "bash -s --" "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}" \
             < "${DISK_AUDIT_HELPER}" | tee "${LOG_FILE}"
           grep -F -q "OPS_DISK_STORAGE_AUDIT_END=ok" "${LOG_FILE}"
+          echo "===== OPS_DEPLOY_MAINTENANCE_DRY_RUN_REMOTE_BEGIN ====="
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            "bash -s --" "dry-run" < "${DISK_MAINT_HELPER}" | tee -a "${LOG_FILE}"
+          if ! grep -F -q "OPS_DEPLOY_MAINTENANCE_END=ok" "${LOG_FILE}"; then
+            echo "maintenance_dry_run_missing_end_ok (sudo for audiolad-maintenance.sh may be denied on host)" >&2
+          fi
+          if grep -F -q "OPS_MAINTENANCE_DISK_SNAPSHOT_END=ok" "${LOG_FILE}"; then
+            echo "host_disk_snapshot_present=ok"
+          else
+            echo "host_disk_snapshot_present=missing hint=update /usr/local/lib/audiolad/audiolad-maintenance.sh on host via Production DEPLOY"
+          fi
 
       - name: Remove trusted helper and SSH identity
         if: always()
@@ -1412,6 +1454,9 @@ jobs:
           set -euo pipefail
           if [[ -n "${DISK_AUDIT_HELPER:-}" ]]; then
             rm -f "${DISK_AUDIT_HELPER}"
+          fi
+          if [[ -n "${DISK_MAINT_HELPER:-}" ]]; then
+            rm -f "${DISK_MAINT_HELPER}"
           fi
           if [[ -n "${SSH_DIR:-}" ]]; then
             rm -rf "${SSH_DIR}"
@@ -3994,8 +4039,6 @@ jobs:
               deploy/sbin/audiolad-music-storage-bulk-ops-resume
               deploy/sbin/audiolad-music-storage-bulk-ops-diag
               deploy/sbin/audiolad-music-storage-bulk-ops-trusted-bundle
-              deploy/scripts/audiolad-disk-storage-audit-privileged.sh
-              deploy/sbin/audiolad-disk-storage-audit-privileged
             )
             for rel in "${TRUSTED_PATHS[@]}"; do
               dest="${TRUSTED_STAGING}/${rel}"
