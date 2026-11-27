@@ -5258,22 +5258,6 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
-        {!businessOnly && !isCourse ? (
-          <AuthorProductVideoExport
-            practiceId={practiceId || null}
-            audioItems={audioItems}
-            getPracticeId={getPracticeIdForCoverUpload}
-            disabled={!canMutateContent || busy}
-            disabledReason={
-              !canMutateContent
-                ? "Создание видео недоступно: для этого проекта запрещено изменение материалов."
-                : busy
-                  ? "Дождитесь завершения текущего сохранения."
-                  : null
-            }
-          />
-        ) : null}
-
         {isProductGalleryEligible(form.publicationClass, form.productKind) &&
         (!businessOnly || (initialProduct?.gallery_slides?.length ?? 0) > 0) ? (
           <AuthorProductGallery
@@ -6368,6 +6352,22 @@ export default function AuthorProductForm({
           ) : null}
         </div>
       </section>
+      ) : null}
+
+      {showWizardStep(2) && !businessOnly && !isCourse ? (
+        <AuthorProductVideoExport
+          practiceId={practiceId || null}
+          audioItems={audioItems}
+          getPracticeId={getPracticeIdForCoverUpload}
+          disabled={!canMutateContent || busy}
+          disabledReason={
+            !canMutateContent
+              ? "Создание видео недоступно: для этого проекта запрещено изменение материалов."
+              : busy
+                ? "Дождитесь завершения текущего сохранения."
+                : null
+          }
+        />
       ) : null}
 
       {showWizardStep(3) && !hideOpenCatalogFields ? (
