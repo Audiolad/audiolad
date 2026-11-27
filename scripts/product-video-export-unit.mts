@@ -160,7 +160,24 @@ assert.equal(PRODUCT_VIDEO_X264_PRESET, "veryfast");
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /AuthorProductVideoExport/);
-assert.match(form, /!businessOnly && !isCourse \? \(\s*<AuthorProductVideoExport/);
+assert.match(
+  form,
+  /showWizardStep\(2\) && !businessOnly && !isCourse \? \(\s*<AuthorProductVideoExport/,
+);
+assert.ok(
+  form.indexOf("Добавить аудио") < form.indexOf("<AuthorProductVideoExport"),
+  "video export follows track upload UI in AuthorProductForm",
+);
+assert.ok(
+  form.indexOf("<AuthorProductVideoExport") <
+    form.indexOf("<JazzRelaxMusicPassportPanel"),
+  "video export precedes music passport panel in AuthorProductForm",
+);
+assert.equal(
+  (form.match(/<AuthorProductVideoExport/g) ?? []).length,
+  1,
+  "single AuthorProductVideoExport mount",
+);
 const availableExportHtml = renderToStaticMarkup(
   createElement(AuthorProductVideoExport, {
     practiceId: null,
