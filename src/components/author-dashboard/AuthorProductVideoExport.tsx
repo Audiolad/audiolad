@@ -762,7 +762,7 @@ export function AuthorProductVideoExport({
 
   return (
     <section
-      className="mt-5 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]"
+      className="mt-5 mb-6 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]"
       data-author-product-video-export="true"
     >
       <button
