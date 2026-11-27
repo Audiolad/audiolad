@@ -12,3 +12,4 @@ deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-diag
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-music-storage-bulk-ops-trusted-bundle ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance.sh --dry-run ""
 deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-maintenance.sh --apply ""
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-disk-storage-audit-privileged ""

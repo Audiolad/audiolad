@@ -74,6 +74,10 @@ install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-b
   "${LIB_DIR}/audiolad-music-storage-bulk-ops-privileged-diag.sh"
 install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-music-storage-bulk-ops-privileged-trusted-bundle.sh" \
   "${LIB_DIR}/audiolad-music-storage-bulk-ops-privileged-trusted-bundle.sh"
+  if [[ -f "${DEPLOY_TREE}/scripts/audiolad-disk-storage-audit-privileged.sh" ]]; then
+    install -o root -g root -m 0755 "${DEPLOY_TREE}/scripts/audiolad-disk-storage-audit-privileged.sh" \
+      "${LIB_DIR}/audiolad-disk-storage-audit-privileged.sh"
+  fi
 fi
 
 for name in \
@@ -96,6 +100,18 @@ for name in \
     install -o root -g root -m 0755 "$src" "${SBIN_DEST_PREFIX}/usr/local/sbin/${name}"
   fi
 done
+
+disk_sbin="${SBIN_SRC}/audiolad-disk-storage-audit-privileged"
+if [[ -f "$disk_sbin" ]]; then
+  if ! audiolad_music_storage_bulk_validate_regular_file "$disk_sbin"; then
+    exit 1
+  fi
+  if [[ -n "${AUDIOLAD_MUSIC_STORAGE_BULK_TEST_ROOT:-}" ]]; then
+    install -m 0755 "$disk_sbin" "${SBIN_DEST_PREFIX}/usr/local/sbin/audiolad-disk-storage-audit-privileged"
+  else
+    install -o root -g root -m 0755 "$disk_sbin" "${SBIN_DEST_PREFIX}/usr/local/sbin/audiolad-disk-storage-audit-privileged"
+  fi
+fi
 
 mkdir -p "$(dirname "$SUDOERS_DST")"
 if [[ -n "${AUDIOLAD_MUSIC_STORAGE_BULK_TEST_ROOT:-}" ]]; then

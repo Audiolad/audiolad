@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read-only production disk/Storage cleanup AUDIT for operators / GHA
-# confirm=OPS_DISK_STORAGE_AUDIT. Never deletes production paths, never
+# confirm=OPS_DISK_STORAGE_AUDIT (marker for GHA fetch). Never deletes production paths, never
 # invokes audiolad-deploy / deploy.sh, never does nginx or current/previous
 # symlink cutover, never prints env file contents or secret values.
 # Docker exec to supabase-db may fail for deploy — fall back to node
@@ -19,6 +19,8 @@ AUDIT_LOG_DIR="${AUDIT_LOG_DIR:-/var/log}"
 AUDIT_NGINX_LOG_DIR="${AUDIT_NGINX_LOG_DIR:-/var/log/nginx}"
 AUDIT_PM2_LOG_DIR="${AUDIT_PM2_LOG_DIR:-/home/deploy/.pm2/logs}"
 AUDIT_DOCKER_VOLUMES_DIR="${AUDIT_DOCKER_VOLUMES_DIR:-/var/lib/docker/volumes}"
+PRIV_AUDIT_SBIN="${PRIV_AUDIT_SBIN:-/usr/local/sbin/audiolad-disk-storage-audit-privileged}"
+AUDIT_SECTION_FAILED=0
 
 CUTOVER="NO"
 AUDIOLAD_DEPLOY="NOT_INVOKED"
@@ -115,8 +117,10 @@ try_cmd() {
   shift
   section "${label}"
   set +e
+  set +o pipefail
   "$@" 2>&1 | redact_studio_stream
   local code=$?
+  set -o pipefail
   set -e
   if [[ "${code}" -ne 0 ]]; then
     printf 'BLOCKED exit=%s label=%s\n' "${code}" "${label}"
@@ -124,16 +128,85 @@ try_cmd() {
   return 0
 }
 
+# head/tail in a pipeline can SIGPIPE upstream; with pipefail that must not abort the audit.
+run_pipeline() {
+  set +o pipefail
+  "$@" || true
+  set -o pipefail
+}
+
+du_largest_subdirs() {
+  local path="$1"
+  local depth="${2:-1}"
+  local limit="${3:-30}"
+  [[ -e "${path}" && -r "${path}" ]] || return 0
+  run_pipeline du -xh --max-depth="${depth}" "${path}" 2>/dev/null | sort -hr | head -n "${limit}"
+}
+
+mark_section_fail() {
+  printf '%s\n' "AUDIT_SECTION_FAILED=${1}"
+  AUDIT_SECTION_FAILED=1
+}
+
+docker_invoke() {
+  if [[ -n "${AUDIOLAD_DOCKER_BIN:-}" ]]; then
+    "${AUDIOLAD_DOCKER_BIN}" "$@"
+    return $?
+  fi
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker "$@"
+    return $?
+  fi
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+    sudo -n docker "$@"
+    return $?
+  fi
+  return 1
+}
+
 docker_bin() {
   if [[ -n "${AUDIOLAD_DOCKER_BIN:-}" ]]; then
     printf '%s\n' "${AUDIOLAD_DOCKER_BIN}"
     return 0
   fi
-  if command -v docker >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     printf '%s\n' "docker"
     return 0
   fi
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+    printf '%s\n' "sudo_docker"
+    return 0
+  fi
   return 1
+}
+
+invoke_privileged_disk_audit() {
+  local err_file
+  err_file="$(mktemp)"
+  trap "rm -f '${err_file}'" RETURN
+  if [[ ! -x "${PRIV_AUDIT_SBIN}" ]]; then
+    echo "privileged_audit=skipped reason=sbin_missing path=${PRIV_AUDIT_SBIN}"
+    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main after merge (trusted bundle; does not start migration)"
+    return 0
+  fi
+  section "PRIVILEGED DISK AUDIT"
+  set +e
+  set +o pipefail
+  if sudo -n "${PRIV_AUDIT_SBIN}" 2>"${err_file}" | redact_studio_stream; then
+    set -o pipefail
+    set -e
+    return 0
+  fi
+  set -o pipefail
+  set -e
+  if grep -qiE 'a password is required|not allowed to execute|sorry, user .+ is not allowed' "${err_file}"; then
+    echo "privileged_audit=denied"
+    echo "hint=run OPS_MUSIC_STORAGE_BULK_INSTALL from main to refresh sudoers/bootstrap"
+  else
+    sed -E 's/(SUPABASE_SERVICE_ROLE_KEY=).*/\1***/g' "${err_file}" | redact_studio_stream || true
+    mark_section_fail "privileged_audit"
+  fi
+  return 0
 }
 
 is_proven_test_blob() {
@@ -172,25 +245,47 @@ audit_disk_before() {
     echo ">>findmnt"
   fi
   set +e
+  set +o pipefail
   if docker_bin >/dev/null; then
     echo "docker_system_df<<"
-    "$(docker_bin)" system df 2>&1 | redact_studio_stream
+    docker_invoke system df 2>&1 | redact_studio_stream | head -n 60 || echo "docker_system_df_blocked"
     echo ">>docker_system_df"
     echo "docker_volume_ls<<"
-    "$(docker_bin)" volume ls 2>&1 | redact_studio_stream
+    docker_invoke volume ls 2>&1 | redact_studio_stream | head -n 40 || echo "docker_volume_ls_blocked"
     echo ">>docker_volume_ls"
   else
     echo "docker_unreadable_or_missing"
+    echo "hint=use_privileged_audit_for_docker"
   fi
+  set -o pipefail
   set -e
   if [[ -d "${AUDIT_DOCKER_VOLUMES_DIR}" ]]; then
     if [[ -r "${AUDIT_DOCKER_VOLUMES_DIR}" ]]; then
       echo "docker_volumes_dir=${AUDIT_DOCKER_VOLUMES_DIR}"
-      du -xh --max-depth=1 "${AUDIT_DOCKER_VOLUMES_DIR}" 2>/dev/null | sort -h | tail -n 20 || echo "docker_volumes_du_blocked"
+      run_pipeline du -xh --max-depth=1 "${AUDIT_DOCKER_VOLUMES_DIR}" 2>/dev/null | sort -hr | head -n 20
     else
       echo "docker_volumes_dir_unreadable path=${AUDIT_DOCKER_VOLUMES_DIR}"
     fi
   fi
+}
+
+audit_filesystem_roots() {
+  section "FILESYSTEM ROOTS (deploy-readable)"
+  local p=""
+  GIT_WORKDIR="${GIT_WORKDIR:-/var/www/audiolad}"
+  for p in "${DEPLOY_ROOT}" "${GIT_WORKDIR}" /var/www "${AUDIT_TMP_DIR}" "${AUDIT_LOG_DIR}"; do
+    if [[ ! -e "${p}" ]]; then
+      echo "missing path=${p}"
+      continue
+    fi
+    if [[ ! -r "${p}" ]]; then
+      echo "unreadable path=${p} note=see_privileged_audit"
+      continue
+    fi
+    echo "top_path=${p} total=$(du -sh "${p}" 2>/dev/null | awk '{print $1}' || echo blocked)"
+    du_largest_subdirs "${p}" 1 25
+  done
+  echo "note=host_wide_/var_/root_/opt_/usr_ require_privileged_audit"
 }
 
 audit_largest_directories() {
@@ -220,10 +315,8 @@ audit_largest_directories() {
       echo "unreadable path=${path}"
       continue
     fi
-    echo "du path=${path}"
-    set +e
-    out="$(du -xh --max-depth=2 "${path}" 2>/dev/null | sort -h | tail -n 40)"
-    set -e
+    echo "du path=${path} total=$(du -sh "${path}" 2>/dev/null | awk '{print $1}' || echo blocked)"
+    out="$(du_largest_subdirs "${path}" 2 40)"
     if [[ -n "${out}" ]]; then
       printf '%s\n' "${out}"
       LARGEST_DIRS_TEXT+="${out}"$'\n'
@@ -231,6 +324,11 @@ audit_largest_directories() {
       echo "du_blocked path=${path}"
     fi
   done
+  if [[ -d "${RELEASES_DIR}" && -r "${RELEASES_DIR}" ]]; then
+    echo "releases_dir_top<<"
+    du_largest_subdirs "${RELEASES_DIR}" 1 50
+    echo ">>releases_dir_top"
+  fi
   echo "studio_ffmpeg_temp_globs<<"
   set +e
   ls -ld "${AUDIT_TMP_DIR}"/audiolad-studio-* 2>/dev/null | redact_studio_stream
@@ -258,14 +356,19 @@ audit_log_sizes() {
       continue
     fi
     echo "log_path=${path} size=$(du -sh "${path}" 2>/dev/null | awk '{print $1}')"
-    set +e
-    du -xh --max-depth=1 "${path}" 2>/dev/null | sort -h | tail -n 20
-    set -e
+    du_largest_subdirs "${path}" 1 20
   done
   if command -v journalctl >/dev/null 2>&1; then
     set +e
+    set +o pipefail
     journalctl --disk-usage 2>&1 | redact_studio_stream
+    set -o pipefail
     set -e
+  fi
+  if [[ -r /var/log ]]; then
+    echo "var_log_largest<<"
+    du_largest_subdirs /var/log 1 20
+    echo ">>var_log_largest"
   fi
 }
 
@@ -731,8 +834,10 @@ run_disk_storage_audit() {
   fi
 
   audit_disk_before
+  audit_filesystem_roots
   audit_largest_directories
   audit_log_sizes
+  invoke_privileged_disk_audit
   audit_old_releases
   audit_disk_test_orphans
   audit_db_and_storage
@@ -756,9 +861,16 @@ run_disk_storage_audit() {
 
   section "DISK_STORAGE_AUDIT_END"
   print_final_flags
+  if (( AUDIT_SECTION_FAILED )); then
+    echo "OPS_DISK_STORAGE_AUDIT_END=incomplete"
+    return 1
+  fi
+  echo "OPS_DISK_STORAGE_AUDIT_END=ok"
   return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  TARGET_SHA="${1:-}"
+  ORIGIN_MAIN_SHA="${2:-}"
   run_disk_storage_audit
 fi
