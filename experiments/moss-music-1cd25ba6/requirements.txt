@@ -1,0 +1,18 @@
+# Пины для setup.sh. Torch ставится с индексом cu128, не с PyPI.
+# transformers зафиксирован на 4.57.1: на этой версии собран чекпоинт
+# (config.transformers_version) и ранее уже читались эти веса.
+torch==2.9.1+cu128
+torchaudio==2.9.1+cu128
+transformers==4.57.1
+tokenizers==0.22.1
+accelerate==1.10.1
+huggingface_hub==0.36.0
+safetensors==0.6.2
+numpy==2.2.6
+soundfile==0.13.1
+scipy==1.15.3
+einops==0.8.1
+tiktoken==0.12.0
+tqdm==4.67.1
+packaging==25.0
+requests==2.32.5
