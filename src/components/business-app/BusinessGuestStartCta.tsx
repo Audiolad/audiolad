@@ -9,6 +9,7 @@ import { BUSINESS_OFFER_EDITION } from "@/lib/business/offer";
 import { BUSINESS_OFFER_LINK_ATTR, BusinessOfferDocumentLink } from "./BusinessOfferDocumentLink";
 import { BusinessPrivacyDocumentLink } from "./BusinessPrivacyDocumentLink";
 import { BUSINESS_ATTRIBUTION_STORAGE_KEY, parseStoredBusinessAttribution } from "@/lib/business-trial-attribution/attribution";
+import { sendYandexGoal } from "@/lib/analytics/yandex-metrika";
 
 /**
  * The owner home after a start stays in this tab without a reload (router.push), so the guest
@@ -39,10 +40,10 @@ export function BusinessGuestIncludedServices({ className }: { className?: strin
 
 /** Disabled flag preserves the original anchor, including its classes and test id. */
 export default function BusinessGuestStartCta({
-  href, className, children, testId, enabledLabel, showIncludedServices = false,
+  href, className, children, testId, enabledLabel, showIncludedServices = false, trackTrialFunnel = false,
 }: {
   href: string; className?: string; children: ReactNode; testId: string; enabledLabel?: string;
-  showIncludedServices?: boolean;
+  showIncludedServices?: boolean; trackTrialFunnel?: boolean;
 }) {
   const enabled = useGuestStartEnabled();
   const attributionEnabled = useAttributionEnabled();
@@ -58,6 +59,7 @@ export default function BusinessGuestStartCta({
   async function start() {
     if (!accepted || busy.current) return;
     busy.current = true;
+    if (trackTrialFunnel && !error) sendYandexGoal("business_trial_start_clicked");
     setLoading(true);
     setError(null);
     let navigating = false;
@@ -97,7 +99,10 @@ export default function BusinessGuestStartCta({
   }
 
   return <div data-testid={`${testId}-guest-start`}>
-    <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => setOpen(!open)}>{enabledLabel ?? children}</button>
+    <button type="button" className={className} data-testid={testId} data-vk-gift-interest aria-expanded={open} onClick={() => {
+      if (trackTrialFunnel && !open) sendYandexGoal("business_trial_offer_clicked");
+      setOpen(!open);
+    }}>{enabledLabel ?? children}</button>
     {open ? <div className="space-y-3 py-3" data-testid={`${testId}-confirmation`}>
       <p>{copy.terms}</p>
       {showIncludedServices ? <BusinessGuestIncludedServices /> : null}

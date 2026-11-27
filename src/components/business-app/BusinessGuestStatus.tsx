@@ -97,6 +97,7 @@ export function BusinessGuestStatusBar() {
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
             testId="biz-guest-register"
             enabledLabel={BUSINESS_GIFT_CTA}
+            trackTrialFunnel
           >
             {GUEST_COFFEE_COPY.exhaustedRegister}
           </BusinessGuestStartCta>
@@ -105,6 +106,7 @@ export function BusinessGuestStatusBar() {
             href={businessAuthHref(hostname, "sign-up", true)}
             className="business-app-btn business-app-btn-cta business-app-focus-ring"
             testId="biz-trial-cta"
+            trackTrialFunnel
           >
             {BUSINESS_GIFT_CTA}
           </BusinessGuestStartCta>
