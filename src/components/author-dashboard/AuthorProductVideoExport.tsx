@@ -96,11 +96,16 @@ function readProgressPercent(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Fixed-height preview well so 16:9 and 9:16 columns share row baselines on lg grid. */
-const ORIENTATION_PREVIEW_SLOT =
-  "mt-3 flex h-48 w-full items-center justify-center overflow-hidden rounded-[16px] border border-[#d9c9ef]";
-const LANDSCAPE_PREVIEW_FRAME = "aspect-video h-full max-h-full w-auto max-w-full";
-const PORTRAIT_PREVIEW_FRAME = "aspect-[9/16] h-full max-h-full w-auto";
+/** Centers aspect-correct frames so control rows stay aligned across lg columns. */
+const ORIENTATION_PREVIEW_STAGE =
+  "mt-3 flex min-h-48 w-full items-center justify-center";
+const ORIENTATION_PREVIEW_FRAME: Record<ProductVideoOrientation, string> = {
+  landscape_16_9:
+    "aspect-video w-full overflow-hidden rounded-[16px] border border-[#d9c9ef]",
+  portrait_9_16:
+    "aspect-[9/16] h-48 w-auto max-w-full overflow-hidden rounded-[16px] border border-[#d9c9ef]",
+};
+const ORIENTATION_PREVIEW_MEDIA = "h-full w-full object-cover";
 
 function VideoPlatformChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -825,26 +830,18 @@ export function AuthorProductVideoExport({
                 type="button"
                 disabled={disabled || cover.busy}
                 onClick={() => inputRef.current?.click()}
-                className={`group ${ORIENTATION_PREVIEW_SLOT} bg-[#f8f4fc] disabled:opacity-60`}
+                className={`group ${ORIENTATION_PREVIEW_STAGE} disabled:opacity-60`}
               >
                 {cover.previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={cover.previewUrl}
                     alt=""
-                    className={`${
-                      orientation === "landscape_16_9"
-                        ? LANDSCAPE_PREVIEW_FRAME
-                        : PORTRAIT_PREVIEW_FRAME
-                    } object-cover`}
+                    className={`${ORIENTATION_PREVIEW_FRAME[orientation]} ${ORIENTATION_PREVIEW_MEDIA} bg-[#f8f4fc]`}
                   />
                 ) : (
                   <span
-                    className={`flex items-center justify-center px-4 text-center text-xs text-[#8c79b6] ${
-                      orientation === "landscape_16_9"
-                        ? LANDSCAPE_PREVIEW_FRAME
-                        : PORTRAIT_PREVIEW_FRAME
-                    }`}
+                    className={`flex items-center justify-center bg-[#f8f4fc] px-4 text-center text-xs text-[#8c79b6] ${ORIENTATION_PREVIEW_FRAME[orientation]}`}
                   >
                     Нет обложки {meta.ratioLabel}
                   </span>
@@ -894,9 +891,7 @@ export function AuthorProductVideoExport({
                 <p className="text-sm font-medium text-[#3f3560]">
                   Видеофон {meta.ratioLabel}
                 </p>
-                <div
-                  className={`${ORIENTATION_PREVIEW_SLOT} bg-[#181228]`}
-                >
+                <div className={ORIENTATION_PREVIEW_STAGE}>
                   {background.previewUrl ? (
                     <video
                       src={background.previewUrl}
@@ -906,19 +901,11 @@ export function AuthorProductVideoExport({
                       loop
                       playsInline
                       preload="metadata"
-                      className={`${
-                        orientation === "landscape_16_9"
-                          ? LANDSCAPE_PREVIEW_FRAME
-                          : PORTRAIT_PREVIEW_FRAME
-                      } object-cover`}
+                      className={`${ORIENTATION_PREVIEW_FRAME[orientation]} ${ORIENTATION_PREVIEW_MEDIA} bg-[#181228]`}
                     />
                   ) : (
                     <div
-                      className={`flex items-center justify-center px-4 text-center text-xs text-[#cbbbe2] ${
-                        orientation === "landscape_16_9"
-                          ? LANDSCAPE_PREVIEW_FRAME
-                          : PORTRAIT_PREVIEW_FRAME
-                      }`}
+                      className={`flex items-center justify-center bg-[#181228] px-4 text-center text-xs text-[#cbbbe2] ${ORIENTATION_PREVIEW_FRAME[orientation]}`}
                     >
                       Нет видеофона {meta.ratioLabel}
                     </div>
