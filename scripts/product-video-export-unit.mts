@@ -133,6 +133,14 @@ assert.match(ui, /hidden=\{!expanded\}/);
 assert.match(ui, /inert=\{!expanded\}/);
 assert.match(ui, /text-\[#7042c5\]/, "purple title on collapsed bar");
 assert.match(ui, /border border-\[#eadff8\] bg-\[#fcfbfe\]/);
+assert.match(ui, /lg:items-stretch/, "orientation columns stretch for row alignment");
+assert.match(
+  ui,
+  /ORIENTATION_PREVIEW_SLOT/,
+  "shared fixed-height preview wells for 16:9 and 9:16",
+);
+assert.match(ui, /flex h-48 w-full items-center justify-center/);
+assert.match(ui, /flex min-h-10 flex-wrap items-center gap-2/);
 assert.match(ui, /Создать MP4 из аудио/);
 assert.match(ui, /Скачать MP4/);
 assert.match(ui, /Создать заново/);
