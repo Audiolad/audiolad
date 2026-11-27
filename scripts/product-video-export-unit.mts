@@ -136,10 +136,13 @@ assert.match(ui, /border border-\[#eadff8\] bg-\[#fcfbfe\]/);
 assert.match(ui, /lg:items-stretch/, "orientation columns stretch for row alignment");
 assert.match(
   ui,
-  /ORIENTATION_PREVIEW_SLOT/,
-  "shared fixed-height preview wells for 16:9 and 9:16",
+  /ORIENTATION_PREVIEW_STAGE/,
+  "shared preview stage min-height for row alignment",
 );
-assert.match(ui, /flex h-48 w-full items-center justify-center/);
+assert.match(ui, /ORIENTATION_PREVIEW_FRAME/);
+assert.match(ui, /flex min-h-48 w-full items-center justify-center/);
+assert.match(ui, /aspect-video w-full overflow-hidden/);
+assert.match(ui, /aspect-\[9\/16\] h-48 w-auto/);
 assert.match(ui, /flex min-h-10 flex-wrap items-center gap-2/);
 assert.match(ui, /Создать MP4 из аудио/);
 assert.match(ui, /Скачать MP4/);
